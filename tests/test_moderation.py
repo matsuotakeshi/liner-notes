@@ -93,7 +93,7 @@ def run(binary):
             print('PASS: explicit admin bootstrap, worker-side authority, board ACLs and read-only-board moderation')
             print('PASS: hidden content excluded from READ/LIST/NOTES/TREE/navigation/unread; children and IDs preserved')
             print('PASS: draft commit rechecks hidden parent; admin-only inspection and idempotent hide')
-        finally: a.close(); b.close(); g.close(); s.close(crash=True)
+        finally: s.close(crash=True); a.close(); b.close(); g.close()
         assert data.read_bytes()==before
         s=Server(binary,data,members=users,catalog=catalog,admins=admins); a,b=Client(s.port),Client(s.port)
         try:

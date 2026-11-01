@@ -108,7 +108,7 @@ def run(binary):
             expect(m,'SUSPEND 2','SUSPENDED 2')
             expect(a,'PROFILE bob','ERR profile unavailable');assert all(b'bob' not in x for x in page(a,'PROFILES')[1])
             expect(m,'RESUME 2','RESUMED 2')
-        finally:a.close();b.close();m.close();g.close();s.close(crash=True)
+        finally:s.close(crash=True);a.close();b.close();m.close();g.close()
         original=extra.read_bytes();assert original.startswith(b'RTEXTRA1') and (len(original)-8)%512==0
         print('PASS: author withdrawal confirmation/ownership, preserved replies, no visibility/search/unread leaks, author/admin title edits and durable journal')
         print('PASS: cross-board and exact-author search, ACL/hidden exclusion, bounded result pages, sequential reading without marking, INFO and member profiles')

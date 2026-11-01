@@ -71,7 +71,7 @@ def run(binary):
                 list(pool.map(shared,[2,3]))
             assert 2 not in unread(a) and 3 not in unread(a)
             print('PASS: two connections of same account merge read acknowledgements')
-        finally: a.close(); b.close(); s.close(crash=True)
+        finally: s.close(crash=True); a.close(); b.close()
         assert PASSWORD.encode() not in members.read_bytes()
         account=members.read_bytes()[8:136]
         assert hashlib.pbkdf2_hmac('sha256',PASSWORD.encode(),account[40:56],600000)==account[56:88]

@@ -76,8 +76,8 @@ def run(binary):
             print('PASS: all logged-in sessions including drafts/timers close; immediate resume does not revive them')
             print('PASS: new login required after resume; suspension does not delete posts or read state')
         finally:
-            for client in [a,b,c,t,g]: client.close()
             s.close(crash=True)
+            for client in [a,b,c,t,g]: client.close()
         snapshot=board.read_bytes(); assert snapshot.startswith(original_board)
         assert users.read_bytes()==original_users  # Suspension has a separate audit journal.
         s=Server(binary,board,members=users,admins=admins); a,b=Client(s.port),Client(s.port)

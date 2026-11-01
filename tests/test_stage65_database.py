@@ -26,7 +26,7 @@ def run(binary,ctl):
     assert b'mail-body' in rows(a,'MAIL READ 1',b'MAIL END')
    finally:a.close();s.close()
   # Journal append followed by a crash cannot reuse the prior cache.
-  s=start();a=Client(s.port);auth(a,'alice');assert post(a,'after checkpoint','crash safe')==141;a.close();s.close(crash=True)
+  s=start();a=Client(s.port);auth(a,'alice');assert post(a,'after checkpoint','crash safe')==141;s.close(crash=True);a.close()
   s=start();a=Client(s.port)
   try:auth(a,'alice');assert read(a,141)[2]=='crash safe\r\n'
   finally:a.close();s.close()

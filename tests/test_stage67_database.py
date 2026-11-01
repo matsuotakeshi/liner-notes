@@ -35,7 +35,7 @@ def run(binary):
    assert b'MACHINE FreeBSD' in rows(c,'PROFILE',b'END PROFILE')
    second=subprocess.run([binary,*options,'0',str(board),str(members)],capture_output=True,timeout=5)
    assert second.returncode!=0 and b'database:' in second.stderr,second.stderr
-  finally:c.close();s.close(crash=True)
+  finally:s.close(crash=True);c.close()
   assert all(hashlib.sha256(q.read_bytes()).hexdigest()==value for q,value in originals.items())
   with sqlite3.connect(database) as db:
    assert db.execute('pragma integrity_check').fetchone()==('ok',)

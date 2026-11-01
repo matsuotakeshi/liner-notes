@@ -28,6 +28,6 @@ runuser -u bbstest -- bash -c '
     cat /home/bbstest/lrzsz-check/build.txt
     exit 1
   fi
-  make CC=clang PYTHON=python3.11 SQLITE_CFLAGS= SQLITE_LIBS=-lsqlite3 test test-stage65 test-stage70 test-stage71
   make CC=clang PYTHON=python3.11 SQLITE_CFLAGS= SQLITE_LIBS=-lsqlite3 test-zmodem LRZ=/home/bbstest/lrzsz-check/local/bin/lrz LSZ=/home/bbstest/lrzsz-check/local/bin/lsz
+  make CC=clang PYTHON=python3.11 SQLITE_CFLAGS= SQLITE_LIBS=-lsqlite3 test test-stage65 test-stage70 test-stage71
 '

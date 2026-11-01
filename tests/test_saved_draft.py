@@ -37,7 +37,7 @@ def run(binary):
             expect(b,'RESUME','DRAFT RESUMED'); assert preview(b)[2].endswith(b'newer\r\n'); expect(b,'/CANCEL','CANCELLED')
             auth(g,'bob'); expect(g,'DRAFT','DRAFT NONE'); expect(g,'DRAFT DELETE 2','ERR draft conflict')
             expect(a,'/CANCEL','CANCELLED'); assert unread(a)==before
-        finally: a.close(); b.close(); g.close(); s.close(crash=True)
+        finally: s.close(crash=True); a.close(); b.close(); g.close()
         raw=users.read_bytes(); snapshot=board.read_bytes()
         assert len([r for _,r in records(raw) if r[0]==ord('D')])==2
         print('PASS: member/board isolation, save/resume, UTF-8 and escape, stale-session conflict, exact revision delete and unchanged unread state')
