@@ -1,0 +1,3 @@
+#!/bin/sh
+# Compatibility command name.
+exec "%%PREFIX%%/bin/liner-notes-admin" "$@"

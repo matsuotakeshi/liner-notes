@@ -1,0 +1,4 @@
+#!/bin/sh
+# Offline maintenance: stop the service and transfer workers before use.
+export LINER_NOTES_TOOLS_DIR="%%PREFIX%%/bin"
+exec "%%PYTHON_CMD%%" -B "%%DATADIR%%/scripts/maintenance.py" "$@"

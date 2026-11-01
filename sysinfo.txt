@@ -1,0 +1,2 @@
+Liner notes Bulletin Board System
+HELPで操作案内を表示します。 / Use HELP for commands.

@@ -1,0 +1,14 @@
+掲示板の管理
+BOARDINFO 番号 / BOARDSET 番号|親番号|閲覧|投稿|題名|説明
+BOARDOPTIONS 番号 BOARD|MENU 順序 記事件数 本文バイト数 ログ件数
+BOARDPASS 番号 / BOARDPASS 番号 NONE CONFIRM / INFOEDIT 番号
+SIGOP ボード番号 会員番号|NONE / SIGOPS
+SIGOPGROUP ボード番号 グループ番号: 担当グループの管理を委任
+BOARDGROUP ボード番号 旧グループ 新グループ CONFIRM: ACLと所属をまとめて移行
+BOARDGUEST ボード番号 ON|OFF
+WITHDRAW 記事番号 CONFIRM: 本人・全体管理者・親を含む担当SIGOPが取り消し
+HIDE / RESTORE / INSPECT 記事番号: 非表示・復元・確認（取り消しとは別）
+RETITLE 記事番号 題名 / AUTHOR 記事番号 会員番号 CONFIRM
+MOVE ベース番号 移動先番号 CONFIRM / MOVEBRANCH 記事番号 移動先番号 CONFIRM
+BOARDDELETE 番号 CONFIRM: 空ボード / BOARDDELETEALL 番号 CASCADE CONFIRM: 配下も削除
+BOARDLOG: 設定変更 / BOARDACCESS 番号: 閲覧・投稿 / AUDIT ARTICLE 記事番号: 記事操作

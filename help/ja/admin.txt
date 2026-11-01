@@ -1,0 +1,6 @@
+管理メニュー
+$ で管理メニューを開き、1～5で目的別の案内を選びます。
+1 会員・申請 / 2 掲示板 / 3 保管庫 / 4 接続・告知 / 5 履歴・保守
+HELP ADMINMEMBERS / ADMINBOARDS / ADMINFILES / ADMINCONNECTIONS / ADMINSTORAGE
+管理操作は対象番号やCONFIRMを確認して実行してください。
+SIGOPの操作範囲はHELP SIGOPにまとめています。

@@ -1,0 +1,10 @@
+python3 tests/test_stage71.py ./runtime
+PASS repeatable receipt creation/reuse/backup/atomic failure/symlink and non-mutating asset check
+PASS spool detail, explicit lost-ID binding, status reconciliation, preview, endpoint isolation and confirmed-only cleanup
+PASS structured profile/history rows, logical export/replay, reader S privacy and unchanged read position
+python3 tests/test_stage70.py ./runtime
+PASS stage70 structured DB/restart/crash/logical backup, persistent editor/protocol, hourly fallback, spool preview/locks/publication/symlink safety
+python3 tests/test_stage70_gather.py ./runtime
+PASS Gather oldest-first retained messages, maximum 70 characters/10 lines, skip-to-compose and read-only exit
+python3 tests/test_transfer_timeouts.py
+PASS common idle timeout: active process send and legacy receive exceed total timeout; stalled peers fail TIMEOUT

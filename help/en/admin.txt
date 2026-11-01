@@ -1,0 +1,5 @@
+Administration
+$ opens the administration menu. Choose 1..5 by task; 0 returns.
+1 Members / 2 Boards / 3 Vault / 4 Connections / 5 History and maintenance
+HELP ADMINMEMBERS / ADMINBOARDS / ADMINFILES / ADMINCONNECTIONS / ADMINSTORAGE
+Operations still require the stated target and confirmation. See HELP SIGOP for delegated scope.

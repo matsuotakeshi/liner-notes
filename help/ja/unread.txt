@@ -1,0 +1,12 @@
+既読・未読と新着巡回
+UNREAD: このボードの未読一覧。NEW: 次の未読記事。
+SEEN: 選択記事を既読にする。UNSEEN 番号: 未読へ戻す。
+NEW スレッド番号: 指定スレッドの未読。NOTES UNREAD: 未読スレッド一覧。
+NEXTBOARD: 他の未読ボードへ。閲覧だけでは既読にしません。
+旧Liner notesのU/F/S/A/K/J短縮キーは使用しません。
+CHECK ARTICLES / MAIL / FILES: 種類別の前回確認日時から巡回。
+CHECK NEXTで続き。MANUALでは最後にCHECK DONEで今回の開始日時を保存。
+CHECK CANCELや切断では確認日時を更新しません。
+
+stage67: メニューでは最後の結果の表示完了後、確認開始日時を自動保存。途中のページをQで閉じる、CHECK CANCEL、切断では更新しません。
+CHECK ARTICLES HERE|SUBTREE|ALL / CHECK FILES パス: 範囲別に確認日時を保存。CHECKMODE MANUALはCHECK DONEで確定する方式、AUTOは自動。機械向けRAW接続の初期値はMANUAL。

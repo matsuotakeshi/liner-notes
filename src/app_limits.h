@@ -1,0 +1,7 @@
+#ifndef APP_LIMITS_H
+#define APP_LIMITS_H
+#define MEMBER_MAX 999999
+#define CONNECTION_MAX 128
+#define INPUT_LINE_MAX 4096
+#define ZMODEM_MAX 24
+#endif

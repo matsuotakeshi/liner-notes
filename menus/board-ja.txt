@@ -1,0 +1,5 @@
+BOARD 掲示板
+ I 案内 / L 記事一覧 / N 新着日付 / T 最新から連続読み
+ E 新規投稿 / R 選択記事へ返信 / F 投稿者抽出
+ 番号: 読む / B ボード一覧 / 0 主メニュー / ? 再表示
+ SEARCH 語句 / TREE / UNREAD / NEW / SEEN / NEXTBOARD

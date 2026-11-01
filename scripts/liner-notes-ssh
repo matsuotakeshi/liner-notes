@@ -1,0 +1,29 @@
+#!/bin/sh
+# FreeBSD OpenSSH/PTY entry point. The BBS remains a single shared process.
+# Usage: ssh -t account@host 'sh /path/scripts/liner-notes-ssh [port]'
+set -eu
+if [ "$#" -gt 1 ]; then
+    printf '%s\n' 'usage: liner-notes-ssh [loopback-port]' >&2
+    exit 2
+fi
+port=${1:-2222}
+case "$port" in
+    ''|*[!0-9]*) printf '%s\n' 'invalid port' >&2; exit 2 ;;
+esac
+# Bound input before shell integer comparisons (also excludes leading-zero forms).
+case "$port" in
+    0*|??????*) printf '%s\n' 'invalid port' >&2; exit 2 ;;
+esac
+if [ "$port" -lt 1 ] || [ "$port" -gt 65535 ]; then
+    printf '%s\n' 'invalid port' >&2; exit 2
+fi
+if [ ! -t 0 ] || [ ! -t 1 ]; then
+    printf '%s\n' 'A terminal is required. Connect with ssh -t.' >&2
+    exit 2
+fi
+if [ ! -x /usr/bin/telnet ]; then
+    printf '%s\n' '/usr/bin/telnet is required on the FreeBSD server.' >&2
+    exit 1
+fi
+# Fixed host, no shell escape, no .telnetrc, no automatic OS-login negotiation.
+exec /usr/bin/telnet -8 -E -c -K 127.0.0.1 "$port"

@@ -1,0 +1,4 @@
+SIGOP board administration
+ 1 Scoped operation guide / 0 Main
+ WITHDRAW / RETITLE / AUTHOR / BOARDINFO / INFOEDIT
+ SIGOPS / GROUP / UNGROUP / HELP SIGOP

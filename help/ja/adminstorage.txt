@@ -1,0 +1,10 @@
+履歴・保守
+AUDIT / AUDIT ARTICLE 記事番号 / AUDIT ACTOR ログイン名
+AUDIT ACTORID 会員番号 / AUDIT REFRESH / AUDIT ALL
+BOARDLOG / BOARDACCESS ボード番号 / FILEAUDIT / FILEHISTORY
++で続き。記事と操作者の絞り込みは併用できます。取り消し・題名・投稿者変更も記録します。
+バックアップ・復元・整理はBBSを停止してOS側のliner-notes-adminで実施します。
+SQLite運用: db-backup / verify / db-restore / db-compact
+旧形式からの移行: db-migrate。旧形式への書き出し: db-export。
+取り消し本文の回収: db-compact --reclaim-withdrawn。元のバックアップは残します。
+全保存領域の整理: --all-stores。詳細と引数はSTAGE67.mdを参照。

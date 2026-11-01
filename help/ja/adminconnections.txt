@@ -1,0 +1,8 @@
+接続・告知・停止
+CONNECTIONS: ゲスト・転送・ゲームを含む接続状態、通信量、無入力時間など
+DISCONNECT 接続番号 CONFIRM: 指定接続を切断
+ANNOUNCE 本文: 接続中のメニュー利用者へ告知
+SHUTDOWN 秒数 理由: 終了予告（1..86400秒）
+SHUTDOWN CANCEL / SHUTDOWN NOW CONFIRM
+チャット内 /KICK ログイン名: チャットの接続を終了
+USERLOG ALL / USERSTATS ALL: 接続履歴と利用集計

@@ -1,0 +1,83 @@
+# Copy the required settings to /etc/rc.conf. Paths must be absolute.
+liner_notes_enable="YES"
+liner_notes_home="/usr/local/libexec/liner-notes"
+liner_notes_run_user="liner_notes"
+liner_notes_data_dir="/var/db/liner_notes"
+liner_notes_bind="127.0.0.1"
+liner_notes_port="2222"
+liner_notes_language="ja"
+
+# Override to retain existing data in a different directory.
+# liner_notes_board="/absolute/path/notes.dat"
+# liner_notes_members="/absolute/path/members.dat"
+# liner_notes_menu_dir="/absolute/path/menus"
+# liner_notes_admins="/absolute/path/admins.conf"
+# liner_notes_catalog="/absolute/path/boards.conf"
+
+# Defaults: /var/run/liner_notes.pid, /var/run/liner_notes.child.pid,
+# /var/log/liner_notes.log. The daemon supervisor owns the PID files and log.
+# liner_notes_pidfile="/var/run/liner_notes.pid"
+# liner_notes_child_pidfile="/var/run/liner_notes.child.pid"
+# liner_notes_logfile="/var/log/liner_notes.log"
+
+# Optional initialized, independent file vault directory:
+# liner_notes_vault_dir="/var/db/liner_notes-vault"
+
+# Optional configured ZMODEM launcher (requires vault_dir and lrzsz):
+# liner_notes_zmodem_helper="/usr/local/libexec/liner-notes/zmodem-helper"
+
+# stage50: open, approval, closed
+liner_notes_registration="open"
+# YES or NO; chat includes private talk
+liner_notes_chat="YES"
+liner_notes_mail="YES"
+liner_notes_vault="YES"
+
+# Stage56: cumulative quotas; 0 means no configured quota.
+liner_notes_max_articles="0"
+liner_notes_max_mail="0"
+liner_notes_max_user_posts="0"
+# Optional UTF-8 banner; missing/empty is allowed.
+liner_notes_banner="/usr/local/libexec/liner-notes/banner.txt"
+
+# Gather: retained messages (0 disables); chat log: blank uses members file + .chatlog, - disables.
+liner_notes_gather_count="16"
+liner_notes_chat_log=""
+
+# Empty: MEMBERS_FILE.userlog (or BOARD_FILE.userlog without members). -: disable.
+liner_notes_user_log=""
+
+# Seconds without input; 0 disables. Transfers use their own timeout.
+liner_notes_idle_seconds="600" # stage60: global admins are exempt
+
+# Stage61: default HELP is home/help; set a complete custom tree if desired.
+# liner_notes_help_dir="/absolute/path/help"
+liner_notes_userlog_keep="1000"
+liner_notes_userlog_public="NO"
+liner_notes_time_warning="60"
+liner_notes_time_grace="30"
+# Seconds per TCP connection at the current level; 0 means unlimited.
+liner_notes_level0_seconds="0"
+liner_notes_level1_seconds="0"
+liner_notes_level2_seconds="0"
+liner_notes_level3_seconds="0"
+liner_notes_level4_seconds="0"
+liner_notes_level5_seconds="0"
+
+# Stage64: free|auto login IDs and simple|detailed application form.
+liner_notes_id_mode="free"
+liner_notes_registration_form="simple"
+
+# Optional native games; leave unset to disable.
+# liner_notes_doors="/usr/local/etc/liner-notes/doors.conf"
+
+# Optional RTBBS member policy; saved private profile settings are retained.
+liner_notes_rtbbs_member_policy="NO"
+liner_notes_id_prefix="u"
+liner_notes_id_digits="6"
+# liner_notes_id_first="sysop"
+liner_notes_login_text_dir="/usr/local/share/liner-notes"
+
+# Optional for a NEW instance only. Existing schema-1 databases are not converted.
+# liner_notes_database="/var/db/liner-notes/liner.sqlite"
+# liner_notes_database_mode="structured"

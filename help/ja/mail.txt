@@ -1,0 +1,29 @@
+会員間メール
+MAILで入ります。L一覧、N新着日付、T最新から連続読み、番号で読む、+続き。
+Eで宛先・題名を入力し本文作成。R 番号で受信メールへ返信。
+K 番号で削除確認。送信者・受信者のいずれも両者から削除できます。
+0で終了。MAIL SEND ログイン名 題名 / MAIL READ 番号 / MAIL REPLY 番号 / MAIL DELETE 番号も使用可能。
+MAIL SENT / MAIL INBOX / MAIL UNREAD で絞り込み。読むと受信者のみ既読になります。
+本文は . で送信、/CANCELで中止。/PREVIEW・行編集に対応。/SAVEで下書きを保存できます。
+ /SAVEで下書き保存・終了。MAIL DRAFTで版番号を確認、MAIL RESUMEで再開、MAIL DRAFT DELETE 版番号で削除。
+MAIL NOTIFYで確認、MAIL NOTIFY ON / OFFで新着通知を切り替えます。
+MAIL SEARCH 語句で題名・本文を検索。+で続き。本人の送受信メールのみ、大小文字を区別します。
+メール添付: ZMAILUPLOAD [説明]で非公開ファイルを送信、MAIL FILESで本人のファイル一覧。メール編集中に /ATTACH 番号 または /DETACH、/SAVEで保存または送信。ZMAILDOWNLOAD 番号で取得。MAIL DROP 番号 CONFIRMで未使用ファイルを回収。1通最大16ファイル、各1GiBまで。送受信者のみ取得可能（SYSOPの例外なし）。
+ZMAILRESUME 元の説明: 中断した添付アップロードを再開。同じ元ファイルを選択。
+MAIL NEWS YYYY-MM-DD: 指定日以降の受信メール（既読も含む、設定タイムゾーン）。+で続き。SYSOPMAIL 題名: ゲストからもSYSOPへ送信（管理者ID最小の有効会員宛）。
+
+/ATTACH 番号を繰り返して最大16ファイルを添付できます。同じ番号の重複は無視します。/DETACH 番号で1件、/DETACHで全件を外します。下書き保存・再開にも対応。添付は送信者と受信者だけが閲覧でき、最後のメール・下書き参照を削除すると容量を回収します。
+
+MAIL SCAN ASC / MAIL SCAN DESC: 連続読み出し。Enter/CONTINUE、+/-、+N/-N、STOPを使用できます。
+MAIL GET [メール番号] / G: 閲覧可能な本文を共通編集バッファへ取り込みます。次の編集で /BUFFER を使います。
+ZMAILDOWNLOADALL メール番号: そのメールの添付最大16件を一括取得（ZMODEM、合計16GiBまで）。同名は番号を前置して区別します。送受信者限定でSYSOPの例外はありません。
+CHECK MAIL: 主メニューから前回確認日時による巡回。
+
+MAIL SCAN中のF: 無停止連続表示。入力で停止。
+ZMAILUPLOADBATCH 説明: 最大16個の添付用ファイルを一括受信。MAILFILESで番号確認、/ATTACH 番号で添付。
+ZMAILRESUMEBATCH 説明: 同じ説明・ファイル集合で一括受信を再開。
+
+Nは日付入力（空入力はCHECK MAIL）。次の未読はMAIL NEXT、最新1通はMAIL LATESTです。
+
+通常の本文表示中もEnter:次、P:前、L:再表示、F:次から無停止、+/-や+N/-N:方向・相対移動。MAIL LISTで一覧へ戻ります。Gは共通バッファへ取り込み、次の編集で/BUFFERを使用。
+MAILUPLOAD / MAILUPLOADBATCH / MAILDOWNLOAD / MAILDOWNLOADALLはPROTOCOLで選んだ方式を使用。UPLOAD側の引数は説明（XMODEM/TEXTは名前|サイズ|説明）、DOWNLOAD側はファイル番号／メール番号。Zで始まる従来コマンドはZMODEM固定。XMODEM/TEXTの一括転送は不可。送受信者限定は全方式共通。

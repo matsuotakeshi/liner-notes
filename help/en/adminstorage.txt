@@ -1,0 +1,10 @@
+History and offline maintenance
+AUDIT / AUDIT ARTICLE id / AUDIT ACTOR login / AUDIT ACTORID id
+AUDIT REFRESH / AUDIT ALL / + for next page
+BOARDLOG / BOARDACCESS board / FILEAUDIT / FILEHISTORY
+Withdrawal, retitling and author changes retain the operator identity.
+Stop the BBS and transfer workers before running liner-notes-admin.
+SQLite: db-backup / verify / db-restore / db-compact
+Migration: db-migrate. Portable export: db-export.
+Use db-compact --reclaim-withdrawn to remove withdrawn bodies in a new copy.
+--all-stores also compacts other stores. Backups are retained. See STAGE67.md for arguments.

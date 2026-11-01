@@ -1,0 +1,4 @@
+PROFILE プロフィール
+ L 一覧 / P 会員指定 / S 検索 / W 自己紹介編集
+ E 項目別編集の案内 / 0 戻る / ? 再表示
+ PROFILESET / PROFILEVIS / PROFILEFIND

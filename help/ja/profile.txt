@@ -1,0 +1,13 @@
+公開プロフィール（ログイン会員向け）
+PROFILE: 自分。PROFILE ログイン名: 他会員の公開プロフィール。
+HANDLE ハンドル: 表示名を保存（80バイト）。HANDLEだけで消去。
+BIO 自己紹介: 1行で保存（320バイト）。BIOだけで消去。
+PROFILES [検索語]: ログイン名・ハンドル・自己紹介を検索。省略で全件。
++で次の一覧、番号でプロフィール。停止会員は表示しません。
+ハンドルは重複可、ログイン名や記事の投稿者名は変更しません。
+公開したくない情報は入力しないでください。編集後も過去の記録は保存ファイルに残ります。
+LOCATION / OCCUPATION / INTERESTS / WEBSITE / CONTACT 文字列: 地域・職業・趣味・URL・連絡先（各320バイト、空で消去）。初期公開範囲は項目により異なります。PROFILEVISで変更し、検索も公開範囲に従います。
+PROFILESET 項目 本文 / PROFILEVIS 項目 PRIVATE|MEMBERS|MONTHDAY（誕生日のみ） / PROFILEFIND 項目 検索語。項目: HANDLE BIO LOCATION OCCUPATION INTERESTS WEBSITE CONTACT MACHINE BIRTHDAY REALNAME KANA ADDRESS PHONE。BIRTHDAYはYYYY-MM-DD。HANDLEは常に会員公開。BIOEDITで複数行（8192バイト）を編集。新しい個人情報項目は初期非公開。PROFILEFIND GROUP 1..100で所属検索。
+
+P画面のEは項目番号→内容で編集。管理者は先に対象会員番号を指定（空欄で本人）。Sは項目→条件を指定し、一致会員の公開可能な詳細を順次表示します。
+--rtbbs-member-policy有効時のみ、本人の住所・誕生日変更は管理者へ依頼、GROUP検索はSIGOP/管理者、実名・カナ・住所・電話の項目検索は管理者限定です。既存の公開範囲は変更せず、他会員の非公開項目は検索・表示しません。

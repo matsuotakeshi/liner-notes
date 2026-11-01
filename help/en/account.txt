@@ -1,0 +1,20 @@
+Registration, login and passwords
+A / REGISTER name creates an account; LOGIN name logs in.
+Names: 1-32 lowercase ASCII letters, digits, _ or -. Passwords: 8-128 bytes.
+Enter passwords only after the password prompt, not on the command line.
+# / ACCOUNT shows your account; LOGOUT logs out.
+PASSWD prompts for the current password, new password and confirmation.
+A successful change revokes your other sessions; this session remains logged in.
+/CANCEL cancels menu input.
+Login unread and saved-draft notices reflect the authentication-time state.
+RIGHTS shows your level and groups. Registration may require approval or be closed.
+USERLOG [ID] [cursor] shows your connection history; USERSTATS shows login count and usage. + continues history.
+USERTABLE [member|ALL] [cursor]: login, logout, seconds, login count and transport on one row per login. Other members require --userlog-public. Unknown baud rates are not invented.
+
+RETIRE CONFIRM ends your membership and disables login. Existing articles, correspondent mail and IDs remain; login names cannot be reused. Protected administrators cannot retire through this command.
+
+With automatic IDs, REGISTER or A issues a u000001-style login name. The optional detailed form collects profile fields, referring BBS and a private SYSOP note. Enter skips a field; /CANCEL aborts. Personal name/address/phone/birthday fields are private by default.
+
+Automatic IDs: --id-mode auto --id-prefix bbs --id-digits 5 issues bbs00001-style names. --id-first sysop names only the first account in an empty member store; administrator rights still require admins configuration. Existing and retired IDs are unchanged.
+Detailed applications show all entered details before Y confirms, E restarts editing or /CANCEL aborts; password entry follows confirmation.
+--rtbbs-member-policy makes USERLOG/USERTABLE available to registered members. Default access stays self/admin. This option never changes saved profile visibility.

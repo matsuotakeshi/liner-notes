@@ -1,0 +1,160 @@
+pkg ('add', '-M', '/home/takeshi/liner-notes-ports70-release-20261101/default-manual-work/home/takeshi/liner-notes-ports70-release-20261101/comms/liner-notes/work/pkg/liner-notes-0.70.pkg') exit 0
+Installing liner-notes-0.70...
+===> Creating groups
+Creating group 'liner_notes' with gid '64964'
+===> Creating users
+Creating user 'liner_notes' with uid '64964'
+===> Creating homedir(s)
+Extracting liner-notes-0.70: .......... done
+=====
+Message from liner-notes-0.70:
+
+--
+Liner notes is installed but NOT enabled or started.
+New installation guide (DOCS): /usr/local/share/doc/liner-notes/INSTALL.md
+
+Daemon: /usr/local/sbin/liner-notes
+Administration: /usr/local/bin/liner-notes-admin
+Configuration: /usr/local/etc/liner-notes
+Editable menus/help/banner: /usr/local/share/liner-notes
+Logs: /var/log/liner-notes
+Supervisor PID: /var/run/liner-notes.pid
+Data and private transfer spool: /var/db/liner-notes
+Service: liner_notes (default: 127.0.0.1:2222)
+Management commands: liner-notes-admin (maintenance alias retained), liner-notes-vaultctl,
+liner-notes-memberctl. Python and SQLite are required.
+
+Review /usr/local/etc/liner-notes/liner_notes.conf, then use:
+  sysrc liner_notes_enable=YES
+  service liner_notes start
+
+Keep the listener private while creating the first BBS account and setting
+liner_notes_admins. Reuse an existing instance only after an offline backup.
+
+ZMODEM is optional. Use the corrected lrzsz 0.13.1 port for resume support.
+The spool must be owned by liner_notes and mode 0700. Enable the helper in
+liner_notes.conf after preparing the engine. Before using resume, run
+liner-notes-check-resume as the service user and save its --receipt to
+/var/db/liner-notes/lrz-resume.json. Regenerate it after replacing lrz. External SSH uses the system's
+OpenSSH; liner-notes-ssh does not configure sshd or system login accounts.
+
+This is a local port; public source URL, redistribution license and official
+UID/GID allocation must be settled before submission to the Ports Collection.
+--
+===>   NOTICE:
+
+The liner-notes port currently does not have a maintainer. As a result, it is
+more likely to have unresolved issues, not be up-to-date, or even be removed in
+the future. To volunteer to maintain this port, please create an issue at:
+
+https://bugs.freebsd.org/bugzilla
+
+More information about port maintainership is available at:
+
+https://docs.freebsd.org/en/articles/contributing/#ports-contributing
+
+pkg: Missing dependency 'py312-sqlite3'
+pkg: Missing dependency 'python312'
+pkg: Missing dependency 'sqlite3'
+pkg: Missing shlib libc.so.7 required by liner-notes
+pkg: Missing shlib libcrypto.so.35 required by liner-notes
+pkg: Missing shlib libsqlite3.so.0 required by liner-notes
+pkg: Missing shlib libthr.so.3 required by liner-notes
+pkg: Missing shlib libutil.so.10 required by liner-notes
+
+pkg ('delete', '-y', 'liner-notes') exit 0
+Updating database digests format: . done
+Checking integrity... done (0 conflicting)
+Deinstallation has been requested for the following 1 packages (of 0 packages in the universe):
+
+Installed packages to be REMOVED:
+	liner-notes: 0.70
+
+Number of packages to be removed: 1
+
+The operation will free 1 MiB.
+[1/1] Deinstalling liner-notes-0.70...
+[1/1] Deleting files for liner-notes-0.70: .......... done
+==> You should manually remove the "liner_notes" user
+==> You should manually remove the "liner_notes" group
+You may need to manually remove /usr/local/share/liner-notes/banner.txt if it is no longer needed.
+You may need to manually remove /usr/local/etc/liner-notes/liner_notes.conf if it is no longer needed.
+You may need to manually remove /usr/local/share/liner-notes/help/ja/read.txt if it is no longer needed.
+You may need to manually remove /usr/local/share/liner-notes/menus/reader-ja.txt if it is no longer needed.
+Message from liner-notes-0.70:
+BBS data and edited configuration are preserved. The liner_notes account is
+also retained. Do not delete these until backups and migration are verified.
+
+
+pkg ('add', '-M', '/home/takeshi/liner-notes-ports71-publish-20261101/default-manual-work/home/takeshi/liner-notes-ports71-publish-20261101/comms/liner-notes/work/pkg/liner-notes-0.71.pkg') exit 0
+Installing liner-notes-0.71...
+===> Creating groups
+Using existing group 'liner_notes'
+===> Creating users
+Using existing user 'liner_notes'
+===> Creating homedir(s)
+Extracting liner-notes-0.71: .......... done
+=====
+Message from liner-notes-0.71:
+
+--
+Liner notes is installed but NOT enabled or started.
+New installation guide (DOCS): /usr/local/share/doc/liner-notes/INSTALL.md
+
+Daemon: /usr/local/sbin/liner-notes
+Administration: /usr/local/bin/liner-notes-admin
+Configuration: /usr/local/etc/liner-notes
+Editable menus/help/banner: /usr/local/share/liner-notes
+Logs: /var/log/liner-notes
+Supervisor PID: /var/run/liner-notes.pid
+Data and private transfer spool: /var/db/liner-notes
+Service: liner_notes (default: 127.0.0.1:2222)
+Management commands: liner-notes-admin (maintenance alias retained), liner-notes-vaultctl,
+liner-notes-memberctl. Python and SQLite are required.
+
+Review /usr/local/etc/liner-notes/liner_notes.conf, then use:
+  sysrc liner_notes_enable=YES
+  service liner_notes start
+
+Keep the listener private while creating the first BBS account and setting
+liner_notes_admins. Reuse an existing instance only after an offline backup.
+
+ZMODEM is optional. Use the corrected lrzsz 0.13.1 port for resume support.
+The spool must be owned by liner_notes and mode 0700. Enable the helper in
+liner_notes.conf after preparing the engine. Before using resume, run
+liner-notes-check-resume as the service user and save its --receipt to
+/var/db/liner-notes/lrz-resume.json. Regenerate it after replacing lrz. External SSH uses the system's
+OpenSSH; liner-notes-ssh does not configure sshd or system login accounts.
+
+Updates: /usr/local/share/doc/liner-notes/UPGRADING.md (DOCS option).
+The resume checker can be rerun without deleting its existing receipt.
+Source releases: https://github.com/matsuotakeshi/liner-notes/releases
+Redistribution license and official UID/GID allocation must be settled before
+submission to the Ports Collection.
+--
+===>   NOTICE:
+
+The liner-notes port currently does not have a maintainer. As a result, it is
+more likely to have unresolved issues, not be up-to-date, or even be removed in
+the future. To volunteer to maintain this port, please create an issue at:
+
+https://bugs.freebsd.org/bugzilla
+
+More information about port maintainership is available at:
+
+https://docs.freebsd.org/en/articles/contributing/#ports-contributing
+
+pkg: Missing dependency 'py312-sqlite3'
+pkg: Missing dependency 'python312'
+pkg: Missing dependency 'sqlite3'
+pkg: Missing shlib libc.so.7 required by liner-notes
+pkg: Missing shlib libcrypto.so.35 required by liner-notes
+pkg: Missing shlib libsqlite3.so.0 required by liner-notes
+pkg: Missing shlib libthr.so.3 required by liner-notes
+pkg: Missing shlib libutil.so.10 required by liner-notes
+
+pkg ('query', '%v', 'liner-notes') exit 0
+0.71
+
+
+PASS actual pkg 0.70 removal -> 0.71 install in isolated root; custom config/help/menu/banner and data preserved; new samples installed. Package scripts executed with isolated account databases; host accounts unchanged and service not started.

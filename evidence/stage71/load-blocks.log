@@ -1,0 +1,2 @@
+{"mode": "blocks", "seconds": 610.11, "peak_connections_checked": 128, "mixed_connections": 64, "posting_clients": 24, "transfer_clients": 8, "baseline_rss": 488677376, "peak_rss": 517332992, "counts": {"posts": 21003, "mails": 21003, "searches": 21003, "uploads": 326, "downloads": 326}}
+PASS mixed post/read/search/mail/upload/download, 128 connection admission, bounded memory and clean restart

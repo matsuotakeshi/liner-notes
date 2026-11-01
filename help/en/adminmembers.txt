@@ -1,0 +1,9 @@
+Members and applications
+MEMBERS / MEMBER id / RIGHTS id
+APPLICATIONS / APPLICATION id / APPLICATIONSET id field value / APPROVE id
+REJECT id CONFIRM / DELETEAPPLICATION id CONFIRM
+SUSPEND id / RESUME id / DELETEUSER id CONFIRM
+RESETPASS id: hidden password entry
+LEVEL id 0..5 / GROUP or UNGROUP id 1..100 / GROUPMOVE source destination CONFIRM
+MEMBERPROFILE id field value
+Level 5 alone does not grant administrator rights. IDs and login names are never reused.

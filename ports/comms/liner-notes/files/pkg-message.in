@@ -1,0 +1,55 @@
+[
+{ type: install
+  message: <<EOM
+Liner notes is installed but NOT enabled or started.
+New installation guide (DOCS): %%DOCSDIR%%/INSTALL.md
+
+Daemon: %%PREFIX%%/sbin/liner-notes
+Administration: %%PREFIX%%/bin/liner-notes-admin
+Configuration: %%ETCDIR%%
+Editable menus/help/banner: %%DATADIR%%
+Logs: /var/log/liner-notes
+Supervisor PID: /var/run/liner-notes.pid
+Data and private transfer spool: /var/db/liner-notes
+Service: liner_notes (default: 127.0.0.1:2222)
+Management commands: liner-notes-admin (maintenance alias retained), liner-notes-vaultctl,
+liner-notes-memberctl. Python and SQLite are required.
+
+Review %%ETCDIR%%/liner_notes.conf, then use:
+  sysrc liner_notes_enable=YES
+  service liner_notes start
+
+Keep the listener private while creating the first BBS account and setting
+liner_notes_admins. Reuse an existing instance only after an offline backup.
+
+ZMODEM is optional. Use the corrected lrzsz 0.13.1 port for resume support.
+The spool must be owned by liner_notes and mode 0700. Enable the helper in
+liner_notes.conf after preparing the engine. Before using resume, run
+liner-notes-check-resume as the service user and save its --receipt to
+/var/db/liner-notes/lrz-resume.json. Regenerate it after replacing lrz. External SSH uses the system's
+OpenSSH; liner-notes-ssh does not configure sshd or system login accounts.
+
+Updates: %%DOCSDIR%%/UPGRADING.md (DOCS option).
+The resume checker can be rerun without deleting its existing receipt.
+Source releases: https://github.com/matsuotakeshi/liner-notes/releases
+Redistribution license and official UID/GID allocation must be settled before
+submission to the Ports Collection.
+EOM
+}
+{ type: upgrade
+  message: <<EOM
+Installation paths changed in 0.65_1. Stop and back up before upgrading.
+Edited settings/assets and old /var/db/liner_notes data are not moved.
+Review liner_notes.conf.sample and PORTS.md before restarting. Update the
+program/home, menus/help/banner, helper, data, logs and PID paths in your
+existing configuration and rc.conf. The rc script rejects a known old home
+or unselected old default data instead of starting a new empty BBS.
+EOM
+}
+{ type: remove
+  message: <<EOM
+BBS data and edited configuration are preserved. The liner_notes account is
+also retained. Do not delete these until backups and migration are verified.
+EOM
+}
+]

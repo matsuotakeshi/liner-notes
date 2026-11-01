@@ -1,0 +1,44 @@
+FILEBOARDS: accessible file boards. ZUPLOADIN path|description (UIN in vault): upload into a board. Parent read permissions apply; FILESIN includes children.
+File vault
+F or VAULT opens the vault menu. L lists, a number opens file actions, FILE id shows details, + continues, S text searches, C lists categories, I displays the current board information.
+U asks for protocol and description for the current board; D number downloads. 0 returns to the parent; at the root it returns to BBS.
+ZUPLOAD [description] / ZDOWNLOAD number [filename] also work directly. One file, up to 1 GiB.
+Requires an enabled server connector and a ZMODEM-capable terminal with Telnet BINARY.
+Wait for the published/sent receipt before treating a transfer as successful.
+FILES / FILE number / FILESEARCH text / FILECATEGORIES / FILESIN category remain available.
+Line-v1 and binary-v1 remain available to dedicated clients.
+N YYYY-MM-DD / FILENEWS YYYY-MM-DD: new files since configured local midnight. 
+BATCH ADD id, BATCH REMOVE id, BATCH LIST, BATCH CLEAR, BATCH SEND: up to 16 selected files / 16 GiB total. Duplicate filenames receive an ID prefix. A failed batch may already have delivered some files.
+ZUPLOADBATCH board|description: upload up to 16 files / 16 GiB. ZRESUME board|original description resumes an interrupted single-file upload or publication; select the same original file. Use - for the root board.
+ZUPLOADBATCHRESUME board|original description: resume batch transfer/publication; select the original file set.
+FILESTATS [ID|ALL] [cursor] shows confirmed download counts. + continues. Failed, skipped and legacy unacknowledged transfers are not counted.
+FILEDESC id description / FILEDELETE id CONFIRM: owner with read/upload rights, or administrator. Deletion is permanent.
+FILESEARCH *.LZH / FILESEARCH file?.txt: case-insensitive filename wildcards. FILEASCII id ON|OFF; FILETYPE id [byte-offset] displays text. FILEBOARDINFO path shows the guide. PROTOCOL ZMODEM|XMODEM|YMODEM|YMODEM-G|MLINK|TEXT selects transfer mode. DOWNLOAD id; UPLOAD path|description; UPLOADBATCH path|description. XMODEM/TEXT uploads use path|filename|bytes|description (TEXT size 0 reads until Ctrl-Z). BATCH SEND uses the selected protocol, except XMODEM/TEXT. Existing ZUPLOAD commands always use ZMODEM.
+BATCH MATCH *.LZH replaces selection with matches (up to 16 files/16 GiB). + continues FILETYPE.
+Vault moderators may use FILEOWNER id member, FILEBOARDNAME path|title, and FILEINFOEDIT path. Vault and article-board moderator assignments are separate.
+
+FILEUNLOCK path: enter the shared password privately, unlocking any protected ancestors first. Grants are connection-local and invalidated on password change or logout.
+FILERENAME id filename: administrator or inherited SIGOP changes the public name without changing the blob or ID.
+FILEBOARDPASS path / FILEBOARDPASS path NONE CONFIRM sets/clears its password. FILEBOARDOPTIONS path|BOARD or MENU order retained-downloads sets node type, order and receipt retention; 0 keeps all receipts. Lifetime download counts are preserved. MENU nodes reject uploads.
+CHECK FILES uses the previous file checkpoint. Default total storage quota is 16 GiB; existing limits.conf overrides it.
+
+RTBBS keys: main F; vault L list, U upload, D download, B batch screen, N date, I current-board info, 0 back. FILEBOARDS lists boards. A bare number opens file actions; FILE id only shows details. U/D use PROTOCOL; ZUPLOAD/ZDOWNLOAD always use ZMODEM.
+
+FILEBOARD path (- for root) selects the current file board for L/I/U/S/N. Search/news include descendants and enforce read permissions. FILESEARCH path|query and FILENEWS path|YYYY-MM-DD combine scope and filtering. Dates use the server timezone.
+U/UB asks protocol, description and (XMODEM/TEXT only) filename and exact size. B opens add/remove/match/list/clear/send choices. /CANCEL aborts.
+limits.conf applies equally to vault/mail and transfer protocols. XMODEM/TEXT transfer one file at a time.
+
+BATCH LIST shows DONE (confirmed) and PENDING. SEND retries only pending files; completed receipts are not counted twice. To download a completed file again, REMOVE then ADD it, or CLEAR and select again. Selection state lasts for the current connection.
+
+After selecting a file: T display; S checksum/C CRC/X 1K/Y YMODEM/G YMODEM-g/Z ZMODEM/M M-LINK; B add to batch; E description; K delete; 0 back.
+DIR lists immediate child boards; select a displayed number to enter. CD child-path enters a child; 0 or CD .. returns to its parent. At root, 0 exits the vault.
+Batch screen: D choose protocol and send; L list; C confirmed clear; M copy into a managed board. Add/remove/MATCH are also available.
+BATCH MATCH searches only the current board, unlike recursive FILESEARCH. DOS masks compare name/extension separately; *.* includes extensionless files; ? can match trailing padding.
+FILECOPY id destination / BATCH COPY destination require management rights at both ends. Publisher, description, timestamp and ASCII attribute survive; the new ID starts its own download count at zero.
+PROTOCOL XMODEM-SUM / XMODEM / XMODEM-1K. Uploads require exact size and filename. The receiving peer negotiates checksum versus CRC; 1K requests 1024-byte blocks.
+Lists include attributes, confirmed download count and description. FILE shows registration PROTOCOL; FILEAUDIT Q records its changes. Older imports are UNKNOWN; administrative copies are COPY.
+Each confirmed file receives a durable receipt even if a later file fails. DONE is excluded from retry; incomplete files remain PENDING. Copy completion is separate from download completion. Selection is connection-local.
+
+Bare ZRESUME uses the current file board and saved description. ZRESUME board also reuses the description. Direct ZUPLOAD targets the root: use ZRESUME -. Reception times out after 120 seconds without file progress. Ask the administrator about resume receiver verification errors.
+
+After receipt, registration progress is displayed. 100% describes bytes written; wait for the final success result. The helper --timeout measures inactivity for every transfer protocol.

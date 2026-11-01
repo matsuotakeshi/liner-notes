@@ -1,0 +1,34 @@
+[
+  {
+    "command": [
+      "make",
+      "BATCH=yes",
+      "DEFAULT_VERSIONS=python=3.12",
+      "DISTDIR=/home/takeshi/liner-notes-ports71-publish-20261101/distfiles",
+      "PACKAGES=/home/takeshi/liner-notes-ports71-publish-20261101/packages/default",
+      "WRKDIRPREFIX=/home/takeshi/liner-notes-ports71-publish-20261101/default-manual-work",
+      "stage",
+      "check-plist",
+      "stage-qa",
+      "package"
+    ],
+    "code": 0
+  },
+  {
+    "command": [
+      "make",
+      "BATCH=yes",
+      "DEFAULT_VERSIONS=python=3.12",
+      "DISTDIR=/home/takeshi/liner-notes-ports71-publish-20261101/distfiles",
+      "PACKAGES=/home/takeshi/liner-notes-ports71-publish-20261101/packages/prefix",
+      "WRKDIRPREFIX=/home/takeshi/liner-notes-ports71-publish-20261101/prefix-manual-work",
+      "PREFIX=/home/takeshi/liner-notes-ports71-publish-20261101/prefix71",
+      "OPTIONS_UNSET=DOCS",
+      "stage",
+      "check-plist",
+      "stage-qa",
+      "package"
+    ],
+    "code": 0
+  }
+]

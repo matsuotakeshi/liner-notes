@@ -1,0 +1,14 @@
+/build/
+/__pycache__/
+**/__pycache__/
+*.pyc
+*.o
+/runtime
+/vaultctl
+/memberctl
+/generate-scale
+/*.pkg
+/*.tar.gz
+/*.dat
+/*.sqlite
+/*.sqlite-*

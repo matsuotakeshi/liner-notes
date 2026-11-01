@@ -1,0 +1,11 @@
+Published articles, cross-board search and sequential reading
+WITHDRAW id asks for confirmation; WITHDRAW id CONFIRM withdraws your article.
+Withdrawal cannot be undone. IDs/replies remain; historical source bytes remain in storage.
+RETITLE id title lets the author or admin rename an article in the current board.
+FIND HERE|ALL author-login|* keyword|* searches the current/all readable boards.
+Examples: FIND ALL alice * / FIND ALL * FreeBSD / FIND HERE alice setup
++ fetches more results; a result number switches boards and reads the article.
+SCAN HERE|ALL author-login|* keyword|* reads matching articles sequentially.
+Enter or CONTINUE advances; STOP/Q stops. Reading does not mark articles read.
+PAGER ON/OFF controls screens inside each article. Q during paging also stops the sequence.
+INFO [board-id] displays board information.

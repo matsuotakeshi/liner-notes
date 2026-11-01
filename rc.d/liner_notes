@@ -1,0 +1,250 @@
+#!/bin/sh
+# PROVIDE: liner_notes
+# REQUIRE: LOGIN NETWORKING
+# KEYWORD: shutdown
+
+. /etc/rc.subr
+
+name=liner_notes
+rcvar=liner_notes_enable
+command=/usr/sbin/daemon
+procname=/usr/sbin/daemon
+start_cmd=liner_notes_start
+stop_cmd=liner_notes_stop
+status_cmd=liner_notes_status
+
+# An explicit config permits isolated, unprivileged service tests. Like rc.conf,
+# this is shell code: only load a configuration you control.
+if [ -n "${LINER_NOTES_RC_CONF:-}" ]; then
+    if [ ! -r "$LINER_NOTES_RC_CONF" ]; then
+        echo "Cannot read LINER_NOTES_RC_CONF" >&2; exit 1
+    fi
+    . "$LINER_NOTES_RC_CONF"
+else
+    # Optional package configuration; /etc/rc.conf takes precedence.
+    if [ -r "/usr/local/etc/liner-notes/liner_notes.conf" ]; then
+        . "/usr/local/etc/liner-notes/liner_notes.conf"
+    fi
+    load_rc_config "$name"
+fi
+
+: ${liner_notes_enable:=NO}
+: ${liner_notes_data_dir:=/var/db/liner-notes}
+: ${liner_notes_home:=${liner_notes_data_dir}}
+: ${liner_notes_program:=/usr/local/sbin/liner-notes}
+: ${liner_notes_menu_dir:=/usr/local/share/liner-notes/menus}
+: ${liner_notes_log_dir:=/var/log/liner-notes}
+: ${liner_notes_board:=${liner_notes_data_dir}/notes.dat}
+: ${liner_notes_members:=${liner_notes_data_dir}/members.dat}
+: ${liner_notes_run_user:=liner_notes}
+: ${liner_notes_bind:=127.0.0.1}
+: ${liner_notes_port:=2222}
+: ${liner_notes_language:=ja}
+: ${liner_notes_database:=}
+: ${liner_notes_database_mode:=blocks}
+: ${liner_notes_limits:=}
+: ${liner_notes_timezone:=UTC}
+: ${liner_notes_sysinfo:=/usr/local/share/liner-notes/sysinfo.txt}
+: ${liner_notes_goodbye:=/usr/local/share/liner-notes/goodbye.txt}
+: ${liner_notes_pidfile:=/var/run/liner-notes.pid}
+: ${liner_notes_child_pidfile:=/var/run/liner-notes.child.pid}
+: ${liner_notes_logfile:=${liner_notes_log_dir}/daemon.log}
+: ${liner_notes_doors:=}
+: ${liner_notes_admins:=}
+: ${liner_notes_catalog:=}
+: ${liner_notes_vault_dir:=}
+: ${liner_notes_zmodem_helper:=}
+: ${liner_notes_registration:=open}
+: ${liner_notes_id_mode:=free}
+: ${liner_notes_id_prefix:=u}
+: ${liner_notes_id_digits:=6}
+: ${liner_notes_id_first:=}
+: ${liner_notes_rtbbs_member_policy:=NO}
+: ${liner_notes_login_text_dir:=/usr/local/share/liner-notes}
+: ${liner_notes_registration_form:=simple}
+: ${liner_notes_max_articles:=0}
+: ${liner_notes_max_mail:=0}
+: ${liner_notes_max_user_posts:=0}
+: ${liner_notes_banner:=/usr/local/share/liner-notes/banner.txt}
+: ${liner_notes_chat:=YES}
+: ${liner_notes_mail:=YES}
+: ${liner_notes_vault:=YES}
+: ${liner_notes_help_dir:=/usr/local/share/liner-notes/help}
+: ${liner_notes_userlog_keep:=1000}
+: ${liner_notes_userlog_public:=NO}
+: ${liner_notes_time_warning:=60}
+: ${liner_notes_time_grace:=30}
+: ${liner_notes_level0_seconds:=0}
+: ${liner_notes_level1_seconds:=0}
+: ${liner_notes_level2_seconds:=0}
+: ${liner_notes_level3_seconds:=0}
+: ${liner_notes_level4_seconds:=0}
+: ${liner_notes_level5_seconds:=0}
+pidfile=$liner_notes_pidfile
+
+liner_notes_ready()
+{
+    _ln_supervisor=$(check_pidfile "$pidfile" "$procname")
+    _ln_child=$(check_pidfile "$liner_notes_child_pidfile" "$liner_notes_program")
+    [ -n "$_ln_supervisor" ] && [ -n "$_ln_child" ] || return 1
+    /usr/bin/sockstat -4l -P tcp -p "$liner_notes_port" 2>/dev/null |
+        /usr/bin/awk -v pid="$_ln_child" '$3 == pid { found=1 } END { exit !found }'
+}
+
+liner_notes_validate()
+{
+    if [ "$liner_notes_home" = "/usr/local/libexec/liner-notes" ]; then
+        echo "Old package layout: update liner_notes_home, asset/helper and log paths; see PORTS.md." >&2
+        return 1
+    fi
+    for _ln_path in "$liner_notes_home" "$liner_notes_program" "$liner_notes_menu_dir" \
+        "$liner_notes_board" "$liner_notes_members" "$pidfile" \
+        "$liner_notes_child_pidfile" "$liner_notes_logfile" "$liner_notes_banner" \
+        "$liner_notes_login_text_dir" "$liner_notes_data_dir" "$liner_notes_log_dir" "$liner_notes_sysinfo" "$liner_notes_goodbye"; do
+        case "$_ln_path" in /*) ;; *) echo "Use absolute paths in liner_notes configuration." >&2; return 1 ;; esac
+    done
+    for _ln_path in "$liner_notes_admins" "$liner_notes_catalog" "$liner_notes_vault_dir" "$liner_notes_zmodem_helper" "$liner_notes_help_dir" "$liner_notes_doors" "$liner_notes_limits"; do
+        case "$_ln_path" in '') ;; /*) [ -r "$_ln_path" ] || return 1 ;; *) return 1 ;; esac
+    done
+    case "$liner_notes_database_mode" in blocks|structured) ;; *) return 1 ;; esac
+    case "$liner_notes_database" in ''|/*) ;; *) return 1 ;; esac
+    if [ -n "$liner_notes_zmodem_helper" ]; then
+        [ -x "$liner_notes_zmodem_helper" ] || return 1
+    fi
+    case "$liner_notes_port" in ''|*[!0-9]*|0*|??????*) echo "Invalid liner_notes_port" >&2; return 1 ;; esac
+    [ "$liner_notes_port" -le 65535 ] || return 1
+    for _ln_limit in "$liner_notes_max_articles" "$liner_notes_max_mail" "$liner_notes_max_user_posts" "$liner_notes_userlog_keep"; do
+        case "$_ln_limit" in ''|*[!0-9]*|???????????*) return 1 ;; esac
+        [ "$_ln_limit" -le 2147483646 ] || return 1
+    done
+    case "$liner_notes_idle_seconds" in ''|*[!0-9]*|??????*) return 1 ;; esac
+    [ "$liner_notes_idle_seconds" -le 86400 ] || return 1
+    for _ln_seconds in "$liner_notes_time_warning" "$liner_notes_time_grace" \
+        "$liner_notes_level0_seconds" "$liner_notes_level1_seconds" "$liner_notes_level2_seconds" \
+        "$liner_notes_level3_seconds" "$liner_notes_level4_seconds" "$liner_notes_level5_seconds"; do
+        case "$_ln_seconds" in ''|*[!0-9]*|??????*) return 1 ;; esac
+        [ "$_ln_seconds" -le 86400 ] || return 1
+    done
+    case "$liner_notes_registration" in open|approval|closed) ;; *) return 1 ;; esac
+    case "$liner_notes_id_mode" in free|auto) ;; *) return 1 ;; esac
+    case "$liner_notes_registration_form" in simple|detailed) ;; *) return 1 ;; esac
+    for _ln_flag in "$liner_notes_chat" "$liner_notes_mail" "$liner_notes_vault" "$liner_notes_userlog_public" "$liner_notes_rtbbs_member_policy"; do
+        case "$_ln_flag" in YES|NO) ;; *) return 1 ;; esac
+    done
+    case "$liner_notes_language" in ja|en) ;; *) echo "Invalid liner_notes_language" >&2; return 1 ;; esac
+    for _ln_path in "$liner_notes_chat_log" "$liner_notes_user_log"; do
+        case "$_ln_path" in -|/*) ;; *) echo "Log paths must be absolute, or - to disable." >&2; return 1 ;; esac
+    done
+    if [ "$liner_notes_data_dir" = /var/db/liner-notes ] &&
+        [ "$liner_notes_board" = /var/db/liner-notes/notes.dat ] &&
+        [ ! -e "$liner_notes_board" ] && [ -e /var/db/liner_notes/notes.dat ]; then
+        echo "Old data exists in /var/db/liner_notes. Migrate it or set liner_notes_data_dir explicitly; see PORTS.md." >&2
+        return 1
+    fi
+    [ -x "$liner_notes_program" ] && [ -d "$liner_notes_home" ] &&
+        [ -d "$liner_notes_log_dir" ] || return 1
+    [ -r "$liner_notes_menu_dir/ja.txt" ] && [ -r "$liner_notes_menu_dir/en.txt" ] || return 1
+    [ "$pidfile" != "$liner_notes_child_pidfile" ] || return 1
+    _ln_uid=$(/usr/bin/id -u "$liner_notes_run_user") || return 1
+    _ln_me=$(/usr/bin/id -u) || return 1
+    if [ "$_ln_me" != 0 ] && [ "$_ln_me" != "$_ln_uid" ]; then
+        echo "Cannot switch to liner_notes_run_user without root privileges." >&2; return 1
+    fi
+}
+
+: ${liner_notes_idle_seconds:=600}
+: ${liner_notes_gather_count:=16}
+: ${liner_notes_chat_log:=${liner_notes_log_dir}/chat.log}
+: ${liner_notes_user_log:=${liner_notes_log_dir}/user.log}
+
+liner_notes_start()
+{
+    liner_notes_validate || { echo "Invalid liner_notes configuration; no process started." >&2; return 1; }
+    if [ -n "$(check_pidfile "$pidfile" "$procname")" ]; then
+        echo "liner_notes is already running." >&2; return 1
+    fi
+    # No eval: paths with spaces and shell metacharacters remain single arguments.
+    set -- "$liner_notes_program" --bind "$liner_notes_bind" --telnet --menu \
+        --menu-dir "$liner_notes_menu_dir" --lang "$liner_notes_language"
+    set -- "$@" --timezone "$liner_notes_timezone" --sysinfo "$liner_notes_sysinfo" --goodbye "$liner_notes_goodbye"
+    if [ -n "$liner_notes_database" ]; then
+        if [ "$liner_notes_database_mode" = structured ]; then
+            set -- "$@" --database-structured "$liner_notes_database"
+        else set -- "$@" --database "$liner_notes_database"; fi
+    fi
+    [ -z "$liner_notes_limits" ] || set -- "$@" --limits "$liner_notes_limits"
+    [ -z "$liner_notes_admins" ] || set -- "$@" --admins "$liner_notes_admins"
+    [ -z "$liner_notes_vault_dir" ] || set -- "$@" --vault-dir "$liner_notes_vault_dir"
+    [ -z "$liner_notes_zmodem_helper" ] || set -- "$@" --zmodem-helper "$liner_notes_zmodem_helper"
+    [ -z "$liner_notes_doors" ] || set -- "$@" --doors "$liner_notes_doors"
+    [ -z "$liner_notes_help_dir" ] || set -- "$@" --help-dir "$liner_notes_help_dir"
+    set -- "$@" --userlog-keep "$liner_notes_userlog_keep" --time-warning "$liner_notes_time_warning" --time-grace "$liner_notes_time_grace" \
+        --level-seconds "0:$liner_notes_level0_seconds" --level-seconds "1:$liner_notes_level1_seconds" \
+        --level-seconds "2:$liner_notes_level2_seconds" --level-seconds "3:$liner_notes_level3_seconds" \
+        --level-seconds "4:$liner_notes_level4_seconds" --level-seconds "5:$liner_notes_level5_seconds"
+    [ -z "$liner_notes_id_first" ] || set -- "$@" --id-first "$liner_notes_id_first"
+    [ "$liner_notes_rtbbs_member_policy" = NO ] || set -- "$@" --rtbbs-member-policy
+    set -- "$@" --id-prefix "$liner_notes_id_prefix" --id-digits "$liner_notes_id_digits" --login-text-dir "$liner_notes_login_text_dir"
+    [ "$liner_notes_userlog_public" = NO ] || set -- "$@" --userlog-public
+    set -- "$@" --idle-seconds "$liner_notes_idle_seconds" --gather-count "$liner_notes_gather_count"
+    [ -z "$liner_notes_user_log" ] || set -- "$@" --user-log "$liner_notes_user_log"
+    [ -z "$liner_notes_chat_log" ] || set -- "$@" --chat-log "$liner_notes_chat_log"
+    set -- "$@" --id-mode "$liner_notes_id_mode" --registration-form "$liner_notes_registration_form"
+    set -- "$@" --registration "$liner_notes_registration" --banner "$liner_notes_banner" \
+        --max-articles "$liner_notes_max_articles" --max-mail "$liner_notes_max_mail" --max-user-posts "$liner_notes_max_user_posts"
+    [ "$liner_notes_chat" = YES ] || set -- "$@" --disable chat
+    [ "$liner_notes_mail" = YES ] || set -- "$@" --disable mail
+    [ "$liner_notes_vault" = YES ] || set -- "$@" --disable vault
+    set -- "$@" "$liner_notes_port" "$liner_notes_board" "$liner_notes_members"
+    [ -z "$liner_notes_catalog" ] || set -- "$@" "$liner_notes_catalog"
+    if [ "$_ln_me" = 0 ]; then set -- -u "$liner_notes_run_user" "$@"; fi
+    echo "Starting liner_notes."
+    (
+        umask 077
+        cd "$liner_notes_home" || exit 1
+        exec /usr/sbin/daemon -f -H -P "$pidfile" -p "$liner_notes_child_pidfile" \
+            -o "$liner_notes_logfile" "$@"
+    ) || return 1
+    _ln_wait=0
+    while [ "$_ln_wait" -lt 15 ]; do
+        if liner_notes_ready; then
+            echo "liner_notes is listening on $liner_notes_bind:$liner_notes_port (pid $_ln_child)."
+            return 0
+        fi
+        sleep 1
+        _ln_wait=$((_ln_wait + 1))
+        if [ "$_ln_wait" -ge 2 ] && [ -z "$(check_pidfile "$pidfile" "$procname")" ]; then break; fi
+    done
+    echo "liner_notes failed to listen; see $liner_notes_logfile" >&2
+    liner_notes_stop >/dev/null 2>&1
+    return 1
+}
+
+liner_notes_stop()
+{
+    _ln_pid=$(check_pidfile "$pidfile" "$procname")
+    if [ -z "$_ln_pid" ]; then echo "liner_notes is not running."; return 1; fi
+    echo "Stopping liner_notes (supervisor $_ln_pid)."
+    # Signal the supervisor: daemon forwards SIGTERM and waits for runtime to exit.
+    kill -TERM "$_ln_pid" || return 1
+    _ln_wait=0
+    while [ "$_ln_wait" -lt 15 ]; do
+        if [ -z "$(check_pidfile "$pidfile" "$procname")" ]; then return 0; fi
+        sleep 1
+        _ln_wait=$((_ln_wait + 1))
+    done
+    echo "liner_notes is still stopping; it was not forcibly killed." >&2
+    return 1
+}
+
+liner_notes_status()
+{
+    if liner_notes_ready; then
+        echo "liner_notes is running (supervisor $_ln_supervisor, runtime $_ln_child; $liner_notes_bind:$liner_notes_port)."
+        return 0
+    fi
+    echo "liner_notes is not ready (no live listener)."
+    return 1
+}
+
+run_rc_command "$1"

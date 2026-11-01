@@ -1,0 +1,28 @@
+Member mail
+MAIL opens the mailbox. L lists, N asks for a date, T reads newest first, number reads, + continues.
+E prompts for recipient and subject, then body. R number replies to received mail.
+K number confirms deletion for both parties; either sender or recipient can delete.
+0 exits. Also: MAIL SEND login subject / MAIL READ number / MAIL REPLY number / MAIL DELETE number.
+MAIL SENT / MAIL INBOX / MAIL UNREAD filter lists. Only the recipient marks a message read by opening it.
+A single . sends; /CANCEL aborts. /PREVIEW and line editing work; /SAVE saves a private draft and exits. MAIL DRAFT shows its revision; MAIL RESUME continues; MAIL DRAFT DELETE revision removes it.
+MAIL NOTIFY shows the setting; MAIL NOTIFY ON / OFF changes arrival notifications.
+MAIL SEARCH text searches your sent/received subjects and bodies. + continues. Case-sensitive.
+Mail attachments: ZMAILUPLOAD [description] stages a private file. MAIL FILES lists your files. In the mail editor use /ATTACH id or /DETACH, then /SAVE or send. ZMAILDOWNLOAD id downloads an attachment. MAIL DROP id CONFIRM reclaims your unreferenced file. Up to 16 files per message, each up to 1 GiB; sender and recipient only, including no SYSOP override.
+ZMAILRESUME original description: resume an interrupted attachment upload; select the same original file.
+MAIL NEWS YYYY-MM-DD lists received mail since configured timezone midnight, including read mail; + continues. SYSOPMAIL title composes mail even as guest to the active administrator with the lowest member ID.
+
+Repeat /ATTACH ID for up to 16 attachments. Duplicate IDs are ignored. /DETACH ID removes one; /DETACH removes all. Attachments survive saved drafts and resume. Only sender/recipient can read them; storage is reclaimed after the final mail/draft reference is removed.
+
+MAIL SCAN ASC / MAIL SCAN DESC  reads continuously. Enter/CONTINUE, +/-, +N/-N and STOP work as for articles.
+MAIL GET [message-id] / G imports an authorized body into your common edit buffer; use /BUFFER in the next editor.
+ZMAILDOWNLOADALL message-id downloads up to 16 attachments in one ZMODEM session, up to 16 GiB total. Duplicate names receive an ID prefix. Only sender/recipient may download; SYSOP has no exception.
+CHECK MAIL from the main menu uses the saved mail checkpoint.
+
+F during MAIL SCAN reads continuously; input stops it.
+ZMAILUPLOADBATCH description receives up to 16 private attachment files. Use MAILFILES for IDs and /ATTACH id to attach.
+ZMAILRESUMEBATCH description resumes the same batch with the same description and file set.
+
+N asks for a date (empty: CHECK MAIL). MAIL NEXT reads unread; MAIL LATEST reads one latest message.
+
+While reading: Enter next, P previous, L repeat, F nonstop from next, +/- or +N/-N changes direction/offset. MAIL LIST returns to the list. G imports into the common buffer; use /BUFFER in a later editor.
+MAILUPLOAD / MAILUPLOADBATCH / MAILDOWNLOAD / MAILDOWNLOADALL use PROTOCOL. Upload arguments: description (XMODEM/TEXT: name|bytes|description). Download arguments: file ID/message ID. Existing Z-prefixed commands remain ZMODEM-only. XMODEM/TEXT cannot batch. Sender/recipient authorization is identical for all protocols.

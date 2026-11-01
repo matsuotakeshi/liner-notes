@@ -1,0 +1,23 @@
+cc  -I/usr/local/include -O2 -pipe  -std=c11 -Wall -Wextra -Werror -Isrc tests/test_zhost.c src/zmodem_host.c src/storage_sqlite.c -I/usr/local/include -pthread -lcrypto -L/usr/local/lib -lsqlite3 -o test-zhost
+./test-zhost
+PASS: 16GiB receipt preserved across helper control channel
+PASS: host watchdog permits continuing activity beyond ten minutes and terminates an idle helper
+PASS: 24 concurrent ZMODEM children, twenty-fifth refused, all reaped and slots reusable
+python3 tests/test_system_control.py ./runtime ./vaultctl
+PASS: admin disconnect of ZMODEM and guest connections; announcements never enter transfer wire; scheduled stop reaps active child
+python3 tests/test_zmodem.py ./runtime ./vaultctl /home/takeshi/liner-notes-stage56-20261030/deps/resume/local/bin/lrz /home/takeshi/liner-notes-stage56-20261030/deps/resume/local/bin/lsz
+PASS: real lrzsz 0.13.1 send/receive, all-byte/empty roundtrip, SHA-256 publication, skipped files, batch/cancel/timeout rejection, PTY restoration and live member revocation
+python3 tests/test_zmodem_menu.py ./runtime ./vaultctl /home/takeshi/liner-notes-stage56-20261030/deps/resume/local/bin/lrz /home/takeshi/liner-notes-stage56-20261030/deps/resume/local/bin/lsz
+PASS: menu ZMODEM upload/download all bytes and empty files, original names, SHA-256, listing/search, JP/EN, skip/cancel, guest denial, revocation and spool cleanup
+python3 tests/test_zmodem_mail.py ./runtime ./vaultctl /home/takeshi/liner-notes-stage56-20261030/deps/resume/local/bin/lrz /home/takeshi/liner-notes-stage56-20261030/deps/resume/local/bin/lsz
+PASS: real ZMODEM mail attachment upload/download, receipt, SHA256, public-vault independence, SYSOP denial and revocation
+python3 tests/test_zmodem_batch_resume.py ./runtime ./vaultctl /home/takeshi/liner-notes-stage56-20261030/deps/resume/local/bin/lrz /home/takeshi/liner-notes-stage56-20261030/deps/resume/local/bin/lsz
+PASS: real Telnet batch upload/board ACL/description; TCP cut retained 1081344 bytes; resumed upload wire 1279865 < full payload 2097152; SHA-256 matches; batch/download/private-mail resume, path rejection and changed-prefix restart
+python3 tests/test_zupload_retry.py ./runtime ./vaultctl /home/takeshi/liner-notes-stage56-20261030/deps/resume/local/bin/lrz /home/takeshi/liner-notes-stage56-20261030/deps/resume/local/bin/lsz
+PASS: real timeout retains partial; next two ZUPLOADs on same Telnet connection start lrz and publish exact payload; original partial preserved
+python3 tests/test_zmodem_resume_defaults.py ./runtime ./vaultctl /home/takeshi/liner-notes-stage56-20261030/deps/resume/local/bin/lrz /home/takeshi/liner-notes-stage56-20261030/deps/resume/local/bin/lsz
+PASS: bare ZRESUME reuses current board and saved description; missing receipt/mismatch/no partial diagnosed; 2097152 bytes SHA256 91d3beb88a9b2f778a6c44a1c53b63d3c79931845a9aef84b3fb414610bd1938 resumed in 24.3s with 3s idle timeout; original name preserved
+python3 tests/test_stage61_protocols.py /home/takeshi/liner-notes-stage56-20261030/deps/resume/local/bin/lrz /home/takeshi/liner-notes-stage56-20261030/deps/resume/local/bin/lsz
+PASS real lrzsz X/Y send/receive, YMODEM-g sender, independent G/M-LINK/text byte fixtures
+python3 tests/test_stage61_transfer_menu.py ./runtime ./vaultctl /home/takeshi/liner-notes-stage56-20261030/deps/resume/local/bin/lrz /home/takeshi/liner-notes-stage56-20261030/deps/resume/local/bin/lsz
+PASS Telnet X/Y/G/M-LINK/TEXT upload/download, wildcard batch and receipt protocol

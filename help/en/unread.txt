@@ -1,0 +1,10 @@
+Read state and new-item checks
+UNREAD lists unread articles. NEW reads next unread. SEEN marks selected article read.
+UNSEEN id marks unread. NEW thread-id reads unread within a thread.
+NOTES UNREAD lists unread threads. NEXTBOARD visits another unread board.
+Reading alone does not mark read. Former Liner notes U/F/S/A/K/J shortcuts are retired.
+CHECK ARTICLES / MAIL / FILES starts from the saved checkpoint for that type.
+CHECK NEXT continues. In MANUAL mode, CHECK DONE saves the start timestamp after the last page.
+CHECK CANCEL or disconnect leaves the checkpoint unchanged.
+
+stage67: Menu sessions automatically save the start timestamp after displaying the final result. Q at a result pager, CHECK CANCEL or disconnect before completion does not advance it. CHECK ARTICLES HERE|SUBTREE|ALL and CHECK FILES path keep independent checkpoints. CHECKMODE MANUAL requires CHECK DONE; AUTO commits automatically. Raw sessions default to MANUAL.

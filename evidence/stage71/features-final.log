@@ -1,0 +1,4 @@
+python3 tests/test_stage71.py ./runtime
+PASS repeatable receipt creation/reuse/backup/atomic failure/symlink and non-mutating asset check
+PASS spool detail, explicit lost-ID binding, status reconciliation, preview, endpoint isolation and confirmed-only cleanup
+PASS structured profile/history rows, logical export/replay, reader S privacy and unchanged read position

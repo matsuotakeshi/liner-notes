@@ -1,0 +1,13 @@
+Public profiles (for logged-in members)
+PROFILE shows yours; PROFILE login shows another member's public profile.
+HANDLE display-name saves a handle (80 bytes). HANDLE alone clears it.
+BIO introduction saves a single-line bio (320 bytes). BIO alone clears it.
+PROFILES [query] searches login, handle and bio; omit query to list all.
++ fetches more; select a number for a profile. Suspended accounts are excluded.
+Handles may repeat and do not change login names or article authorship.
+Enter only information you want members to see. Historical values remain in the journal.
+LOCATION / OCCUPATION / INTERESTS / WEBSITE / CONTACT text: additional public fields, 320 bytes each; omit text to clear. Visibility is controlled by PROFILEVIS; search respects visibility.
+PROFILESET field text; PROFILEVIS field PRIVATE|MEMBERS|MONTHDAY (birthday only); PROFILEFIND field query. Fields: HANDLE BIO LOCATION OCCUPATION INTERESTS WEBSITE CONTACT MACHINE BIRTHDAY REALNAME KANA ADDRESS PHONE. Birthday: YYYY-MM-DD. HANDLE remains public to members. BIOEDIT edits up to 8192 bytes. New personal fields default to private. PROFILEFIND GROUP 1..100 searches group membership.
+
+Profile screen E asks field number then value; administrators first choose a member ID (Enter selects self). S asks field and condition, then displays each matching member's visible details.
+Only with --rtbbs-member-policy: address/birthday self-edits require an administrator; GROUP search requires SIGOP/admin; real name/kana/address/phone field searches require admin. Existing visibility is preserved; private fields are not exposed to other members.

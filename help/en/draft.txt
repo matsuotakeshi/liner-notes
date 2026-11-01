@@ -1,0 +1,9 @@
+Saving and resuming drafts
+/SAVE in the editor stores one draft per member. Saving is manual.
+At the normal prompt, DRAFT shows its revision and deletion instructions; RESUME resumes it.
+DRAFT DELETE revision removes it only if that revision is current.
+Posting leaves the stored copy intact. Confirm the post, then delete the copy explicitly.
+/CANCEL or disconnect keeps the stored copy; unsaved additions are lost.
+A new draft cannot overwrite an existing copy: RESUME it or delete it first.
+On conflict, keep needed text using /PREVIEW, then /CANCEL before DRAFT and RESUME.
+Save/resume rechecks permissions. Undo history is not stored.

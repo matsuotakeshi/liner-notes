@@ -1,0 +1,45 @@
+FILEBOARDS: 利用可能なファイルボード。ZUPLOADIN パス|説明（保管庫内 UIN）: ボードへ登録。親の閲覧権限も適用し、FILESIN は子階層も表示。
+ファイル保管庫
+主画面F または VAULTで保管庫メニューへ。L一覧、番号で操作画面（詳細はFILE 番号）、+続き、S 検索語、Cカテゴリ一覧、FILESIN カテゴリで絞り込み。
+Uで転送方式・説明を入力して現在ボードへ登録、D 番号で取得（PROTOCOLの選択方式）。0で親へ、ルートではBBSへ戻ります。
+ZUPLOAD [説明] / ZDOWNLOAD 番号 [保存名] の直接指定も可能。1ファイル1GiBまで。
+サーバー側コネクタの有効化と、Telnet BINARY・ZMODEM対応端末が必要です。
+転送成功は公開・送信完了の案内で確認してください。
+FILES / FILE 番号 / FILESEARCH 検索語 / FILECATEGORIES / FILESIN カテゴリも利用できます。
+専用クライアント用のline-v1・binary-v1も引き続き利用できます。
+N YYYY-MM-DD / FILENEWS YYYY-MM-DD: 設定タイムゾーンの指定日午前0時以降の新着。
+BATCH ADD 番号で選択、REMOVE 番号で解除、LISTで確認、CLEARで全解除、SENDで一括送信。最大16件・合計16GiB。同名ファイルはIDを前置して区別します。途中失敗時でも一部が相手に届いている場合があります。
+ZUPLOADBATCH ボード|説明: 最大16ファイル・合計16GiBの一括登録。単一ファイル転送が中断したら ZRESUME ボード|元の説明 で続行。同じ名前・同じ内容の元ファイルを選んでください。ルートは -。登録中断の再試行にも使用できます。
+ZUPLOADBATCHRESUME ボード|元の説明: 一括転送・登録の途中から再開。端末では元のファイル一式を選択。
+FILESTATS [番号|ALL] [位置] で完了確認済みの取得回数。+ で続き。失敗・スキップ・旧式の完了通知なし転送は集計しません。
+FILEDESC 番号 説明 / FILEDELETE 番号 CONFIRM: 登録者本人（閲覧・登録権限が必要）または管理者。削除は復元不可。
+FILESEARCH *.LZH / FILESEARCH file?.txt: ファイル名のワイルドカード（英字の大小を区別しません）。FILEASCII 番号 ON|OFF / FILETYPE 番号 [バイト位置]: テキストを表示。FILEBOARDINFO パス: 案内文を表示。PROTOCOL ZMODEM|XMODEM|YMODEM|YMODEM-G|MLINK|TEXT で方式を選択。DOWNLOAD 番号 / UPLOAD パス|説明 / UPLOADBATCH パス|説明。XMODEM・TEXTのUPLOADは パス|ファイル名|バイト数|説明（TEXTの0はCtrl-Zまで）。BATCH SENDは選択方式で送信（XMODEM・TEXTの一括は不可）。従来ZUPLOAD等は常にZMODEMです。
+BATCH MATCH *.LZH: 一致するファイルを一括選択（選択を置換、最大16件/16GiB）。FILETYPE の続きは +。
+保管庫担当者は FILEOWNER 番号 会員番号、FILEBOARDNAME パス|表示名、FILEINFOEDIT パス を使用できます。掲示板SIGOPとは別の担当設定です。
+
+FILEUNLOCK パス: 共通パスワードを非表示入力。親にもパスワードがあれば親から順に解除します。解除は接続中のみ有効で、変更・ログアウトで無効になります。
+FILERENAME 番号 新ファイル名: 管理者または親を含む担当SIGOPが登録名を変更します。データ本体やファイル番号は変わりません。
+FILEBOARDPASS パス / FILEBOARDPASS パス NONE CONFIRM: パスワード設定／解除。FILEBOARDOPTIONS パス|BOARD またはMENU 配置番号 履歴保持件数: メニュー専用ノード・表示順・取得履歴保持を指定。保持0は無制限、累計取得回数は保持します。MENUには登録できません。
+CHECK FILESは前回確認日時を使います。標準総容量は16GiB、既存limits.confの設定があればそちらが優先です。
+
+RTBBS風: 主画面F / 保管庫L一覧・U登録・D取得・Bバッチ・N新着日付・I現在ボードの案内・0戻る。BはBATCH操作案内で、FILEBOARDSはボード一覧です。番号単独はファイル操作画面を表示。詳細だけ見る場合はFILE 番号。UPLOAD/DOWNLOADとU/Dは選択方式、ZUPLOAD/ZDOWNLOADはZMODEM固定です。
+
+FILEBOARD パス（ルートは-）で現在のファイルボードを選択。L/I/U/S/Nは現在ボードを使用。検索・新着は子孫も対象で閲覧権限を適用します。
+FILESEARCH パス|語句 / FILENEWS パス|YYYY-MM-DD。日付はサーバー設定タイムゾーン。
+U/UB: 転送方式→説明→XMODEM/TEXTのみ名前・サイズを質問。B: 選択追加・削除・ワイルドカード・一覧・クリア・一括送信のメニュー。/CANCELで中止。
+容量上限はlimits.confで保管庫・メール添付・転送方式共通に設定。XMODEM/TEXTは1ファイルずつ。
+
+BATCH LISTのDONEは取得確認済み、PENDINGは未完了です。SENDは未完了分だけ再送し、成功分の取得回数を重複計上しません。成功分を再取得する場合はREMOVE→ADD、またはCLEAR後に選び直してください。選択状態は現在の接続中だけ保持します。
+
+番号選択後は T=本文表示、S=SUM/C=CRC/X=1K/Y=YMODEM/G=YMODEM-g/Z=ZMODEM/M=M-LINK、B=バッチ追加、E=説明編集、K=削除、0=戻る。
+DIRで現在ボード直下の子を表示し、表示中の番号で入室。CD 子パス、0/CD ..で親へ。ルートの0は主画面へ。
+Bのバッチ画面: D=方式を選んで送信、L=一覧、C=確認してクリア、M=担当ボードへコピー。追加・除外・MATCHも利用可。
+BATCH MATCHは現在ボード内だけ。FILESEARCHの配下検索とは範囲が異なります。*.*は拡張子なしも一致し、?はDOS式の末尾空白に一致します。
+FILECOPY 番号 宛先パス / BATCH COPY 宛先パス: コピー元・先の両方を管理できるSIGOPまたは管理者。投稿者・説明・日付・ASCII属性を維持し、新しい番号を発行。取得回数は新規ファイルとして0から。
+PROTOCOL XMODEM-SUM / XMODEM / XMODEM-1K。XMODEM受信は名前・正確なサイズを指定。送信時のSUM/CRCは相手の要求で決まり、1Kは1024バイトブロックを使用します。
+一覧に属性・取得回数・説明を表示。FILEのPROTOCOLは登録時方式、FILEAUDITのQは方式変更記録。以前の記録はUNKNOWN、管理コピーはCOPYです。
+転送完了ごとに取得履歴を確定。途中失敗時も成功分を保持し、DONEのみを送信対象から除外します。未完了分はPENDINGのまま。BATCH COPYの完了状態は送信とは別管理。接続終了で選択は破棄します。
+
+ZRESUME（引数なし）は現在の保管庫と保存済みの説明文で再開。ZRESUME ボード も説明を引き継ぎます。直接のZUPLOADはルート登録なので ZRESUME - を指定。受信中はデータが増えない状態が120秒続くと停止します。再開検証記録のエラーは管理者へ連絡してください。
+
+受信後は登録処理の進捗を表示します。100%は送信データの書込み量で、成功は最終結果で確認してください。転送の--timeoutは方式共通の無通信時間です。

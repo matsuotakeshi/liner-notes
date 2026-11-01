@@ -1,0 +1,6 @@
+担当ボードと子孫のSIGOP権限を継承します。SIGOPSで確認。
+担当範囲のBOARDSETで子ボードを新設・設定変更し、SIGOP ボード 会員番号|NONEで下位の担当者を変更できます。自身の担当元・範囲外を取得する操作は不可。親変更は移動元・移動先の両方が担当範囲内の場合に限ります。
+BOARDで対象を選び HIDE / RESTORE / INSPECT / RETITLE / WITHDRAW / AUDIT / BOARDOPTIONS / BOARDPASS / INFOEDIT / BOARDACCESS / AUTHOR / BOARDGUESTを操作。
+担当ボードの閲覧・投稿条件にあるグループは、GROUP 会員番号 グループ番号 / UNGROUPで追加・除外できます。SIGOPGROUPの追加委任は不要。無関係なグループと保護管理者への変更は拒否します。
+ボード削除・記事移動・全体会員レベル変更は全体管理者です。
+保管庫も親パスのSIGOPを継承。FILEBOARDSETで配下を設定し、FILEBOARDSIGOPで下位担当者を指定。FILECOPY / BATCH COPYはコピー元・先の両方の管理権限が必要。自己昇格はできません。

@@ -1,0 +1,3 @@
+GATHER reads retained messages oldest first, then composes. GATHER READ only reads. Members only; 70 Unicode characters/line, 10 lines; // saves, /CANCEL cancels; line 10 saves automatically. --gather-count controls retained entries (default 16, 0 disables).
+
+At the continuation prompt, // or Q skips remaining messages and starts composition; GATHER READ exits instead. /CANCEL leaves without writing.

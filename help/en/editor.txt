@@ -1,0 +1,12 @@
+EDITOR BETA / LINE; /EDITOR BETA / LINE while composing. Beta: // finish, /E line mode, /N clear, /M numbering. Line: nn select, E[n] edit, A append / U timed receive, I[n] insert, N clear, D range delete, L range list, Q range quote, S search, M numbering, 0 confirm. Ranges: L3-5, D-2. // returns from input. /SAVE /CANCEL /UNDO /PREVIEW /TITLE remain available.
+
+U receives consecutive text until 3 seconds idle, then returns to editing without posting. A keeps manual append mode. S text shows matching lines/count and highlights all matches per line in terminal menus. 0 asks W to write, E to continue editing or 0 to cancel (Q also works).
+
+U with existing text asks whether to clear: Y/empty clears, N appends. Receive ends after 3 seconds idle. Use 0 then W to post.
+
+Beta // opens confirmation: W commit / E edit / 0 cancel. The extended . command commits immediately.
+
+S3-10 query, or S3-10 then a query, searches a range; S query searches all lines. Every occurrence is highlighted and counted. M controls numbers in input, L listing and S results.
+At the line-command prompt: W lists all connections; # shows time, connection duration, online count and own usage totals; \ asks for a connection memo; T [connection] sends one private line and returns to the unchanged editor/Undo buffer. In beta input use /W /# /MEMO text /T connection.
+
+/TALK [connection] starts continuing talk; // returns to the editor.

@@ -1,0 +1,169 @@
+sbin/liner-notes
+%%DATADIR%%/scripts/activity-export.py
+%%DATADIR%%/scripts/build-lrzsz.py
+%%DATADIR%%/scripts/configure-zmodem.py
+%%DATADIR%%/scripts/legacy_transfer.py
+%%DATADIR%%/scripts/log-retain.py
+%%DATADIR%%/scripts/maintenance.py
+%%DATADIR%%/scripts/notes_compact.py
+%%DATADIR%%/scripts/state_compact.py
+%%DATADIR%%/scripts/transfer_connectors.py
+%%DATADIR%%/scripts/vault-download.py
+%%DATADIR%%/scripts/vault-upload.py
+%%DATADIR%%/scripts/vault_zmodem.py
+%%DATADIR%%/scripts/zmodem_connector.py
+%%DATADIR%%/scripts/zmodem_host.py
+bin/liner-notes-ssh
+bin/liner-notes-admin
+bin/liner-notes-maintenance
+bin/liner-notes-vaultctl
+bin/liner-notes-memberctl
+bin/liner-notes-zmodem
+bin/liner-notes-check-resume
+%%DATADIR%%/scripts/check-resume.py
+@sample %%DATADIR%%/banner.txt.sample
+@sample %%ETCDIR%%/liner_notes.conf.sample
+@sample %%ETCDIR%%/vault-limits.conf.sample
+@sample %%DATADIR%%/menus/ja.txt.sample
+@sample %%DATADIR%%/help/ja/account.txt.sample
+@sample %%DATADIR%%/help/ja/admin.txt.sample
+@sample %%DATADIR%%/help/ja/chat.txt.sample
+@sample %%DATADIR%%/help/ja/content.txt.sample
+@sample %%DATADIR%%/help/ja/draft.txt.sample
+@sample %%DATADIR%%/help/ja/editor.txt.sample
+@sample %%DATADIR%%/help/ja/files.txt.sample
+@sample %%DATADIR%%/help/ja/gather.txt.sample
+@sample %%DATADIR%%/help/ja/index.txt.sample
+@sample %%DATADIR%%/help/ja/mail.txt.sample
+@sample %%DATADIR%%/help/ja/post.txt.sample
+@sample %%DATADIR%%/help/ja/profile.txt.sample
+@sample %%DATADIR%%/help/ja/read.txt.sample
+@sample %%DATADIR%%/help/ja/settings.txt.sample
+@sample %%DATADIR%%/help/ja/sigop.txt.sample
+@sample %%DATADIR%%/help/ja/unread.txt.sample
+@sample %%DATADIR%%/menus/en.txt.sample
+@sample %%DATADIR%%/help/en/account.txt.sample
+@sample %%DATADIR%%/help/en/admin.txt.sample
+@sample %%DATADIR%%/help/en/chat.txt.sample
+@sample %%DATADIR%%/help/en/content.txt.sample
+@sample %%DATADIR%%/help/en/draft.txt.sample
+@sample %%DATADIR%%/help/en/editor.txt.sample
+@sample %%DATADIR%%/help/en/files.txt.sample
+@sample %%DATADIR%%/help/en/gather.txt.sample
+@sample %%DATADIR%%/help/en/index.txt.sample
+@sample %%DATADIR%%/help/en/mail.txt.sample
+@sample %%DATADIR%%/help/en/post.txt.sample
+@sample %%DATADIR%%/help/en/profile.txt.sample
+@sample %%DATADIR%%/help/en/read.txt.sample
+@sample %%DATADIR%%/help/en/settings.txt.sample
+@sample %%DATADIR%%/help/en/sigop.txt.sample
+@sample %%DATADIR%%/help/en/unread.txt.sample
+%%PORTDOCS%%%%DOCSDIR%%/ADMIN.md
+%%PORTDOCS%%%%DOCSDIR%%/AUDIT.md
+%%PORTDOCS%%%%DOCSDIR%%/BINARY_TRANSFER.md
+%%PORTDOCS%%%%DOCSDIR%%/BOARD_UNREAD.md
+%%PORTDOCS%%%%DOCSDIR%%/CHAT.md
+%%PORTDOCS%%%%DOCSDIR%%/CHAT_ADMIN.md
+%%PORTDOCS%%%%DOCSDIR%%/CONTENT_AUDIT.md
+%%PORTDOCS%%%%DOCSDIR%%/DAEMON.md
+%%PORTDOCS%%%%DOCSDIR%%/DRAFT_EDIT.md
+%%PORTDOCS%%%%DOCSDIR%%/DRAFT_NOTICE.md
+%%PORTDOCS%%%%DOCSDIR%%/DRAFT_UNDO.md
+%%PORTDOCS%%%%DOCSDIR%%/FILE_BOARDS.md
+%%PORTDOCS%%%%DOCSDIR%%/HELP.md
+%%PORTDOCS%%%%DOCSDIR%%/I18N.md
+%%PORTDOCS%%%%DOCSDIR%%/LIST_PAGER.md
+%%PORTDOCS%%%%DOCSDIR%%/LOGIN_UNREAD.md
+%%PORTDOCS%%%%DOCSDIR%%/MAIL_ATTACHMENTS.md
+%%PORTDOCS%%%%DOCSDIR%%/MAINTENANCE.md
+%%PORTDOCS%%%%DOCSDIR%%/MEMBER_MAIL.md
+%%PORTDOCS%%%%DOCSDIR%%/MEMBERS_ADMIN.md
+%%PORTDOCS%%%%DOCSDIR%%/NEXT_BOARD.md
+%%PORTDOCS%%%%DOCSDIR%%/PAGER.md
+%%PORTDOCS%%%%DOCSDIR%%/PASSWORD.md
+%%PORTDOCS%%%%DOCSDIR%%/PREFERENCES.md
+%%PORTDOCS%%%%DOCSDIR%%/PREVIEW.md
+%%PORTDOCS%%%%DOCSDIR%%/README.md
+%%PORTDOCS%%%%DOCSDIR%%/SAVED_DRAFT.md
+%%PORTDOCS%%%%DOCSDIR%%/SEARCH.md
+%%PORTDOCS%%%%DOCSDIR%%/STAGE2.md
+%%PORTDOCS%%%%DOCSDIR%%/STAGE28.md
+%%PORTDOCS%%%%DOCSDIR%%/STAGE3.md
+%%PORTDOCS%%%%DOCSDIR%%/STAGE30.md
+%%PORTDOCS%%%%DOCSDIR%%/STAGE31.md
+%%PORTDOCS%%%%DOCSDIR%%/STAGE4.md
+%%PORTDOCS%%%%DOCSDIR%%/STAGE5.md
+%%PORTDOCS%%%%DOCSDIR%%/STAGE56.md
+%%PORTDOCS%%%%DOCSDIR%%/STAGE57.md
+%%PORTDOCS%%%%DOCSDIR%%/STAGE58.md
+%%PORTDOCS%%%%DOCSDIR%%/STAGE59.md
+%%PORTDOCS%%%%DOCSDIR%%/STAGE6.md
+%%PORTDOCS%%%%DOCSDIR%%/STAGE60.md
+%%PORTDOCS%%%%DOCSDIR%%/STAGE61.md
+%%PORTDOCS%%%%DOCSDIR%%/STAGE62.md
+%%PORTDOCS%%%%DOCSDIR%%/STAGE63.md
+%%PORTDOCS%%%%DOCSDIR%%/STAGE64.md
+%%PORTDOCS%%%%DOCSDIR%%/TALK.md
+%%PORTDOCS%%%%DOCSDIR%%/THREAD_UNREAD.md
+%%PORTDOCS%%%%DOCSDIR%%/TRANSFER.md
+%%PORTDOCS%%%%DOCSDIR%%/TRANSPORTS.md
+%%PORTDOCS%%%%DOCSDIR%%/UNREAD_THREADS.md
+%%PORTDOCS%%%%DOCSDIR%%/UPLOAD.md
+%%PORTDOCS%%%%DOCSDIR%%/VAULT.md
+%%PORTDOCS%%%%DOCSDIR%%/ZMODEM.md
+%%PORTDOCS%%%%DOCSDIR%%/ZMODEM_MENU.md
+@dir(liner_notes,liner_notes,0700) /var/db/liner-notes/spool
+@dir(liner_notes,liner_notes,0700) /var/db/liner-notes
+%%PORTDOCS%%%%DOCSDIR%%/PORTS.md
+@sample %%ETCDIR%%/doors.conf.sample
+%%DATADIR%%/scripts/door_guess.py
+%%PORTDOCS%%%%DOCSDIR%%/DOORS.md
+%%PORTDOCS%%%%DOCSDIR%%/HISTORY.md
+%%PORTDOCS%%%%DOCSDIR%%/STAGE65.md
+@dir(liner_notes,liner_notes,0700) /var/log/liner-notes
+%%PORTDOCS%%%%DOCSDIR%%/COMMANDS.md
+%%PORTDOCS%%%%DOCSDIR%%/STAGE66.md
+@sample %%DATADIR%%/menus/board-ja.txt.sample
+@sample %%DATADIR%%/menus/reader-ja.txt.sample
+@sample %%DATADIR%%/menus/settings-ja.txt.sample
+@sample %%DATADIR%%/menus/profile-ja.txt.sample
+@sample %%DATADIR%%/menus/board-en.txt.sample
+@sample %%DATADIR%%/menus/reader-en.txt.sample
+@sample %%DATADIR%%/menus/settings-en.txt.sample
+@sample %%DATADIR%%/menus/profile-en.txt.sample
+%%DATADIR%%/scripts/database_tools.py
+@sample %%ETCDIR%%/limits.conf.sample
+@sample %%DATADIR%%/sysinfo.txt.sample
+@sample %%DATADIR%%/goodbye.txt.sample
+%%PORTDOCS%%%%DOCSDIR%%/STAGE67.md
+@sample %%DATADIR%%/menus/admin-ja.txt.sample
+@sample %%DATADIR%%/menus/sigop-ja.txt.sample
+@sample %%DATADIR%%/help/ja/adminmembers.txt.sample
+@sample %%DATADIR%%/help/ja/adminboards.txt.sample
+@sample %%DATADIR%%/help/ja/adminfiles.txt.sample
+@sample %%DATADIR%%/help/ja/adminconnections.txt.sample
+@sample %%DATADIR%%/help/ja/adminstorage.txt.sample
+@sample %%DATADIR%%/menus/admin-en.txt.sample
+@sample %%DATADIR%%/menus/sigop-en.txt.sample
+@sample %%DATADIR%%/help/en/adminmembers.txt.sample
+@sample %%DATADIR%%/help/en/adminboards.txt.sample
+@sample %%DATADIR%%/help/en/adminfiles.txt.sample
+@sample %%DATADIR%%/help/en/adminconnections.txt.sample
+@sample %%DATADIR%%/help/en/adminstorage.txt.sample
+@sample %%DATADIR%%/welcome.txt.sample
+@sample %%DATADIR%%/systemnews.txt.sample
+@sample %%DATADIR%%/birthday.txt.sample
+%%PORTDOCS%%%%DOCSDIR%%/STAGE69.md
+%%PORTDOCS%%%%DOCSDIR%%/INSTALL.md
+%%PORTDOCS%%%%DOCSDIR%%/ZUPLOAD_FIX.md
+%%PORTDOCS%%%%DOCSDIR%%/ZRESUME_FIX.md
+%%DATADIR%%/scripts/transfer_spool.py
+%%DATADIR%%/scripts/structured_db.py
+%%PORTDOCS%%%%DOCSDIR%%/STAGE70.md
+@sample %%DATADIR%%/greeting-06.txt.sample
+@sample %%DATADIR%%/greeting-12.txt.sample
+@sample %%DATADIR%%/greeting-18.txt.sample
+
+%%DATADIR%%/scripts/upgrade_check.py
+%%PORTDOCS%%%%DOCSDIR%%/STAGE71.md
+%%PORTDOCS%%%%DOCSDIR%%/UPGRADING.md

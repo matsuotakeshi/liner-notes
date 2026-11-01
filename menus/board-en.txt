@@ -1,0 +1,5 @@
+BOARD
+ I Information / L Notes / N New by date / T Read newest first
+ E Post / R Reply / F Filter author
+ Number: read / B Boards / 0 Main / ? Menu
+ SEARCH text / TREE / UNREAD / NEW / SEEN / NEXTBOARD

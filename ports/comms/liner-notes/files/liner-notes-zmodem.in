@@ -1,0 +1,6 @@
+#!/bin/sh
+# Runtime-owned connector, not an interactive command. FD 3 is authenticated RPC.
+export LINER_NOTES_RESUME_RECEIPT="${LINER_NOTES_RESUME_RECEIPT:-/var/db/liner-notes/lrz-resume.json}"
+exec "%%PYTHON_CMD%%" -B "%%DATADIR%%/scripts/zmodem_host.py" \
+    --receiver "%%LOCALBASE%%/bin/lrz" --sender "%%LOCALBASE%%/bin/lsz" \
+    --spool-root /var/db/liner-notes/spool -- "$@"

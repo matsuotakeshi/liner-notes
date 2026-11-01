@@ -1,0 +1,10 @@
+Vault administration
+FILEBOARDINFO path / FILEBOARDSET path|read|upload (root: -)
+FILEBOARDNAME path|name / FILEINFOEDIT path / FILEBOARDSIGOP path|member or NONE
+FILEBOARDPASS path / FILEBOARDPASS path NONE CONFIRM
+FILEBOARDOPTIONS path|BOARD or MENU order download-log-retention
+FILEOWNER file member / FILERENAME file name / FILEASCII file ON|OFF
+FILECATEGORY file path / FILEDESC file description
+FILEHIDE file CONFIRM / FILERESTORE file CONFIRM / FILEDELETE file CONFIRM
+FILEDELETE reclaims the physical payload. FILEAUDIT / FILEHISTORY / FILESTATS report events and counts.
+Inherited SIGOP rights apply only within scope. Private mail attachment permissions are unchanged.

@@ -1,0 +1,18 @@
+Topic help
+HELP ACCOUNT   Registration, login and passwords
+HELP READ      Reading, navigation and search
+HELP UNREAD    Read state and unread navigation
+HELP CONTENT   Article changes, cross-board search, sequential reading
+HELP CHAT      Shared chat room
+HELP POST      Posting, replies and editing
+HELP EDITOR    Shared editor and auxiliary commands
+HELP DRAFT     Saving and resuming drafts
+HELP FILES     File vault and downloads
+HELP GATHER    Gather message board
+HELP SETTINGS  Language, paging and preferences
+HELP MAIL      Member mail
+HELP PROFILE   Public profiles
+HELP TALK      Private talk
+HELP ADMIN     Administrator commands
+HELP shows this index; ? shows the current menu; MENU opens the main screen.
+Shortcuts apply at the menu prompt, not inside input fields or the body.

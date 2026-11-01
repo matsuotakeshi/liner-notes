@@ -1,0 +1,25 @@
+============================================================
+  Liner notes — RTBBS風メニュー
+============================================================
+ [読む・探す]
+  B 掲示板       F ファイル保管庫   P プロフィール
+  L 接続履歴     U 会員一覧         S システム案内
+ [交流・メール]
+  M メール       C チャット         T 個別トーク
+  G Gather伝言板 W 接続者一覧       D SYSOP呼出
+  \ 接続者メモ   # 自分の状態       SYSOPMAIL 題名
+ [書く・設定]
+  E 共通エディタ I 個人設定         A 入会・登録
+  LOGIN 名前 / LOGOUT / PASSWD / ACCOUNT
+  CHECK ARTICLES / MAIL / FILES     前回確認後の新着
+  LANG JA|EN / PAGER ON|OFF / MENUMODE BEGINNER|STANDARD|EXPERT
+  GAMES / DOOR 番号                 外部ゲーム
+ [案内・終了]
+  H HELP         ? メニュー再表示   V バージョン
+  O / Q 接続終了 MENU 主画面へ
+[ADMIN_MENU]
+------------------------------------------------------------
+  初めて: A 登録 → B 掲示板 → 番号 選択 → E 投稿
+  キーは画面ごとに変わります。機能名のコマンドも使えます。
+  小文字も可。入力中 /CANCEL で中止。
+  CHAT / MAIL / VAULT / GATHER / ONLINE  機能名でも入力可

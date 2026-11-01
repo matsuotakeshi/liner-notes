@@ -1,0 +1,52 @@
+# Shell configuration, loaded before rc.conf; only administrators may edit.
+# Keep the service disabled until its data and administrator account are ready.
+liner_notes_enable="NO"
+# Working directory defaults to liner_notes_data_dir.
+liner_notes_program="%%PREFIX%%/sbin/liner-notes"
+liner_notes_data_dir="/var/db/liner-notes"
+liner_notes_run_user="liner_notes"
+liner_notes_menu_dir="%%DATADIR%%/menus"
+liner_notes_help_dir="%%DATADIR%%/help"
+liner_notes_banner="%%DATADIR%%/banner.txt"
+liner_notes_bind="127.0.0.1"
+liner_notes_port="2222"
+liner_notes_language="ja"
+liner_notes_registration="open"
+liner_notes_id_mode="free"
+liner_notes_registration_form="simple"
+# Set after registering the first BBS account (one numeric member ID per line):
+# liner_notes_admins="%%ETCDIR%%/admins.conf"
+# Initialize this vault as liner_notes before enabling it:
+# liner_notes_vault_dir="/var/db/liner-notes/vault"
+# Requires a verified lrzsz engine and a private spool owned by liner_notes:
+# liner_notes_zmodem_helper="%%PREFIX%%/bin/liner-notes-zmodem"
+
+# Optional native games; leave unset to disable.
+# liner_notes_doors="%%ETCDIR%%/doors.conf"
+
+# rc.conf may override these; derived log filenames follow liner_notes_log_dir.
+liner_notes_log_dir="/var/log/liner-notes"
+# liner_notes_logfile="/var/log/liner-notes/daemon.log"
+# liner_notes_user_log="/var/log/liner-notes/user.log"
+# liner_notes_chat_log="/var/log/liner-notes/chat.log"
+liner_notes_pidfile="/var/run/liner-notes.pid"
+liner_notes_child_pidfile="/var/run/liner-notes.child.pid"
+
+# Authoritative SQLite. Existing installations: stop and use db-migrate first.
+# Explicit opt-in avoids silently changing an existing installation.
+# liner_notes_database="/var/db/liner-notes/liner.sqlite"
+liner_notes_timezone="UTC"
+liner_notes_limits="%%ETCDIR%%/limits.conf"
+liner_notes_sysinfo="%%DATADIR%%/sysinfo.txt"
+liner_notes_goodbye="%%DATADIR%%/goodbye.txt"
+
+# Optional RTBBS member policy; saved private profile settings are retained.
+liner_notes_rtbbs_member_policy="NO"
+liner_notes_id_prefix="u"
+liner_notes_id_digits="6"
+# liner_notes_id_first="sysop"
+liner_notes_login_text_dir="%%DATADIR%%"
+
+# Optional for a NEW instance only. Existing schema-1 databases are not converted.
+# liner_notes_database="/var/db/liner-notes/liner.sqlite"
+# liner_notes_database_mode="structured"

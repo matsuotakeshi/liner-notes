@@ -1,0 +1,6 @@
+SIGOP rights apply to the assigned board and descendants. SIGOPS lists the scope.
+BOARDSET may create children and change settings inside that scope. SIGOP board member|NONE appoints subordinate moderators, never the actor's own assignment or an unrelated board. Reparenting requires management rights at both the original board and destination parent.
+Select BOARD, then HIDE / RESTORE / INSPECT / RETITLE / WITHDRAW / AUDIT / BOARDOPTIONS / BOARDPASS / INFOEDIT / BOARDACCESS / AUTHOR / BOARDGUEST.
+GROUP member group / UNGROUP manages groups named in the current managed board's read/write rules; SIGOPGROUP delegation is no longer required. Unrelated groups and protected administrators cannot be changed.
+Board deletion, article moves and global member-level changes remain administrator operations.
+File SIGOPs inherit parent paths. FILEBOARDSET configures descendants and FILEBOARDSIGOP appoints subordinate moderators. FILECOPY / BATCH COPY requires management rights at both ends. No self-promotion.

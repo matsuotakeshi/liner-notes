@@ -1,0 +1,21 @@
+RTBBS-style boards and reading
+Main B / BOARDS lists boards. Select a number or BOARD id.
+Board L / NOTES lists base notes. Select an article number or READ id.
+I / INFO: information. E: new post. R: reply to the selected article.
+N asks for a date. Empty input starts CHECK ARTICLES HERE for the current board.
+F asks for an author login. T starts newest-first sequential reading.
+While reading: Enter next, P previous, L repeat, F nonstop.
+D / PARENT: parent. A / CHILD: first reply. TREE: reply tree.
++/- or +N/-N while reading changes direction/offset in article-ID order.
+G / GET [id]: copy into the shared edit buffer. Read permission suffices; BUFFER edits it, /BUFFER imports it into a later draft. K: withdraw as author, admin or inherited SIGOP (Y confirms).
+E while reading: moderator title/author editing.
+0 returns from reading to notes, then to main. MENU goes to main. ? shows screen help.
+SEARCH text searches this board. FIND HERE|ALL|SUBTREE author|* text|*.
+SCAN [ASC|DESC] HERE|ALL|SUBTREE author|* text|* selects sequential reading.
+During SCAN: Enter/CONTINUE next, F nonstop, STOP/0/Q stops the sequence.
+O/Q at an ordinary menu ask Y/N before disconnecting. Reading does not mark articles read.
+SEEN marks read; NEW reads unread; UNREAD lists unread; NEXTBOARD changes unread board.
+List + fetches more results; Enter at the screen pager continues that screen.
+NEWS [ALL|HERE] YYYY-MM-DD filters from configured local midnight.
+
+S  Author profile (keeps the reading position)

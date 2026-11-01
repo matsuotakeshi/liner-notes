@@ -1,0 +1,25 @@
+============================================================
+  Liner notes — RTBBS-style menu
+============================================================
+ [Read and search]
+  B Select board       F File vault       P Profiles
+  L User log     U Member list      S System information
+ [Communication and mail]
+  M Mail         C Chat             T Private talk
+  G Gather       W Online           D Call SYSOP
+  \ Memo         # Account          SYSOPMAIL title
+ [Write and settings]
+  E Shared editor I Settings        A Register / apply
+  LOGIN name / LOGOUT / PASSWD / ACCOUNT
+  CHECK ARTICLES / MAIL / FILES     New since last check
+  LANG JA|EN / PAGER ON|OFF / MENUMODE BEGINNER|STANDARD|EXPERT
+  GAMES / DOOR id                   Native games
+ [Help and exit]
+  H HELP         ? Redisplay menu   V Version
+  O / Q Disconnect                  MENU Main screen
+[ADMIN_MENU]
+------------------------------------------------------------
+  First visit: A register, B boards, number select, E post.
+  Shortcuts depend on the current screen. Named commands remain available.
+  Lowercase is accepted. /CANCEL cancels an input prompt.
+  CHAT / MAIL / VAULT / GATHER / ONLINE  Named commands also work

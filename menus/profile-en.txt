@@ -1,0 +1,4 @@
+PROFILE
+ L List / P Member / S Search / W Edit biography
+ E Edit fields / 0 Back / ? Menu
+ PROFILESET / PROFILEVIS / PROFILEFIND

@@ -1,0 +1,18 @@
+操作別ヘルプ
+HELP ACCOUNT   登録・ログイン・パスワード
+HELP READ      閲覧・移動・検索
+HELP UNREAD    既読と未読巡回
+HELP CONTENT   記事管理・横断検索・連続読み出し
+HELP CHAT      チャット室
+HELP POST      投稿・返信・本文編集
+HELP EDITOR    共通エディタ・補助操作
+HELP DRAFT     下書きの保存と再開
+HELP FILES     ファイル保管庫
+HELP GATHER    Gather伝言板
+HELP SETTINGS  言語・ページ送り・表示設定
+HELP MAIL      会員間メール
+HELP PROFILE   公開プロフィール
+HELP TALK      個別トーク
+HELP ADMIN     管理者の操作
+HELPでこの一覧、?で現在画面の案内、MENUで主画面。
+短縮キーはメニュー画面用です。本文や入力欄では文字として扱います。

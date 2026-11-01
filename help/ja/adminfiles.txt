@@ -1,0 +1,12 @@
+ファイル保管庫の管理
+FILEBOARDINFO パス / FILEBOARDSET パス|閲覧|登録（ルートは -）
+FILEBOARDNAME パス|表示名 / FILEINFOEDIT パス
+FILEBOARDSIGOP パス|会員番号 または NONE
+FILEBOARDPASS パス / FILEBOARDPASS パス NONE CONFIRM
+FILEBOARDOPTIONS パス|BOARDまたはMENU 順序 取得履歴保持件数
+FILEOWNER ファイル番号 会員番号 / FILERENAME ファイル番号 名前
+FILEASCII ファイル番号 ON|OFF / FILECATEGORY ファイル番号 パス
+FILEDESC ファイル番号 説明 / FILEHIDE ファイル番号 CONFIRM
+FILERESTORE ファイル番号 CONFIRM / FILEDELETE ファイル番号 CONFIRM
+削除はファイル本体を回収します。FILEAUDIT / FILEHISTORY / FILESTATSで履歴・回数を確認。
+親から継承した担当SIGOPも担当範囲を管理できます。私信添付の閲覧権限は広がりません。

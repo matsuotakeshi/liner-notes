@@ -1,0 +1,8 @@
+READ
+ Enter Next / P Previous / L Repeat / F Continuous / +/- Direction/offset
+ D Parent / A First reply / R Reply / G Copy body
+ K Withdraw confirmation / E Header edit (moderator)
+ 0 Notes / ? Menu / TREE Reply tree
+ SEEN marks read; NEW reads unread. O/Q disconnect.
+
+S  Author profile (keeps the reading position)

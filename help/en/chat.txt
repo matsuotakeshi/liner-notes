@@ -1,0 +1,21 @@
+Chat room (active members only)
+CHAT enters the shared room. Type a line to send it.
+W or /WHO: all logged-in connections; ? or /HELP: this help.
+// or /LEAVE: return to BBS; /QUIT: disconnect.
+/LANG ja or /LANG en: change display language.
+/SAY text: send W, ?, //, or slash-prefixed text literally.
+Up to 512 UTF-8 bytes per line; at least 0.5 seconds between messages.
+The last 20 room events are shown on entry. Public chat can be logged using --chat-log; private talk is not logged.
+The in-memory replay is cleared when the last participant leaves or the server stops; disk logs remain.
+Handles are taken at entry; login names identify members.
+T or /TALK: select a connection number; T number or /TALK number selects directly.
+/REPLY selects the most recent private sender. Private text is never in room history.
+Inside private talk, // or /END returns to the room; /LEAVE leaves the room.
+Unavailable targets block text until you return or select again. /SAY stays private.
+Private recipients can be logged-in members outside this room. CALL notifies available administrators.
+ /TALK OFF|ON: disable/enable private reception; /MUTE login: hide their private and public speech; /UNMUTE login: restore; /MUTES: list. Settings are saved automatically and shared across your connections. Presence remains visible.
+From BBS: TALK [connection] for outside-room talk; ONLINE lists logged-in connections; /REPLY replies. // returns. Busy editing/password/transfer sessions do not receive private messages.
+From the BBS screen: MEMO [text] sets/clears a connection memo; ONLINE shows it. CALL [reason] notifies available administrators, once per 30 seconds. Disabled with chat.
+Legacy keys: D calls SYSOP, # shows connection status, \ enters a connection memo (`` also accepted).
+
+W lists all connections, including members outside chat. # displays current time, connection duration, online count and own usage totals. T [number] sends one private line then returns to chat. /TALK [number] remains a continuing private conversation; from BBS use TALK [number]. \ enters a connection memo.

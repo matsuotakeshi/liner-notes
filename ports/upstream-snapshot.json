@@ -1,0 +1,16 @@
+{
+  "url": "https://github.com/freebsd/freebsd-ports/tree/main/comms/lrzsz",
+  "retrieved": "2026-10-30",
+  "files": {
+    "comms/lrzsz/distinfo": "19431f489a265d747620df27cdb081f8fc0c081f5ab903cdf4d2a9c8b605bd5d",
+    "comms/lrzsz/Makefile": "de4c00913804cdfe15a103df812b38373e59c5529880010c1691715216e5ca47",
+    "comms/lrzsz/pkg-descr": "e7c8ec8534fe5d2af441ff77e8f9c2830dd7e6bb37fc8683895776667b72a75c",
+    "comms/lrzsz/pkg-plist": "116f40315dbc01bf3f40b91068bde16e2602b23050cb7f4920a3cc639fafc485",
+    "comms/lrzsz/files/patch-lrz.c": "9cba164a55d94f9774e77f389fa3d5facd4ebbecf6cb2d5278ee4fd959ca83f7",
+    "comms/lrzsz/files/patch-lsz.c": "aee2cb500192d821b148d80fcbd1612c5d940dd61858352cbddcd859695d0d32",
+    "comms/lrzsz/files/patch-Makefile.in": "871aa1a75e7e7f72024b0c3023e45e3936dcd6d39904615d41eebcf6ea3ba806",
+    "comms/lrzsz/files/patch-Makefile.in.in": "e4d35146322fc0f4b766b9b8fb4d352003e482cc6bacdf6cb20fd9649ad2c2fc",
+    "comms/lrzsz/files/patch-rbsb.c": "071e264fdde1093ea0587e7dd778aa08982e2afd7aa51ba72ca117f0034e97d5",
+    "comms/lrzsz/files/patch-zm.c": "bc0324f5f304e9996235aedefd4bdc73924d62d1aaa63757b8eb984fb2a95a49"
+  }
+}

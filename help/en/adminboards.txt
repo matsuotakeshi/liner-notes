@@ -1,0 +1,12 @@
+Board administration
+BOARDINFO id / BOARDSET id|parent|read|write|title|description
+BOARDOPTIONS id BOARD|MENU order article-limit body-byte-limit access-log-limit
+BOARDPASS id / BOARDPASS id NONE CONFIRM / INFOEDIT id
+SIGOP board member|NONE / SIGOPS / SIGOPGROUP board group
+BOARDGROUP board old-group new-group CONFIRM / BOARDGUEST board ON|OFF
+WITHDRAW article CONFIRM: author, administrator or inherited SIGOP
+HIDE / RESTORE / INSPECT article: moderation distinct from withdrawal
+RETITLE article title / AUTHOR article member CONFIRM
+MOVE root destination CONFIRM / MOVEBRANCH article destination CONFIRM
+BOARDDELETE board CONFIRM / BOARDDELETEALL board CASCADE CONFIRM
+BOARDLOG / BOARDACCESS board / AUDIT ARTICLE article

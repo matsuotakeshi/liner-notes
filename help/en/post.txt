@@ -1,0 +1,18 @@
+Posting, replies and editing
+E at the board menu prompts for a title; R replies to the selected article. POST title / REPLY id title also work.
+In the body editor (title: 80 bytes; body: 262144 bytes including line endings):
+A line containing only . posts; /PREVIEW previews; /CANCEL discards the in-memory draft.
+/TITLE title changes the title; /LINES lists numbered lines.
+/REPLACE number text replaces a line; /DELETE number removes it.
+/INSERT number text inserts a line, including after the last line.
+/UNDO reverts one edit; /SAVE stores a member draft.
+/HELP shows this help without changing the body or Undo.
+Double a leading dot to enter it literally. //HELP and //SAVE enter /HELP and /SAVE as text.
+Ordinary HELP and menu shortcuts are body text while editing.
+Help is not executed during password input.
+EDITOR BETA / LINE; /EDITOR BETA / LINE while composing. Beta: // finish, /E line mode, /N clear, /M numbering. Line: nn select, E[n] edit, A append / U timed receive, I[n] insert, N clear, D range delete, L range list, Q range quote, S search, M numbering, 0 confirm. Ranges: L3-5, D-2. // returns from input. /SAVE /CANCEL /UNDO /PREVIEW /TITLE remain available.
+BUFFER edits a shared 262144-byte buffer. In editors, /BUFFER imports it and /TOBUFFER copies the current text into it. /SAVE or . commits BIOEDIT and FILEINFOEDIT documents. /ONLINE /W /STATUS /TALK [connection] /MEMO text /CALL are available while editing. Ending talk returns to the document.
+
+Guest posting requires explicit BOARDGUEST permission. HANDLE name lasts for the connection; author is recorded as guest:name.
+
+Beta // opens confirmation: W commit / E edit / 0 cancel. The extended . command commits immediately.

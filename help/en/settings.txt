@@ -1,0 +1,18 @@
+Language, paging and preferences
+LANG ja / LANG en selects Japanese or English.
+PAGER ON / PAGER OFF controls screen paging (initially OFF).
+While paging: Enter continues, Q closes the display, OFF flushes the rest.
+Closing help preserves article selection and result-page position.
+PAGER SIZE columns rows sets dimensions; Telnet also supports NAWS.
+PREFS summarizes saved settings. PREFS SAVE stores language, paging, editor type, line numbers, transfer protocol and screen dimensions.
+PREFS LOAD reloads them. Login restores them too.
+RAW selects protocol output; MENU returns to menus. QUIT / O / Q disconnects at the normal prompt.
+Use D in Settings to inspect all current values.
+
+MENUMODE BEGINNER / STANDARD / EXPERT: home menu always / initially / explicitly; saved per account.
+LOGOUT / QUIT saves before leaving. Network disconnects also queue a save; process failure or revocation can prevent it.
+GAMES lists native games; DOOR id starts one. Exit or Ctrl-] returns to the BBS.
+
+D in Settings displays actual language, editor, menu verbosity, paging, screen dimensions, timezone and transfer protocol. S reads external sysinfo.txt; V shows version. O/Q ask Y/N; QUIT is immediate. goodbye.txt is displayed on exit.
+
+Line numbering (editor M / /M) and PROTOCOL are included in PREFS SAVE/LOAD, login restoration and normal disconnect saving. Abrupt process failure or revoked credentials can prevent a save.

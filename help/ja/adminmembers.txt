@@ -1,0 +1,12 @@
+会員・申請の管理
+MEMBERS / MEMBER 会員番号 / RIGHTS 会員番号
+APPLICATIONS / APPLICATION 会員番号: 申請の一覧・詳細
+APPLICATIONSET 会員番号 項目 値 / APPROVE 会員番号
+REJECT 会員番号 CONFIRM / DELETEAPPLICATION 会員番号 CONFIRM
+SUSPEND 会員番号 / RESUME 会員番号: 利用停止・解除
+DELETEUSER 会員番号 CONFIRM: 退会扱い。会員番号とログイン名は再利用しません。
+RESETPASS 会員番号: 新パスワードを非表示入力
+LEVEL 会員番号 0..5 / GROUP・UNGROUP 会員番号 1..100
+GROUPMOVE 元グループ 先グループ CONFIRM
+MEMBERPROFILE 会員番号 項目 値: プロフィール編集
+レベル5だけでは管理者権限は付きません。権限変更は接続を失効させる場合があります。

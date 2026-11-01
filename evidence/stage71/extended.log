@@ -1,0 +1,138 @@
+cc  -I/usr/local/include -O2 -pipe  -std=c11 -Wall -Wextra -Werror -Isrc tests/test_stage61_userlog.c src/userlog.c -lcrypto -L/usr/local/lib -lsqlite3  src/storage_sqlite.c -I/usr/local/include -pthread -lcrypto -L/usr/local/lib -lsqlite3 -o test-stage61-userlog
+python3 tests/test_userlog.py ./test-stage61-userlog
+PASS retained complete connections, concurrent slots, lifetime totals and restart
+python3 tests/test_stage61.py ./runtime ./vaultctl
+stage61 profiles/vault: PASS
+python3 tests/test_stage61_ui.py ./runtime
+PASS stage61 level limits/admin exemption/public USERLOG/external HELP/menu and banner
+python3 tests/test_stage61_safety.py ./runtime ./vaultctl
+PASS stage61 restart/privacy/missing and incomplete journals/group99/editor isolation/UTF8 text
+python3 tests/test_maintenance.py ./runtime ./vaultctl ./memberctl
+PASS maintenance: hashes, corruption/truncation/CRC, traversal, links, locks, changed source, exclusive output, copy-only failures
+PASS maintenance runtime: restore + compact restart, moved replies, monotonic IDs, deleted mail, draft, group100, private profile/attachment, public vault, original unchanged
+cc  -I/usr/local/include -O2 -pipe  -std=c11 -Wall -Wextra -Werror tests/generate_scale.c src/storage_sqlite.c -I/usr/local/include -pthread -lcrypto -L/usr/local/lib -lsqlite3 -o generate-scale
+python3 tests/test_state_compact.py
+PASS state compaction: superseded invalid password, guide control, birthday and extras padding are rejected
+python3 tests/test_stage63_read_errors.py ./runtime
+PASS lazy body faults: article/mail searches reject disk read failure; peer commands survive
+python3 tests/test_stage63.py ./runtime ./vaultctl ./memberctl
+PASS stage63: connection status, protected lifecycle, pending rejection/deletion, retire, 16 attachments, restart/draft/privacy/reclamation, full state compaction
+python3 tests/test_stage63_limits.py ./runtime ./vaultctl
+PASS stage63 quotas: IDs >2000, events >10000, physical total >256MiB, zero unlimited, lowering quotas, invalid config, private attachments
+python3 tests/test_stage63_memory.py ./runtime ./generate-scale
+{"articles": 12000, "mails": 12000, "body_bytes": 4096, "baseline_rss": 79036416, "loaded_rss": 88588288, "growth": 9551872}
+PASS stage63 memory: body storage on disk; 12000 article/mail read/search/reply/send/seen; RSS growth <48MiB
+python3 tests/test_index_fault.py ./runtime
+PASS: real file-size quota fails SQLite startup closed; original journals unchanged
+python3 tests/test_stage64_batch_names.py
+PASS: duplicate/max-byte UTF-8 attachment names and prefix collisions preserve all files
+python3 tests/test_stage64.py ./runtime ./vaultctl
+b'BOARD UPDATED 2'
+b'BOARD UPDATED 3'
+b'BOARD UPDATED 4'
+b'SIGOP SET 2 2'
+b'BOARD OPTIONS SAVED'
+b'ERR admin required'
+b'BOARD UPDATED 3'
+b'BOARD 3 Child'
+b'RIGHTS 3 LEVEL 2 GROUPS 10 STATUS active'
+b'SIGOP GROUP SAVED'
+b'RIGHTS 3 LEVEL 2 GROUPS 10 STATUS active'
+b'ERR admin required'
+b'ERR admin required'
+b'BOARD 3 Child'
+b'BOARD 4 Elsewhere'
+b'BOARD 2 Forum'
+b'ERR profile permission or value'
+b'PROFILE SAVED'
+b'MAIL EDIT end with . or /CANCEL'
+b'MAIL SENT 1'
+b'MAIL IMPORTED TO BUFFER'
+b'MAIL ERROR unavailable'
+b'MAIL CLOSED'
+b'MAIL CLOSED'
+b'CHECK CANCELLED'
+b'CHECKPOINT SAVED'
+b'FILEBOARD UPDATED'
+b'FILEBOARD UPDATED'
+b'FILEBOARD UPDATED'
+b'FILEBOARD UPDATED'
+b'FILEBOARD UPDATED'
+b'FILEBOARD UPDATED'
+b'ERR vault denied'
+b'FILEBOARD UPDATED'
+b'NEW PASSWORD'
+b'CONFIRM PASSWORD'
+b'FILEBOARD UPDATED'
+b'ERR vault denied'
+b'PASSWORD'
+b'FILEBOARD UNLOCKED 2 8'
+b'BOARD 3 Child'
+b'WITHDRAW SAVED 1'
+b'BOARD OPTIONS SAVED'
+b'BOARD GROUP MOVED'
+PASS stage64 inherited/scoped roles, subtree search, private import, checkpoints, vault passwords, profiles, reclaim and replay
+python3 tests/test_stage64_details.py ./runtime
+PASS stage64 4096-byte input, 256KiB article/mail/draft/buffer, reverse/relative reads, timed U, confirmation, generated IDs, detailed application and review/restart
+python3 tests/test_stage64_vault.py ./runtime ./vaultctl
+PASS stage64 inherited vault management, rename, retained receipts and totals, menu nodes, parent password revision/logout/restart, physical deletion
+python3 tests/test_stage64_persistence.py ./runtime ./vaultctl
+PASS: separate article/mail/file checkpoints, pagination completion, cancellation/restart, interrupted group intent recovery
+python3 tests/test_stage64_reclaim.py ./runtime
+PASS: management CLI backup/reclaim/restart; withdrawn body and old FTS removed, HIDE preserved, IDs and checkpoint retained, originals unchanged
+python3 tests/test_stage65.py ./runtime
+BOARDSET 2|1|all|all|Public|public b'BOARD UPDATED 2'
+BOARDSET 3|1|member|member|Other|other b'BOARD UPDATED 3'
+BOARDSET 4|2|all|all|Child|child b'BOARD UPDATED 4'
+SIGOP 2 2 b'SIGOP SET 2 2'
+BOARDGUEST 3 ON b'ERR admin required'
+boardguest 2 on b'BOARD GUEST SAVED'
+HANDLE visitor b'GUEST HANDLE guest:visitor'
+BOARD 2 b'BOARD 2 Public'
+BOARD 2 b'BOARD 2 Public'
+AUTHOR 1 3 CONFIRM b'ERR admin required'
+author 1 3 confirm b'AUTHOR CHANGED 1 3'
+BOARD 2 b'BOARD 2 Public'
+MOVEBRANCH 2 3 CONFIRM b'THREAD MOVED 2 3'
+BOARD 3 b'BOARD 3 Other'
+MENUMODE EXPERT b'MENU MODE SAVED'
+LANG ja b'\xe8\xa1\xa8\xe7\xa4\xba\xe8\xa8\x80\xe8\xaa\x9e: ja / LANG ja: \xe6\x97\xa5\xe6\x9c\xac\xe8\xaa\x9e / LANG en: English'
+PAGER ON b'PAGER ON'
+LOGOUT b'LOGGED OUT'
+PREFS b'PREFS STORED ja ON'
+BOARD 3 b'BOARD 3 Other'
+BOARDDELETEALL 2 CASCADE CONFIRM b'BOARD TREE DELETED'
+BOARD 2 b'ERR board unavailable'
+BOARD 4 b'ERR board unavailable'
+BOARD 3 b'BOARD 3 Other'
+BOARD 3 b'BOARD 3 Other'
+BOARD 2 b'ERR board unavailable'
+stage65 core permissions/restart/compaction passed
+python3 tests/test_stage65_delete_recovery.py ./runtime
+stage65 cascade intent recovery, deepest-first deletion, repeat restart and no duplicate withdrawals passed
+python3 tests/test_stage65_doors.py ./runtime
+stage65 native PTY door: auth, level, environment, return, escape passed
+python3 tests/test_stage65_terminal.py ./runtime
+stage65 Telnet PTY CRLF, connections, revocation cleanup, U clear/append confirmation passed
+python3 tests/test_stage65_ui.py ./runtime
+stage65 menu quantity and continuous reader passed
+python3 tests/test_stage65_scan_telnet.py ./runtime
+stage65 Telnet F/CRLF, pager entry, Ctrl-C cancellation and mail continuous reading passed
+python3 tests/test_stage65_database.py ./runtime ./vaultctl
+stage65 SQL cache: reuse, eviction, mail, crash replay, tamper rejection passed
+python3 tests/test_stage66_commands.py ./runtime ./vaultctl
+PASS stage66: native Telnet RTBBS main/board/read/mail/vault/settings/profile keys, confirmation, authorization, persistence
+python3 tests/test_stage67.py ./runtime ./vaultctl
+PASS stage67 permission, shared buffer, file scope, timezone/DST
+python3 tests/test_stage67_database.py ./runtime
+PASS stage67 authoritative DB: migration preserves originals, crash persistence, exclusive instance, no legacy dependency, missing block rejection
+python3 tests/test_stage67_ui.py ./runtime ./vaultctl
+PASS stage67 Telnet reading, shared buffer, role menus, scope, questions, timezone, goodbye
+python3 tests/test_stage67_limits_checks.py ./runtime ./vaultctl
+PASS stage67 quotas preserve existing data; scoped auto checkpoint waits for display and respects cancellation
+python3 tests/test_stage68.py ./runtime
+PASS stage68 scoped news, filtered P/L, disconnect preferences, journal and SQLite
+python3 tests/test_stage69.py ./runtime ./vaultctl
+PASS stage69 role boundaries, implicit groups, privacy opt-in, current-board DOS match, copy and protocol replay/compact
+python3 tests/test_stage69_ui.py ./runtime ./vaultctl
+PASS stage69 Telnet file/batch/hierarchy, profile forms, editor ranges/highlights/numbers, memo, W/#/one-shot T, birthday and registration confirmation

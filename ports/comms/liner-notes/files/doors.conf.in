@@ -1,0 +1,2 @@
+# id|minimum-level|seconds|absolute-executable|absolute-work-directory|title
+# 1|0|600|%%DATADIR%%/scripts/door_guess.py|/var/db/liner-notes/games|Number guessing

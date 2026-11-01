@@ -1,0 +1,6 @@
+Connections, announcements and shutdown
+CONNECTIONS: all connections, transport, activity, elapsed/idle time and traffic
+DISCONNECT connection CONFIRM / ANNOUNCE text
+SHUTDOWN seconds reason (1..86400) / SHUTDOWN CANCEL / SHUTDOWN NOW CONFIRM
+In chat: /KICK login
+USERLOG ALL / USERSTATS ALL
