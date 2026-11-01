@@ -1,5 +1,6 @@
 /* Test-only short-write shim: constrain sequential journal writes, not SQLite
  * pwrite() calls. Never linked into, or enabled by, the production runtime. */
+#define _GNU_SOURCE
 #define _POSIX_C_SOURCE 200809L
 #include <sys/types.h>
 #include <sys/stat.h>

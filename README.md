@@ -12,6 +12,7 @@ FreeBSD向けのC製BBSです。HyperNotes型の返信ツリー、会員間メ�
 
 ## 最初に読む文書
 
+- [Rocky Linux / AlmaLinuxでの構築・systemd](LINUX.md) / [対応OSの見通し](PLATFORMS.md)
 - [新規インストールから運用開始](INSTALL.md)
 - [今回の変更](STAGE71.md) / [既存環境の更新](UPGRADING.md)
 - [旧RTBBS互換モード](STAGE69.md)
