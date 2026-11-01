@@ -7,8 +7,8 @@ from test_telnet_client import run as native_client
 
 
 def run(binary):
-    if os.name!='posix':
-        print('SKIP: SSH entry PTY check requires POSIX'); return
+    if not sys.platform.startswith('freebsd'):
+        print('SKIP: bundled SSH entry uses the FreeBSD Telnet client'); return
     entry=pathlib.Path(__file__).resolve().parents[1]/'scripts/liner-notes-ssh'
     for args in [['0'],['65536'],['-1'],['abc'],['2222;id'],['1','2'],['00022'],['9'*100]]:
         result=subprocess.run(['/bin/sh',str(entry)]+args,capture_output=True,timeout=5)

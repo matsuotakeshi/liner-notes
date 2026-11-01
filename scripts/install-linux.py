@@ -8,6 +8,7 @@ ROOT=Path(__file__).resolve().parents[1]
 
 def install(destdir,prefix,python):
     if sys.platform!='linux':raise ValueError('This installer targets Linux; use ports on FreeBSD')
+    if sys.version_info<(3,11):raise ValueError('Run this installer with Python 3.11 or later')
     for value in (prefix,python):
         if not re.fullmatch(r'/[A-Za-z0-9_./-]+',value) or '..' in Path(value).parts:
             raise ValueError('Use absolute paths without whitespace or parent traversal')
@@ -35,7 +36,8 @@ def install(destdir,prefix,python):
             if os.path.exists(name):os.unlink(name)
     for source,installed in [('runtime','sbin/liner-notes'),('memberctl','bin/liner-notes-memberctl'),('vaultctl','bin/liner-notes-vaultctl')]:
         put(prefix+'/'+installed,(ROOT/source).read_bytes(),0o755)
-    for p in (ROOT/'scripts').glob('*.py'):put(share+'/scripts/'+p.name,p.read_bytes())
+    for p in (ROOT/'scripts').glob('*.py'):
+        put(share+'/scripts/'+p.name,p.read_bytes(),0o755 if p.name=='door_guess.py' else 0o644)
     put(share+'/scripts/check-resume.py',(ROOT/'ports/test-resume.py').read_bytes())
     def wrapper(name,script,setup='',arguments=''):
         text='#!/bin/sh\n'+setup+'exec '+shlex.quote(python)+' -B '+shlex.quote(share+'/scripts/'+script)+' '+arguments+' "$@"\n'
@@ -45,13 +47,14 @@ def install(destdir,prefix,python):
     wrapper('liner-notes-zmodem','zmodem_host.py',
             'export LINER_NOTES_RESUME_RECEIPT="${LINER_NOTES_RESUME_RECEIPT:-/var/lib/liner-notes/lrz-resume.json}"\n',
             '--receiver "${LINER_NOTES_LRZ:-'+prefix+'/bin/lrz}" --sender "${LINER_NOTES_LSZ:-'+prefix+'/bin/lsz}" --spool-root "${LINER_NOTES_SPOOL_ROOT:-/var/lib/liner-notes/spool}" --')
-    put(prefix+'/bin/liner-notes-ssh',(ROOT/'scripts/liner-notes-ssh').read_bytes(),0o755)
     for directory in ('help','menus'):
         for p in (ROOT/directory).rglob('*.txt'):put(share+'/'+p.relative_to(ROOT).as_posix(),p.read_bytes(),sample=True)
     for name in ('banner','sysinfo','goodbye','welcome','systemnews','birthday','greeting-06','greeting-12','greeting-18'):
         put(share+'/'+name+'.txt',(ROOT/(name+'.txt')).read_bytes(),sample=True)
     for name in ('limits','vault-limits','doors'):
-        put(config+'/'+name+'.conf',(ROOT/(name+'.example.conf')).read_bytes(),sample=True)
+        content=(ROOT/(name+'.example.conf')).read_bytes()
+        if name=='doors':content=('# id|minimum-level|seconds|absolute-executable|absolute-work-directory|title\n# 1|0|600|'+share+'/scripts/door_guess.py|/var/lib/liner-notes/games|Number guessing\n').encode()
+        put(config+'/'+name+'.conf',content,sample=True)
     for p in ROOT.glob('*.md'):put(prefix+'/share/doc/liner-notes/'+p.name,p.read_bytes())
     for name,path in [('liner-notes.env','/etc/liner-notes/liner-notes.env'),('liner-notes.service','/usr/local/lib/systemd/system/liner-notes.service')]:
         content=(ROOT/'linux'/name).read_text().replace('@PREFIX@',prefix).encode()

@@ -1,7 +1,7 @@
 #!/bin/bash
 set -euo pipefail
 cat /etc/os-release
-dnf install -y clang gcc make openssl-devel sqlite-devel python3.11 tar gzip procps-ng shadow-utils systemd
+dnf install -y clang gcc make openssl-devel sqlite-devel python3.11 tar gzip procps-ng shadow-utils systemd telnet
 useradd --create-home bbstest
 mkdir /home/bbstest/source
 tar -C /source --exclude=.git --exclude=build -cf - . | tar -C /home/bbstest/source -xf -
