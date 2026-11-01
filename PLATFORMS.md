@@ -15,3 +15,5 @@
 Windowsネイティブ化では、保存領域の排他・同期・置換、外部転送プロセスと通信路、ConPTY等によるゲーム端末、Windowsサービス、パス・権限モデルをOS依存層へ分離する必要があります。記事・メール・会員・ボード権限の共通ロジックは維持する方針が適切です。これはソースを基にした見通しで、Windows版の動作確認結果ではありません。
 
 今回のLinux対応に、他のUNIXやWindowsネイティブ版の実装・公開は含めていません。
+
+参考: [MicrosoftのWSL概要](https://learn.microsoft.com/en-us/windows/wsl/about)、[WSLのsystemd](https://learn.microsoft.com/en-us/windows/wsl/systemd/)、[Windowsの疑似コンソール](https://learn.microsoft.com/en-us/windows/console/creating-a-pseudoconsole-session)。WSLにsystemdがあることと、本アプリのWindows常駐運用を検証済みであることは別です。

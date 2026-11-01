@@ -74,6 +74,10 @@ sudo -u liner_notes /usr/local/bin/liner-notes-check-resume \
 
 成功後、`LINER_NOTES_OPTIONS`へ`--zmodem-helper /usr/local/bin/liner-notes-zmodem`を追加して再起動します。繰り返し検証しても既存記録は安全に再利用・更新されます。ディストリビューション付属lrzszの再開可否を、パッケージ名だけで判断しません。
 
+## ドアゲーム
+
+ゲームを使用する場合は、`/etc/liner-notes/doors.conf`のサンプルを編集し、`LINER_NOTES_OPTIONS`へ`--doors /etc/liner-notes/doors.conf`を追加します。ゲーム用作業ディレクトリをサービス所有者で作成してください。付属サンプルは`/usr/local/share/liner-notes/scripts/door_guess.py`です。Windows/DOS用ゲームの互換実行は含みません。
+
 ## 更新と検証範囲
 
 更新前にサービス・外部転送を停止し、データと`/etc/liner-notes`、編集済み`/usr/local/share/liner-notes`をバックアップしてください。新しいソースを別ディレクトリで構築し、`install-linux`を実行します。
@@ -91,3 +95,5 @@ DBの詳細・復元上の制約は[UPGRADING.md](UPGRADING.md)を参照して�
 [Linux CI](https://github.com/matsuotakeshi/liner-notes/actions/workflows/linux.yml)は、Ubuntuホスト上のRocky/Almaコンテナ内でビルドし、一般ユーザーで回帰試験と転送試験を実行します。systemd unitは構文検証しますが、コンテナ試験だけではOS起動時の自動起動、SELinux enforcing下の運用、実際のファイアウォール設定まで実証できません。SELinuxを無効にせず、設置先でラベルと拒否ログを確認してください。
 
 対応OS全体の見通しは[PLATFORMS.md](PLATFORMS.md)を参照してください。
+
+依存パッケージの参考: [AlmaLinux 9.2のPython 3.11提供](https://wiki.almalinux.org/release-notes/9.2)、[RHEL 9のPython導入](https://docs.redhat.com/en/documentation/red_hat_enterprise_linux/9/html-single/installing_and_using_dynamic_programming_languages/index)。

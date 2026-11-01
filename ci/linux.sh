@@ -22,3 +22,4 @@ useradd --system --home-dir /var/lib/liner-notes --shell /sbin/nologin liner_not
 systemd-analyze verify /usr/local/lib/systemd/system/liner-notes.service
 /usr/local/bin/liner-notes-admin --help
 /usr/local/bin/liner-notes-check-resume --help
+python3.11 tests/test_linux_service.py
