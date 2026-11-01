@@ -1,5 +1,7 @@
 CC?=cc
 PYTHON?=python3
+PREFIX?=/usr/local
+DESTDIR?=
 CFLAGS?=-O2 -g
 CPPFLAGS?=
 LDFLAGS?=
@@ -250,3 +252,7 @@ test-stage71: all
 	$(PYTHON) tests/test_stage71.py ./runtime
 	$(PYTHON) tests/test_stage71_reconcile.py ./runtime ./vaultctl
 check: test-stage71
+
+.PHONY: install-linux
+install-linux: all
+	$(PYTHON) scripts/install-linux.py --prefix "$(PREFIX)" --destdir "$(DESTDIR)"
