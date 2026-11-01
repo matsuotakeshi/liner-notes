@@ -12,9 +12,6 @@ runuser -u bbstest -- bash -c '
   export CC=clang
   make -j2 CC=clang PYTHON=python3.11 SQLITE_CFLAGS= SQLITE_LIBS=-lsqlite3
   python3.11 tests/test_linux_install.py
-  make CC=clang PYTHON=python3.11 SQLITE_CFLAGS= SQLITE_LIBS=-lsqlite3 test test-stage65 test-stage70 test-stage71
-  python3.11 scripts/build-lrzsz.py /home/bbstest/lrzsz-check
-  make CC=clang PYTHON=python3.11 SQLITE_CFLAGS= SQLITE_LIBS=-lsqlite3 test-zmodem LRZ=/home/bbstest/lrzsz-check/local/bin/lrz LSZ=/home/bbstest/lrzsz-check/local/bin/lsz
 '
 cd /home/bbstest/source
 python3.11 scripts/install-linux.py --python /usr/bin/python3.11
@@ -23,3 +20,14 @@ systemd-analyze verify /usr/local/lib/systemd/system/liner-notes.service
 /usr/local/bin/liner-notes-admin --help
 /usr/local/bin/liner-notes-check-resume --help
 python3.11 tests/test_linux_service.py
+runuser -u bbstest -- bash -c '
+  set -euo pipefail
+  cd /home/bbstest/source
+  export CC=clang
+  if ! python3.11 scripts/build-lrzsz.py /home/bbstest/lrzsz-check; then
+    cat /home/bbstest/lrzsz-check/build.txt
+    exit 1
+  fi
+  make CC=clang PYTHON=python3.11 SQLITE_CFLAGS= SQLITE_LIBS=-lsqlite3 test test-stage65 test-stage70 test-stage71
+  make CC=clang PYTHON=python3.11 SQLITE_CFLAGS= SQLITE_LIBS=-lsqlite3 test-zmodem LRZ=/home/bbstest/lrzsz-check/local/bin/lrz LSZ=/home/bbstest/lrzsz-check/local/bin/lsz
+'
