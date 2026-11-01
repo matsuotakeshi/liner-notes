@@ -7,7 +7,7 @@ Linux対応ブランチのソース構築手順です。対象はRocky Linux 9 /
 管理者で依存パッケージを導入します。Python 3.11はOS標準Pythonを置換せず、明示的に指定します。
 
 ```sh
-sudo dnf install clang make openssl-devel sqlite-devel python3.11 git tar gzip
+sudo dnf install clang gcc make openssl-devel sqlite-devel python3.11 git tar gzip telnet
 git clone --branch linux-support https://github.com/matsuotakeshi/liner-notes.git
 cd liner-notes
 make CC=clang PYTHON=python3.11

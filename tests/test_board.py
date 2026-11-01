@@ -132,7 +132,13 @@ def run(binary):
             assert read(c, 2)[0] == read(c, 3)[0] == 1
             assert post(c, 'after restart', 'persist') == 20
         finally:
-            c.close(); s.close(crash=True)
+            # Crash after the acknowledged post while the guest is idle.
+            # Closing the socket first races SIGKILL against the userlog's
+            # disconnect write, testing a truncated log instead of article durability.
+            try:
+                s.close(crash=True)
+            finally:
+                c.close()
         s = Server(binary, store); c = Client(s.port)
         try:
             assert read(c, 20) == (0, 'after restart', 'persist\r\n')
