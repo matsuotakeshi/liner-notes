@@ -72,6 +72,9 @@ def run(binary):
                 a.send(b'/TALK\n');a.send(b'not-a-number\n');until(a,b'CHAT ERROR target')
                 rid=replacement.greeting.split()[1].decode()
                 command(a,rid,b'CHAT TALK OPEN '+rid.encode())
+                # Selection/roster round trips can take less than the 500 ms
+                # send interval on Linux. Do not rely on incidental latency.
+                time.sleep(.55)
                 command(a,'private-after-reselect',b'CHAT PRIVATE TO ');until(replacement,b'CHAT PRIVATE FROM ')
                 command(admin,'SUSPEND 2',b'SUSPENDED 2');until(a,b'CHAT TALK GONE')
                 command(a,'blocked-by-suspension',b'CHAT ERROR target');roster(c,b'blocked-by-suspension')
