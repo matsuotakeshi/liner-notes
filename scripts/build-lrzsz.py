@@ -5,6 +5,7 @@ import hashlib
 import json
 import difflib
 import os
+import sys
 import pathlib
 import subprocess
 import tarfile
@@ -58,9 +59,12 @@ def main():
     source.write_text(changed)
     (root/'liner-notes-crc32.patch').write_text(''.join(difflib.unified_diff(original.splitlines(True),changed.splitlines(True),fromfile='a/src/lrz.c',tofile='b/src/lrz.c')))
     prefix=root/'local' 
-    # Upstream adds _POSIX_C_SOURCE, hiding S_IFMT on FreeBSD. Undefine it in
-    # CFLAGS so FreeBSD's default API visibility is used; no upstream code edit.
-    commands = [['./configure','CC=cc','CFLAGS=-O2 -U_POSIX_C_SOURCE',f'--prefix={prefix}'],
+    # FreeBSD needs its default API visibility for S_IFMT. glibc instead needs
+    # POSIX declarations retained under upstream's strict C17 mode.
+    cflags='-O2'
+    if sys.platform.startswith('freebsd'):cflags+=' -U_POSIX_C_SOURCE'
+    elif sys.platform.startswith('linux'):cflags+=' -D_DEFAULT_SOURCE'
+    commands = [['./configure','CC=cc','CFLAGS='+cflags,f'--prefix={prefix}'],
                 ['make','-j2'],['make','install']]
     with (root/'build.txt').open('w') as log:
         log.write(f'Source: {URL}\nSHA256: {SHA256}\n');log.flush()
