@@ -6,7 +6,7 @@
 
 2026-10-31 修正版: 配下新着検索の範囲、P/L読書中の検索条件保持、回線切断時の変更済み表示設定保存、一括転送の個別完了・未完了分再送を修正。選択状態は接続中のみ保持します。`make test-stage68` と `tests/test_stage68_batch.py` が追加の回帰試験です。関連試験は0.69の回帰検証にも含まれます。
 
-FreeBSD向けのC製BBSです。HyperNotes型の返信ツリー、会員間メール、チャット、ファイル保管庫を備え、メニューとHELPは日本語・英語に対応します。
+FreeBSD向けのC製BBSです。この`linux-support`ブランチではRocky Linux／AlmaLinux向けの構築・インストール手順も追加しています。HyperNotes型の返信ツリー、会員間メール、チャット、ファイル保管庫を備え、メニューとHELPは日本語・英語に対応します。
 
 0.71では繰り返し実行できる転送検証、中断データの照合、プロフィールと履歴のSQL保存、読書中Sの投稿者プロフィール表示を追加しました。[STAGE71.md](STAGE71.md) と [UPGRADING.md](UPGRADING.md) を参照してください。
 
@@ -26,6 +26,8 @@ FreeBSD向けのC製BBSです。HyperNotes型の返信ツリー、会員間メ�
 - [過去の開発記録](HISTORY.md)（当時の制限や未実装表は現状と異なります）
 
 ## ビルドと試運転
+
+以下はFreeBSDでの手順です。Linuxでは[LINUX.md](LINUX.md)の依存パッケージ・Clang・Python 3.11の指定を使用してください。
 
 FreeBSDのCコンパイラ、libcrypto、SQLite3（FTS5/trigram）、検証・転送ツール用のPython3が必要です。
 

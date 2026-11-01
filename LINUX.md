@@ -80,6 +80,8 @@ sudo -u liner_notes /usr/local/bin/liner-notes-check-resume \
 
 ## 更新と検証範囲
 
+2026-11-01、コミット`2f9629a`の[Linux CI](https://github.com/matsuotakeshi/liner-notes/actions/runs/41272810028)はRocky Linux 9／AlmaLinux 9の両方で成功しました。`make test test-stage65 test-stage70 test-stage71`、実lrzsz 0.13.1を使う`make test-zmodem`、配置・設定保持・導入後起動の試験を実施しています。保管庫とメール添付の送受信、実データの途中再開、SHA-256一致、中断後の同じ接続での再アップロード、PTYドアゲームも対象です。Linuxでの1GiB実転送試験とFreeBSD専用SSH入口・rc.d試験は含みません。
+
 更新前にサービス・外部転送を停止し、データと`/etc/liner-notes`、編集済み`/usr/local/share/liner-notes`をバックアップしてください。新しいソースを別ディレクトリで構築し、`install-linux`を実行します。
 
 ```sh
@@ -92,7 +94,7 @@ sudo systemctl start liner-notes
 
 DBの詳細・復元上の制約は[UPGRADING.md](UPGRADING.md)を参照してください。Linux対応のために保存形式を変更する必要はありません。
 
-[Linux CI](https://github.com/matsuotakeshi/liner-notes/actions/workflows/linux.yml)は、Ubuntuホスト上のRocky/Almaコンテナ内でビルドし、一般ユーザーで回帰試験と転送試験を実行します。systemd unitは構文検証しますが、コンテナ試験だけではOS起動時の自動起動、SELinux enforcing下の運用、実際のファイアウォール設定まで実証できません。SELinuxを無効にせず、設置先でラベルと拒否ログを確認してください。
+[Linux CI](https://github.com/matsuotakeshi/liner-notes/actions/workflows/linux.yml)は、Ubuntuホスト上のRocky/Almaコンテナ内でビルドし、一般ユーザーで回帰試験と転送試験を実行します。systemd unitの構文と、インストールした設定引数を使うサービス用ユーザーでの起動・Telnet接続・SQLite作成・SIGTERM終了も検証します。ただし、この起動試験はsystemdを介さず実行します。コンテナ試験だけではOS起動時の自動起動、SELinux enforcing下の運用、実際のファイアウォール設定まで実証できません。SELinuxを無効にせず、設置先でラベルと拒否ログを確認してください。
 
 対応OS全体の見通しは[PLATFORMS.md](PLATFORMS.md)を参照してください。
 

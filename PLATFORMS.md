@@ -3,7 +3,7 @@
 | 環境 | 状況・追加作業 |
 |---|---|
 | FreeBSD 15.1/amd64 | 現行リリースの検証環境。ports、rc.d、実ZMODEMを検証済み。 |
-| Rocky Linux 9 / AlmaLinux 9 x86_64 | `linux-support`ブランチでClang/Python 3.11ビルド、インストーラー、systemd設定とCIを追加。結果はLinux CIを参照。 |
+| Rocky Linux 9 / AlmaLinux 9 x86_64 | `linux-support`ブランチでClang/Python 3.11ビルド、インストーラー、systemd設定を追加。[コンテナCI](https://github.com/matsuotakeshi/liner-notes/actions/runs/41272810028)で回帰・実ZMODEM・PTYドア・導入後起動試験に成功。systemd自動起動とSELinux実機運用は未確認。 |
 | その他のLinux | 同じPOSIX実装を使える見込み。各ディストリビューションの依存ライブラリ、常駐起動、実転送の確認が必要。 |
 | 他のBSD / macOS | 移植候補。PTYヘッダー、ライブラリ、ファイルロック・同期、常駐起動の違いを確認する。未検証。 |
 | Solaris / illumos / AIX等 | POSIXという共通点はあるが、一括して対応済みとは扱わない。OS・バージョン・CPU・ツールチェーンを決めた実機調査が必要。 |
