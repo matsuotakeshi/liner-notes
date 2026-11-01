@@ -43,6 +43,10 @@ def main():
                 with bundle.extractfile(item) as source, destination.open('xb') as target:
                     while chunk:=source.read(65536):target.write(chunk)
                 destination.chmod(0o755 if item.mode & 0o111 else 0o644)
+                # Keep generated configure/Makefile.in newer than their inputs.
+                # Resetting every mtime to extraction time spuriously requires
+                # the release author's Autoconf/Automake on a clean Linux host.
+                os.utime(destination,(item.mtime,item.mtime),follow_symlinks=False)
             else: raise ValueError('Unexpected non-regular archive entry')
     # LP64: ~unsigned-long sets the upper 32 bits, but ZCRC is a 32-bit wire value.
     # Preserve the pristine downloaded archive and record the exact local patch.
