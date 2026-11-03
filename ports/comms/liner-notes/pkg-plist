@@ -58,20 +58,71 @@ bin/liner-notes-check-resume
 @sample %%DATADIR%%/help/en/settings.txt.sample
 @sample %%DATADIR%%/help/en/sigop.txt.sample
 @sample %%DATADIR%%/help/en/unread.txt.sample
+@dir(liner_notes,liner_notes,0700) /var/db/liner-notes/spool
+@dir(liner_notes,liner_notes,0700) /var/db/liner-notes
+@sample %%ETCDIR%%/doors.conf.sample
+%%DATADIR%%/scripts/door_guess.py
+%%DATADIR%%/scripts/door_clans.sh
+@dir(liner_notes,liner_notes,0700) /var/log/liner-notes
+@sample %%DATADIR%%/menus/board-ja.txt.sample
+@sample %%DATADIR%%/menus/reader-ja.txt.sample
+@sample %%DATADIR%%/menus/settings-ja.txt.sample
+@sample %%DATADIR%%/menus/profile-ja.txt.sample
+@sample %%DATADIR%%/menus/board-en.txt.sample
+@sample %%DATADIR%%/menus/reader-en.txt.sample
+@sample %%DATADIR%%/menus/settings-en.txt.sample
+@sample %%DATADIR%%/menus/profile-en.txt.sample
+%%DATADIR%%/scripts/database_tools.py
+@sample %%ETCDIR%%/limits.conf.sample
+@sample %%DATADIR%%/sysinfo.txt.sample
+@sample %%DATADIR%%/goodbye.txt.sample
+@sample %%DATADIR%%/menus/admin-ja.txt.sample
+@sample %%DATADIR%%/menus/sigop-ja.txt.sample
+@sample %%DATADIR%%/help/ja/adminmembers.txt.sample
+@sample %%DATADIR%%/help/ja/adminboards.txt.sample
+@sample %%DATADIR%%/help/ja/adminfiles.txt.sample
+@sample %%DATADIR%%/help/ja/adminconnections.txt.sample
+@sample %%DATADIR%%/help/ja/adminstorage.txt.sample
+@sample %%DATADIR%%/menus/admin-en.txt.sample
+@sample %%DATADIR%%/menus/sigop-en.txt.sample
+@sample %%DATADIR%%/help/en/adminmembers.txt.sample
+@sample %%DATADIR%%/help/en/adminboards.txt.sample
+@sample %%DATADIR%%/help/en/adminfiles.txt.sample
+@sample %%DATADIR%%/help/en/adminconnections.txt.sample
+@sample %%DATADIR%%/help/en/adminstorage.txt.sample
+@sample %%DATADIR%%/welcome.txt.sample
+@sample %%DATADIR%%/systemnews.txt.sample
+@sample %%DATADIR%%/birthday.txt.sample
+%%DATADIR%%/scripts/transfer_spool.py
+%%DATADIR%%/scripts/structured_db.py
+@sample %%DATADIR%%/greeting-06.txt.sample
+@sample %%DATADIR%%/greeting-12.txt.sample
+@sample %%DATADIR%%/greeting-18.txt.sample
+
+%%DATADIR%%/scripts/upgrade_check.py
+%%DATADIR%%/LICENSE
+%%DATADIR%%/THIRD_PARTY.md
 %%PORTDOCS%%%%DOCSDIR%%/ADMIN.md
 %%PORTDOCS%%%%DOCSDIR%%/AUDIT.md
 %%PORTDOCS%%%%DOCSDIR%%/BINARY_TRANSFER.md
 %%PORTDOCS%%%%DOCSDIR%%/BOARD_UNREAD.md
 %%PORTDOCS%%%%DOCSDIR%%/CHAT.md
 %%PORTDOCS%%%%DOCSDIR%%/CHAT_ADMIN.md
+%%PORTDOCS%%%%DOCSDIR%%/COMMANDS.md
 %%PORTDOCS%%%%DOCSDIR%%/CONTENT_AUDIT.md
 %%PORTDOCS%%%%DOCSDIR%%/DAEMON.md
+%%PORTDOCS%%%%DOCSDIR%%/DOOR_GENERIC_VERIFICATION.md
+%%PORTDOCS%%%%DOCSDIR%%/DOOR_RESIZE_VERIFICATION.md
+%%PORTDOCS%%%%DOCSDIR%%/DOORS.md
 %%PORTDOCS%%%%DOCSDIR%%/DRAFT_EDIT.md
 %%PORTDOCS%%%%DOCSDIR%%/DRAFT_NOTICE.md
 %%PORTDOCS%%%%DOCSDIR%%/DRAFT_UNDO.md
 %%PORTDOCS%%%%DOCSDIR%%/FILE_BOARDS.md
 %%PORTDOCS%%%%DOCSDIR%%/HELP.md
+%%PORTDOCS%%%%DOCSDIR%%/HISTORY.md
 %%PORTDOCS%%%%DOCSDIR%%/I18N.md
+%%PORTDOCS%%%%DOCSDIR%%/INSTALL.md
+%%PORTDOCS%%%%DOCSDIR%%/LINUX.md
 %%PORTDOCS%%%%DOCSDIR%%/LIST_PAGER.md
 %%PORTDOCS%%%%DOCSDIR%%/LOGIN_UNREAD.md
 %%PORTDOCS%%%%DOCSDIR%%/MAIL_ATTACHMENTS.md
@@ -81,6 +132,8 @@ bin/liner-notes-check-resume
 %%PORTDOCS%%%%DOCSDIR%%/NEXT_BOARD.md
 %%PORTDOCS%%%%DOCSDIR%%/PAGER.md
 %%PORTDOCS%%%%DOCSDIR%%/PASSWORD.md
+%%PORTDOCS%%%%DOCSDIR%%/PLATFORMS.md
+%%PORTDOCS%%%%DOCSDIR%%/PORTS.md
 %%PORTDOCS%%%%DOCSDIR%%/PREFERENCES.md
 %%PORTDOCS%%%%DOCSDIR%%/PREVIEW.md
 %%PORTDOCS%%%%DOCSDIR%%/README.md
@@ -103,67 +156,55 @@ bin/liner-notes-check-resume
 %%PORTDOCS%%%%DOCSDIR%%/STAGE62.md
 %%PORTDOCS%%%%DOCSDIR%%/STAGE63.md
 %%PORTDOCS%%%%DOCSDIR%%/STAGE64.md
+%%PORTDOCS%%%%DOCSDIR%%/STAGE65.md
+%%PORTDOCS%%%%DOCSDIR%%/STAGE66.md
+%%PORTDOCS%%%%DOCSDIR%%/STAGE67.md
+%%PORTDOCS%%%%DOCSDIR%%/STAGE69.md
+%%PORTDOCS%%%%DOCSDIR%%/STAGE70.md
+%%PORTDOCS%%%%DOCSDIR%%/STAGE71.md
+%%PORTDOCS%%%%DOCSDIR%%/STAGE72.md
+%%PORTDOCS%%%%DOCSDIR%%/STARROUTE.md
 %%PORTDOCS%%%%DOCSDIR%%/TALK.md
+%%PORTDOCS%%%%DOCSDIR%%/THIRD_PARTY.md
 %%PORTDOCS%%%%DOCSDIR%%/THREAD_UNREAD.md
 %%PORTDOCS%%%%DOCSDIR%%/TRANSFER.md
 %%PORTDOCS%%%%DOCSDIR%%/TRANSPORTS.md
 %%PORTDOCS%%%%DOCSDIR%%/UNREAD_THREADS.md
+%%PORTDOCS%%%%DOCSDIR%%/UPGRADING.md
 %%PORTDOCS%%%%DOCSDIR%%/UPLOAD.md
 %%PORTDOCS%%%%DOCSDIR%%/VAULT.md
+%%PORTDOCS%%%%DOCSDIR%%/WEBUI.md
+%%PORTDOCS%%%%DOCSDIR%%/WEBUI_REVIEW_VERIFICATION.md
 %%PORTDOCS%%%%DOCSDIR%%/ZMODEM.md
 %%PORTDOCS%%%%DOCSDIR%%/ZMODEM_MENU.md
-@dir(liner_notes,liner_notes,0700) /var/db/liner-notes/spool
-@dir(liner_notes,liner_notes,0700) /var/db/liner-notes
-%%PORTDOCS%%%%DOCSDIR%%/PORTS.md
-@sample %%ETCDIR%%/doors.conf.sample
-%%DATADIR%%/scripts/door_guess.py
-%%PORTDOCS%%%%DOCSDIR%%/DOORS.md
-%%PORTDOCS%%%%DOCSDIR%%/HISTORY.md
-%%PORTDOCS%%%%DOCSDIR%%/STAGE65.md
-@dir(liner_notes,liner_notes,0700) /var/log/liner-notes
-%%PORTDOCS%%%%DOCSDIR%%/COMMANDS.md
-%%PORTDOCS%%%%DOCSDIR%%/STAGE66.md
-@sample %%DATADIR%%/menus/board-ja.txt.sample
-@sample %%DATADIR%%/menus/reader-ja.txt.sample
-@sample %%DATADIR%%/menus/settings-ja.txt.sample
-@sample %%DATADIR%%/menus/profile-ja.txt.sample
-@sample %%DATADIR%%/menus/board-en.txt.sample
-@sample %%DATADIR%%/menus/reader-en.txt.sample
-@sample %%DATADIR%%/menus/settings-en.txt.sample
-@sample %%DATADIR%%/menus/profile-en.txt.sample
-%%DATADIR%%/scripts/database_tools.py
-@sample %%ETCDIR%%/limits.conf.sample
-@sample %%DATADIR%%/sysinfo.txt.sample
-@sample %%DATADIR%%/goodbye.txt.sample
-%%PORTDOCS%%%%DOCSDIR%%/STAGE67.md
-@sample %%DATADIR%%/menus/admin-ja.txt.sample
-@sample %%DATADIR%%/menus/sigop-ja.txt.sample
-@sample %%DATADIR%%/help/ja/adminmembers.txt.sample
-@sample %%DATADIR%%/help/ja/adminboards.txt.sample
-@sample %%DATADIR%%/help/ja/adminfiles.txt.sample
-@sample %%DATADIR%%/help/ja/adminconnections.txt.sample
-@sample %%DATADIR%%/help/ja/adminstorage.txt.sample
-@sample %%DATADIR%%/menus/admin-en.txt.sample
-@sample %%DATADIR%%/menus/sigop-en.txt.sample
-@sample %%DATADIR%%/help/en/adminmembers.txt.sample
-@sample %%DATADIR%%/help/en/adminboards.txt.sample
-@sample %%DATADIR%%/help/en/adminfiles.txt.sample
-@sample %%DATADIR%%/help/en/adminconnections.txt.sample
-@sample %%DATADIR%%/help/en/adminstorage.txt.sample
-@sample %%DATADIR%%/welcome.txt.sample
-@sample %%DATADIR%%/systemnews.txt.sample
-@sample %%DATADIR%%/birthday.txt.sample
-%%PORTDOCS%%%%DOCSDIR%%/STAGE69.md
-%%PORTDOCS%%%%DOCSDIR%%/INSTALL.md
-%%PORTDOCS%%%%DOCSDIR%%/ZUPLOAD_FIX.md
 %%PORTDOCS%%%%DOCSDIR%%/ZRESUME_FIX.md
-%%DATADIR%%/scripts/transfer_spool.py
-%%DATADIR%%/scripts/structured_db.py
-%%PORTDOCS%%%%DOCSDIR%%/STAGE70.md
-@sample %%DATADIR%%/greeting-06.txt.sample
-@sample %%DATADIR%%/greeting-12.txt.sample
-@sample %%DATADIR%%/greeting-18.txt.sample
-
-%%DATADIR%%/scripts/upgrade_check.py
-%%PORTDOCS%%%%DOCSDIR%%/STAGE71.md
-%%PORTDOCS%%%%DOCSDIR%%/UPGRADING.md
+%%PORTDOCS%%%%DOCSDIR%%/ZUPLOAD_FIX.md
+%%WEBUI%%sbin/liner-notes-web
+%%WEBUI%%etc/rc.d/liner_notes_web
+%%WEBUI%%%%DATADIR%%/web/apache.conf.sample
+%%WEBUI%%%%DATADIR%%/web/webui/__init__.py
+%%WEBUI%%%%DATADIR%%/web/webui/__main__.py
+%%WEBUI%%%%DATADIR%%/web/webui/app.py
+%%WEBUI%%%%DATADIR%%/web/webui/bridge.py
+%%WEBUI%%%%DATADIR%%/web/webui/commands.py
+%%WEBUI%%%%DATADIR%%/web/webui/install.py
+%%WEBUI%%%%DATADIR%%/web/webui/presentation.py
+%%WEBUI%%%%DATADIR%%/web/webui/static/app.js
+%%WEBUI%%%%DATADIR%%/web/webui/static/style.css
+%%WEBUI%%%%DATADIR%%/web/webui/static/terminal-ui.js
+%%WEBUI%%%%DATADIR%%/web/webui/static/xterm-fit-LICENSE
+%%WEBUI%%%%DATADIR%%/web/webui/static/xterm-fit.js
+%%WEBUI%%%%DATADIR%%/web/webui/static/xterm-LICENSE
+%%WEBUI%%%%DATADIR%%/web/webui/static/xterm.css
+%%WEBUI%%%%DATADIR%%/web/webui/static/xterm.js
+%%WEBUI%%%%DATADIR%%/web/webui/templates/components.html
+%%WEBUI%%%%DATADIR%%/web/webui/templates/index.html
+%%WEBUI%%%%DATADIR%%/web/webui/terminal.py
+%%WEBUI%%%%DATADIR%%/web/webui/transfers.py
+%%WEBUI%%@sample %%ETCDIR%%/web/messages/en.json.sample
+%%WEBUI%%@sample %%ETCDIR%%/web/messages/ja.json.sample
+%%WEBUI%%@sample %%ETCDIR%%/web/templates/components.html.sample
+%%WEBUI%%@sample %%ETCDIR%%/web/templates/index.html.sample
+%%WEBUI%%@sample(root,liner_notes_web,0640) %%ETCDIR%%/web/web.toml.sample
+%%WEBUI%%@dir(liner_notes_web,liner_notes_web,0700) /var/db/liner-notes-web/spool
+%%WEBUI%%@dir(liner_notes_web,liner_notes_web,0700) /var/db/liner-notes-web

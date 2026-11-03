@@ -1,0 +1,23 @@
+[web]
+listen = "127.0.0.1"
+port = 8088
+origin = "https://srv.ysni.org"
+base_path = "/notes/"
+secure_cookies = true
+max_sessions = 64
+browser_idle_seconds = 1800
+messages = "messages"
+templates = "templates"
+timezone = "Asia/Tokyo"
+# A private directory owned by the Web service account; never under the document root.
+spool = "/var/db/liner-notes-web/spool"
+max_upload_bytes = 1073741824
+max_spool_bytes = 17179869184
+
+[bbs]
+host = "127.0.0.1"
+port = 23
+telnet = true
+timeout = 30
+# Final hash verification may take longer on slower storage.
+transfer_timeout = 120

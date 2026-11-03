@@ -1,0 +1,59 @@
+#!/bin/sh
+# PROVIDE: liner_notes_web
+# REQUIRE: LOGIN NETWORKING liner_notes
+# KEYWORD: shutdown
+. /etc/rc.subr
+name=liner_notes_web
+rcvar=liner_notes_web_enable
+if [ -n "${LINER_NOTES_WEB_RC_CONF:-}" ]; then
+    [ -r "$LINER_NOTES_WEB_RC_CONF" ] || exit 1
+    . "$LINER_NOTES_WEB_RC_CONF"
+else
+    load_rc_config "$name"
+fi
+: ${liner_notes_web_enable:=NO}
+: ${liner_notes_web_user:=liner_notes_web}
+: ${liner_notes_web_program:=@PREFIX@/sbin/liner-notes-web}
+: ${liner_notes_web_config:=@PREFIX@/etc/liner-notes/web/web.toml}
+: ${liner_notes_web_pidfile:=/var/run/liner-notes-web.pid}
+: ${liner_notes_web_log:=/var/log/liner-notes/web.log}
+# Keep the public rc.conf names, but hide rc.subr's reserved overrides. In
+# particular, stop must run as the caller to signal the root-owned supervisor.
+_lnw_program="$liner_notes_web_program"
+_lnw_user="$liner_notes_web_user"
+unset liner_notes_web_program liner_notes_web_user
+pidfile="$liner_notes_web_pidfile"
+command=/usr/sbin/daemon
+procname=/usr/sbin/daemon
+start_cmd=liner_notes_web_start
+
+liner_notes_web_start()
+{
+    # rc.subr treats ${name}_program and ${name}_user specially in its default
+    # start method. Launch daemon explicitly so its flags never reach Python,
+    # and drop privileges in daemon after it opens the supervisor PID/log files.
+    if [ -n "$(check_pidfile "$pidfile" "$procname")" ]; then
+        echo "liner_notes_web is already running." >&2; return 1
+    fi
+    [ -x "$_lnw_program" ] && [ -r "$liner_notes_web_config" ] || {
+        echo "Web program or configuration is unavailable." >&2; return 1
+    }
+    _lnw_uid=$(/usr/bin/id -u "$_lnw_user") || return 1
+    _lnw_me=$(/usr/bin/id -u) || return 1
+    set -- "$_lnw_program" --config "$liner_notes_web_config"
+    if [ "$_lnw_me" = 0 ]; then
+        set -- -u "$_lnw_user" "$@"
+    elif [ "$_lnw_me" != "$_lnw_uid" ]; then
+        echo "Cannot switch Web service user without root privileges." >&2; return 1
+    fi
+    echo "Starting liner_notes_web."
+    (
+        umask 077
+        exec /usr/sbin/daemon -f -H -P "$pidfile" -o "$liner_notes_web_log" "$@"
+    ) || return 1
+    sleep 1
+    if [ -z "$(check_pidfile "$pidfile" "$procname")" ]; then
+        echo "Web service exited; check $liner_notes_web_log" >&2; return 1
+    fi
+}
+run_rc_command "$1"

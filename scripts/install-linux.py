@@ -39,6 +39,7 @@ def install(destdir,prefix,python):
     for p in (ROOT/'scripts').glob('*.py'):
         put(share+'/scripts/'+p.name,p.read_bytes(),0o755 if p.name=='door_guess.py' else 0o644)
     put(share+'/scripts/check-resume.py',(ROOT/'ports/test-resume.py').read_bytes())
+    put(share+'/scripts/door_clans.sh',(ROOT/'scripts/door_clans.sh').read_bytes(),0o755)
     def wrapper(name,script,setup='',arguments=''):
         text='#!/bin/sh\n'+setup+'exec '+shlex.quote(python)+' -B '+shlex.quote(share+'/scripts/'+script)+' '+arguments+' "$@"\n'
         put(prefix+'/bin/'+name,text.encode(),0o755)
@@ -56,6 +57,8 @@ def install(destdir,prefix,python):
         if name=='doors':content=('# id|minimum-level|seconds|absolute-executable|absolute-work-directory|title\n# 1|0|600|'+share+'/scripts/door_guess.py|/var/lib/liner-notes/games|Number guessing\n').encode()
         put(config+'/'+name+'.conf',content,sample=True)
     for p in ROOT.glob('*.md'):put(prefix+'/share/doc/liner-notes/'+p.name,p.read_bytes())
+    put(share+'/LICENSE',(ROOT/'LICENSE').read_bytes())
+    put(share+'/THIRD_PARTY.md',(ROOT/'THIRD_PARTY.md').read_bytes())
     for name,path in [('liner-notes.env','/etc/liner-notes/liner-notes.env'),('liner-notes.service','/usr/local/lib/systemd/system/liner-notes.service')]:
         content=(ROOT/'linux'/name).read_text().replace('@PREFIX@',prefix).encode()
         put(path,content,0o640 if name.endswith('.env') else 0o644,sample=True)

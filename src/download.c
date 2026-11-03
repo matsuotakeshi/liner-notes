@@ -57,7 +57,8 @@ static int parse_hash(const char *text,unsigned char out[32]) {
 }
 static const char *vault_error(VaultResult r) { return r==VAULT_BUSY?"ERR vault busy":r==VAULT_STORAGE?"ERR vault storage":r==VAULT_DENIED?"ERR vault denied":r==VAULT_INVALID?"ERR vault syntax":"ERR no file"; }
 int downloads_command(Vault *v,const Principal *p,const char *line,const char *protocol,char *out,size_t size) {
-    if(strncmp(line,"FILEOPEN ",9) && strncmp(line,"FILEFETCH ",10) && strncmp(line,"FILEDONE ",9) && strncmp(line,"FILEABORT ",10))return 0;
+    int block=!strncmp(line,"FILEFETCHBLOCK ",15);
+    if(!block && strncmp(line,"FILEOPEN ",9) && strncmp(line,"FILEFETCH ",10) && strncmp(line,"FILEDONE ",9) && strncmp(line,"FILEABORT ",10))return 0;
     const char *error="ERR vault syntax";char token[33]={0},hash[65]={0};uint32_t id=0,offset=0;int n=0;
     if(journal.broken || journal.fd<0) { error="ERR vault storage";goto fail; }
     if(!(p->capabilities&CAP_VAULT_READ)) { error="ERR vault denied";goto fail; }
@@ -72,8 +73,9 @@ int downloads_command(Vault *v,const Principal *p,const char *line,const char *p
         snprintf(t->protocol,sizeof(t->protocol),"%s",protocol);snprintf(t->subject,sizeof(t->subject),"%s",p->subject);t->file=id;t->size=e.size;t->at=(uint64_t)time(NULL);memcpy(t->hash,e.sha256,32);vault_hex(e.sha256,hash);
         snprintf(out,size,"DOWNLOAD %s %u %s\r\n",t->token,e.size,hash);return 1;
     }
-    if(!strncmp(line,"FILEFETCH ",10)) {
-        if(sscanf(line+10,"%32s %u%n",token,&offset,&n)!=2 || line[10+n] || !token_valid(token))goto fail;
+    if(block || !strncmp(line,"FILEFETCH ",10)) {
+        int start=block?15:10;
+        if(sscanf(line+start,"%32s %u%n",token,&offset,&n)!=2 || line[start+n] || !token_valid(token))goto fail;
     } else if(!strncmp(line,"FILEDONE ",9)) {
         if(sscanf(line+9,"%32s %64s%n",token,hash,&n)!=2 || line[9+n] || !token_valid(token))goto fail;
     } else if(sscanf(line+10,"%32s%n",token,&n)!=1 || line[10+n] || !token_valid(token))goto fail;
@@ -91,10 +93,10 @@ int downloads_command(Vault *v,const Principal *p,const char *line,const char *p
     }
     VaultEntry e;VaultResult result=vault_info(v,p,t->file,&e);if(result!=VAULT_OK) { error=vault_error(result);goto fail; }
     if(e.size!=t->size || memcmp(e.sha256,t->hash,32)) { error="ERR no file";goto fail; }
-    if(!strncmp(line,"FILEFETCH ",10)) {
+    if(block || !strncmp(line,"FILEFETCH ",10)) {
         if(offset>t->received)goto fail;
-        unsigned char bytes[VAULT_CHUNK],encoded[VAULT_CHUNK*4/3+1];size_t got;
-        result=vault_read(v,p,t->file,offset,bytes,&got);if(result!=VAULT_OK) { error=vault_error(result);goto fail; }
+        unsigned char bytes[VAULT_BLOCK],encoded[(VAULT_BLOCK+2)/3*4+1];size_t got;
+        result=vault_read_block(v,p,t->file,offset,bytes,block?VAULT_BLOCK:VAULT_CHUNK,&got);if(result!=VAULT_OK) { error=vault_error(result);goto fail; }
         if(offset+got>t->received)t->received=offset+(uint32_t)got;
         EVP_EncodeBlock(encoded,bytes,(int)got);snprintf(out,size,"DOWNLOADDATA %u %zu %s\r\n",offset,got,got?(char *)encoded:"-");return 1;
     }

@@ -4,7 +4,7 @@
 #include <openssl/evp.h>
 static void hex(const unsigned char hash[32],char out[65]) { static const char digits[]="0123456789abcdef";for(int i=0;i<32;i++) { out[i*2]=digits[hash[i]>>4];out[i*2+1]=digits[hash[i]&15]; }out[64]=0; }
 int transfer_line_command(const char *s) {
-    static const char *names[]={"FILEOPEN","FILEFETCH","FILEDONE","FILEABORT","FILECHECK","FILEMETA","FILEGET","FILESTART","FILESTARTIN","FILEPUT","FILESTATUS","FILEFINISH","FILECANCEL"};
+    static const char *names[]={"FILEOPEN","FILEFETCH","FILEFETCHBLOCK","FILEPUTBLOCK","FILEGETBLOCK","FILEDONE","FILEABORT","FILECHECK","FILEMETA","FILEGET","FILESTART","FILESTARTIN","FILEPUT","FILESTATUS","FILEFINISH","FILECANCEL"};
     for(size_t i=0;i<sizeof(names)/sizeof(names[0]);i++) {
         size_t n=strlen(names[i]);if(!strncmp(s,names[i],n) && (!s[n] || s[n]==' '))return 1;
     }
@@ -22,8 +22,8 @@ static int hash(const char *s,unsigned char out[32]) {
 }
 static int decode(const char *s,unsigned char *out,size_t max,size_t *count) {
     if(!strcmp(s,"-")) { *count=0;return 1; }
-    size_t len=strlen(s);unsigned char decoded[1025],canonical[1369];
-    if(!len || len>1024 || len%4)return 0;
+    size_t len=strlen(s);unsigned char decoded[VAULT_BLOCK+3],canonical[(VAULT_BLOCK+2)/3*4+1];
+    if(!len || len>(VAULT_BLOCK+2)/3*4 || len%4)return 0;
     int n=EVP_DecodeBlock(decoded,(const unsigned char *)s,(int)len);if(n<0)return 0;
     if(s[len-1]=='=')n--;
     if(s[len-2]=='=')n--;
@@ -32,9 +32,9 @@ static int decode(const char *s,unsigned char *out,size_t max,size_t *count) {
     memcpy(out,decoded,(size_t)n);*count=(size_t)n;return 1;
 }
 void transfer_line_execute(TransferBackend backend,const Principal *p,const char *line,char *out,size_t capacity) {
-    TransferRequest q={0};TransferReply reply={0};char copy[1025],*tokens[6];size_t n=0;
+    TransferRequest q={0};TransferReply reply={0};char copy[90001],*tokens[6];size_t n=0;
     VaultResult r=VAULT_INVALID;
-    if(strlen(line)>1024)goto error;
+    if(strlen(line)>90000)goto error;
     strcpy(copy,line);char *cur=copy;
     while(*cur) {
         if(n==6 || *cur==' ')goto error;
@@ -55,11 +55,11 @@ void transfer_line_execute(TransferBackend backend,const Principal *p,const char
         q.operation=TRANSFER_START;
     } else {
         if(!number(tokens[1],VAULT_ID_MAX,&q.id) || !q.id)goto error;
-        if(!strcmp(tokens[0],"FILEGET")) {
+        if(!strcmp(tokens[0],"FILEGET") || !strcmp(tokens[0],"FILEGETBLOCK")) {
             if(n!=3 || !number(tokens[2],VAULT_MAX_BYTES,&q.offset))goto error;
-            q.operation=TRANSFER_READ;
-        } else if(!strcmp(tokens[0],"FILEPUT")) {
-            if(n!=4 || !number(tokens[2],VAULT_MAX_BYTES,&q.offset) || !decode(tokens[3],q.bytes,TRANSFER_LINE_CHUNK,&q.count) || !q.count)goto error;
+            q.operation=TRANSFER_READ;q.count=!strcmp(tokens[0],"FILEGETBLOCK")?VAULT_BLOCK:VAULT_CHUNK;
+        } else if(!strcmp(tokens[0],"FILEPUT") || !strcmp(tokens[0],"FILEPUTBLOCK")) {
+            if(n!=4 || !number(tokens[2],VAULT_MAX_BYTES,&q.offset) || !decode(tokens[3],q.bytes,!strcmp(tokens[0],"FILEPUTBLOCK")?VAULT_BLOCK:TRANSFER_LINE_CHUNK,&q.count) || !q.count)goto error;
             q.operation=TRANSFER_WRITE;
         } else {
             if(n!=2)goto error;
@@ -77,8 +77,8 @@ void transfer_line_execute(TransferBackend backend,const Principal *p,const char
         hex(reply.entry.sha256,digest);
         snprintf(out,capacity,q.operation==TRANSFER_INFO?"FILE %u %u %s\r\nEND FILE\r\n":"UPLOADED %u %u %s\r\n",reply.entry.id,reply.entry.size,digest);
     } else if(q.operation==TRANSFER_READ) {
-        unsigned char encoded[VAULT_CHUNK*4/3+1];
-        if(reply.count>VAULT_CHUNK) { r=VAULT_STORAGE;goto error; }
+        unsigned char encoded[(VAULT_BLOCK+2)/3*4+1];
+        if(reply.count>VAULT_BLOCK) { r=VAULT_STORAGE;goto error; }
         EVP_EncodeBlock(encoded,reply.bytes,(int)reply.count);
         snprintf(out,capacity,"FILEDATA %u %u %zu %s\r\n",q.id,q.offset,reply.count,reply.count?(char *)encoded:"-");
     } else if(q.operation==TRANSFER_START)snprintf(out,capacity,"UPLOAD %u\r\n",reply.id);

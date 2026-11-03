@@ -1,0 +1,40 @@
+<!-- Trusted operator templates. User text is inserted with textContent/value, never HTML. -->
+<template id="template-auth">
+  <form class="auth-form">
+    <label><span data-i18n="loginName">ログイン名</span><input name="login" autocomplete="username" required></label>
+    <label><span data-i18n="password">パスワード</span><input name="password" type="password" autocomplete="current-password" required></label>
+    <div class="button-row"><button type="button" class="text-button" data-switch></button><button class="primary-button" type="submit"></button></div>
+  </form>
+</template>
+<template id="template-compose">
+  <form class="compose-form">
+    <div data-destination></div>
+    <label data-recipient><span data-i18n="recipient">宛先</span><input name="recipient" autocomplete="off"></label>
+    <label><span data-i18n="title">題名</span><input name="title" required></label>
+    <label><span data-i18n="body">本文</span><textarea name="body" spellcheck="true"></textarea></label>
+    <div class="body-count">0 / 262144 bytes</div>
+    <section class="attachment-picker" data-attachments hidden>
+      <h3 data-i18n="attachments">添付ファイル</h3>
+      <p class="compose-info" data-i18n="attachmentHint">この画面でファイルを選択できます。送信・下書き保存時にアップロードします。</p>
+      <input type="file" name="attachmentFiles" multiple>
+      <div data-attachment-list></div><div data-transfers aria-live="polite"></div>
+    </section>
+    <p class="compose-info" data-i18n="plainTextHint">本文はプレーンテキストで保存します。</p>
+    <div class="button-row"><button type="button" class="secondary-button" data-cancel data-i18n="cancel">キャンセル</button><button type="button" class="secondary-button" data-draft data-i18n="draft">下書きに保存</button><button type="submit" class="primary-button" data-i18n="send">投稿・送信</button></div>
+  </form>
+</template>
+<template id="template-upload">
+  <section class="file-drop">
+    <h3 data-i18n="uploadFiles">ファイルを登録する</h3>
+    <p class="compose-info" data-i18n="uploadHint">一度に16ファイルまで。各1GiB。登録先と説明を確認してください。</p>
+    <div class="form-grid"><label><span data-i18n="fileBoard">登録先ボード</span><input name="category" value="-"></label><label><span data-i18n="description">説明</span><input name="description"></label></div>
+    <input name="kind" type="hidden" value="public"><input name="resume" type="hidden">
+    <div data-resumes></div><p data-resume-selected class="compose-info" hidden></p>
+    <input type="file" multiple>
+    <button type="button" class="primary-button" data-upload data-i18n="upload">登録する</button>
+    <div data-transfers aria-live="polite"></div>
+  </section>
+</template>
+<template id="template-profile">
+  <form class="profile-editor"><div class="form-grid" data-fields></div><div data-errors aria-live="polite"></div><div class="button-row"><button type="button" class="secondary-button" data-cancel data-i18n="cancel">キャンセル</button><button type="submit" class="primary-button" data-i18n="save">保存</button></div></form>
+</template>

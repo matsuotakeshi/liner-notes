@@ -103,7 +103,7 @@ static void selection_reset(Session *s) {
     s->batch_count=s->batch_copy_at=0;memset(s->batch_done,0,sizeof(s->batch_done));
     memset(s->batch_copied,0,sizeof(s->batch_copied));s->batch_copy_path[0]=0;
     s->vault_child_view=s->vault_child_count=s->vault_child_next=0;
-    s->vault_mode=s->vault_selecting=0;s->vault_path[0]=s->vault_select[0]=0;
+    s->game_menu=0;s->vault_mode=s->vault_selecting=0;s->vault_path[0]=s->vault_select[0]=0;
     memset(s->vault_grants,0,sizeof(s->vault_grants));
     s->profile_walk=s->profile_walk_pending=s->profile_edit_target=0;
     OPENSSL_cleanse(&s->profile_search,sizeof(s->profile_search));
@@ -124,6 +124,7 @@ static void show_menu(Session *s,int explicit_request) {
 static void prompt(Session *s) {
     if(s->auto_read || s->door || s->memo_input || s->application_step || (s->editing && s->editor_input==4))return;
     if(!s->zmodem && !s->chatting && !s->binary && s->ui.enabled && s->active && !s->pending && !s->closing && !s->wake && !s->page[0]) {
+        if(s->game_menu && !s->editing && !s->password_mode) { queue_text(s,s->ui.language==LANGUAGE_JA?"ゲーム [番号:起動 Enter/L:一覧 0:主画面] > ":"Games [number:play Enter/L:list 0:main] > ");return; }
         if(s->gather_mode) { queue_text(s,ui_text(&s->ui,s->gather_cursor?MSG_GATHER_MORE:MSG_GATHER_PROMPT));return; }
         if(s->vault_mode && !s->editing && !s->password_mode && !s->ui.input && (!s->classic_input || s->classic_input==CI_FILE_ACTION || s->classic_input==CI_BATCH)) {
             if(s->batch_screen) { s->classic_input=CI_BATCH;queue_text(s,ui_text(&s->ui,MSG_TRANSFER_BATCH));return; }
@@ -1289,7 +1290,7 @@ board_syntax:emit(s,"ERR command\r\n");return;
         if(arg) { const char *tail; if(!number_arg(arg+1,&q.number,&tail)||*tail) { emit(s,"ERR article number\r\n"); return; } }
         submit(s,&q); return;
     }
-    if(!strcmp(line,"GAMES") || !strncmp(line,"DOOR ",5)) {
+    if(!strcmp(line,"GAME") || !strcmp(line,"GAMES") || !strncmp(line,"DOOR ",5)) {
         BoardRequest q={0};q.op='}';q.action='J';const char *end;
         if(line[0]=='D' && (!number_arg(line+5,&q.number,&end) || *end || !s->binary_allowed)) { emit(s,"ERR command\r\n");return; }
         submit(s,&q);return;
@@ -1346,7 +1347,7 @@ board_syntax:emit(s,"ERR command\r\n");return;
         s->exit_after_save=0;selection_reset(s);
         s->classic_input=0;s->classic_id=0;s->classic_area=CM_MAIN;s->checking=s->check_pending=s->check_finished=0;s->check_since=s->check_until=0;s->check_cursor=0;memset(s->vault_grants,0,sizeof(s->vault_grants));
         chat_disconnect(s->id);s->mail_mode=0;OPENSSL_cleanse(s->mail_query,sizeof(s->mail_query));s->mail_filter=0;s->mail_cursor=0;
-        memset(s->board_grants,0,sizeof(s->board_grants));s->batch_count=0;s->vault_mode=0;s->mail_arrivals=0;s->user=0;s->ui.admin=0;s->ui.sigop=0;s->reset_target=0; s->user_epoch=0; s->current=0; s->board=1; memset(&s->draft,0,sizeof(s->draft)); s->draft_revision=0; undo_clear(s); emit(s,"LOGGED OUT\r\n");
+        memset(s->board_grants,0,sizeof(s->board_grants));s->batch_count=0;s->game_menu=0;s->vault_mode=0;s->mail_arrivals=0;s->user=0;s->ui.admin=0;s->ui.sigop=0;s->reset_target=0; s->user_epoch=0; s->current=0; s->board=1; memset(&s->draft,0,sizeof(s->draft)); s->draft_revision=0; undo_clear(s); emit(s,"LOGGED OUT\r\n");
     } else if(!strcmp(line,"NEXTBOARD")) {
         if(!s->board_enabled) { emit(s,"ERR no board\r\n"); return; }
         if(!s->user) { emit(s,"ERR login required\r\n"); return; }
@@ -1478,6 +1479,20 @@ static void command(Session *s,char *line) {
             queue_text(s,mapped);
         }
         prompt(s); return;
+    }
+    if(!s->ui.input && !s->classic_input && !s->mail_input && !s->mail_delete && s->ui.enabled && !*s->connector_token &&
+       (!strcmp(line,"GAME") || !strcmp(line,"GAMES"))) {
+        if(!s->user) { emit(s,"ERR login required\r\n");prompt(s);return; }
+        s->game_menu=1;s->vault_mode=s->mail_mode=s->gather_mode=0;s->classic_area=CM_MAIN;
+        command_core(s,"GAMES");prompt(s);return;
+    }
+    if(s->game_menu) {
+        if(!strcmp(line,"0") || !strcmp(line,"EXIT") || !strcmp(line,"MENU")) { s->game_menu=0;s->ui.view=UI_HOME;s->classic_area=CM_MAIN;show_menu(s,1);prompt(s);return; }
+        if(!*line || !strcmp(line,"L") || !strcmp(line,"?") || !strcmp(line,"H")) { command_core(s,"GAMES");prompt(s);return; }
+        uint32_t id;const char *tail;
+        if(number_arg(line,&id,&tail) && !*tail && id) { snprintf(mapped,sizeof(mapped),"DOOR %u",id);command_core(s,mapped);prompt(s);return; }
+        if(!strncmp(line,"DOOR ",5) || !strncmp(line,"LANG ",5) || !strcmp(line,"PING") || !strcmp(line,"QUIT") || !strcmp(line,"LOGOUT")) { command_core(s,line);prompt(s);return; }
+        queue_text(s,s->ui.language==LANGUAGE_JA?"ゲーム番号、L（一覧）、0（主画面）を入力してください。\r\n":"Enter a game number, L (list), or 0 (main).\r\n");prompt(s);return;
     }
     if(classic_commands(s,line))return;
     if(!strcmp(line,"+") && *s->report) {
@@ -1616,10 +1631,11 @@ void session_scan_stop(Session *s) {
 }
 void session_door_finish(Session *s) {
     s->door=0;queue_text(s,s->ui.language==LANGUAGE_JA?"\r\nゲーム終了。BBSへ戻ります。\r\n":"\r\nGame ended. Back to BBS.\r\n");
+    if(s->game_menu && s->user && !s->closing) { command_core(s,"GAMES");prompt(s);return; }
     if(s->ui.enabled)show_menu(s,0);prompt(s);
 }
 uint64_t session_ui_signature(const Session *s) { return (uint64_t)s->ui.language | ((uint64_t)s->pager_enabled<<2) | ((uint64_t)s->editor_line<<3) | ((uint64_t)s->columns<<8) | ((uint64_t)s->rows<<24) | ((uint64_t)s->editor_numbers<<32) | ((uint64_t)s->transfer_protocol<<33); }
-void session_dispose(Session *s) { s->active=0;chat_disconnect(s->id);OPENSSL_cleanse(s,sizeof(*s)); }
+void session_dispose(Session *s) { free(s->connector_block);s->connector_block=NULL;s->active=0;chat_disconnect(s->id);OPENSSL_cleanse(s,sizeof(*s)); }
 int session_ready(const Session *s) { return s->active && !s->wake && !s->pending && !s->closing && !s->zmodem; }
 int session_secret(const Session *s) { return s->password_mode!=0; }
 void session_mail_notify(Session *s,uint32_t user,int deny,uint32_t revision) {
@@ -1648,6 +1664,7 @@ void session_tick(Session *s,uint64_t now) {
         char text[256];snprintf(text,sizeof(text),ui_text(&s->ui,MSG_MAIL_ARRIVED),s->mail_arrivals);s->mail_arrivals=0;
         s->chat_notice=1;queue_text(s,text);s->chat_prompting=1;prompt(s);s->chat_prompting=0;s->chat_notice=0;
     }
+    if(s->connector_block && now>=s->connector_block_until) { free(s->connector_block);s->connector_block=NULL;session_abort(s);return; }
     if(s->binary && now>=s->binary_deadline) { session_abort(s);return; }
     if(s->active && s->wake && now>=s->wake) { s->wake=0; emit(s,"AWAKE\r\n"); prompt(s); }
 }
@@ -1705,10 +1722,89 @@ static void normalize_command(Session *s,char *line,size_t n) {
         char *last=strrchr(line,' ');if(last && word_is(last+1,strlen(last+1),"CONFIRM"))memcpy(last+1,"CONFIRM",7);
     }
 }
+static int connector_hex(const char *text,size_t size) {
+    for(size_t i=0;i<size;i++)if(!((text[i]>='0' && text[i]<='9') || (text[i]>='a' && text[i]<='f')))return 0;
+    return 1;
+}
+/* A negotiated, unguessable marker separates responses from asynchronous notices.
+ * SYNC is accepted in editors/password/chat states without becoming user content.
+ * It reports state only: all operations still use the existing permission checks.
+ * The scheduler calls us after the previous worker result has been applied. */
+static void connector_transfer(Session *s,const char *line) {
+    BoardRequest q={0};
+    if(!strncmp(line,"MFILE",5)) { q.op=BOARD_MAIL_TRANSFER;line++; }
+    else q.op='$';
+    snprintf(q.body,sizeof(q.body),"%s",line);submit(s,&q);
+}
+static int connector_line(Session *s,char *line,size_t size) {
+    if(*s->connector_token && size>84 && !memcmp(line,"CONNECTOR TRANSFER ",19) &&
+       !memcmp(line+19,s->connector_token,64) && line[83]==' ') {
+        char *cmd=line+84;
+        if(s->user && !s->password_mode && !s->chatting && !s->gather_mode &&
+           (!s->editing || s->draft.op=='m') && !strncmp(cmd,"MFILE",5) && transfer_line_command(cmd+1))connector_transfer(s,cmd);
+        else queue_text(s,"ERR vault syntax\r\n");
+        return 1;
+    }
+    if(*s->connector_token && !strncmp(line,"CONNECTOR BLOCK ",16) && size>81 &&
+       !memcmp(line+16,s->connector_token,64) && line[80]==' ') {
+        const char *end;uint32_t n;
+        free(s->connector_block);s->connector_block=NULL;
+        if(!s->user || (s->editing && s->draft.op!='m') || s->password_mode || s->chatting || s->gather_mode ||
+           !number_arg(line+81,&n,&end) || *end || !n || n>90000) { queue_text(s,"ERR vault syntax\r\n");return 1; }
+        s->connector_block=malloc((size_t)n+1);if(!s->connector_block) { session_abort(s);return 1; }
+        s->connector_block_size=n;s->connector_block_used=0;s->connector_block_until=s->now+60000;return 1;
+    }
+    if(*s->connector_token && !strncmp(line,"CONNECTOR DATA ",15) && size>80 &&
+       !memcmp(line+15,s->connector_token,64) && line[79]==' ') {
+        size_t n=size-80;
+        if(!s->connector_block || n>s->connector_block_size-s->connector_block_used) {
+            free(s->connector_block);s->connector_block=NULL;queue_text(s,"ERR vault syntax\r\n");return 1;
+        }
+        memcpy(s->connector_block+s->connector_block_used,line+80,n);s->connector_block_used+=n;
+        if(s->connector_block_used==s->connector_block_size) {
+            char *command=s->connector_block;s->connector_block=NULL;command[s->connector_block_used]=0;
+            if((!s->editing && !strncmp(command,"FILEPUTBLOCK ",13)) || !strncmp(command,"MFILEPUTBLOCK ",14))connector_transfer(s,command);
+            else queue_text(s,"ERR vault syntax\r\n");
+            free(command);
+        }return 1;
+    }
+    if(*s->connector_token && size==82 && !memcmp(line,"CONNECTOR LITERAL ",18) &&
+       !memcmp(line+18,s->connector_token,64) && s->editing && !s->password_mode && !s->chatting) {
+        s->connector_literal=1;queue_text(s,"CONNECTOR LITERAL READY\r\n");return 1;
+    }
+    if(!s->ui.enabled && !s->editing && !s->chatting && !s->password_mode &&
+       size==79 && !memcmp(line,"CONNECTOR OPEN ",15) && connector_hex(line+15,64)) {
+        memcpy(s->connector_token,line+15,64);s->connector_token[64]=0;
+        queue_text(s,"CONNECTOR READY 1\r\n");return 1;
+    }
+    if(*s->connector_token && size==112 && !memcmp(line,"CONNECTOR SYNC ",15) &&
+       !memcmp(line+15,s->connector_token,64) && line[79]==' ' && connector_hex(line+80,32)) {
+        char out[2048];
+        snprintf(out,sizeof(out),"CONNECTOR STATE %.32s {\"version\":1,\"transfer_block\":65536,\"connection\":%lu,\"user\":%u,\"username\":\"%s\",\"board\":%u,\"article\":%u,\"admin\":%d,\"sigop\":%d,\"level\":%u,\"editing\":%d,\"editor_kind\":%u,\"secret\":%d,\"password_mode\":%d,\"mail\":%d,\"mail_current\":%u,\"chat\":%d,\"talk\":%d,\"pager\":%d,\"gather\":%d,\"input\":%d,\"confirmation\":%u,\"binary\":%d,\"door\":%d,\"members\":%d,\"features\":{\"mail\":%d,\"chat\":%d,\"vault\":%d}}\r\n",
+            line+80,s->id,s->user,s->user?s->username:"",s->board,s->current,!!s->ui.admin,!!s->ui.sigop,s->member_level,
+            s->editing,(unsigned char)s->draft.op,session_secret(s),s->password_mode,s->mail_mode,s->mail_current,s->chatting,s->outside_talk,
+            !!s->page[0],s->gather_mode,s->application_step?s->application_step:s->classic_input?s->classic_input:s->memo_input?s->memo_input:s->mail_input?s->mail_input:s->talk_select,s->mail_delete,
+            s->binary,s->door,s->member_mode,board_feature_enabled("mail"),board_feature_enabled("chat"),board_feature_enabled("vault"));
+        queue_text(s,out);return 1;
+    }
+    if(s->connector_literal) {
+        s->connector_literal=0;
+        if(!s->editing || s->password_mode || s->chatting)queue_text(s,"ERR connector editor state\r\n");
+        else if(!safe_text(line))queue_text(s,"ERR control character\r\n");
+        else {
+            size_t have=strlen(s->draft.body);
+            if(have+size+2>BOARD_BODY)queue_text(s,"ERR body limit\r\n");
+            else { undo_save(s);memcpy(s->draft.body+have,line,size);memcpy(s->draft.body+have+size,"\r\n",3); }
+        }
+        return 1;
+    }
+    return 0;
+}
 int session_line(Session *s,const char *text,size_t size,uint64_t now) {
     if(!session_ready(s)) return 0;
     if(size>ln_limit("INPUT",INPUT_LINE_MAX) || memchr(text,0,size)) { session_abort(s); return 0; }
     char line[INPUT_LINE_MAX+1]; memcpy(line,text,size); line[size]=0; s->now=now;
+    if(connector_line(s,line,size)) { OPENSSL_cleanse(line,sizeof(line));return 1; }
     normalize_command(s,line,size);command(s,line); OPENSSL_cleanse(line,sizeof(line)); return 1;
 }
 void session_result(Session *s,const BoardResult *completion,uint64_t now) {
@@ -1968,7 +2064,7 @@ void session_revoke(Session *s) {
     if(s->chatting) { s->chatting=0;chat_leave(s->id); }
     if(s->door || s->binary || s->zmodem) { session_abort(s);return; }
     if(!s->active || s->closing) return;
-    s->vault_mode=0;s->mail_arrivals=0;s->user=0;s->ui.admin=0;s->ui.sigop=0;s->reset_target=0; s->user_epoch=0; s->current=0; s->board=1; s->password_mode=0;
+    s->game_menu=0;s->vault_mode=0;s->mail_arrivals=0;s->user=0;s->ui.admin=0;s->ui.sigop=0;s->reset_target=0; s->user_epoch=0; s->current=0; s->board=1; s->password_mode=0;
     page_clear(s);
     s->scanning=0; OPENSSL_cleanse(&s->scan,sizeof(s->scan));
     s->editing=0;s->editor_upload=s->editor_confirm=s->editor_upload_question=0; s->pending=0; s->wake=0; s->ui.input=0;

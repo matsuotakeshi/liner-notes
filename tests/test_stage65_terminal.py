@@ -33,7 +33,7 @@ def run(binary):
    assert b'DOOR' in a.cmd('CONNECTIONS')
    a.cmd('LEVEL 1 1');c.sock.settimeout(5)
    while c.sock.recv(8192):pass
-   time.sleep(.15)
+   time.sleep(.5) # bounded Door hangup grace before SIGKILL
    try:os.kill(pid,0)
    except ProcessLookupError:pass
    else:raise AssertionError('Door survived account revocation')

@@ -10,7 +10,7 @@ typedef struct {
     TransferOperation operation;
     uint32_t id,offset,size;
     size_t count;
-    unsigned char bytes[VAULT_CHUNK],sha256[32];
+    unsigned char bytes[VAULT_BLOCK],sha256[32];
     char name[128],description[256],category[49];
 } TransferRequest;
 typedef struct {
@@ -18,7 +18,7 @@ typedef struct {
     VaultUpload upload;
     uint32_t id,received;
     size_t count;
-    unsigned char bytes[VAULT_CHUNK];
+    unsigned char bytes[VAULT_BLOCK];
 } TransferReply;
 typedef struct {
     void *context;

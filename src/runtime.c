@@ -61,6 +61,20 @@ static uint64_t now_ms(void) {
 }
 #endif
 
+static int listener_error(socket_t listener, const char *operation,
+                          const char *address, unsigned port) {
+#ifdef _WIN32
+    int error=WSAGetLastError();
+    fprintf(stderr,"listen setup failed: %s %s:%u: Winsock error %d\n",
+            operation,address,port,error);
+#else
+    int error=errno;
+    fprintf(stderr,"listen setup failed: %s %s:%u: %s (errno=%d)\n",
+            operation,address,port,strerror(error),error);
+#endif
+    if(listener!=INVALID)close_socket(listener);
+    return 1;
+}
 
 #define SLOTS CONNECTION_MAX
 #define CAP (INPUT_LINE_MAX+4096)
@@ -148,7 +162,7 @@ static void service_result(BoardResult *r) {
         Connection *c=&connections[r->slot];Session *s=&c->app;
         if(c->fd==INVALID || s->id!=r->session || !s->user || s->closing || !s->binary_allowed || c->door) { strcpy(r->text,"ERR game unavailable\r\n");return; }
         c->door=door_start(r->service_number,r->service_next,s->user,s->username,s->columns,s->rows,now_ms());
-        if(!c->door) { strcpy(r->text,"ERR game unavailable\r\n");return; }
+        if(!c->door) { strcpy(r->text,errno==EBUSY?"ERR game busy\r\n":"ERR game unavailable\r\n");return; }
         s->door=1;c->used=0;terminal_clear(&c->terminal);s->scanning=s->auto_read=0;
         snprintf(r->text,sizeof(r->text),s->ui.language==LANGUAGE_JA?"ゲーム開始。Ctrl-] でBBSへ戻ります。\r\n":"Game started. Ctrl-] returns to BBS.\r\n");return;
     }
@@ -248,12 +262,19 @@ static void door_advance(Connection *c,uint64_t now) {
     Session *s=&c->app;
     if(!s->active || s->closing) { drop(c);return; }
     terminal_set_binary(&c->terminal,1);int done=0;size_t used=0;
+    unsigned old_width=c->terminal.telnet.width,old_height=c->terminal.telnet.height;
     while(used<c->used && door_room(c->door)) {
         unsigned char byte;int rc=terminal_binary_receive(&c->terminal,c->input[used++],&byte);
         if(rc<0) { drop(c);return; }if(!rc)continue;c->last_input=now;c->idle_warned=0;
         if(byte==29) { done=1;break; }if(!door_input(c->door,byte)) { done=-1;break; }
     }
     memmove(c->input,c->input+used,c->used-used);c->used-=used;
+    if(c->terminal.mode==TERMINAL_TELNET &&
+       (old_width!=c->terminal.telnet.width || old_height!=c->terminal.telnet.height)) {
+        session_dimensions(s,c->terminal.telnet.width,c->terminal.telnet.height);
+        /* A vanished PTY must not kill the BBS session: door_pump handles exit. */
+        if(!done)(void)door_resize(c->door,s->columns,s->rows);
+    }
     if(!done && c->queued<=OUT_CAP/2)done=door_pump(c->door,zbytes,c,now);
     if(done) {
         door_stop(c->door);c->door=NULL;s->door=0;c->used=0;terminal_clear(&c->terminal);terminal_set_binary(&c->terminal,0);
@@ -432,16 +453,27 @@ int main(int argc,char **argv) {
     if(chat_log && strcmp(chat_log,"-") && board_feature_enabled("chat") && !chat_log_open(chat_log)) { fprintf(stderr,"chat log: cannot open/lock/validate\n");board_stop();return 1; }
     for(int i=0;i<SLOTS;i++) connections[i].fd=INVALID;
     socket_t listener=socket(AF_INET,SOCK_STREAM,0);
-    if(listener==INVALID || nonblock(listener) ||
-       bind(listener,(struct sockaddr *)&addr,sizeof(addr)) || listen(listener,CONNECTION_MAX)) {
-        fprintf(stderr,"listen setup failed\n"); return 1;
-    }
+    unsigned requested_port=(unsigned)ntohs(addr.sin_port);
+    if(listener==INVALID)return listener_error(listener,"socket",bind_address,requested_port);
+#ifndef _WIN32
+    /* Rebind after our closed connections enter TIME_WAIT. Do not use
+     * SO_REUSEPORT: a second live server must still fail to bind. Winsock's
+     * SO_REUSEADDR has different exclusivity semantics, so leave it unchanged. */
+    int reuse_address=1;
+    if(setsockopt(listener,SOL_SOCKET,SO_REUSEADDR,&reuse_address,sizeof(reuse_address)))
+        return listener_error(listener,"setsockopt(SO_REUSEADDR)",bind_address,requested_port);
+#endif
+    if(nonblock(listener))return listener_error(listener,"nonblock",bind_address,requested_port);
+    if(bind(listener,(struct sockaddr *)&addr,sizeof(addr)))
+        return listener_error(listener,"bind",bind_address,requested_port);
+    if(listen(listener,CONNECTION_MAX))return listener_error(listener,"listen",bind_address,requested_port);
 #ifdef _WIN32
     int addrlen=sizeof(addr);
 #else
     socklen_t addrlen=sizeof(addr);
 #endif
-    if(getsockname(listener,(struct sockaddr *)&addr,&addrlen)) return 1;
+    if(getsockname(listener,(struct sockaddr *)&addr,&addrlen))
+        return listener_error(listener,"getsockname",bind_address,requested_port);
     service_port=(unsigned)ntohs(addr.sin_port);
     printf("LISTEN %s %u\n",bind_address,service_port); fflush(stdout);
     int result=0;

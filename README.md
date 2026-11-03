@@ -1,20 +1,21 @@
-> 現行版は0.71です。[変更内容](STAGE71.md)、[更新手順](UPGRADING.md)を参照してください。既存DB形式は自動変換しません。
+> 現行版は0.72です。[変更内容](STAGE72.md)、[更新手順](UPGRADING.md)を参照してください。既存DB形式は自動変換しません。
 
-# Liner notes 0.71
+# Liner notes 0.72
 
-今回の変更は [STAGE71.md](STAGE71.md)、更新は [UPGRADING.md](UPGRADING.md) を参照してください。互換モードは [STAGE69.md](STAGE69.md) に記載しています。
+今回の変更は [STAGE71.md](STAGE72.md)、更新は [UPGRADING.md](UPGRADING.md) を参照してください。互換モードは [STAGE69.md](STAGE69.md) に記載しています。
 
 2026-10-31 修正版: 配下新着検索の範囲、P/L読書中の検索条件保持、回線切断時の変更済み表示設定保存、一括転送の個別完了・未完了分再送を修正。選択状態は接続中のみ保持します。`make test-stage68` と `tests/test_stage68_batch.py` が追加の回帰試験です。関連試験は0.69の回帰検証にも含まれます。
 
-FreeBSD向けのC製BBSです。この`linux-support`ブランチではRocky Linux／AlmaLinux向けの構築・インストール手順も追加しています。HyperNotes型の返信ツリー、会員間メール、チャット、ファイル保管庫を備え、メニューとHELPは日本語・英語に対応します。
+FreeBSD向けのC製BBSです。Rocky Linux／AlmaLinux向けの構築・インストール手順も備えています。HyperNotes型の返信ツリー、会員間メール、チャット、ファイル保管庫を備え、メニューとHELPは日本語・英語に対応します。
 
-0.71では繰り返し実行できる転送検証、中断データの照合、プロフィールと履歴のSQL保存、読書中Sの投稿者プロフィール表示を追加しました。[STAGE71.md](STAGE71.md) と [UPGRADING.md](UPGRADING.md) を参照してください。
+0.71では繰り返し実行できる転送検証、中断データの照合、プロフィールと履歴のSQL保存、読書中Sの投稿者プロフィール表示を追加しました。[STAGE71.md](STAGE72.md) と [UPGRADING.md](UPGRADING.md) を参照してください。
 
 ## 最初に読む文書
 
+- [WebUI・別プロセス構成と導入](WEBUI.md)
 - [Rocky Linux / AlmaLinuxでの構築・systemd](LINUX.md) / [対応OSの見通し](PLATFORMS.md)
 - [新規インストールから運用開始](INSTALL.md)
-- [今回の変更](STAGE71.md) / [既存環境の更新](UPGRADING.md)
+- [今回の変更](STAGE72.md) / [既存環境の更新](UPGRADING.md)
 - [旧RTBBS互換モード](STAGE69.md)
 - [SQLite移行・バックアップの仕様](STAGE67.md)
 - [RTBBSとのコマンド対応・残る差分](COMMANDS.md)
@@ -50,3 +51,9 @@ SQLite原本保存、タイムゾーン、運用上限は[stage67](STAGE67.md)�
 ## 検証
 
 `make check` が通常の回帰試験です。`make test-stage69 test-stage70 test-stage71` で操作・権限と今回の機能の試験、実ZMODEMは `make test-zmodem LRZ=/path/lrz LSZ=/path/lsz` です。今回の結果は配布物の `evidence/stage71/` を参照してください。
+
+## ライセンス
+
+Liner notes本体は **GPL-3.0-only** です。[LICENSE](LICENSE)と[第三者ソフトの表記](THIRD_PARTY.md)を参照してください。
+
+0.72ではWebUI・汎用Door・PTYリサイズを正式配布へ統合しました。設定・データの自動変換やサービスの自動再起動は行いません。

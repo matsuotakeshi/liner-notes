@@ -11,7 +11,7 @@ RAW: 機械向け応答。MENU: メニュー表示へ戻る。QUIT / O / Q: 接�
 
 MENUMODE BEGINNER / STANDARD / EXPERT: 主画面案内を毎回/初回/手動表示。会員設定として即時保存。
 LOGOUT / QUIT で表示設定を保存して終了（通信断も保存を試みます。プロセス異常終了・権限失効は除きます）。
-GAMES: FreeBSD外部ゲーム一覧。DOOR 番号: 起動。終了/Ctrl-]でBBSへ戻ります。
+GAME / GAMES: ゲームメニュー。番号で起動し、終了後はゲーム一覧に戻ります。Enter/L: 再表示、0: 主画面。DOOR 番号の直接起動も使えます。
 
 設定画面のDで現在値を一覧表示（言語・エディタ・案内量・ページ送り・画面サイズ・タイムゾーン・転送方式）。
 Sは外部sysinfo.txt、Vは版情報。O/QはY/N確認、QUITは確認なし。終了時は外部goodbye.txtを表示。

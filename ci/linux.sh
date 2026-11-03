@@ -1,7 +1,7 @@
 #!/bin/bash
 set -euo pipefail
 cat /etc/os-release
-dnf install -y clang gcc make openssl-devel sqlite-devel python3.11 tar gzip procps-ng shadow-utils systemd telnet
+dnf install -y clang gcc make openssl-devel sqlite-devel python3.11 python3.11-pip tar gzip procps-ng shadow-utils systemd telnet
 useradd --create-home bbstest
 mkdir /home/bbstest/source
 tar -C /source --exclude=.git --exclude=build -cf - . | tar -C /home/bbstest/source -xf -
@@ -30,4 +30,7 @@ runuser -u bbstest -- bash -c '
   fi
   make CC=clang PYTHON=python3.11 SQLITE_CFLAGS= SQLITE_LIBS=-lsqlite3 test-zmodem LRZ=/home/bbstest/lrzsz-check/local/bin/lrz LSZ=/home/bbstest/lrzsz-check/local/bin/lsz
   make CC=clang PYTHON=python3.11 SQLITE_CFLAGS= SQLITE_LIBS=-lsqlite3 test test-stage65 test-stage70 test-stage71
+  python3.11 -m venv .web-venv
+  .web-venv/bin/pip install -r webui/requirements.txt
+  make CC=clang PYTHON="$PWD/.web-venv/bin/python" SQLITE_CFLAGS= SQLITE_LIBS=-lsqlite3 test-stage72
 '

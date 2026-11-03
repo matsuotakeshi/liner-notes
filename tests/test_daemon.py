@@ -84,6 +84,7 @@ def run(binary,run_user=None,zhelper=None):
                 assert b'Logged in as daemonprobe' in reply and b'daemon-test-secret' not in reply
                 assert b'rc.d test game' in c.cmd('GAMES')
                 assert b'Back to BBS' in c.cmd('DOOR 1')
+                c.cmd('0') # GAME/GAMES now has its own persistent menu.
                 if 'liner_notes_vault_dir' in settings:assert b'sample.txt' in c.cmd('FILES')
                 if zhelper:
                     c.cmd('ZUPLOAD',b'1 GiB.\r\n');c.send(b'\x18'*8+b'\x08'*8)

@@ -16,6 +16,7 @@ with tempfile.TemporaryDirectory(prefix='install-linux-') as tmp:
     assert not (stage/'var').exists(),'Installer must not create or alter instance data'
     assert (stage/'usr/local/sbin/liner-notes').read_bytes()==(ROOT/'runtime').read_bytes()
     assert os.access(stage/'usr/local/share/liner-notes/scripts/door_guess.py',os.X_OK)
+    assert os.access(stage/'usr/local/share/liner-notes/scripts/door_clans.sh',os.X_OK)
     assert not (stage/'usr/local/bin/liner-notes-ssh').exists(),'FreeBSD-specific Telnet wrapper must not be installed on Linux'
     for p in (stage/'usr/local/bin').glob('*'):
         assert os.access(p,os.X_OK),p

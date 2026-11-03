@@ -1,6 +1,6 @@
-> 現行版は0.71です。[変更内容](STAGE71.md)、[更新手順](UPGRADING.md)を参照してください。既存DB形式は自動変換しません。
+> 現行版は0.72です。[変更内容](STAGE72.md)、[更新手順](UPGRADING.md)を参照してください。既存DB形式は自動変換しません。
 
-# Liner notes FreeBSD port 0.71
+# Liner notes FreeBSD port 0.72
 
 新規構築は [インストールと運用開始](INSTALL.md) を順に実施してください。この文書は配置・既存環境の更新・独自構成の補足です。今回の変更は [STAGE70.md](STAGE70.md) を参照してください。以前の再開修正も含みます。
 
@@ -13,7 +13,7 @@ stage71の更新対策・転送照合・プロフィール/履歴SQL保存を含
 FreeBSDのportsツリーと依存パッケージが必要です。配布物を展開し、rootで実行します。
 
 ```sh
-cd liner-notes-ports-stage71/comms/liner-notes
+cd liner-notes-ports-stage72/comms/liner-notes
 make BATCH=yes DISTDIR="$(realpath ../../distfiles)" install clean
 ```
 
@@ -23,7 +23,7 @@ GitHub ReleasesのソースURLを指定したportです。オフライン配置�
 
 ```sh
 pkg install python312 py312-sqlite3 sqlite3
-pkg add packages/liner-notes-0.71.pkg
+pkg add packages/liner-notes-0.72.pkg
 ```
 
 ## 配置
@@ -46,7 +46,7 @@ pkg add packages/liner-notes-0.71.pkg
 
 記事操作履歴や転送履歴など、データの整合性に関わる保存ファイルは引き続きデータディレクトリに置きます。`PREFIX`の変更にも対応します。`/var`配下の既定値はPREFIXに連動しません。
 
-サービス名とOSアカウントは `liner_notes` のままです。データ・spool・ログのディレクトリは所有者 `liner_notes:liner_notes`、権限0700です。新規アカウントのホームは `/var/db/liner-notes`、ログインシェルはnologinです。私用UID/GID **64964** を使うローカルportです。導入前に衝突を確認し、必要なら `files/UIDs` と `files/GIDs` を変更して再ビルドしてください。
+サービス名とOSアカウントは `liner_notes` のままです。データ・spool・ログのディレクトリは所有者 `liner_notes:liner_notes`、権限0700です。新規アカウントのホームは `/var/db/liner-notes`、ログインシェルはnologinです。私用UID/GID **64964**（BBS）、**64965**（WEBUI有効時） を使うローカルportです。導入前に衝突を確認し、必要なら `files/UIDs` と `files/GIDs` を変更して再ビルドしてください。
 
 新しい互換モード・ID・接続文書の設定は [STAGE69.md](STAGE69.md) を参照してください。互換モードは既定OFFです。
 
@@ -89,7 +89,7 @@ service liner_notes stop
 
 1. 旧rcスクリプトで `service liner_notes stop` を実行し、転送ワーカーも停止していることを確認します。
 2. 旧データ全体、旧設定、編集したバナー・HELP・メニュー、既存ログを保存します。
-3. ローカルpkgでの更新は、停止・バックアップ後に `pkg delete liner-notes` で旧プログラムを除去し、続けて `pkg add packages/liner-notes-0.71.pkg` で導入します。依存パッケージのautoremoveは行いません。portから導入する場合も、旧パッケージを除去してから冒頭のinstallを実行します。編集済み `liner_notes.conf` は維持されるため、`.sample` と比較し、`rc.conf` にある旧指定も更新します。以前の配置移行の検証では `pkg add -f` だけでは旧libexecのファイルが残ったため、この置換手順を確認しています。
+3. ローカルpkgでの更新は、停止・バックアップ後に `pkg delete liner-notes` で旧プログラムを除去し、続けて `pkg add packages/liner-notes-0.72.pkg` で導入します。依存パッケージのautoremoveは行いません。portから導入する場合も、旧パッケージを除去してから冒頭のinstallを実行します。編集済み `liner_notes.conf` は維持されるため、`.sample` と比較し、`rc.conf` にある旧指定も更新します。以前の配置移行の検証では `pkg add -f` だけでは旧libexecのファイルが残ったため、この置換手順を確認しています。
 4. 旧 `liner_notes_home="/usr/local/libexec/liner-notes"` は削除し、必要ならデータディレクトリを指定します。本体の指定は `/usr/local/sbin/liner-notes` へ変更します。
 5. 編集済み表示ファイルは旧 `/usr/local/etc/liner-notes/` 配下から `/usr/local/share/liner-notes/` の対応箇所へコピーします。旧配置を使い続ける場合はmenu/help/bannerの変数で明示できます。
 6. 旧 `/var/db/liner_notes/` を新 `/var/db/liner-notes/` へ、属性を保って**コピー**します。新側に運用データがある場合は混ぜず、別の空ディレクトリで検証してください。移動しない場合は `liner_notes_data_dir="/var/db/liner_notes"` を明示します。旧 `liner_notes_board` 等の個別指定があれば、それらも確認します。
@@ -129,13 +129,13 @@ su -m liner_notes -c '/usr/local/bin/liner-notes-vaultctl init /var/db/liner-not
 
 ## ZMODEM・外部ゲーム
 
-DOCSは既定ON、ZMODEM依存オプションは既定OFFです。転送コネクタは常に入ります。同梱 `comms/lrzsz` の修正版0.13.1を必要に応じて先に導入し、Liner notesの `make config` でZMODEMを選ぶとlrzszの依存を記録できます。
+DOCSとWEBUIは既定ON、ZMODEM依存は既定OFFです。ZMODEMを選ぶと本家FreeBSDのcomms/lrzszを依存に記録します。独自lrzsz portsは同梱しません。WEBUIを無効にする場合はOPTIONS_UNSET=WEBUIを指定します。
 
 ```sh
 su -m liner_notes -c '/usr/local/bin/liner-notes-check-resume /usr/local/bin/lrz /usr/local/bin/lsz --receipt /var/db/liner-notes/lrz-resume.json'
 ```
 
-受信バイナリを交換したら、記録を退避して再検証してください。設定例:
+受信バイナリを交換したら再検証してください。成功時に検証ツールが旧記録を退避して更新します。設定例:
 
 ```sh
 liner_notes_vault_dir="/var/db/liner-notes/vault"
@@ -148,6 +148,6 @@ liner_notes_doors="/usr/local/etc/liner-notes/doors.conf"
 
 ## 検証・公開準備
 
-今回の機能・転送・ports検査は配布物内 `evidence/stage71/` を参照してください。旧版の機能試験とは分けて記録します。既存の稼働BBSやホストのrc.confは変更しません。
+今回の機能・転送・ports検査は配布物内 `evidence/stage72/` を参照してください。旧版の機能試験とは分けて記録します。既存の稼働BBSやホストのrc.confは変更しません。
 
-公式Ports Collectionへ提出する前には公開ソースURL/WWW、配布ライセンス、担当者の連絡先、公式UID/GIDが必要です。これらを推測で設定せず、ローカルportとして提供しています。poudriereや他FreeBSD版・他ABIでの検証とは区別してください。
+公開URLとGPL-3.0-only表記は設定済みです。公式Ports Collectionへの提出は別作業で、担当者の連絡先と公式UID/GID割当の確定が残ります。現在は私用UID/GIDの配布portです。poudriereや他FreeBSD版・他ABIでの検証とは区別してください。

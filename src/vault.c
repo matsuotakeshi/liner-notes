@@ -579,14 +579,18 @@ VaultResult vault_info(Vault *v,const Principal *p,uint32_t id,VaultEntry *out) 
     CLOSE(fd);return r;
 }
 VaultResult vault_read(Vault *v,const Principal *p,uint32_t id,uint32_t offset,unsigned char out[VAULT_CHUNK],size_t *count) {
-    *count=0;if(!allowed(p,CAP_VAULT_READ)) return VAULT_DENIED;
+    return vault_read_block(v,p,id,offset,out,VAULT_CHUNK,count);
+}
+VaultResult vault_read_block(Vault *v,const Principal *p,uint32_t id,uint32_t offset,unsigned char *out,size_t limit,size_t *count) {
+    *count=0;if(!out || !limit || limit>VAULT_BLOCK)return VAULT_INVALID;
+    if(!allowed(p,CAP_VAULT_READ)) return VAULT_DENIED;
     if(!id || id>VAULT_ID_MAX) return VAULT_INVALID;
     int fd;VaultResult r=begin(v,&fd);if(r!=VAULT_OK) return r;
     if(id>v->last || !(*vault_file(v,id)).entry.id || (*vault_file(v,id)).hidden || !board_allows(v,p,(*vault_file(v,id)).entry.category,0)) { CLOSE(fd);return VAULT_NOT_FOUND; }
     uint32_t size=(*vault_file(v,id)).entry.size;if(offset>size) { CLOSE(fd);return VAULT_INVALID; }
     char file[4096];path(v,file,id);int blob=regular_open(file,O_RDONLY);struct STAT st;
     if(blob<0 || FSTAT(blob,&st) || st.st_size!=size || SEEK(blob,offset,SEEK_SET)<0) r=VAULT_STORAGE;
-    else { size_t n=size-offset;if(n>VAULT_CHUNK) n=VAULT_CHUNK; if(!io_all(blob,out,n,0)) r=VAULT_STORAGE;else *count=n; }
+    else { size_t n=size-offset;if(n>limit) n=limit; if(!io_all(blob,out,n,0)) r=VAULT_STORAGE;else *count=n; }
     if(blob>=0) CLOSE(blob);
     CLOSE(fd);return r;
 }
@@ -698,8 +702,12 @@ VaultResult vault_upload_status(Vault *v,const Principal *p,uint32_t id,VaultUpl
     CLOSE(fd);return r;
 }
 VaultResult vault_upload_write(Vault *v,const Principal *p,uint32_t id,uint32_t offset,const unsigned char *bytes,size_t count,uint32_t *out) {
+    if(count>VAULT_CHUNK) { *out=0;return VAULT_INVALID; }
+    return vault_upload_write_block(v,p,id,offset,bytes,count,out);
+}
+VaultResult vault_upload_write_block(Vault *v,const Principal *p,uint32_t id,uint32_t offset,const unsigned char *bytes,size_t count,uint32_t *out) {
     *out=0;if(!allowed(p,CAP_VAULT_UPLOAD))return VAULT_DENIED;
-    if(!bytes || !count || count>VAULT_CHUNK)return VAULT_INVALID;
+    if(!bytes || !count || count>VAULT_BLOCK)return VAULT_INVALID;
     int fd;VaultResult r=begin(v,&fd);if(r!=VAULT_OK)return r;
     r=upload_access(v,p,id,0);int blob=-1;
     if(r!=VAULT_OK)goto done_upload;
@@ -712,7 +720,7 @@ VaultResult vault_upload_write(Vault *v,const Principal *p,uint32_t id,uint32_t 
     if(blob<0 || FSTAT(blob,&st) || st.st_size<0 || st.st_size>(*vault_file(v,id)).upload.size) { r=VAULT_STORAGE;goto done_upload; }
     if(offset>(uint32_t)st.st_size) { r=VAULT_INVALID;goto done_upload; }
     size_t prefix=(size_t)st.st_size-offset;if(prefix>count)prefix=count;
-    unsigned char previous[VAULT_CHUNK];
+    unsigned char previous[VAULT_BLOCK];
     if(SEEK(blob,offset,SEEK_SET)<0 || !io_all(blob,previous,prefix,0)) { r=VAULT_STORAGE;goto done_upload; }
     if(memcmp(previous,bytes,prefix)) { r=VAULT_INVALID;goto done_upload; }
     if(!authorized(v)) { r=VAULT_DENIED;goto done_upload; }

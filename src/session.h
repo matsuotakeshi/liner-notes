@@ -19,7 +19,7 @@ typedef struct {
     int slot,active,board_enabled,member_mode;
     Ui ui;
     uint64_t connected_at;int talk_once,talk_return_editor,status_pending;uint32_t file_selected,file_selecting;unsigned profile_edit_target;int profile_walk,profile_walk_pending;BoardRequest profile_search;int batch_screen,batch_copying;unsigned batch_copy_at;char batch_copy_path[49];unsigned char batch_copied[16];int profile_edit_field;int classic_area,classic_input,classic_direction;uint32_t classic_id;
-    int door;int pager_enabled, help_page,menu_mode,menu_shown,auto_read,exit_after_save,editor_upload_question;
+    int door,game_menu;int pager_enabled, help_page,menu_mode,menu_shown,auto_read,exit_after_save,editor_upload_question;
     char guest_handle[33];
     unsigned columns,rows;
     size_t page_offset;
@@ -42,6 +42,12 @@ typedef struct {
     uint64_t binary_deadline;size_t binary_used,binary_length;unsigned char binary_buffer[1029];
     uint32_t current,user,board,user_epoch;unsigned member_level;
     char username[33];
+    /* Opt-in transport synchronization; never an authentication credential. */
+    char connector_token[65];
+    int connector_literal;
+    char *connector_block;
+    size_t connector_block_size,connector_block_used;
+    uint64_t connector_block_until;
     char old_password[129], new_password[129];
     BoardRequest draft, scan;
     char check_key[80];int check_scope,check_auto,check_committing;uint32_t check_board;

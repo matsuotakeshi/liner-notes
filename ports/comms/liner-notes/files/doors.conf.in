@@ -1,2 +1,5 @@
 # id|minimum-level|seconds|absolute-executable|absolute-work-directory|title
 # 1|0|600|%%DATADIR%%/scripts/door_guess.py|/var/db/liner-notes/games|Number guessing
+# Optional seventh field: dorinfo1:N (private DORINFO1.DEF, N slots) or none:N (slots only).
+# See DOORS.md before initializing a native Clans world. This sample does not install the game.
+# 2|0|3600|%%DATADIR%%/scripts/door_clans.sh|/var/db/liner-notes/games/clans|The Clans|dorinfo1:1

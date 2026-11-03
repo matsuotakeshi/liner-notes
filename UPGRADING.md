@@ -1,87 +1,88 @@
-# Liner notes 更新手順
+# 0.72への更新
 
-0.70から0.71への更新を含む、現在のports配置用の手順です。新規構築はINSTALL.mdを参照してください。設定・データの自動移行、サービスの自動再起動は行いません。
+0.71およびWeb/Doorレビュー版からの更新です。本番で利用者へ停止を案内してから行います。
+ゲームの初期化や既存DBの形式変更は不要です。
 
-## 1. 停止とバックアップ
+## 1. 現在の設定とバックアップ
 
-接続者へ終了予定を案内し、転送終了を待ってからrootで停止します。外部から起動した転送ツールも終了させます。
+rootの `/bin/sh` で実行します。バックアップ先は毎回新しく作成します。
 
 ```sh
-service liner_notes stop
-service liner_notes status
+/bin/sh
+set -eu
+LN_BACKUP=$(mktemp -d /root/liner-notes-backup-XXXXXXXX)
+cp -p /etc/rc.conf "$LN_BACKUP/rc.conf"
+if service liner_notes_web onestatus >/dev/null 2>&1; then service liner_notes_web stop; fi
+if service liner_notes onestatus >/dev/null 2>&1; then service liner_notes stop; fi
+if service liner_notes onestatus >/dev/null 2>&1; then echo 'BBS is still running'; exit 1; fi
+if service liner_notes_web onestatus >/dev/null 2>&1; then echo 'Web is still running'; exit 1; fi
+tar -cpf "$LN_BACKUP/config.tar" -C / usr/local/etc/liner-notes
+tar -cpf "$LN_BACKUP/data.tar" -C / var/db/liner-notes
+pkg create -o "$LN_BACKUP" liner-notes
+printf 'Backup: %s\n' "$LN_BACKUP"
 ```
 
-statusが停止を示すことを確認します。旧版のports配布物・pkgを保管してください。データに加え、`/etc/rc.conf`、`/usr/local/etc/liner-notes/`、`/usr/local/share/liner-notes/`、`/var/log/liner-notes/`も別途バックアップします。変更したHELP・メニュー・挨拶はshareの下にあります。
+独自データパス、Webのspool、ゲームの設定・世界データは実際の場所も別途バックアップします。
+レビュー版のruntime・Webプログラムを使っている場合はその実体も保存してください。
+既存StarRoute/Clansの設定・世界を初期化しないでください。
 
-標準配置のSQLite運用の場合、データの論理バックアップ例は次のとおりです。保存先はデータディレクトリの外です。実際のボード・会員・DBの名前に合わせてください。
+## 2. portsで構築・配置
 
-```sh
-backup_dir="/root/liner-notes-backup-$(date +%Y%m%d-%H%M%S)"
-install -d -m 700 "$backup_dir"
-liner-notes-admin db-backup --root /var/db/liner-notes \
-  --database /var/db/liner-notes/liner.sqlite \
-  --board notes.dat --members members.dat "$backup_dir/data.tar.gz"
-liner-notes-admin verify "$backup_dir/data.tar.gz"
-tar -czpf "$backup_dir/system-files.tar.gz" -C / \
-  etc/rc.conf usr/local/etc/liner-notes usr/local/share/liner-notes var/log/liner-notes
-```
-
-SQLiteを使わない場合は`db-backup`を`backup`に変更し、`--database`を省略します。標準外の場所にある保管庫・添付・設定も必ず保存します。DB形式も完全に同じ状態へ戻したい場合は、停止中のデータディレクトリ全体も別コピーで保管してください。論理`db-restore`は互換形式のschema 1を作ります。
-
-## 2. プログラムを更新
-
-新しい配布物を別ディレクトリへ展開してSHA256SUMSを確認します。0.70と0.71は同じインストール配置です。旧パッケージを外してから、新しいportを導入します。依存パッケージのautoremoveは不要です。
+新しい配布物を空のディレクトリへ展開し、SHA256SUMSを確認します。
+配布物のルートから実行してください。最初にpackageまで作成するため、
+ビルド失敗時は旧パッケージをそのまま残せます。
 
 ```sh
+cd comms/liner-notes
+make BATCH=yes OPTIONS_SET="WEBUI ZMODEM" DISTDIR="$(pwd)/../../distfiles" package
 pkg delete liner-notes
-cd liner-notes-ports-stage71/comms/liner-notes
-make BATCH=yes OPTIONS_SET=ZMODEM \
-  DISTDIR="$(realpath ../../distfiles)" install clean
+make BATCH=yes OPTIONS_SET="WEBUI ZMODEM" DISTDIR="$(pwd)/../../distfiles" install
+test -x /usr/local/sbin/liner-notes
+test -x /usr/local/sbin/liner-notes-web
 ```
 
-上の`cd`は新しい配布物を展開した場所で実行します。配布物のpkgを使う場合は、portのmakeに代えて`pkg add packages/liner-notes-0.71.pkg`を配布物のルートで実行します。旧パッケージの除去はデータディレクトリの削除ではありません。編集済みの設定・メニュー・HELPはportsの`@sample`で保持します。更新中は停止したままです。
-
-## 3. 設定と外部文書を確認
+編集済みの設定・メニュー・HELP・Webテンプレート・メッセージは保持します。
+既存のweb.tomlがroot専用ならWebアカウントに読み取りを許可してください。
+Web設定の `[bbs] port` は実際の待受ポート（23等）に合わせます。
+既存のWeb実行ユーザーが異なる場合、rc.confの指定とファイル権限もそのユーザーに揃えます。
 
 ```sh
-liner-notes-admin upgrade-check \
-  --assets /usr/local/etc/liner-notes \
-  --assets /usr/local/share/liner-notes \
-  --database /var/db/liner-notes/liner.sqlite
+chown root:liner_notes_web /usr/local/etc/liner-notes/web/web.toml
+chmod 640 /usr/local/etc/liner-notes/web/web.toml
+liner-notes-admin upgrade-check --assets /usr/local/etc/liner-notes --assets /usr/local/share/liner-notes
 ```
 
-SQLiteを使わない場合は`--database`を省略します。この操作はファイルを上書きしません。
-
-- `matches-sample`: 配布内容と同じです。
-- `review-required`: 現在の内容と新しい`.sample`が違います。変更理由は自動判定しません。差分を確認して必要な行だけ取り込みます。
-- `missing`: 対応する実ファイルがありません。必要な設定・文書ならsampleから配置します。
-- `unsafe`: リンク等のため自動で読みません。設置者が確認します。
-
-今回の読書中`S`の説明は`menus/reader-*.txt.sample`と`help/*/read.txt.sample`にあります。rc.confの既存設定はそのまま使用します。**更新のために`liner_notes_database_mode`を変更しないでください。** 既存schema 1/2は維持し、初回構築でstructuredを選んだ新規DBだけがschema 3になります。
-
-## 4. ZMODEMの再検証
-
-0.71の検証ツールは何度でも実行できます。既存記録を先に削除・移動する必要はありません。
+新sampleと独自HTMLの差を確認して統合します。既存DBモード、ポート23の権限設定、
+doors.conf内のStarRoute行は維持します。レビュー版へのプログラム指定がある場合、
+上記の配置確認が成功してから切り替えます。
 
 ```sh
-su -m liner_notes -c \
-  '/usr/local/bin/liner-notes-check-resume /usr/local/bin/lrz /usr/local/bin/lsz --receipt /var/db/liner-notes/lrz-resume.json'
+sysrc liner_notes_program=/usr/local/sbin/liner-notes
+sysrc liner_notes_web_program=/usr/local/sbin/liner-notes-web
 ```
 
-実転送検証に成功した後、同じ内容なら`receipt_status: unchanged`、初回は`created`、変更時は`updated`を表示します。更新前の記録は同じディレクトリの`.bak-日時-識別子`へ残し、新しい記録を一括で置換します。テスト失敗や置換失敗時は旧記録を保持します。リンク・不適切な権限の記録は拒否します。lrzを変更後にテストが失敗した場合、残っている旧記録を新しいlrzの検証済み証拠として使用できません。
+## 3. 再開検査と起動
 
-## 5. 起動と確認
+lrzszを交換した場合はサービス所有者で再開検査を実施します。記録が存在していても
+再実行でき、成功時だけ更新されます。既存の検査記録を先に削除する必要はありません。
 
 ```sh
+su -m liner_notes -c '/usr/local/bin/liner-notes-check-resume /usr/local/bin/lrz /usr/local/bin/lsz --receipt /var/db/liner-notes/lrz-resume.json'
 service liner_notes start
 service liner_notes status
-tail -n 50 /var/log/liner-notes/daemon.log
+service liner_notes_web start
+service liner_notes_web status
 ```
 
-ログイン、既存記事・メールの閲覧、プロフィール、保管庫一覧、実際のファイル転送を確認します。試験用会員で投稿する場合は、運用上問題のないボードを使ってください。失敗した状態でバックアップを削除しません。
+Webを使用しない構成はWeb関連の手順を省略します。ログイン、記事、添付・保管庫転送、
+GAMEからStarRoute/Clans起動と一覧復帰を確認してください。
+`Invalid liner_notes configuration` の場合は最初に `sysrc -n liner_notes_program` と
+そのパスの `ls -l` を確認します。runtime未配置のままパスだけを変更しないでください。
 
-## 戻す場合
+## 4. 戻す場合
 
-サービスを停止し、旧パッケージと更新前の設定・データ一式を組で復元します。現状のデータも別途保存してから戻します。復元ツールは空の別ディレクトリへ出力し、その内容を確認してから手動で切り替えます。
-
-0.70以降の補助設定を保存した会員データは0.69系では読めません。schema 3は0.71以降が必要です。**実行ファイルだけを古くして新形式のデータを開かないでください。** 0.70から0.71への通常更新ではschema 1/2を変換しません。
+両サービスを停止し、保存した旧pkgを再導入します。レビュー版を使っていた場合は
+保存した旧プログラムとrc.confの起動先を戻します。編集した設定はバックアップと比較して戻します。
+DBモードの自動変更はありませんが、旧版へ戻すときはその版が読める形式か確認してください。
+データを復元する場合は更新後のデータも別に保存し、新しい投稿やゲーム進行を失わないようにします。
+0.69以前へ戻す場合は特に会員設定・DB形式の互換性に注意が必要です。

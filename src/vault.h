@@ -9,6 +9,7 @@
 #define VAULT_TOTAL_BYTES (16ULL*1024*1024*1024)
 #define VAULT_BATCH_BYTES (16ULL*1024*1024*1024)
 #define VAULT_CHUNK 768
+#define VAULT_BLOCK 65536
 #define VAULT_MAX_EVENTS 10000
 #define VAULT_CATEGORY_BYTES 48
 #define VAULT_UPLOADS 24
@@ -40,6 +41,7 @@ void vault_set_guard(Vault *,int (*guard)(void *),void *context);
 VaultResult vault_list(Vault *,const Principal *,uint32_t cursor,VaultEntry out[8],size_t *count,uint32_t *next);
 VaultResult vault_info(Vault *,const Principal *,uint32_t id,VaultEntry *out);
 VaultResult vault_read(Vault *,const Principal *,uint32_t id,uint32_t offset,unsigned char out[VAULT_CHUNK],size_t *count);
+VaultResult vault_read_block(Vault *,const Principal *,uint32_t,uint32_t,unsigned char *,size_t,size_t *);
 /* Local administration only; no filesystem path is accepted from BBS clients. */
 VaultResult vault_import(Vault *,const Principal *,const char *source,const char *name,const char *description,VaultEntry *out);
 VaultResult vault_upload_protocol(Vault *,const Principal *,uint32_t,const char *);
@@ -74,6 +76,7 @@ VaultResult vault_audit(Vault *,const Principal *,uint32_t cursor,VaultEvent out
 VaultResult vault_upload_start(Vault *,const Principal *,uint32_t size,const unsigned char sha256[32],const char *name,const char *description,uint32_t *id);
 VaultResult vault_upload_status(Vault *,const Principal *,uint32_t id,VaultUpload *out);
 VaultResult vault_upload_write(Vault *,const Principal *,uint32_t id,uint32_t offset,const unsigned char *bytes,size_t count,uint32_t *received);
+VaultResult vault_upload_write_block(Vault *,const Principal *,uint32_t,uint32_t,const unsigned char *,size_t,uint32_t *);
 VaultResult vault_upload_finish(Vault *,const Principal *,uint32_t id,VaultEntry *out);
 VaultResult vault_upload_cancel(Vault *,const Principal *,uint32_t id);
 const char *vault_result_name(VaultResult result);

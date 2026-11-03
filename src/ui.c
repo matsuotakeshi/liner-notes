@@ -74,6 +74,7 @@ static const char *error_text(const Ui *u,const char *p) {
         {"ERR activity storage",MSG_ERR_ACTIVITY},
         {"ERR no connection",MSG_ERR_CONNECTION},
         {"ERR game unavailable",MSG_ERR_GAME},
+        {"ERR game busy",MSG_ERR_GAME_BUSY},
         {"ERR SYSOP unavailable",MSG_ERR_SYSOP},
         {"ERR mail storage or limit",MSG_ERR_SYSOP_MAIL},
         {"ERR legacy board capacity; compact to RTBOARD4 first",MSG_ERR_LEGACY_CAPACITY},
@@ -101,6 +102,7 @@ static const char *error_text(const Ui *u,const char *p) {
         {"ERR draft conflict",MSG_ERR_DRAFT_CONFLICT},
         {"ERR draft revision",MSG_ERR_DRAFT_REVISION},
         {"ERR no undo",MSG_ERR_NO_UNDO},
+        {"ERR connector editor state",MSG_ERR_CONNECTOR_EDITOR_STATE},
         {"ERR draft line",MSG_ERR_DRAFT_LINE},
         {"ERR preferences",MSG_ERR_PREFS},
         {"ERR pager size",MSG_ERR_PAGER_SIZE},
@@ -176,7 +178,8 @@ static int report_format(Ui *u,const char *wire,Text *t) {
     if(sscanf(wire,"AUTHOR CHANGED %u %u",&id,&user)==2) { add(t,u->language==LANGUAGE_JA?"記事 %u の投稿者を会員 %u に変更しました。\r\n":"Article %u author changed to member %u.\r\n",id,user);return 1; }
     if(!strncmp(wire,"GUEST HANDLE ",13)) { add(t,u->language==LANGUAGE_JA?"接続中ハンドル: %s":"Connection handle: %s",wire+13);return 1; }
     if(!strncmp(wire,"GAMES\r\n",7)) {
-        add(t,"%s",u->language==LANGUAGE_JA?"外部ゲーム（DOOR 番号で起動）\r\n":"Native games (DOOR id to start)\r\n");
+        add(t,"%s",u->language==LANGUAGE_JA?"外部ゲーム（ゲームメニューでは番号、直接起動は DOOR 番号）\r\n":"Native games (number in game menu; DOOR id for direct launch)\r\n");
+        if(!strncmp(wire+7,"END GAMES",9))add(t,"%s",u->language==LANGUAGE_JA?"現在利用できるゲームはありません。\r\n":"No games are available for this account.\r\n");
         const char *p=wire+7;while(!strncmp(p,"GAME ",5)) { unsigned game,seconds;int n=0;if(sscanf(p,"GAME %u %u %n",&game,&seconds,&n)!=2)break;const char *end=strstr(p+n,"\r\n");if(!end)break;add(t,u->language==LANGUAGE_JA?"%u: %.*s（制限 %u 秒）\r\n":"%u: %.*s (limit %u seconds)\r\n",game,(int)(end-p-n),p+n,seconds);p=end+2; }
         return 1;
     }

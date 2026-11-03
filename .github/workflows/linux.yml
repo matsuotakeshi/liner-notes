@@ -1,7 +1,7 @@
 name: Linux compatibility
 on:
   push:
-    branches: [main, linux-support]
+    branches: [main, linux-support, 'release/**']
   pull_request:
   workflow_dispatch:
 permissions:

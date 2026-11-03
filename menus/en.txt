@@ -13,7 +13,7 @@
   LOGIN name / LOGOUT / PASSWD / ACCOUNT
   CHECK ARTICLES / MAIL / FILES     New since last check
   LANG JA|EN / PAGER ON|OFF / MENUMODE BEGINNER|STANDARD|EXPERT
-  GAMES / DOOR id                   Native games
+  GAME / GAMES                     Game menu
  [Help and exit]
   H HELP         ? Redisplay menu   V Version
   O / Q Disconnect                  MENU Main screen

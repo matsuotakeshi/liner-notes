@@ -22,7 +22,7 @@ Review %%ETCDIR%%/liner_notes.conf, then use:
 Keep the listener private while creating the first BBS account and setting
 liner_notes_admins. Reuse an existing instance only after an offline backup.
 
-ZMODEM is optional. Use the corrected lrzsz 0.13.1 port for resume support.
+ZMODEM is optional. Use the official FreeBSD comms/lrzsz port for resume support.
 The spool must be owned by liner_notes and mode 0700. Enable the helper in
 liner_notes.conf after preparing the engine. Before using resume, run
 liner-notes-check-resume as the service user and save its --receipt to
@@ -32,8 +32,14 @@ OpenSSH; liner-notes-ssh does not configure sshd or system login accounts.
 Updates: %%DOCSDIR%%/UPGRADING.md (DOCS option).
 The resume checker can be rerun without deleting its existing receipt.
 Source releases: https://github.com/matsuotakeshi/liner-notes/releases
-Redistribution license and official UID/GID allocation must be settled before
-submission to the Ports Collection.
+License: GPL-3.0-only; bundled xterm.js retains MIT notices.
+Official UID/GID allocation is still required before Ports Collection submission.
+
+With WEBUI enabled, read WEBUI.md before enabling liner_notes_web. Configure
+web/web.toml for your HTTPS origin and actual BBS port. Existing templates and
+messages are preserved. Neither service is automatically started.
+When replacing a preview runtime, set liner_notes_program to the installed
+/usr/local/sbin/liner-notes only after verifying that executable exists.
 EOM
 }
 { type: upgrade

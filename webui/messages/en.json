@@ -1,0 +1,11 @@
+{
+  "name": "Liner notes",
+  "tagline": "Leave a note. Start a conversation.",
+  "banner": "A small note. A new connection.",
+  "welcome": "Boards, private mail and shared files. Your BBS, in your browser.",
+  "news": "Welcome to Liner notes. The operator can customize every Web greeting and announcement.",
+  "system": "Add your system information and community guide here.",
+  "goodbye": "Until our next conversation.",
+  "birthday": "Happy birthday, {{handle}}!",
+  "greetings": {"0":"Good evening. Take your time and catch up.", "6":"Good morning. A new day, a new conversation.", "12":"Good afternoon. Take a moment to connect.", "18":"Good evening. What is on your mind?"}
+}

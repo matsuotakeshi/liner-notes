@@ -101,7 +101,7 @@ HyperNotesの枝表示は`TREE`、未読管理は`UNREAD`、`NEW`、`SEEN`、`SE
 | プロフィールE | 項目番号式の編集画面と名前付き操作 | 現行仕様で確定。追加項目・公開範囲・他会員編集の権限を維持 |
 | フォーラムの配置番号、`#nnn`移動 | BOARD 番号、FILEBOARDS、階層パス | 記事・ボード・ファイルの識別方法は旧データと互換ではない |
 | 掲示板Lの全記事平面リスト | Lは親記事一覧。TREEで返信、LISTでも一覧取得可能 | HyperNotesの親記事・返信構造を維持 |
-| 読書中Sの投稿者プロフィール直行 | PROFILE ログイン名 | Sを新しい意味へ転用せず、名前付き操作を使用 |
+| 読書中Sの投稿者プロフィール直行 | Sで現在の記事投稿者を表示。PROFILEも利用可能 | 0.71で対応。公開範囲を維持 |
 | 読書中のA/D | 最初の返信/親への対応あり。分岐全体はTREE | 旧版の単一の返信連鎖とHyperNotesの返信木は同一ではない |
 | 新着確認 | 空入力で現在範囲を巡回し、表示完了時に日時更新 | 範囲別に保存。RAWではMANUALが既定 |
 | 新着日付の表記 | YYYY-MM-DD、設定タイムゾーン基準 | 旧版の日付入力形式とは異なる |
@@ -119,7 +119,7 @@ HyperNotesの枝表示は`TREE`、未読管理は`UNREAD`、`NEW`、`SEEN`、`SE
 - メール: MAIL SEARCH / DRAFT / RESUME / NOTIFY、/ATTACH、ZMAILUPLOADBATCH、ZMAILDOWNLOADALL等。
 - 保管庫: FILEDESC / FILEDELETE / FILERENAME / FILESTATS、BATCH MATCH、ZRESUME / ZUPLOADBATCHRESUME等。
 - 管理: SIGOPGROUP / BOARDGROUP / BOARDDELETEALL / MOVEBRANCH / CONNECTIONS / ANNOUNCE / DISCONNECT / SHUTDOWN等。
-- 外部ゲーム: GAMES / DOOR。
+- 外部ゲーム: GAME / GAMESでゲーム一覧、番号で起動、終了後は一覧へ復帰。DOOR 番号も利用可能。
 - OS側の保守: liner-notes-adminのbackup / verify / restore / compact。SQLiteはdb-migrate / db-backup / db-export / db-restore / db-compact。
 
 ## stage66以前からの更新

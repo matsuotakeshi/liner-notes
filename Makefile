@@ -64,6 +64,7 @@ test: test-userlog test-chat runtime vaultctl test-adapters test-vault-core test
 	$(PYTHON) tests/test_mail_arrival.py ./runtime
 	$(PYTHON) tests/test_mail_notify.py ./runtime
 	$(PYTHON) tests/test_runtime.py ./runtime
+	$(PYTHON) tests/test_listener_restart.py ./runtime
 	$(PYTHON) tests/test_bind.py ./runtime
 	$(PYTHON) tests/test_ssh_entry.py ./runtime
 	$(PYTHON) tests/test_daemon.py ./runtime
@@ -202,6 +203,9 @@ test-stage65: runtime vaultctl memberctl
 	$(PYTHON) tests/test_stage65.py ./runtime
 	$(PYTHON) tests/test_stage65_delete_recovery.py ./runtime
 	$(PYTHON) tests/test_stage65_doors.py ./runtime
+	$(PYTHON) tests/test_door_resize.py ./runtime
+	$(PYTHON) tests/test_doors_generic.py ./runtime
+	$(PYTHON) tests/test_doors_config.py ./runtime
 	$(PYTHON) tests/test_stage65_terminal.py ./runtime
 	$(PYTHON) tests/test_stage65_ui.py ./runtime
 	$(PYTHON) tests/test_stage65_scan_telnet.py ./runtime
@@ -256,3 +260,20 @@ check: test-stage71
 .PHONY: install-linux
 install-linux: all
 	$(PYTHON) scripts/install-linux.py --prefix "$(PREFIX)" --destdir "$(DESTDIR)"
+
+# Optional Web connector tests; use a Python with webui/requirements.txt installed.
+.PHONY: test-web
+test-web: runtime vaultctl
+	$(PYTHON) tests/test_web_connector.py ./runtime
+	$(PYTHON) tests/test_web_blocks.py ./runtime ./vaultctl
+	$(PYTHON) tests/test_web_http.py ./runtime ./vaultctl
+	$(PYTHON) tests/test_web_transfers.py ./runtime ./vaultctl
+	$(PYTHON) tests/test_web_install.py
+	$(PYTHON) tests/test_web_errors.py
+
+.PHONY: test-doors test-stage72
+test-doors: runtime
+	$(PYTHON) tests/test_door_resize.py ./runtime
+	$(PYTHON) tests/test_doors_config.py ./runtime
+	$(PYTHON) tests/test_doors_generic.py ./runtime
+test-stage72: test-doors test-web

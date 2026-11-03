@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="color-scheme" content="light dark"><title>Liner notes</title>
+  <link rel="stylesheet" href="assets/style.css"><link rel="stylesheet" href="assets/xterm.css">
+  <script src="assets/xterm.js" defer></script><script src="assets/xterm-fit.js" defer></script><script type="module" src="assets/app.js"></script>
+</head>
+<body>
+<div class="app-shell">
+  <aside class="sidebar" id="sidebar">
+    <a class="brand" href="#home"><span class="brand-mark">Ln<span>↗</span></span><span>Liner notes<small>BULLETIN BOARD SYSTEM</small></span></a>
+    <div class="workspace"><span class="workspace-icon">L</span><div id="site-name">Liner notes</div><span class="connection-dot" id="connection-dot"></span></div>
+    <div class="nav-caption" data-i18n="workspace">ワークスペース</div>
+    <nav id="navigation" aria-label="Main navigation"></nav>
+    <div class="sidebar-bottom"><button class="nav-item" id="theme"><span>◐</span><span data-i18n="theme">表示テーマ</span></button><button class="nav-item" id="language"><span>文</span><span>日本語 / English</span></button><div class="session-card"><span class="avatar" id="avatar">G</span><div><strong id="account-name">ゲスト</strong><small id="account-detail">接続を準備しています</small></div><button id="account-button" class="icon-button" aria-label="Account">↗</button></div></div>
+  </aside>
+  <div class="main-shell">
+    <header class="topbar"><div class="breadcrumbs"><button class="icon-button mobile-menu" id="menu-toggle" aria-label="Menu">☰</button><span class="breadcrumb-site">Liner notes</span><span class="slash">/</span><nav id="breadcrumb" aria-label="パンくず"></nav></div><div class="top-actions"><button class="primary-button small" id="login-button" data-i18n="login">ログイン</button><span class="status-label" id="status">接続中…</span><button class="quiet-button" id="notification-button" aria-label="Notifications">◌ <span id="notice-count">0</span></button><button class="primary-button small" id="new-post" data-i18n="write">投稿する</button></div></header>
+    <main id="main" tabindex="-1"><div class="loading">Liner notesを開いています…</div></main>
+    <footer><span>Liner notes · A place for conversation.</span><button class="text-button" id="help-footer" data-i18n="help">ヘルプ</button></footer>
+  </div>
+</div>
+<aside class="notice-drawer" id="notice-drawer" hidden><div class="section-heading"><h2 data-i18n="notifications">お知らせ</h2><button class="icon-button" id="close-notices" aria-label="Close">×</button></div><div id="notices"></div></aside>
+<dialog id="dialog"><div class="dialog-heading"><h2 id="dialog-title"></h2><button class="icon-button" id="dialog-close" aria-label="Close">×</button></div><div id="dialog-body"></div></dialog>
+<div id="toasts" aria-live="polite"></div>
+{{components}}
+</body></html>

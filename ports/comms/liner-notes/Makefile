@@ -1,13 +1,17 @@
 PORTNAME=	liner-notes
-DISTVERSION=	0.71
+DISTVERSION=	0.72
 CATEGORIES=	comms
 # Release source archive; DISTDIR may also use the verified bundle.
-MASTER_SITES=	https://github.com/matsuotakeshi/liner-notes/releases/download/v0.71/
-DISTNAME=	liner-notes-stage71
+MASTER_SITES=	https://github.com/matsuotakeshi/liner-notes/releases/download/v0.72/
+DISTNAME=	liner-notes-stage72
 
 MAINTAINER=	ports@FreeBSD.org
 COMMENT=	HyperNotes-style BBS with Telnet, mail, chat, and file vaults
-# No license is assigned here on behalf of the author. Local packaging only.
+WWW=		https://github.com/matsuotakeshi/liner-notes
+LICENSE=	GPLv3 MIT
+LICENSE_COMB=	multi
+LICENSE_FILE_GPLv3=	${WRKSRC}/LICENSE
+LICENSE_FILE_MIT=	${WRKSRC}/webui/static/xterm-LICENSE
 
 USES=		python:3.11+ shebangfix sqlite:3 ssl
 RUN_DEPENDS=	${PYTHON_PKGNAMEPREFIX}sqlite3>0:databases/py-sqlite3@${PY_FLAVOR}
@@ -32,13 +36,25 @@ SUB_FILES=	liner-notes-admin liner-notes-maintenance \
 		liner_notes.conf doors.conf pkg-message
 SUB_LIST=	PYTHON_CMD=${PYTHON_CMD}
 
-OPTIONS_DEFINE=	DOCS ZMODEM
-OPTIONS_DEFAULT=	DOCS
+OPTIONS_DEFINE=	DOCS WEBUI ZMODEM
+OPTIONS_DEFAULT=	DOCS WEBUI
+OPTIONS_SUB=	yes
+WEBUI_DESC=	Install the separate HTTP/WebSocket connector
+WEBUI_RUN_DEPENDS=	${PYTHON_PKGNAMEPREFIX}aiohttp>=3.11:www/py-aiohttp@${PY_FLAVOR}
+
+.include <bsd.port.options.mk>
+.if ${PORT_OPTIONS:MWEBUI}
+USERS+=		liner_notes_web
+GROUPS+=	liner_notes_web
+.endif
 ZMODEM_DESC=	Depend on lrzsz 0.13.1 or newer for external file transfers
 ZMODEM_RUN_DEPENDS=	lrzsz>=0.13.1:comms/lrzsz
 
 # Public executables in sbin/bin; support files in DATADIR.
 do-install:
+	${MKDIR} ${STAGEDIR}${DATADIR}
+	${INSTALL_DATA} ${WRKSRC}/LICENSE ${STAGEDIR}${DATADIR}/LICENSE
+	${INSTALL_DATA} ${WRKSRC}/THIRD_PARTY.md ${STAGEDIR}${DATADIR}/THIRD_PARTY.md
 	${MKDIR} ${STAGEDIR}${PREFIX}/bin ${STAGEDIR}${PREFIX}/sbin
 	${MKDIR} ${STAGEDIR}${DATADIR}/scripts
 	${INSTALL_PROGRAM} ${WRKSRC}/runtime ${STAGEDIR}${PREFIX}/sbin/liner-notes
@@ -54,6 +70,7 @@ do-install:
 	${MKDIR} ${STAGEDIR}${ETCDIR} ${STAGEDIR}${DATADIR}/menus ${STAGEDIR}${DATADIR}/help/ja ${STAGEDIR}${DATADIR}/help/en
 	${INSTALL_DATA} ${WRKDIR}/doors.conf ${STAGEDIR}${ETCDIR}/doors.conf.sample
 	${INSTALL_SCRIPT} ${WRKSRC}/scripts/door_guess.py ${STAGEDIR}${DATADIR}/scripts/door_guess.py
+	${INSTALL_SCRIPT} ${WRKSRC}/scripts/door_clans.sh ${STAGEDIR}${DATADIR}/scripts/door_clans.sh
 	${INSTALL_DATA} ${WRKSRC}/limits.example.conf ${STAGEDIR}${ETCDIR}/limits.conf.sample
 	${INSTALL_DATA} ${WRKSRC}/sysinfo.txt ${STAGEDIR}${DATADIR}/sysinfo.txt.sample
 	${INSTALL_DATA} ${WRKSRC}/goodbye.txt ${STAGEDIR}${DATADIR}/goodbye.txt.sample
@@ -73,6 +90,10 @@ do-install:
 .endfor
 .endfor
 	${MKDIR} ${STAGEDIR}/var/db/liner-notes/spool ${STAGEDIR}/var/log/liner-notes
+
+do-install-WEBUI-on:
+	${PYTHON_CMD} ${WRKSRC}/webui/install.py --destdir ${STAGEDIR} --prefix ${PREFIX} --python ${PYTHON_CMD} --samples-only
+	${MKDIR} ${STAGEDIR}/var/db/liner-notes-web/spool
 
 do-install-DOCS-on:
 	${MKDIR} ${STAGEDIR}${DOCSDIR}

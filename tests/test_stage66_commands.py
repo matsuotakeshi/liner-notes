@@ -29,7 +29,7 @@ def run(binary,vaultctl):
    assert b'Connections' in c.cmd('w') or b'alice' in c.cmd('w')
    out=c.cmd('l');assert b'UTC' in out,out
    assert b'gateway' in c.cmd('x')
-   assert b'stage71' in c.cmd('v')
+   assert b'stage72' in c.cmd('v')
    c.cmd('\\',b'> ');c.cmd('Mixed Case Memo');assert b'Mixed Case Memo' in c.cmd('W')
    assert b'INSTALL' in c.cmd('i');c.cmd('h',b'> ');c.cmd('Alice Mixed');assert b'Alice Mixed' in c.cmd('PROFILE')
    c.cmd('1',b'> ');c.cmd('beta');c.cmd('4',b'> ');out=c.cmd('0');assert b'OFF' in out,out

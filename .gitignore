@@ -12,3 +12,6 @@
 /*.dat
 /*.sqlite
 /*.sqlite-*
+/.web-venv/
+/webui/local.toml
+/.preview/

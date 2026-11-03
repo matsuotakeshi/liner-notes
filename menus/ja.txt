@@ -13,7 +13,7 @@
   LOGIN 名前 / LOGOUT / PASSWD / ACCOUNT
   CHECK ARTICLES / MAIL / FILES     前回確認後の新着
   LANG JA|EN / PAGER ON|OFF / MENUMODE BEGINNER|STANDARD|EXPERT
-  GAMES / DOOR 番号                 外部ゲーム
+  GAME / GAMES                     ゲームメニュー
  [案内・終了]
   H HELP         ? メニュー再表示   V バージョン
   O / Q 接続終了 MENU 主画面へ

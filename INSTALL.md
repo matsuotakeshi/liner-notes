@@ -1,8 +1,8 @@
-> 現行版は0.71です。[変更内容](STAGE71.md)、[更新手順](UPGRADING.md)を参照してください。既存DB形式は自動変換しません。
+> 現行版は0.72です。[変更内容](STAGE72.md)、[更新手順](UPGRADING.md)を参照してください。既存DB形式は自動変換しません。
 
 # Liner notes インストールと運用開始
 
-Liner notes 0.71をFreeBSD 15.1/amd64へ新規に構築する手順です。portsでインストールし、SQLite保存、Telnetメニュー、ファイル保管庫、ZMODEMを有効にします。最初はサーバー内だけで接続し、管理者登録と動作確認を済ませてから公開します。
+Liner notes 0.72をFreeBSD 15.1/amd64へ新規に構築する手順です。portsでインストールし、SQLite保存、Telnetメニュー、ファイル保管庫、ZMODEMを有効にします。最初はサーバー内だけで接続し、管理者登録と動作確認を済ませてから公開します。
 
 OSのコマンドは、特記のない限りサーバー上のrootで実行します。会員登録などのBBS操作はTelnet接続後に入力します。例の公開先は `bbs.example.org:2222` です。他のサーバーでは読み替えてください。
 
@@ -30,23 +30,26 @@ pkg info lrzsz
 
 ## 2 配布物とportsのインストール
 
-配布物は `liner-notes-ports-stage71.tar.gz`、portsの版は **0.71**です。アーカイブをサーバーへ転送してください。次のコマンドは、転送したファイルのあるディレクトリから実行します。
+配布物は `liner-notes-ports-stage72.tar.gz`、portsの版は **0.72**です。アーカイブをサーバーへ転送してください。次のコマンドは、転送したファイルのあるディレクトリから実行します。
 
 途中でエラーが出たら、その手順を解決してから次へ進みます。以下では `$()` を使うため、rootのログインシェルがcsh/tcshの場合も、最初に `sh` を起動してください。
 
 ```sh
 sh
-tar -xzf liner-notes-ports-stage71.tar.gz
-cd liner-notes-ports-stage71
+tar -xzf liner-notes-ports-stage72.tar.gz
+cd liner-notes-ports-stage72
 ```
 
-配布物には `comms/liner-notes`、修正版 `comms/lrzsz`、Liner notesのソースを収めた `distfiles`、マニュアル、検証記録があります。システムのportsツリーへ上書きコピーする必要はありません。
-
-**lrzszが未導入の場合**は、同梱の修正版を先に入れます。
+配布物には `comms/liner-notes`、ソースを収めた `distfiles`、マニュアル、検証記録があります。
+独自のlrzsz portsは同梱しません。ZMODEMには本家FreeBSDの `comms/lrzsz` を使います。
 
 ```sh
-(cd comms/lrzsz && make BATCH=yes install clean)
+pkg install lrzsz
 ```
+
+portsからlrzszを構築する場合は、更新済みの `/usr/ports/comms/lrzsz` を使用します。
+パッケージ配布系統によっては旧0.12系のままの場合があります。0.13.1以上が
+取得できない場合は本家portsを更新して構築してください。導入後は以下の再開検査を行ってください。
 
 続いてLiner notesをインストールします。`OPTIONS_SET=ZMODEM` はlrzszを依存関係に登録する指定で、BBS側の転送設定は後の手順で行います。
 
@@ -287,5 +290,15 @@ tail -n 80 /var/log/liner-notes/daemon.log
 | 管理者メニューがない | admins.confはログイン名でなく会員番号。再起動と再ログイン |
 | ZMODEMを開始できない | helperの絶対パスと実行権限、検証記録、端末のBINARY設定 |
 | db-backupが失敗 | サービスの停止、DB指定、出力先がデータ領域外か、空き容量 |
+
+`listen setup failed`は、詳細にある操作名・アドレス・ポート・OSエラーを確認します。
+`bind ... Address already in use`は別プロセスの待受や停止後に残ったTCP接続、
+`Permission denied`は起動ユーザーのポート使用許可、`Can't assign requested address`は
+bind先IPを確認します。旧版の短いエラー表示だけでは原因を区別できません。
+この版ではUNIXの待受に`SO_REUSEADDR`を指定し、正常停止後のTCP接続がTIME_WAITに
+残っても同じポートで再起動できるようにしています。稼働中の同一アドレス・ポートへの
+二重起動は許可しません。旧版から最初に切り替える際は、旧接続の状態解消を待つ必要が
+残る場合があります。mac_portaclの許可はUIDに対する設定なので、実行ファイルの
+パス変更だけで許可が失われることはありません。
 
 FreeBSDのサービス管理の基本は [FreeBSD Handbookの設定とサービス](https://docs.freebsd.org/en/books/handbook/config/#configtuning-rcd) を参照してください。本マニュアルの設定名は同梱のrcスクリプトに対応しています。
