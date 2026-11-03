@@ -1,0 +1,311 @@
+Installing liner-notes-0.71...
+===> Creating groups
+Creating group 'liner_notes' with gid '64964'
+===> Creating users
+Creating user 'liner_notes' with uid '64964'
+===> Creating homedir(s)
+Extracting liner-notes-0.71: .......... done
+=====
+Message from liner-notes-0.71:
+
+--
+Liner notes is installed but NOT enabled or started.
+New installation guide (DOCS): /usr/local/share/doc/liner-notes/INSTALL.md
+
+Daemon: /usr/local/sbin/liner-notes
+Administration: /usr/local/bin/liner-notes-admin
+Configuration: /usr/local/etc/liner-notes
+Editable menus/help/banner: /usr/local/share/liner-notes
+Logs: /var/log/liner-notes
+Supervisor PID: /var/run/liner-notes.pid
+Data and private transfer spool: /var/db/liner-notes
+Service: liner_notes (default: 127.0.0.1:2222)
+Management commands: liner-notes-admin (maintenance alias retained), liner-notes-vaultctl,
+liner-notes-memberctl. Python and SQLite are required.
+
+Review /usr/local/etc/liner-notes/liner_notes.conf, then use:
+  sysrc liner_notes_enable=YES
+  service liner_notes start
+
+Keep the listener private while creating the first BBS account and setting
+liner_notes_admins. Reuse an existing instance only after an offline backup.
+
+ZMODEM is optional. Use the corrected lrzsz 0.13.1 port for resume support.
+The spool must be owned by liner_notes and mode 0700. Enable the helper in
+liner_notes.conf after preparing the engine. Before using resume, run
+liner-notes-check-resume as the service user and save its --receipt to
+/var/db/liner-notes/lrz-resume.json. Regenerate it after replacing lrz. External SSH uses the system's
+OpenSSH; liner-notes-ssh does not configure sshd or system login accounts.
+
+Updates: /usr/local/share/doc/liner-notes/UPGRADING.md (DOCS option).
+The resume checker can be rerun without deleting its existing receipt.
+Source releases: https://github.com/matsuotakeshi/liner-notes/releases
+Redistribution license and official UID/GID allocation must be settled before
+submission to the Ports Collection.
+--
+===>   NOTICE:
+
+The liner-notes port currently does not have a maintainer. As a result, it is
+more likely to have unresolved issues, not be up-to-date, or even be removed in
+the future. To volunteer to maintain this port, please create an issue at:
+
+https://bugs.freebsd.org/bugzilla
+
+More information about port maintainership is available at:
+
+https://docs.freebsd.org/en/articles/contributing/#ports-contributing
+
+Installing liner-notes-0.72...
+package liner-notes is already installed, forced install
+===> Creating groups
+Using existing group 'liner_notes'
+Creating group 'liner_notes_web' with gid '64965'
+===> Creating users
+Using existing user 'liner_notes'
+===> Creating homedir(s)
+Creating user 'liner_notes_web' with uid '64965'
+===> Creating homedir(s)
+Extracting liner-notes-0.72: .......... done
+=====
+Message from liner-notes-0.72:
+
+--
+Liner notes is installed but NOT enabled or started.
+New installation guide (DOCS): /usr/local/share/doc/liner-notes/INSTALL.md
+
+Daemon: /usr/local/sbin/liner-notes
+Administration: /usr/local/bin/liner-notes-admin
+Configuration: /usr/local/etc/liner-notes
+Editable menus/help/banner: /usr/local/share/liner-notes
+Logs: /var/log/liner-notes
+Supervisor PID: /var/run/liner-notes.pid
+Data and private transfer spool: /var/db/liner-notes
+Service: liner_notes (default: 127.0.0.1:2222)
+Management commands: liner-notes-admin (maintenance alias retained), liner-notes-vaultctl,
+liner-notes-memberctl. Python and SQLite are required.
+
+Review /usr/local/etc/liner-notes/liner_notes.conf, then use:
+  sysrc liner_notes_enable=YES
+  service liner_notes start
+
+Keep the listener private while creating the first BBS account and setting
+liner_notes_admins. Reuse an existing instance only after an offline backup.
+
+ZMODEM is optional. Use the official FreeBSD comms/lrzsz port for resume support.
+The spool must be owned by liner_notes and mode 0700. Enable the helper in
+liner_notes.conf after preparing the engine. Before using resume, run
+liner-notes-check-resume as the service user and save its --receipt to
+/var/db/liner-notes/lrz-resume.json. Regenerate it after replacing lrz. External SSH uses the system's
+OpenSSH; liner-notes-ssh does not configure sshd or system login accounts.
+
+Updates: /usr/local/share/doc/liner-notes/UPGRADING.md (DOCS option).
+The resume checker can be rerun without deleting its existing receipt.
+Source releases: https://github.com/matsuotakeshi/liner-notes/releases
+License: GPL-3.0-only; bundled xterm.js retains MIT notices.
+Official UID/GID allocation is still required before Ports Collection submission.
+
+With WEBUI enabled, read WEBUI.md before enabling liner_notes_web. Configure
+web/web.toml for your HTTPS origin and actual BBS port. Existing templates and
+messages are preserved. Neither service is automatically started.
+When replacing a preview runtime, set liner_notes_program to the installed
+/usr/local/sbin/liner-notes only after verifying that executable exists.
+--
+===>   NOTICE:
+
+The liner-notes port currently does not have a maintainer. As a result, it is
+more likely to have unresolved issues, not be up-to-date, or even be removed in
+the future. To volunteer to maintain this port, please create an issue at:
+
+https://bugs.freebsd.org/bugzilla
+
+More information about port maintainership is available at:
+
+https://docs.freebsd.org/en/articles/contributing/#ports-contributing
+
+Installing liner-notes-0.72...
+package liner-notes is already installed, forced install
+===> Creating groups
+Using existing group 'liner_notes'
+Using existing group 'liner_notes_web'
+===> Creating users
+Using existing user 'liner_notes'
+===> Creating homedir(s)
+Using existing user 'liner_notes_web'
+===> Creating homedir(s)
+Extracting liner-notes-0.72: .......... done
+=====
+Message from liner-notes-0.72:
+
+--
+Liner notes is installed but NOT enabled or started.
+New installation guide (DOCS): /usr/local/share/doc/liner-notes/INSTALL.md
+
+Daemon: /usr/local/sbin/liner-notes
+Administration: /usr/local/bin/liner-notes-admin
+Configuration: /usr/local/etc/liner-notes
+Editable menus/help/banner: /usr/local/share/liner-notes
+Logs: /var/log/liner-notes
+Supervisor PID: /var/run/liner-notes.pid
+Data and private transfer spool: /var/db/liner-notes
+Service: liner_notes (default: 127.0.0.1:2222)
+Management commands: liner-notes-admin (maintenance alias retained), liner-notes-vaultctl,
+liner-notes-memberctl. Python and SQLite are required.
+
+Review /usr/local/etc/liner-notes/liner_notes.conf, then use:
+  sysrc liner_notes_enable=YES
+  service liner_notes start
+
+Keep the listener private while creating the first BBS account and setting
+liner_notes_admins. Reuse an existing instance only after an offline backup.
+
+ZMODEM is optional. Use the official FreeBSD comms/lrzsz port for resume support.
+The spool must be owned by liner_notes and mode 0700. Enable the helper in
+liner_notes.conf after preparing the engine. Before using resume, run
+liner-notes-check-resume as the service user and save its --receipt to
+/var/db/liner-notes/lrz-resume.json. Regenerate it after replacing lrz. External SSH uses the system's
+OpenSSH; liner-notes-ssh does not configure sshd or system login accounts.
+
+Updates: /usr/local/share/doc/liner-notes/UPGRADING.md (DOCS option).
+The resume checker can be rerun without deleting its existing receipt.
+Source releases: https://github.com/matsuotakeshi/liner-notes/releases
+License: GPL-3.0-only; bundled xterm.js retains MIT notices.
+Official UID/GID allocation is still required before Ports Collection submission.
+
+With WEBUI enabled, read WEBUI.md before enabling liner_notes_web. Configure
+web/web.toml for your HTTPS origin and actual BBS port. Existing templates and
+messages are preserved. Neither service is automatically started.
+When replacing a preview runtime, set liner_notes_program to the installed
+/usr/local/sbin/liner-notes only after verifying that executable exists.
+--
+===>   NOTICE:
+
+The liner-notes port currently does not have a maintainer. As a result, it is
+more likely to have unresolved issues, not be up-to-date, or even be removed in
+the future. To volunteer to maintain this port, please create an issue at:
+
+https://bugs.freebsd.org/bugzilla
+
+More information about port maintainership is available at:
+
+https://docs.freebsd.org/en/articles/contributing/#ports-contributing
+
+Updating database digests format: .......... done
+Checking integrity... done (0 conflicting)
+Deinstallation has been requested for the following 1 packages (of 0 packages in the universe):
+
+Installed packages to be REMOVED:
+	liner-notes: 0.72
+
+Number of packages to be removed: 1
+
+The operation will free 2 MiB.
+[1/1] Deinstalling liner-notes-0.72...
+[1/1] Deleting files for liner-notes-0.72: .......... done
+==> You should manually remove the "liner_notes" user
+==> You should manually remove the "liner_notes_web" user
+==> You should manually remove the "liner_notes" group
+==> You should manually remove the "liner_notes_web" group
+You may need to manually remove /usr/local/share/liner-notes/banner.txt if it is no longer needed.
+You may need to manually remove /usr/local/etc/liner-notes/liner_notes.conf if it is no longer needed.
+You may need to manually remove /usr/local/share/liner-notes/menus/ja.txt if it is no longer needed.
+You may need to manually remove /usr/local/share/liner-notes/help/ja/admin.txt if it is no longer needed.
+You may need to manually remove /usr/local/share/liner-notes/help/ja/content.txt if it is no longer needed.
+You may need to manually remove /usr/local/share/liner-notes/help/ja/draft.txt if it is no longer needed.
+You may need to manually remove /usr/local/share/liner-notes/help/ja/index.txt if it is no longer needed.
+You may need to manually remove /usr/local/share/liner-notes/help/ja/mail.txt if it is no longer needed.
+You may need to manually remove /usr/local/share/liner-notes/help/ja/post.txt if it is no longer needed.
+You may need to manually remove /usr/local/share/liner-notes/help/ja/settings.txt if it is no longer needed.
+You may need to manually remove /usr/local/share/liner-notes/help/ja/unread.txt if it is no longer needed.
+You may need to manually remove /usr/local/share/liner-notes/menus/en.txt if it is no longer needed.
+You may need to manually remove /usr/local/share/liner-notes/help/en/admin.txt if it is no longer needed.
+You may need to manually remove /usr/local/share/liner-notes/help/en/content.txt if it is no longer needed.
+You may need to manually remove /usr/local/share/liner-notes/help/en/draft.txt if it is no longer needed.
+You may need to manually remove /usr/local/share/liner-notes/help/en/index.txt if it is no longer needed.
+You may need to manually remove /usr/local/share/liner-notes/help/en/mail.txt if it is no longer needed.
+You may need to manually remove /usr/local/share/liner-notes/help/en/post.txt if it is no longer needed.
+You may need to manually remove /usr/local/share/liner-notes/help/en/settings.txt if it is no longer needed.
+You may need to manually remove /usr/local/share/liner-notes/help/en/unread.txt if it is no longer needed.
+You may need to manually remove /usr/local/etc/liner-notes/doors.conf if it is no longer needed.
+You may need to manually remove /usr/local/share/liner-notes/sysinfo.txt if it is no longer needed.
+You may need to manually remove /usr/local/share/liner-notes/goodbye.txt if it is no longer needed.
+You may need to manually remove /usr/local/share/liner-notes/help/ja/adminmembers.txt if it is no longer needed.
+You may need to manually remove /usr/local/share/liner-notes/help/ja/adminboards.txt if it is no longer needed.
+You may need to manually remove /usr/local/share/liner-notes/help/ja/adminfiles.txt if it is no longer needed.
+You may need to manually remove /usr/local/share/liner-notes/help/ja/adminconnections.txt if it is no longer needed.
+You may need to manually remove /usr/local/share/liner-notes/help/ja/adminstorage.txt if it is no longer needed.
+You may need to manually remove /usr/local/share/liner-notes/help/en/adminmembers.txt if it is no longer needed.
+You may need to manually remove /usr/local/share/liner-notes/help/en/adminboards.txt if it is no longer needed.
+You may need to manually remove /usr/local/share/liner-notes/help/en/adminfiles.txt if it is no longer needed.
+You may need to manually remove /usr/local/share/liner-notes/help/en/adminconnections.txt if it is no longer needed.
+You may need to manually remove /usr/local/share/liner-notes/help/en/adminstorage.txt if it is no longer needed.
+You may need to manually remove /usr/local/etc/liner-notes/web/templates/index.html if it is no longer needed.
+You may need to manually remove /usr/local/etc/liner-notes/web/web.toml if it is no longer needed.
+Message from liner-notes-0.72:
+BBS data and edited configuration are preserved. The liner_notes account is
+also retained. Do not delete these until backups and migration are verified.
+
+Installing liner-notes-0.72...
+===> Creating groups
+Using existing group 'liner_notes'
+Using existing group 'liner_notes_web'
+===> Creating users
+Using existing user 'liner_notes'
+===> Creating homedir(s)
+Using existing user 'liner_notes_web'
+===> Creating homedir(s)
+Extracting liner-notes-0.72: .......... done
+=====
+Message from liner-notes-0.72:
+
+--
+Liner notes is installed but NOT enabled or started.
+New installation guide (DOCS): /usr/local/share/doc/liner-notes/INSTALL.md
+
+Daemon: /usr/local/sbin/liner-notes
+Administration: /usr/local/bin/liner-notes-admin
+Configuration: /usr/local/etc/liner-notes
+Editable menus/help/banner: /usr/local/share/liner-notes
+Logs: /var/log/liner-notes
+Supervisor PID: /var/run/liner-notes.pid
+Data and private transfer spool: /var/db/liner-notes
+Service: liner_notes (default: 127.0.0.1:2222)
+Management commands: liner-notes-admin (maintenance alias retained), liner-notes-vaultctl,
+liner-notes-memberctl. Python and SQLite are required.
+
+Review /usr/local/etc/liner-notes/liner_notes.conf, then use:
+  sysrc liner_notes_enable=YES
+  service liner_notes start
+
+Keep the listener private while creating the first BBS account and setting
+liner_notes_admins. Reuse an existing instance only after an offline backup.
+
+ZMODEM is optional. Use the official FreeBSD comms/lrzsz port for resume support.
+The spool must be owned by liner_notes and mode 0700. Enable the helper in
+liner_notes.conf after preparing the engine. Before using resume, run
+liner-notes-check-resume as the service user and save its --receipt to
+/var/db/liner-notes/lrz-resume.json. Regenerate it after replacing lrz. External SSH uses the system's
+OpenSSH; liner-notes-ssh does not configure sshd or system login accounts.
+
+Updates: /usr/local/share/doc/liner-notes/UPGRADING.md (DOCS option).
+The resume checker can be rerun without deleting its existing receipt.
+Source releases: https://github.com/matsuotakeshi/liner-notes/releases
+License: GPL-3.0-only; bundled xterm.js retains MIT notices.
+Official UID/GID allocation is still required before Ports Collection submission.
+
+With WEBUI enabled, read WEBUI.md before enabling liner_notes_web. Configure
+web/web.toml for your HTTPS origin and actual BBS port. Existing templates and
+messages are preserved. Neither service is automatically started.
+When replacing a preview runtime, set liner_notes_program to the installed
+/usr/local/sbin/liner-notes only after verifying that executable exists.
+--
+===>   NOTICE:
+
+The liner-notes port currently does not have a maintainer. As a result, it is
+more likely to have unresolved issues, not be up-to-date, or even be removed in
+the future. To volunteer to maintain this port, please create an issue at:
+
+https://bugs.freebsd.org/bugzilla
+
+More information about port maintainership is available at:
+
+https://docs.freebsd.org/en/articles/contributing/#ports-contributing

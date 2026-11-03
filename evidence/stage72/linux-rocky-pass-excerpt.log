@@ -1,0 +1,41 @@
+Successful assertion excerpt; full job: https://github.com/matsuotakeshi/liner-notes/actions/runs/41623299654/job/125874209649
+2026-11-03T11:11:59.5132830Z PASS Linux staged install, repeat updates preserve config/help/banner/unit, no data mutation, wrapper syntax, symlink rejection
+2026-11-03T11:11:59.9751609Z PASS installed Linux service arguments, unprivileged startup, Telnet menu/PING, SQLite creation and graceful SIGTERM
+2026-11-03T11:16:24.1331913Z PASS stage67 permission, shared buffer, file scope, timezone/DST
+2026-11-03T11:16:26.8568262Z PASS stage67 authoritative DB: migration preserves originals, crash persistence, exclusive instance, no legacy dependency, missing block rejection
+2026-11-03T11:16:28.9796722Z PASS stage67 Telnet reading, shared buffer, role menus, scope, questions, timezone, goodbye
+2026-11-03T11:16:54.4394213Z PASS stage60: locked-board isolation/revision, long info, node policies/quotas, article import, move/reply/read-state/restart/compaction, delete/nonreuse, scoped retained access logs and corrupt-tail refusal
+2026-11-03T11:17:10.2418813Z PASS stage60 UI: global admin idle exemption, guest/member cutoff, uppercase command echo, case-sensitive content/passwords, JA/EN, lowercase editor commands, G import and long INFO
+2026-11-03T11:17:20.9095854Z PASS stage60 safety: inherited passwords, ACL/SIGOP scope, username case, order, INFO boundary/UTF-8/incomplete commit, missing sidecars and disabled retention; POSIX move/read/post short-write handling
+2026-11-03T11:17:40.6190769Z PASS stage59: reset short write fails closed; truncated credential/role journals refused
+2026-11-03T11:17:40.6192018Z PASS stage59: ownership/policy, scoped SIGOP, revocation/restart, secret password reset and idle disconnect
+2026-11-03T11:17:41.9793897Z PASS retention: stable totals/replay, whole sessions, receipt rejection, backup integrity, Gather, lock/corruption/state refusal
+2026-11-03T11:18:49.3620620Z PASS listener 127.0.0.1: occupied-port diagnostic and four immediate restarts after accepted TCP sessions
+2026-11-03T11:18:49.3621840Z PASS listener 0.0.0.0: occupied-port diagnostic and four immediate restarts after accepted TCP sessions
+2026-11-03T11:20:46.2083607Z PASS: default OFF, per-session toggle, Enter/stop/flush, Japanese/English, raw bypass and reconnect isolation
+2026-11-03T11:21:48.5662038Z stage65 core permissions/restart/compaction passed
+2026-11-03T11:21:50.4912324Z stage65 cascade intent recovery, deepest-first deletion, repeat restart and no duplicate withdrawals passed
+2026-11-03T11:21:52.7083555Z stage65 native PTY door: auth, level, environment, return, escape passed
+2026-11-03T11:21:56.9885267Z PASS live Door NAWS: existing 20..240 x 5..100 policy, missing/zero/invalid/duplicate/fragmented/refused notifications, SIGWINCH, identity/environment, independent sessions, quit/reentry/crash/escape/disconnect/timeout, BBS return, independent stty PTY app
+2026-11-03T11:22:00.6216399Z generic Door: menu, raw keys, private DORINFO, slots across runtimes, timeout/crash/escape/disconnect and descendants passed
+2026-11-03T11:22:02.5383451Z PASS Door config validation, failed exec cleanup/retry, slots without dropfiles and empty menu
+2026-11-03T11:22:11.0501423Z stage65 Telnet PTY CRLF, connections, revocation cleanup, U clear/append confirmation passed
+2026-11-03T11:22:13.1177160Z stage65 menu quantity and continuous reader passed
+2026-11-03T11:22:18.0077695Z stage65 Telnet F/CRLF, pager entry, Ctrl-C cancellation and mail continuous reading passed
+2026-11-03T11:22:33.9987588Z stage65 SQL cache: reuse, eviction, mail, crash replay, tamper rejection passed
+2026-11-03T11:22:36.8835862Z PASS stage70 structured DB/restart/crash/logical backup, persistent editor/protocol, hourly fallback, spool preview/locks/publication/symlink safety
+2026-11-03T11:22:51.7229020Z PASS Gather oldest-first retained messages, maximum 70 characters/10 lines, skip-to-compose and read-only exit
+2026-11-03T11:22:57.0530063Z PASS common idle timeout: active process send and legacy receive exceed total timeout; stalled peers fail TIMEOUT
+2026-11-03T11:22:59.4422440Z PASS repeatable receipt creation/reuse/backup/atomic failure/symlink and non-mutating asset check
+2026-11-03T11:22:59.4423208Z PASS spool detail, explicit lost-ID binding, status reconciliation, preview, endpoint isolation and confirmed-only cleanup
+2026-11-03T11:22:59.4423981Z PASS structured profile/history rows, logical export/replay, reader S privacy and unchanged read position
+2026-11-03T11:23:03.5040628Z PASS real public/private reservation reconcile, lost reply binding, active cleanup refusal, owner isolation and published payload preservation
+2026-11-03T11:23:14.5240751Z PASS live Door NAWS: existing 20..240 x 5..100 policy, missing/zero/invalid/duplicate/fragmented/refused notifications, SIGWINCH, identity/environment, independent sessions, quit/reentry/crash/escape/disconnect/timeout, BBS return, independent stty PTY app
+2026-11-03T11:23:16.5113950Z PASS Door config validation, failed exec cleanup/retry, slots without dropfiles and empty menu
+2026-11-03T11:23:20.1378532Z generic Door: menu, raw keys, private DORINFO, slots across runtimes, timeout/crash/escape/disconnect and descendants passed
+2026-11-03T11:23:22.6956394Z PASS Web connector: real Telnet, password secrecy, member ACL, literal 4096-byte lines, article/mail bodies and chat synchronization
+2026-11-03T11:23:24.5575597Z PASS connector blocks: size bounds, legacy line limit, token matching, guest refusal, command allowlist, owner checks, mid-download hiding, no premature receipt, private mail denies SYSOP
+2026-11-03T11:23:35.5694962Z PASS Web HTTP: CSRF/Origin, session isolation, 256KiB drafts, Gather, literal posts, mail/privacy, public/private files with SHA256, one-use downloads, resume/retry, terminal login and real PTY door return
+2026-11-03T11:23:38.0996137Z PASS block transfer, durable resume ID, owner isolation, mismatched source, mail editor preservation and private attachments
+2026-11-03T11:23:38.2945878Z PASS Web installer: config preservation, samples-only pkg staging, permissions, rc syntax, symlink refusal
+2026-11-03T11:23:38.4931614Z PASS Web errors: missing template fallback, invalid UTF-8/permission errors=500, recovered template=200, BBS network failure=503

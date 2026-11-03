@@ -1,0 +1,106 @@
+{
+  "version": "0.72",
+  "date": "2026-11-03",
+  "environment": "FreeBSD 15.1/amd64, Python 3.12.15",
+  "source_sha256": "4f01379d1989f6a6b8afd059542d5bf8ffd323e883779a1ae28f16204cc1907b",
+  "package_sha256": "6020939e17bb4f66a91bb9af297babc734c50c734ed7d049905e0b0b00504e06",
+  "tests": [
+    {
+      "command": [
+        "make",
+        "check"
+      ],
+      "code": 0,
+      "seconds": 769.06,
+      "log": "regression-1.log"
+    },
+    {
+      "command": [
+        "make",
+        "test-stage67",
+        "test-stage68",
+        "test-stage69",
+        "test-stage70"
+      ],
+      "code": 0,
+      "seconds": 63.85,
+      "log": "regression-2.log"
+    },
+    {
+      "command": [
+        "make",
+        "test-stage72"
+      ],
+      "code": 0,
+      "seconds": 39.19,
+      "log": "regression-3.log"
+    },
+    {
+      "command": [
+        "/home/takeshi/liner-notes-release72-20261103/.web-venv/bin/python",
+        "tests/test_web_service.py"
+      ],
+      "code": 0,
+      "seconds": 4.16,
+      "log": "regression-4.log"
+    },
+    {
+      "command": [
+        "/home/takeshi/liner-notes-release72-20261103/.web-venv/bin/python",
+        "tests/test_listener_restart.py",
+        "./runtime"
+      ],
+      "code": 0,
+      "seconds": 0.48,
+      "log": "regression-5.log"
+    }
+  ],
+  "ports": {
+    "default": "stage/check-plist/stage-qa/package passed; DOCS+WEBUI",
+    "custom": "custom PREFIX, DOCS/WEBUI disabled passed",
+    "dependencies": "Real dependencies installed in a private chroot. NO_DEPENDS avoids host installs; dependency metadata and installed imports verified.",
+    "warnings": [
+      "USES=ssl may not be needed (base libcrypto is deliberately linked)"
+    ],
+    "source_match": {
+      "production_files_match": 181,
+      "code": 0
+    }
+  },
+  "lifecycle": "0.71 -> 0.72, reinstall, remove and reinstall; config/templates/doors/data preserved; web UID/modes/import checked; host account and package DB unchanged",
+  "web_dependencies": [
+    "aiohttp 3.14.5 (venv)",
+    "aiohttp 3.14.3 (FreeBSD pkg)"
+  ],
+  "zmodem": "Real lrzsz 0.13.1 interoperability and resume regression passed",
+  "linux_ci": {
+    "url": "https://github.com/matsuotakeshi/liner-notes/actions/runs/41623299654",
+    "commit": "e49c1426d91d889866ae2d799624c166cacfcea6",
+    "jobs": [
+      {
+        "name": "linux (almalinux:9)",
+        "status": "completed",
+        "conclusion": "success",
+        "id": 125874209212
+      },
+      {
+        "name": "linux (rockylinux/rockylinux:9)",
+        "status": "completed",
+        "conclusion": "success",
+        "id": 125874209649
+      }
+    ]
+  },
+  "changes_after_ci_commit": [
+    "LINUX.md",
+    "PLATFORMS.md",
+    "README.md",
+    "THIRD_PARTY.md",
+    "ports/comms/liner-notes/distinfo"
+  ],
+  "limits": [
+    "No production service or data modified by this release task",
+    "No 1GiB x16 or day-long full-load claim",
+    "No Clans browser visual or complete game-scenario claim"
+  ]
+}

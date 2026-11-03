@@ -1,0 +1,12 @@
+python3.12 tests/test_web_connector.py ./runtime
+PASS Web connector: real Telnet, password secrecy, member ACL, literal 4096-byte lines, article/mail bodies and chat synchronization
+python3.12 tests/test_web_blocks.py ./runtime ./vaultctl
+PASS connector blocks: size bounds, legacy line limit, token matching, guest refusal, command allowlist, owner checks, mid-download hiding, no premature receipt, private mail denies SYSOP
+python3.12 tests/test_web_http.py ./runtime ./vaultctl
+PASS Web HTTP: CSRF/Origin, session isolation, 256KiB drafts, Gather, literal posts, mail/privacy, public/private files with SHA256, one-use downloads, resume/retry, terminal login and real PTY door return
+python3.12 tests/test_web_transfers.py ./runtime ./vaultctl
+PASS block transfer, durable resume ID, owner isolation, mismatched source, mail editor preservation and private attachments
+python3.12 tests/test_web_install.py
+PASS Web installer: config preservation, samples-only pkg staging, permissions, rc syntax, symlink refusal
+python3.12 tests/test_web_errors.py
+PASS Web errors: missing template fallback, invalid UTF-8/permission errors=500, recovered template=200, BBS network failure=503

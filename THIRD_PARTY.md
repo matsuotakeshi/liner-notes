@@ -13,6 +13,12 @@ Bundled browser dependencies retain their MIT licenses:
 | `webui/static/xterm.js`, `xterm.css` | `webui/static/xterm-LICENSE` |
 | `webui/static/xterm-fit.js` | `webui/static/xterm-fit-LICENSE` |
 
+The bundled versions are @xterm/xterm 6.0.0 and @xterm/addon-fit 0.11.0.
+Their JavaScript, CSS and license notices were compared byte-for-byte (with LF
+line endings) against official npm archives. The matching upstream archives,
+including preferred TypeScript source, are included under `third_party/`.
+See `third_party/SOURCES.json` for exact source URLs and SHA-256 hashes.
+
 Upstream: https://github.com/xtermjs/xterm.js . These notices are installed
 with the Web assets. Original copyright notices must be retained.
 

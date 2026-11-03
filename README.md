@@ -2,13 +2,11 @@
 
 # Liner notes 0.72
 
-今回の変更は [STAGE71.md](STAGE72.md)、更新は [UPGRADING.md](UPGRADING.md) を参照してください。互換モードは [STAGE69.md](STAGE69.md) に記載しています。
-
-2026-10-31 修正版: 配下新着検索の範囲、P/L読書中の検索条件保持、回線切断時の変更済み表示設定保存、一括転送の個別完了・未完了分再送を修正。選択状態は接続中のみ保持します。`make test-stage68` と `tests/test_stage68_batch.py` が追加の回帰試験です。関連試験は0.69の回帰検証にも含まれます。
+今回の変更は [STAGE72.md](STAGE72.md)、更新は [UPGRADING.md](UPGRADING.md) を参照してください。互換モードは [STAGE69.md](STAGE69.md) に記載しています。
 
 FreeBSD向けのC製BBSです。Rocky Linux／AlmaLinux向けの構築・インストール手順も備えています。HyperNotes型の返信ツリー、会員間メール、チャット、ファイル保管庫を備え、メニューとHELPは日本語・英語に対応します。
 
-0.71では繰り返し実行できる転送検証、中断データの照合、プロフィールと履歴のSQL保存、読書中Sの投稿者プロフィール表示を追加しました。[STAGE71.md](STAGE72.md) と [UPGRADING.md](UPGRADING.md) を参照してください。
+0.72ではWebUI、転送改善、専用ゲームメニューと汎用Door連携を正式配布へ統合しました。GPL-3.0-onlyを明記し、portsと設定保持を含む更新手順を整えています。[STAGE72.md](STAGE72.md) と [UPGRADING.md](UPGRADING.md) を参照してください。
 
 ## 最初に読む文書
 

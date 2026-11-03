@@ -1,0 +1,18 @@
+{
+  "url": "https://github.com/matsuotakeshi/liner-notes/actions/runs/41623299654",
+  "commit": "e49c1426d91d889866ae2d799624c166cacfcea6",
+  "jobs": [
+    {
+      "name": "linux (almalinux:9)",
+      "status": "completed",
+      "conclusion": "success",
+      "id": 125874209212
+    },
+    {
+      "name": "linux (rockylinux/rockylinux:9)",
+      "status": "completed",
+      "conclusion": "success",
+      "id": 125874209649
+    }
+  ]
+}

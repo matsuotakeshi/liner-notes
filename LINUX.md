@@ -1,6 +1,6 @@
 # Rocky Linux / AlmaLinux
 
-Linux対応ブランチのソース構築手順です。対象はRocky Linux 9 / AlmaLinux 9、x86_64、Clang、Python 3.11です。FreeBSD向けのports/pkgはLinuxにはインストールしません。Linux用RPMはまだ提供していません。
+Liner notes 0.72のソース構築手順です。対象はRocky Linux 9 / AlmaLinux 9、x86_64、Clang、Python 3.11です。FreeBSD向けのports/pkgはLinuxにはインストールしません。Linux用RPMはまだ提供していません。
 
 ## ビルド
 
@@ -8,7 +8,7 @@ Linux対応ブランチのソース構築手順です。対象はRocky Linux 9 /
 
 ```sh
 sudo dnf install clang gcc make openssl-devel sqlite-devel python3.11 git tar gzip telnet
-git clone --branch linux-support https://github.com/matsuotakeshi/liner-notes.git
+git clone --branch v0.72 https://github.com/matsuotakeshi/liner-notes.git
 cd liner-notes
 make CC=clang PYTHON=python3.11
 ```

@@ -1,0 +1,51 @@
+[
+  {
+    "command": [
+      "make",
+      "check"
+    ],
+    "code": 0,
+    "seconds": 769.06,
+    "log": "regression-1.log"
+  },
+  {
+    "command": [
+      "make",
+      "test-stage67",
+      "test-stage68",
+      "test-stage69",
+      "test-stage70"
+    ],
+    "code": 0,
+    "seconds": 63.85,
+    "log": "regression-2.log"
+  },
+  {
+    "command": [
+      "make",
+      "test-stage72"
+    ],
+    "code": 0,
+    "seconds": 39.19,
+    "log": "regression-3.log"
+  },
+  {
+    "command": [
+      "/home/takeshi/liner-notes-release72-20261103/.web-venv/bin/python",
+      "tests/test_web_service.py"
+    ],
+    "code": 0,
+    "seconds": 4.16,
+    "log": "regression-4.log"
+  },
+  {
+    "command": [
+      "/home/takeshi/liner-notes-release72-20261103/.web-venv/bin/python",
+      "tests/test_listener_restart.py",
+      "./runtime"
+    ],
+    "code": 0,
+    "seconds": 0.48,
+    "log": "regression-5.log"
+  }
+]
