@@ -18,13 +18,17 @@ getent passwd 64964
 getent group 64964
 getent passwd liner_notes
 getent group liner_notes
+getent passwd 64965
+getent group 64965
+getent passwd liner_notes_web
+getent group liner_notes_web
 pkg info liner-notes
 pkg info lrzsz
 ```
 
 `test` が成功すればportsの基盤があります。portsツリーがない場合の準備は [FreeBSD HandbookのPorts Collection](https://docs.freebsd.org/en/books/handbook/ports/#ports-using) を参照してください。依存ソフトとlrzszの原本を取得するため、ビルド時には外部への接続が必要です。
 
-このローカルportはOSアカウント `liner_notes` にUID/GID **64964**を使います。番号と名前の両方の `getent` に何も表示されなければ未使用です。別のアカウントが表示された場合は、配布物の `comms/liner-notes/files/UIDs` と `GIDs` を未使用番号に変更してからビルドします。既存アカウントの番号を変更する手順ではありません。
+この配布portはOSアカウント `liner_notes` にUID/GID **64964**、WEBUI有効時は `liner_notes_web` に **64965**を使います。番号と名前の両方の `getent` に何も表示されなければ未使用です。別のアカウントが表示された場合は、配布物の `comms/liner-notes/files/UIDs` と `GIDs` を未使用番号に変更してからビルドします。既存アカウントの番号を変更する手順ではありません。
 
 `pkg info`の「not found」は未導入なら正常です。Liner notesや同名のデータ領域がすでにある場合は、新規構築先が正しいか確認してください。lrzszがある場合は、他の用途でも使用しているか確認し、後述の再開検査を行います。版番号だけでは修正パッチの有無を判別できません。
 

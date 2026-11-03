@@ -35,6 +35,9 @@ async def exercise(port):
         r=await b.command('ordinary chat text');assert 'ordinary chat text' in r['text'],r
         assert 'CONNECTOR SYNC' not in r['text']
         r=await b.command('/LEAVE');assert not r['state']['chat'],r
+        # Successful authentication sets a 1000ms cooldown in session.c.
+        # A fast CI host can reach PASSWD before it expires; do not weaken it.
+        await asyncio.sleep(1.05)
         r=await b.command('PASSWD');assert r['state']['secret'],r
         r=await b.command('/CANCEL');assert not r['state']['secret'],r
         print('PASS Web connector: real Telnet, password secrecy, member ACL, literal 4096-byte lines, article/mail bodies and chat synchronization')

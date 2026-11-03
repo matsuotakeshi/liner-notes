@@ -101,6 +101,7 @@ bin/liner-notes-check-resume
 
 %%DATADIR%%/scripts/upgrade_check.py
 %%DATADIR%%/LICENSE
+%%DATADIR%%/scripts/install-linux.py
 %%DATADIR%%/THIRD_PARTY.md
 %%PORTDOCS%%%%DOCSDIR%%/ADMIN.md
 %%PORTDOCS%%%%DOCSDIR%%/AUDIT.md
@@ -206,5 +207,12 @@ bin/liner-notes-check-resume
 %%WEBUI%%@sample %%ETCDIR%%/web/templates/components.html.sample
 %%WEBUI%%@sample %%ETCDIR%%/web/templates/index.html.sample
 %%WEBUI%%@sample(root,liner_notes_web,0640) %%ETCDIR%%/web/web.toml.sample
+%%WEBUI%%@dir(root,wheel,0755) %%ETCDIR%%/web/templates
+%%WEBUI%%@dir(root,wheel,0755) %%ETCDIR%%/web/messages
+%%WEBUI%%@dir(root,wheel,0755) %%ETCDIR%%/web
+%%WEBUI%%@dir(root,wheel,0755) %%DATADIR%%/web/webui/templates
+%%WEBUI%%@dir(root,wheel,0755) %%DATADIR%%/web/webui/static
+%%WEBUI%%@dir(root,wheel,0755) %%DATADIR%%/web/webui
+%%WEBUI%%@dir(root,wheel,0755) %%DATADIR%%/web
 %%WEBUI%%@dir(liner_notes_web,liner_notes_web,0700) /var/db/liner-notes-web/spool
 %%WEBUI%%@dir(liner_notes_web,liner_notes_web,0700) /var/db/liner-notes-web

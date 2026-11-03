@@ -2,7 +2,7 @@
 
 # Liner notes FreeBSD port 0.72
 
-新規構築は [インストールと運用開始](INSTALL.md) を順に実施してください。この文書は配置・既存環境の更新・独自構成の補足です。今回の変更は [STAGE70.md](STAGE70.md) を参照してください。以前の再開修正も含みます。
+新規構築は [インストールと運用開始](INSTALL.md) を順に実施してください。この文書は配置・既存環境の更新・独自構成の補足です。今回の変更は [STAGE72.md](STAGE72.md) を参照してください。以前の再開修正も含みます。
 
 > stage67: 正式なSQLite保存を使う場合の移行・バックアップ・復元・整理と新しいrc.conf項目はSTAGE67.mdを参照してください。旧backup/compactではなくdb-backup/db-compactを使用します。
 
@@ -17,12 +17,12 @@ cd liner-notes-ports-stage72/comms/liner-notes
 make BATCH=yes DISTDIR="$(realpath ../../distfiles)" install clean
 ```
 
-GitHub ReleasesのソースURLを指定したportです。オフライン配置用に検証済みの `distfiles/liner-notes-stage71.tar.gz` を同梱しています。ビルドだけなら一般ユーザーで `make BATCH=yes DISTDIR="$(realpath ../../distfiles)" stage check-plist stage-qa package` を実行できます。
+GitHub ReleasesのソースURLを指定したportです。オフライン配置用に検証済みの `distfiles/liner-notes-stage72.tar.gz` を同梱しています。ビルドだけなら一般ユーザーで `make BATCH=yes DISTDIR="$(realpath ../../distfiles)" stage check-plist stage-qa package` を実行できます。
 
 同梱pkgはFreeBSD 15/amd64用です。15.1-RELEASE、base OpenSSLのlibcrypto.so.35を使用してビルドしています。他のABIではportからビルドしてください。pkgで導入する場合:
 
 ```sh
-pkg install python312 py312-sqlite3 sqlite3
+pkg install python312 py312-sqlite3 py312-aiohttp sqlite3
 pkg add packages/liner-notes-0.72.pkg
 ```
 
