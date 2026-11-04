@@ -74,6 +74,9 @@ async def exercise(binary,p):
   servers[1]=Server(binary,dirs[1]/'notes',members=dirs[1]/'members',telnet=True,options=['--link-accounts',str(dirs[1]/'accounts')])
   with sqlite3.connect(str(dirs[1]/'notes')+'.features.sqlite') as db:assert db.execute('SELECT count(*) FROM link_articles WHERE local_id=4').fetchone()==(0,)
   servers[1].close()
+  # Offline migration must also stop the co-located test link store. Reading
+  # an open SQLite WAL store can change its shared-memory file on Linux.
+  stores[1].close()
   migrated=p/'migrated'
   migration=subprocess.run([sys.executable,str(ROOT/'scripts/maintenance.py'),'db-migrate','--structured','--root',str(dirs[1]),'--board','notes','--members','members',str(migrated)],capture_output=True)
   assert migration.returncode==0,(migration.stdout,migration.stderr)

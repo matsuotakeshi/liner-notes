@@ -1,9 +1,13 @@
 """Build a fresh, isolated chroot for 0.73 package lifecycle tests only."""
 from pathlib import Path
-import hashlib,json,os,shutil,subprocess,tarfile
+import hashlib,json,os,shutil,subprocess,time
 base=Path(__file__).resolve().parents[1]
 assert base==Path('/home/takeshi/liner-notes-release73-20261104') and os.getuid()==0
-root=base/'port-check/pkgroot';assert not root.exists()
+root=base/'port-check/pkgroot'
+if root.exists():
+ assert root.is_dir() and not root.is_symlink() and root.resolve().parent==base/'port-check'
+ preserved=root.with_name('pkgroot-preserved-'+str(time.time_ns()));assert not preserved.exists()
+ root.rename(preserved)
 protected=[Path(p) for p in ('/etc/master.passwd','/etc/passwd','/etc/group','/var/db/pkg/local.sqlite')]
 before={str(p):hashlib.sha256(p.read_bytes()).hexdigest() for p in protected}
 root.mkdir(mode=0o755)
