@@ -15,6 +15,7 @@ import json
 import os
 from pathlib import Path, PurePosixPath
 import re
+import shutil
 import stat
 import sqlite3
 import subprocess
@@ -118,9 +119,18 @@ def backup(root, board, members, destination):
     import sqlite3
     for name in files:
         if not name.endswith('.sqlite'):continue
-        with sqlite3.connect((root/name).as_uri()+'?mode=ro',uri=True) as db:
-            if db.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='storage_meta'").fetchone():
-                raise ValueError('Authoritative SQLite database found; use db-backup with --database')
+        # Even mode=ro can create/change WAL shared-memory files. Inspect a
+        # private copy (including WAL) so the probe never changes its source.
+        with tempfile.TemporaryDirectory(prefix='.liner-sql-probe-',dir=destination.parent) as scratch:
+            snapshot=Path(scratch)/'probe.sqlite'
+            for suffix in ('','-wal'):
+                if name+suffix not in files:continue
+                fd=os.open(root/(name+suffix),os.O_RDONLY|getattr(os,'O_NOFOLLOW',0)|getattr(os,'O_BINARY',0))
+                with os.fdopen(fd,'rb') as source,Path(str(snapshot)+suffix).open('wb') as target:
+                    shutil.copyfileobj(source,target,CHUNK)
+            with contextlib.closing(sqlite3.connect(snapshot.as_uri()+'?mode=ro',uri=True)) as db:
+                if db.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='storage_meta'").fetchone():
+                    raise ValueError('Authoritative SQLite database found; use db-backup with --database')
     board, members = relative(board), relative(members)
     need(board != members and board in files and members in files, 'Existing, separate board and members files are required')
     temporary = None

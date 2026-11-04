@@ -5,6 +5,7 @@ import hashlib
 import io
 import json
 import os
+import sqlite3
 from pathlib import Path
 import subprocess
 import sys
@@ -259,7 +260,24 @@ def integration(binary, ctl, memberctl=None):
         print('PASS maintenance runtime: restore + compact restart, moved replies, monotonic IDs, deleted mail, draft, group100, private profile/attachment, public vault, original unchanged')
 
 
+def sqlite_probe():
+    with tempfile.TemporaryDirectory(prefix='maintenance-sql-probe-') as tmp:
+        p=Path(tmp);root=p/'source';root.mkdir()
+        (root/'board').write_bytes(b'RTBOARD4');(root/'members').write_bytes(b'RTMEMB01')
+        db=sqlite3.connect(root/'extra.sqlite');db.execute('PRAGMA journal_mode=WAL');db.execute('CREATE TABLE data(value)');db.commit();db.close()
+        before=hashes(root);tool.backup(root,'board','members',p/'closed.tar.gz');assert hashes(root)==before
+        # Detect storage_meta even if the schema exists only in the WAL, and
+        # do not mutate the source SHM while inspecting it.
+        db=sqlite3.connect(root/'authoritative.sqlite');db.execute('PRAGMA journal_mode=WAL');db.execute('CREATE TABLE storage_meta(version)');db.commit()
+        try:
+            before=hashes(root);rejected(lambda:tool.backup(root,'board','members',p/'unsafe.tar.gz'));assert hashes(root)==before
+            assert not (p/'unsafe.tar.gz').exists()
+        finally:db.close()
+    print('PASS SQLite backup probe: closed WAL source unchanged; authoritative WAL detected without source SHM mutation')
+
+
 if __name__ == '__main__':
+    sqlite_probe()
     unit()
     if len(sys.argv) > 1:
         integration(*sys.argv[1:])
