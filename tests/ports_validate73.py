@@ -1,14 +1,11 @@
 """Finish package validation inside the guarded release chroot."""
 from pathlib import Path
-import hashlib,json,os,shutil,subprocess,signal
+import hashlib,json,os,shutil,subprocess
 base=Path(__file__).resolve().parents[1];root=base/'port-check/pkgroot'
 assert base==Path('/home/takeshi/liner-notes-release73-20261104') and os.getuid()==0 and root.is_dir()
 protected=[Path(p) for p in ('/etc/master.passwd','/etc/passwd','/etc/group','/var/db/pkg/local.sqlite')]
 before={str(p):hashlib.sha256(p.read_bytes()).hexdigest() for p in protected}
 try:
- # Only the observed child from the failed disposable harness, never a service.
- stale=subprocess.run(['ps','-ww','-p','18537','-o','command='],capture_output=True,text=True).stdout.strip()
- if stale=='/usr/local/sbin/liner-notes --telnet 0 /tmp/installed73-w7a49es5/web.dat /tmp/installed73-w7a49es5/web.members':os.kill(18537,signal.SIGTERM)
  shutil.copytree('/usr/share/zoneinfo',root/'usr/share/zoneinfo',dirs_exist_ok=True)
  for p in Path('/usr/lib/ossl-modules').glob('*.so'):
   target=root/str(p).lstrip('/');target.parent.mkdir(parents=True,exist_ok=True);shutil.copyfile(p,target)
