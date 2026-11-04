@@ -1,0 +1,14 @@
+PASS separate link daemons: real BBS/mTLS with rotated TLS keys, persistent pause/resume/retry control, withdrawn historical parent, outage, restart, cursor reset/replay, maintenance lock
+/usr/local/bin/python3.12 tests/test_stage74_links.py
+.
+----------------------------------------------------------------------
+Ran 1 test in 0.179s
+
+OK
+/usr/local/bin/python3.12 tests/test_stage74_link_bbs.py ./runtime
+PASS real BBS checkpoint bootstrap, withdrawn parent, title after bootstrap, replay and paged metadata
+clang  -I/usr/local/include -O2 -pipe  -std=c11 -Wall -Wextra -Werror tests/generate_scale.c src/storage_sqlite.c -I/usr/local/include -pthread -lcrypto -L/usr/local/lib -lsqlite3 -o generate-scale
+/usr/local/bin/python3.12 tests/test_stage74_scale.py
+{"articles": 10050, "withdrawn": 1005, "removed_events": 11055, "snapshot_bytes": 13911630, "seconds": 34.59051593099139, "rss_increase_kib": 12580, "replay_duplicates": 0}
+/usr/local/bin/python3.12 tests/test_stage74_scan.py ./runtime ./generate-scale
+{"articles": 12000, "metadata_requests": 376, "seconds": 0.34517807001248, "body_omitted": true}

@@ -1,6 +1,6 @@
 # Rocky Linux / AlmaLinux
 
-Liner notes 0.73のソース構築手順です。対象はRocky Linux 9 / AlmaLinux 9、x86_64、Clang、Python 3.11です。FreeBSD向けのports/pkgはLinuxにはインストールしません。Linux用RPMはまだ提供していません。
+以下はRocky Linux 9 / AlmaLinux 9、x86_64、Clang、Python 3.11で確認したソース構築手順です。FreeBSD向けのports/pkgはLinuxにはインストールしません。0.74のRocky Linux 10.2向けRPM・systemd導入手順は[RPM.md](RPM.md)を参照してください。10系はPython 3.12を使います。
 
 ## ビルド
 
@@ -8,7 +8,7 @@ Liner notes 0.73のソース構築手順です。対象はRocky Linux 9 / AlmaLi
 
 ```sh
 sudo dnf install clang gcc make openssl-devel sqlite-devel python3.11 git tar gzip telnet
-git clone --branch v0.73 https://github.com/matsuotakeshi/liner-notes.git
+git clone --branch v0.74 https://github.com/matsuotakeshi/liner-notes.git
 cd liner-notes
 make CC=clang PYTHON=python3.11
 ```

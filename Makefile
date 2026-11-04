@@ -293,3 +293,12 @@ test-stage73: all
 	$(PYTHON) tests/test_link_tls.py
 	$(PYTHON) tests/test_link_bbs.py ./runtime
 	$(PYTHON) tests/test_link_service.py ./runtime
+
+.PHONY: test-stage74 test-stage74-scale
+test-stage74: all
+	$(PYTHON) tests/test_stage74_links.py
+	$(PYTHON) tests/test_stage74_link_bbs.py ./runtime
+
+test-stage74-scale: runtime generate-scale
+	$(PYTHON) tests/test_stage74_scale.py
+	$(PYTHON) tests/test_stage74_scan.py ./runtime ./generate-scale

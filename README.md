@@ -1,21 +1,21 @@
-> Liner notes 0.73です。今回の実装・検証範囲は [STAGE73.md](STAGE73.md)、DB変換は [DATABASE_STRUCTURED.md](DATABASE_STRUCTURED.md)、COMは [SERIAL.md](SERIAL.md)、共有ボードは [BBS_LINKS.md](BBS_LINKS.md) を参照してください。
+> Liner notes 0.74です。今回の実装・検証範囲は [STAGE74.md](STAGE74.md)、DB変換は [DATABASE_STRUCTURED.md](DATABASE_STRUCTURED.md)、COMは [SERIAL.md](SERIAL.md)、共有ボードは [BBS_LINKS.md](BBS_LINKS.md) を参照してください。
 
-> 現行版は0.73です。[変更内容](STAGE73.md)、[更新手順](UPGRADING.md)を参照してください。既存DB形式は自動変換しません。
+> 現行版は0.74です。[変更内容](STAGE74.md)、[更新手順](UPGRADING.md)を参照してください。既存DB形式は自動変換しません。
 
-# Liner notes 0.73
+# Liner notes 0.74
 
-今回の変更は [STAGE73.md](STAGE73.md)、更新は [UPGRADING.md](UPGRADING.md) を参照してください。互換モードは [STAGE69.md](STAGE69.md) に記載しています。
+今回の変更は [STAGE74.md](STAGE74.md)、更新は [UPGRADING.md](UPGRADING.md) を参照してください。互換モードは [STAGE69.md](STAGE69.md) に記載しています。
 
 FreeBSD向けのC製BBSです。Rocky Linux／AlmaLinux向けの構築・インストール手順も備えています。HyperNotes型の返信ツリー、会員間メール、チャット、ファイル保管庫を備え、メニューとHELPは日本語・英語に対応します。
 
-0.73ではWebUIの管理帳票、転送高速化、別コピーへのDB変換、COM・共有ボードコネクタを追加しました。GPL-3.0-onlyを明記し、portsと設定保持を含む更新手順を整えています。[STAGE73.md](STAGE73.md) と [UPGRADING.md](UPGRADING.md) を参照してください。
+0.74ではLinux RPM、リンク管理・履歴回収・新規参加用スナップショットを追加しました。Rocky Linux実機の再起動と大容量同時転送を検証しています。[変更・検証範囲](STAGE74.md)、[RPM](RPM.md)、[リンク保守](BBS_LINK_OPERATIONS.md)を参照してください。
 
 ## 最初に読む文書
 
-- **[詳細導入マニュアル（0.73・2026-11-04改訂）](INSTALL.md)** — ダウンロード照合、管理者登録、ポート23、Apache/WebUI、ゲーム、バックアップ、トラブル対応。
+- **[詳細導入マニュアル（0.74・2026-11-04改訂）](INSTALL.md)** — ダウンロード照合、管理者登録、ポート23、Apache/WebUI、ゲーム、バックアップ、トラブル対応。
 - [WebUI・別プロセス構成と導入](WEBUI.md)
 - [Rocky Linux / AlmaLinuxでの構築・systemd](LINUX.md) / [対応OSの見通し](PLATFORMS.md)
-- [今回の変更](STAGE73.md) / [既存環境の更新](UPGRADING.md)
+- [今回の変更](STAGE74.md) / [既存環境の更新](UPGRADING.md)
 - [旧RTBBS互換モード](STAGE69.md)
 - [SQLite移行・バックアップの仕様](STAGE67.md)
 - [RTBBSとのコマンド対応・残る差分](COMMANDS.md)
@@ -50,7 +50,7 @@ SQLite原本保存、タイムゾーン、運用上限は[stage67](STAGE67.md)�
 
 ## 検証
 
-`make check` が通常の回帰試験です。`make test-stage69 test-stage70 test-stage71` で操作・権限の試験、`make test-stage72 test-stage73 PYTHON=/path/to/web-venv/bin/python` でDoor/WebUI・新コネクタ、実ZMODEMは `make test-zmodem LRZ=/path/lrz LSZ=/path/lsz` です。0.73の結果はports配布セットまたはリポジトリの `evidence/stage73/` を参照してください。
+`make check` が通常の回帰試験です。`make test-stage69 test-stage70 test-stage71` で操作・権限の試験、`make test-stage72 test-stage73 test-stage74 PYTHON=/path/to/web-venv/bin/python` でDoor/WebUI・新コネクタ、実ZMODEMは `make test-zmodem LRZ=/path/lrz LSZ=/path/lsz` です。0.74の結果はports配布セットまたはリポジトリの `evidence/stage74/` を参照してください。
 
 ## ライセンス
 

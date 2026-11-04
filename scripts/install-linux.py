@@ -6,10 +6,10 @@ from pathlib import Path
 ROOT=Path(__file__).resolve().parents[1]
 
 
-def install(destdir,prefix,python):
+def install(destdir,prefix,python,unitdir='/usr/local/lib/systemd/system'):
     if sys.platform!='linux':raise ValueError('This installer targets Linux; use ports on FreeBSD')
     if sys.version_info<(3,11):raise ValueError('Run this installer with Python 3.11 or later')
-    for value in (prefix,python):
+    for value in (prefix,python,unitdir):
         if not re.fullmatch(r'/[A-Za-z0-9_./-]+',value) or '..' in Path(value).parts:
             raise ValueError('Use absolute paths without whitespace or parent traversal')
     if not os.path.isfile(python) or not os.access(python,os.X_OK):raise ValueError('Python interpreter is not executable')
@@ -64,7 +64,7 @@ def install(destdir,prefix,python):
     put(config+'/link-accounts.conf',(ROOT/'link-accounts.example.conf').read_bytes(),sample=True)
     put(share+'/LICENSE',(ROOT/'LICENSE').read_bytes())
     put(share+'/THIRD_PARTY.md',(ROOT/'THIRD_PARTY.md').read_bytes())
-    for name,path in [('liner-notes.env','/etc/liner-notes/liner-notes.env'),('liner-notes.service','/usr/local/lib/systemd/system/liner-notes.service')]:
+    for name,path in [('liner-notes.env','/etc/liner-notes/liner-notes.env'),('liner-notes.service',unitdir+'/liner-notes.service')]:
         content=(ROOT/'linux'/name).read_text().replace('@PREFIX@',prefix).encode()
         put(path,content,0o640 if name.endswith('.env') else 0o644,sample=True)
     print('Installed programs and samples. Existing settings preserved; accounts, data and services unchanged.')
@@ -73,6 +73,7 @@ def install(destdir,prefix,python):
 if __name__=='__main__':
     p=argparse.ArgumentParser(description=__doc__)
     p.add_argument('--destdir',default='');p.add_argument('--prefix',default='/usr/local');p.add_argument('--python',default=sys.executable)
+    p.add_argument('--unitdir',default='/usr/local/lib/systemd/system')
     a=p.parse_args()
-    try:install(a.destdir,a.prefix,a.python)
+    try:install(a.destdir,a.prefix,a.python,a.unitdir)
     except (OSError,ValueError) as e:p.exit(1,str(e)+'\n')

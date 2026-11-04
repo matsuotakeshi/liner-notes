@@ -1,0 +1,40 @@
+{
+  "bytes_per_file": 159809104,
+  "clients": 4,
+  "sha256": "0d81a6fa12d12702e7a8adaa385b380df99d38daa046beddabbb819fefc91e27",
+  "verified": true,
+  "tls_verified": true,
+  "proxy": "Apache httpd",
+  "synthetic": true,
+  "upload_seconds": 174.1348970279796,
+  "download_seconds": 50.99215841598925,
+  "upload_mib_s": 3.500868363868664,
+  "download_mib_s": 11.95523725584493,
+  "uploads": [
+    {
+      "id": 3,
+      "seconds": 173.1722136090102
+    },
+    {
+      "id": 1,
+      "seconds": 173.77078156301286
+    },
+    {
+      "id": 2,
+      "seconds": 173.6602640110068
+    },
+    {
+      "id": 4,
+      "seconds": 174.12138787301956
+    }
+  ],
+  "downloads": [
+    50.971846133004874,
+    50.942875812004786,
+    50.94446574698668,
+    50.95166715700179
+  ],
+  "ping_samples": 861,
+  "ping_max_seconds": 0.05545302800601348,
+  "ping_p95_seconds": 0.019725532998563722
+}

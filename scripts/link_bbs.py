@@ -42,8 +42,17 @@ class Core:
         match=re.search(r'^LINK LOOKUP (\d+) (\d+)\r?$',text,re.M)
         if not match:raise ValueError('Shared-board lookup failed')
         return tuple(map(int,match.groups()))
+    async def page(self,cursor):
+        text=(await self.bridge.command('LINKPAGE '+str(cursor)))['text']
+        rows=[]
+        pattern=r'^LINK ITEM (\d+) (\d+) (\d+) (LIVE|WITHDRAWN|HIDDEN) (\S+) (\S+) (\d+)\r\nAUTHOR ([^\r\n]*)\r\nTITLE ([^\r\n]*)\r\nBODY 0\r\n'
+        for match in re.finditer(pattern,text,re.M):
+            rows.append(dict(id=int(match[1]),parent=int(match[2]),created=int(match[3]),state=match[4],origin=match[5],article=match[6],revision=int(match[7]),author=match[8],title=match[9],body=''))
+        if not rows and not re.search(r'^LINK END\r?$',text,re.M):raise ValueError('Shared-board metadata page failed')
+        if len(rows)>32 or any(row['id']<cursor or i and row['id']<=rows[i-1]['id'] for i,row in enumerate(rows)):raise ValueError('Invalid metadata page ordering')
+        return rows
     async def apply(self,event,parent=0):
-        kind={'post':'P','title':'T','withdraw':'D'}[event['kind']]
+        kind={'post':'P','title':'T','withdraw':'D','checkpoint':'C','tombstone':'W'}[event['kind']]
         command=f"LINKAPPLY {event['origin']} {event['article']} {event['revision']} {parent} {event['created']} {kind} {encode(event['author'])} {encode(event['title'])} {encode(event['body'])}"
         b=self.bridge
         if len(command)>4096:
@@ -59,22 +68,27 @@ class Core:
             raise ValueError('Shared-board apply failed; event remains queued: '+('; '.join(errors) or 'no completion receipt'))
         return int(match[1])
 
-async def export_board(store,core,board,local):
+async def export_board(store,core,board,local,budget=128):
+    if type(budget) is not int or not 1<=budget<=8192:raise ValueError('Invalid scan budget')
     await core.select(local);row=store.db.execute('SELECT next_id FROM scans WHERE board=?',(board,)).fetchone();cursor=row[0] if row else 1;count=0
+    page=[]
     # Bound each pass, and persist progress only after its events are durable.
     # Revisiting old metadata discovers edits/withdrawals without rereading bodies.
-    for _ in range(128):
-        item=await core.snapshot(cursor)
+    for _ in range(budget):
+        if hasattr(core,'page'):
+            if not page:page=await core.page(cursor)
+            item=page.pop(0) if page else None
+        else:item=await core.snapshot(cursor)
         if item is None:cursor=1;break
         cursor=item['id']+1
         if item['origin']!='-' or item['state']=='HIDDEN':continue
         key=article_key(store.node,board,item['id'])
-        row=store.db.execute('SELECT envelope FROM events WHERE origin=? AND board=? AND article=? ORDER BY revision DESC LIMIT 1',(store.node,board,key)).fetchone()
-        import json
-        previous=json.loads(row[0])['event'] if row else None
+        row=store.db.execute('SELECT revision,kind,title,author FROM article_heads WHERE origin=? AND board=? AND article=?',(store.node,board,key)).fetchone()
+        previous=dict(zip(('revision','kind','title','author'),row)) if row else None
         if previous:
-            with store.db:store.db.execute('INSERT INTO local_articles VALUES(?,?,?,?,?,?) ON CONFLICT(board,local_id) DO NOTHING',(board,item['id'],key,previous['revision'],previous['title'],previous['kind']=='withdraw'))
-        if previous and previous['kind']=='withdraw':continue
+            with store.db:store.db.execute('INSERT INTO local_articles VALUES(?,?,?,?,?,?) ON CONFLICT(board,local_id) DO NOTHING',(board,item['id'],key,previous['revision'],previous['title'],previous['kind'] in ('withdraw','tombstone')))
+        if previous and previous['kind'] in ('withdraw','tombstone'):continue
+        if previous and item['state']!='WITHDRAWN' and item['title']==previous['title']:continue
         parent=None
         if item['parent']:
             p=await core.snapshot(item['parent'])
@@ -104,9 +118,9 @@ async def apply_pending(store,core,boards,after=0):
         if event['origin']==store.node:store.applied(seq);continue
         await core.select(boards[event['board']]);ident,revision=await core.lookup(event['origin'],event['article'])
         if revision>=event['revision']:store.applied(seq);continue
-        if revision+1!=event['revision']:continue
+        if revision+1!=event['revision'] and event['version']!=2:continue
         parent=0
-        if event['kind']=='post' and event['parent']:
+        if event['kind'] in ('post','checkpoint','tombstone') and event['parent']:
             ref=event['parent']
             if ref['origin']==store.node:
                 row=store.db.execute('SELECT local_id FROM local_articles WHERE board=? AND article=?',(event['board'],ref['article'])).fetchone();parent=row[0] if row else 0

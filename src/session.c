@@ -1750,8 +1750,8 @@ static int link_decode(const char *in,char *out,size_t capacity) {
 static void connector_link(Session *s,char *line) {
     if(!s->user || s->editing || session_secret(s) || s->chatting || s->gather_mode || !board_link_enabled(s->board,s->user)) { queue_text(s,"ERR link denied\r\n");return; }
     BoardRequest q={0};q.op=BOARD_LINK;
-    if(!strncmp(line,"LINKSNAP ",9) || !strncmp(line,"LINKSCAN ",9)) {
-        const char *end;if(!number_arg(line+9,&q.cursor,&end) || *end)goto bad;q.action=line[5]=='N'?'S':'M';
+    if(!strncmp(line,"LINKSNAP ",9) || !strncmp(line,"LINKSCAN ",9) || !strncmp(line,"LINKPAGE ",9)) {
+        const char *end;if(!number_arg(line+9,&q.cursor,&end) || *end)goto bad;q.action=line[4]=='P'?'B':line[5]=='N'?'S':'M';
     } else if(!strncmp(line,"LINKLOOKUP ",11)) {
         char extra;if(sscanf(line+11,"%64s %64s %c",q.link_origin,q.link_article,&extra)!=2)goto bad;q.action='L';
     } else if(!strncmp(line,"LINKAPPLY ",10)) {
@@ -1764,7 +1764,7 @@ static void connector_link(Session *s,char *line) {
         if(!*fields[4] || strlen(fields[4])>12)goto bad;
         for(const char *p=fields[4];*p;p++)if(*p<'0' || *p>'9')goto bad;
         q.since=strtoull(fields[4],NULL,10);if(!q.since || q.since>253402300799ULL)goto bad;
-        if(strlen(fields[5])!=1 || !strchr("PTD",fields[5][0]))goto bad;q.action=fields[5][0];
+        if(strlen(fields[5])!=1 || !strchr("PTDCW",fields[5][0]))goto bad;q.action=fields[5][0];
         if(!link_decode(fields[6],q.username,sizeof(q.username)) || !link_decode(fields[7],q.title,sizeof(q.title)) || !link_decode(fields[8],q.body,sizeof(q.body)))goto bad;
         if(!safe_text(q.username) || !safe_text(q.title))goto bad;
         for(const unsigned char *p=(const unsigned char *)q.body;*p;p++)if((*p<32 && *p!='\r' && *p!='\n' && *p!='\t') || *p==127)goto bad;
@@ -1773,7 +1773,7 @@ static void connector_link(Session *s,char *line) {
 bad:queue_text(s,"ERR link syntax\r\n");
 }
 static int connector_line(Session *s,char *line,size_t size) {
-    if(*s->connector_token && (!strncmp(line,"LINKSNAP ",9) || !strncmp(line,"LINKSCAN ",9) || !strncmp(line,"LINKLOOKUP ",11) || !strncmp(line,"LINKAPPLY ",10))) { connector_link(s,line);return 1; }
+    if(*s->connector_token && (!strncmp(line,"LINKSNAP ",9) || !strncmp(line,"LINKSCAN ",9) || !strncmp(line,"LINKPAGE ",9) || !strncmp(line,"LINKLOOKUP ",11) || !strncmp(line,"LINKAPPLY ",10))) { connector_link(s,line);return 1; }
     if(*s->connector_token && !strncmp(line,"CONNECTOR LINKBLOCK ",20) && size>85 && !memcmp(line+20,s->connector_token,64) && line[84]==' ') {
         const char *end;uint32_t n;free(s->connector_block);s->connector_block=NULL;
         if(!s->user || s->editing || session_secret(s) || s->chatting || s->gather_mode || !board_link_enabled(s->board,s->user) || !number_arg(line+85,&n,&end) || *end || !n || n>360000) { queue_text(s,"ERR link syntax\r\n");return 1; }

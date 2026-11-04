@@ -28,7 +28,7 @@ runuser -u bbstest -- bash -c '
   export LINER_TEST_START_TIMEOUT=180
   python3.11 -m venv .web-venv
   .web-venv/bin/pip install -r webui/requirements.txt -r link-requirements.txt
-  make CC=clang PYTHON="$PWD/.web-venv/bin/python" SQLITE_CFLAGS= SQLITE_LIBS=-lsqlite3 test-stage73
+  make CC=clang PYTHON="$PWD/.web-venv/bin/python" SQLITE_CFLAGS= SQLITE_LIBS=-lsqlite3 test-stage73 test-stage74
   if ! python3.11 scripts/build-lrzsz.py /home/bbstest/lrzsz-check; then
     cat /home/bbstest/lrzsz-check/build.txt
     exit 1

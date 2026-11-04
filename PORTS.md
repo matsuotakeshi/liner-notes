@@ -1,8 +1,8 @@
-> 現行版は0.73です。[変更内容](STAGE73.md)、[更新手順](UPGRADING.md)を参照してください。既存DB形式は自動変換しません。
+> 現行版は0.74です。[変更内容](STAGE74.md)、[更新手順](UPGRADING.md)を参照してください。既存DB形式は自動変換しません。
 
-# Liner notes FreeBSD port 0.73
+# Liner notes FreeBSD port 0.74
 
-新規構築は [インストールと運用開始](INSTALL.md) を順に実施してください。この文書は配置・既存環境の更新・独自構成の補足です。今回の変更は [STAGE73.md](STAGE73.md) を参照してください。以前の再開修正も含みます。
+新規構築は [インストールと運用開始](INSTALL.md) を順に実施してください。この文書は配置・既存環境の更新・独自構成の補足です。今回の変更は [STAGE74.md](STAGE74.md) を参照してください。以前の再開修正も含みます。
 
 > stage67: 正式なSQLite保存を使う場合の移行・バックアップ・復元・整理と新しいrc.conf項目はSTAGE67.mdを参照してください。旧backup/compactではなくdb-backup/db-compactを使用します。
 
@@ -13,17 +13,17 @@ WebUI帳票・転送改善・DB変換・COM・共有ボードリンクを含むp
 FreeBSDのportsツリーと依存パッケージが必要です。配布物を展開し、rootで実行します。
 
 ```sh
-cd liner-notes-ports-stage73/comms/liner-notes
+cd liner-notes-ports-stage74/comms/liner-notes
 make BATCH=yes DISTDIR="$(realpath ../../distfiles)" install clean
 ```
 
-GitHub ReleasesのソースURLを指定したportです。オフライン配置用に検証済みの `distfiles/liner-notes-stage73.tar.gz` を同梱しています。ビルドだけなら一般ユーザーで `make BATCH=yes DISTDIR="$(realpath ../../distfiles)" stage check-plist stage-qa package` を実行できます。
+GitHub ReleasesのソースURLを指定したportです。オフライン配置用に検証済みの `distfiles/liner-notes-stage74.tar.gz` を同梱しています。ビルドだけなら一般ユーザーで `make BATCH=yes DISTDIR="$(realpath ../../distfiles)" stage check-plist stage-qa package` を実行できます。
 
 同梱pkgはFreeBSD 15/amd64用です。15.1-RELEASE、base OpenSSLのlibcrypto.so.35を使用してビルドしています。他のABIではportからビルドしてください。pkgで導入する場合:
 
 ```sh
 pkg install python312 py312-sqlite3 py312-aiohttp py312-cryptography sqlite3
-pkg add packages/liner-notes-0.73.pkg
+pkg add packages/liner-notes-0.74.pkg
 ```
 
 ## 配置
@@ -89,7 +89,7 @@ service liner_notes stop
 
 1. 旧rcスクリプトで `service liner_notes stop` を実行し、転送ワーカーも停止していることを確認します。
 2. 旧データ全体、旧設定、編集したバナー・HELP・メニュー、既存ログを保存します。
-3. ローカルpkgでの更新は、停止・バックアップ後に `pkg delete liner-notes` で旧プログラムを除去し、続けて `pkg add packages/liner-notes-0.73.pkg` で導入します。依存パッケージのautoremoveは行いません。portから導入する場合も、旧パッケージを除去してから冒頭のinstallを実行します。編集済み `liner_notes.conf` は維持されるため、`.sample` と比較し、`rc.conf` にある旧指定も更新します。以前の配置移行の検証では `pkg add -f` だけでは旧libexecのファイルが残ったため、この置換手順を確認しています。
+3. ローカルpkgでの更新は、停止・バックアップ後に `pkg delete liner-notes` で旧プログラムを除去し、続けて `pkg add packages/liner-notes-0.74.pkg` で導入します。依存パッケージのautoremoveは行いません。portから導入する場合も、旧パッケージを除去してから冒頭のinstallを実行します。編集済み `liner_notes.conf` は維持されるため、`.sample` と比較し、`rc.conf` にある旧指定も更新します。以前の配置移行の検証では `pkg add -f` だけでは旧libexecのファイルが残ったため、この置換手順を確認しています。
 4. 旧 `liner_notes_home="/usr/local/libexec/liner-notes"` は削除し、必要ならデータディレクトリを指定します。本体の指定は `/usr/local/sbin/liner-notes` へ変更します。
 5. 編集済み表示ファイルは旧 `/usr/local/etc/liner-notes/` 配下から `/usr/local/share/liner-notes/` の対応箇所へコピーします。旧配置を使い続ける場合はmenu/help/bannerの変数で明示できます。
 6. 旧 `/var/db/liner_notes/` を新 `/var/db/liner-notes/` へ、属性を保って**コピー**します。新側に運用データがある場合は混ぜず、別の空ディレクトリで検証してください。移動しない場合は `liner_notes_data_dir="/var/db/liner_notes"` を明示します。旧 `liner_notes_board` 等の個別指定があれば、それらも確認します。
@@ -151,6 +151,6 @@ liner_notes_doors="/usr/local/etc/liner-notes/doors.conf"
 
 ## 検証・公開準備
 
-今回の機能・転送・ports検査は配布物内 `evidence/stage73/` を参照してください。旧版の機能試験とは分けて記録します。既存の稼働BBSやホストのrc.confは変更しません。
+今回の機能・転送・ports検査は配布物内 `evidence/stage74/` を参照してください。旧版の機能試験とは分けて記録します。既存の稼働BBSやホストのrc.confは変更しません。
 
 公開URLとGPL-3.0-only表記は設定済みです。公式Ports Collectionへの提出は別作業で、担当者の連絡先と公式UID/GID割当の確定が残ります。現在は私用UID/GIDの配布portです。poudriereや他FreeBSD版・他ABIでの検証とは区別してください。

@@ -1,0 +1,2 @@
+{"articles": 12000, "mails": 12000, "body_bytes": 4096, "baseline_rss": 77410304, "loaded_rss": 84369408, "growth": 6959104}
+PASS stage63 memory: body storage on disk; 12000 article/mail read/search/reply/send/seen; RSS growth <48MiB

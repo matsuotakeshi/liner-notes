@@ -3,6 +3,7 @@
 | 環境 | 状況・追加作業 |
 |---|---|
 | FreeBSD 15.1/amd64 | 現行リリースの検証環境。ports、rc.d、実ZMODEMを検証済み。 |
+| Rocky Linux 10.2 x86_64 | RPM新規導入・更新、systemd、再起動自動起動、SELinux Enforcing、大容量同時転送を実機検証。[記録](STAGE74.md)。専用SELinuxポリシーは未提供。 |
 | Rocky Linux 9 / AlmaLinux 9 x86_64 | Clang/Python 3.11ビルド、インストーラー、systemd設定を提供。[0.73コンテナCI](https://github.com/matsuotakeshi/liner-notes/actions/runs/41783614429)で通常・拡張回帰、実ZMODEM、Web、PTY、COM、共有ボード、導入後起動を検査。合否・ログは `evidence/stage73/` を参照。systemd自動起動とSELinux実機運用は未確認。 |
 | その他のLinux | 同じPOSIX実装を使える見込み。各ディストリビューションの依存ライブラリ、常駐起動、実転送の確認が必要。 |
 | 他のBSD / macOS | 移植候補。PTYヘッダー、ライブラリ、ファイルロック・同期、常駐起動の違いを確認する。未検証。 |

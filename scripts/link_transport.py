@@ -1,7 +1,8 @@
 """Mutual TLS transport with explicit public-key peer identity and signed events."""
-import asyncio,datetime,json,os,ssl,struct
+import asyncio,datetime,json,os,ssl,struct,tempfile
 from pathlib import Path
 from cryptography import x509
+from cryptography.exceptions import InvalidSignature
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 from cryptography.x509.oid import NameOID,ExtendedKeyUsageOID
@@ -38,12 +39,64 @@ def context(directory,certificates,server=False):
     for path in certificates:ctx.load_verify_locations(cafile=str(path))
     return ctx
 
+
+def rotate_tls(directory,force=False):
+    """Rotate only online TLS keys; the pinned signing identity stays stable.
+
+    The new leaf certificate is signed by that identity. It is not a new origin
+    and cannot grant any additional board permission. Call with the daemon lock.
+    """
+    directory=Path(directory);current=directory/'tls-current.json'
+    now=datetime.datetime.now(datetime.timezone.utc)
+    if current.exists() and not force:
+        value=json.loads(current.read_text());stem=value['generation']
+        if not isinstance(stem,str) or not stem.startswith('tls-') or '/' in stem or '\\' in stem or '..' in stem:raise ValueError('Unsafe TLS generation')
+        cert=x509.load_pem_x509_certificate((directory/stem/'certificate.pem').read_bytes())
+        if cert.not_valid_after_utc>now+datetime.timedelta(days=30):return directory/stem,False
+    authority=x509.load_pem_x509_certificate((directory/'identity.crt').read_bytes())
+    signer=serialization.load_pem_private_key((directory/'identity.key').read_bytes(),None)
+    if authority.not_valid_after_utc<=now+datetime.timedelta(days=1):raise ValueError('Pinned identity certificate needs administrator renewal')
+    key=Ed25519PrivateKey.generate()
+    subject=x509.Name([x509.NameAttribute(NameOID.COMMON_NAME,'TLS '+identity(authority.public_key())[:40])])
+    cert=(x509.CertificateBuilder().subject_name(subject).issuer_name(authority.subject).public_key(key.public_key())
+        .serial_number(x509.random_serial_number()).not_valid_before(now-datetime.timedelta(minutes=5))
+        .not_valid_after(min(now+datetime.timedelta(days=90),authority.not_valid_after_utc))
+        .add_extension(x509.BasicConstraints(ca=False,path_length=None),True)
+        .add_extension(x509.AuthorityKeyIdentifier.from_issuer_public_key(authority.public_key()),False)
+        .add_extension(x509.SubjectKeyIdentifier.from_public_key(key.public_key()),False)
+        .add_extension(x509.KeyUsage(True,False,False,False,False,False,False,False,False),True)
+        .add_extension(x509.ExtendedKeyUsage([ExtendedKeyUsageOID.SERVER_AUTH,ExtendedKeyUsageOID.CLIENT_AUTH]),False).sign(signer,None))
+    target=Path(tempfile.mkdtemp(prefix='tls-',dir=directory))
+    for name,data in [('key.pem',key.private_bytes(serialization.Encoding.PEM,serialization.PrivateFormat.PKCS8,serialization.NoEncryption())),('certificate.pem',cert.public_bytes(serialization.Encoding.PEM))]:
+        fd=os.open(target/name,os.O_WRONLY|os.O_CREAT|os.O_EXCL,0o600)
+        with os.fdopen(fd,'wb') as stream:stream.write(data);stream.flush();os.fsync(stream.fileno())
+    fd,temp=tempfile.mkstemp(prefix='.tls-current-',dir=directory)
+    with os.fdopen(fd,'w') as stream:json.dump(dict(generation=target.name),stream);stream.flush();os.fsync(stream.fileno())
+    os.replace(temp,current)
+    return target,True
+
+
+def rotated_context(directory,certificates,server=False):
+    generation,_=rotate_tls(directory)
+    ctx=context(directory,certificates,server)
+    ctx.load_cert_chain(str(generation/'certificate.pem'),str(generation/'key.pem'))
+    return ctx
+
 def authenticated_peer(writer,allowed,expected=None):
     tls=writer.get_extra_info('ssl_object')
     if not tls:raise ValueError('TLS is required')
     cert=x509.load_der_x509_certificate(tls.getpeercert(binary_form=True));node=identity(cert.public_key())
-    if node not in allowed or expected is not None and node!=expected:raise ValueError('Unregistered peer public key')
-    return node
+    if node in allowed and (expected is None or node==expected):return node
+    # TLS has verified the chain. Pin the leaf's signer to the registered root
+    # as well, so another trusted root cannot choose somebody else's identity.
+    for pinned,policy in allowed.items():
+        if expected is not None and pinned!=expected:continue
+        try:
+            from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey
+            Ed25519PublicKey.from_public_bytes(policy['public']).verify(cert.signature,cert.tbs_certificate_bytes)
+            return pinned
+        except (InvalidSignature,ValueError):continue
+    raise ValueError('Unregistered peer public key')
 
 def unique(pairs):
     value={}
@@ -75,10 +128,12 @@ async def serve(store,reader,writer):
     try:
         async with asyncio.timeout(30):
             peer=authenticated_peer(writer,store.peers)
+            if store.db.execute('SELECT 1 FROM paused_peers WHERE peer=?',(peer,)).fetchone():raise ValueError('Peer exchange paused')
             request=await receive(reader)
-            if not isinstance(request,dict) or set(request)!={'version','after'} or type(request['version']) is not int or request['version']!=1:raise ValueError('Invalid exchange request')
+            if not isinstance(request,dict) or set(request)!={'version','after'} or type(request['version']) is not int or request['version'] not in (1,2):raise ValueError('Invalid exchange request')
             events,cursor=store.batch(peer,request['after'])
-            await send(writer,{'version':1,'cursor':cursor,'events':events})
+            if request['version']==1 and any(e['event']['version']==2 for e in events):raise ValueError('Peer must support link protocol 2')
+            await send(writer,{'version':request['version'],'cursor':cursor,'events':events})
     finally:
         writer.close()
         try:await writer.wait_closed()
@@ -89,9 +144,9 @@ async def pull(store,peer,host,port,ctx):
         reader,writer=await asyncio.open_connection(host,port,ssl=ctx,server_hostname=host)
         try:
             authenticated_peer(writer,store.peers,peer)
-            after=store.cursor(peer);await send(writer,{'version':1,'after':after})
+            after=store.cursor(peer);await send(writer,{'version':2,'after':after})
             result=await receive(reader)
-            if not isinstance(result,dict) or set(result)!={'version','cursor','events'} or type(result['version']) is not int or result['version']!=1:raise ValueError('Invalid exchange response')
+            if not isinstance(result,dict) or set(result)!={'version','cursor','events'} or type(result['version']) is not int or result['version']!=2:raise ValueError('Invalid exchange response')
             if type(result['cursor']) is not int or not after<=result['cursor']<=9223372036854775807 or not isinstance(result['events'],list) or len(result['events'])>4:raise ValueError('Invalid peer cursor or batch')
             count=0
             for event in result['events']:count+=store.accept(event,peer)

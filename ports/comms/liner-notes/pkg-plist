@@ -236,3 +236,8 @@ bin/liner-notes-serial
 %%PORTDOCS%%%%DOCSDIR%%/SERIAL.md
 %%PORTDOCS%%%%DOCSDIR%%/STAGE73.md
 %%PORTDOCS%%%%DOCSDIR%%/WEBUI_COVERAGE.md
+%%DATADIR%%/scripts/build-rpm.py
+%%DATADIR%%/scripts/link_maintenance.py
+%%PORTDOCS%%%%DOCSDIR%%/BBS_LINK_OPERATIONS.md
+%%PORTDOCS%%%%DOCSDIR%%/RPM.md
+%%PORTDOCS%%%%DOCSDIR%%/STAGE74.md

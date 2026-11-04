@@ -47,6 +47,8 @@ identity = {q(d/'identity')}
 database = {q(d/'link.sqlite')}
 port = {ports[i]}
 interval = 1
+control_socket = {q(d/'control.sock')}
+rotate_tls = true
 [bbs]
 port = {servers[i].port}
 login = "link"
@@ -71,6 +73,19 @@ port = {ports[1-i]}
   await wait_for(has_reply)
   async def withdrawn():return 'WITHDRAWN 1' in (await users[1].command('READ 1'))['text']
   await wait_for(withdrawn)
+  async def control(i,action,peer=None):
+   reader,writer=await asyncio.open_unix_connection(str(dirs[i]/'control.sock'))
+   try:
+    writer.write(json.dumps(dict(action=action,peer=peer)).encode()+b'\n');await writer.drain();return json.loads(await reader.readline())
+   finally:writer.close();await writer.wait_closed()
+  peer=tls.certificate_node(dirs[0]/'identity/identity.crt')[0]
+  status=await control(1,'pause',peer);assert status['peers'][0]['paused']
+  stop(1);start(1)
+  async def control_ready():return (dirs[1]/'control.sock').exists()
+  await wait_for(control_ready)
+  assert (await control(1,'status'))['peers'][0]['paused']
+  assert not (await control(1,'resume',peer))['peers'][0]['paused']
+  assert (await control(1,'retry',peer))['node']
   assert b'private withdrawn original' not in (dirs[1]/'notes').read_bytes()
   # Peer unavailable: local accepted work persists, then converges on restart.
   stop(1)
@@ -91,7 +106,7 @@ port = {ports[1-i]}
   # Live daemon owns its lock, so maintenance must not reset its cursor.
   result=subprocess.run([sys.executable,str(ROOT/'scripts/link_service.py'),'reset-peer','--config',str(configs[1]),peer],capture_output=True)
   assert result.returncode!=0
-  print('PASS separate link daemons: real BBS/mTLS, withdrawn historical parent, outage, restart, cursor reset/replay, maintenance lock')
+  print('PASS separate link daemons: real BBS/mTLS with rotated TLS keys, persistent pause/resume/retry control, withdrawn historical parent, outage, restart, cursor reset/replay, maintenance lock')
  finally:
   for i in range(2):stop(i)
   for log in logs:log.close()

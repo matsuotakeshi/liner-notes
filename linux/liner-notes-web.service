@@ -1,0 +1,23 @@
+[Unit]
+Description=Liner notes Web connector
+After=network.target liner-notes.service
+
+[Service]
+Type=simple
+User=liner_notes_web
+Group=liner_notes_web
+SupplementaryGroups=liner_notes_linkctl
+ExecStart=/usr/sbin/liner-notes-web --config /etc/liner-notes/web/web.toml
+StateDirectory=liner-notes-web
+StateDirectoryMode=0700
+UMask=0077
+Restart=on-failure
+RestartSec=5
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectSystem=strict
+ProtectHome=yes
+ReadWritePaths=/var/lib/liner-notes-web
+
+[Install]
+WantedBy=multi-user.target

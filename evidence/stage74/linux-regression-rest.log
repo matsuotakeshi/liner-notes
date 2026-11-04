@@ -1,0 +1,213 @@
+clang   -O2 -g  -std=c11 -Wall -Wextra -Werror -pthread src/doors.c src/zmodem_host.c src/runtime.c src/download.c src/userlog.c src/activity.c src/board.c src/members.c src/profile_store.c src/board_policy.c src/catalog.c src/ui.c src/menu.c src/messages.c src/session.c src/terminal.c src/telnet.c src/moderation.c src/extras.c src/vault.c src/vault_bridge.c src/identity_legacy.c src/vault_transfer.c src/transfer_line.c src/vault_worker.c src/chat.c src/mail_files.c src/mailbox.c -lutil -lcrypto -lsqlite3  src/storage_sqlite.c  -pthread -lcrypto -lsqlite3 -o runtime
+clang   -O2 -g  -std=c11 -Wall -Wextra -Werror src/vaultctl.c src/vault.c -lcrypto -lsqlite3  src/storage_sqlite.c  -pthread -lcrypto -lsqlite3 -o vaultctl
+clang   -O2 -g  -std=c11 -Wall -Wextra -Werror src/memberctl.c src/members.c -lcrypto -lsqlite3  src/storage_sqlite.c  -pthread -lcrypto -lsqlite3 -o memberctl
+python3 tests/test_index_fault.py ./runtime
+PASS: real file-size quota fails SQLite startup closed; original journals unchanged
+python3 tests/test_stage64_batch_names.py
+PASS: duplicate/max-byte UTF-8 attachment names and prefix collisions preserve all files
+python3 tests/test_stage64.py ./runtime ./vaultctl
+b'BOARD UPDATED 2'
+b'BOARD UPDATED 3'
+b'BOARD UPDATED 4'
+b'SIGOP SET 2 2'
+b'BOARD OPTIONS SAVED'
+b'ERR admin required'
+b'BOARD UPDATED 3'
+b'BOARD 3 Child'
+b'RIGHTS 3 LEVEL 2 GROUPS 10 STATUS active'
+b'SIGOP GROUP SAVED'
+b'RIGHTS 3 LEVEL 2 GROUPS 10 STATUS active'
+b'ERR admin required'
+b'ERR admin required'
+b'BOARD 3 Child'
+b'BOARD 4 Elsewhere'
+b'BOARD 2 Forum'
+b'ERR profile permission or value'
+b'PROFILE SAVED'
+b'MAIL EDIT end with . or /CANCEL'
+b'MAIL SENT 1'
+b'MAIL IMPORTED TO BUFFER'
+b'MAIL ERROR unavailable'
+b'MAIL CLOSED'
+b'MAIL CLOSED'
+b'CHECK CANCELLED'
+b'CHECKPOINT SAVED'
+b'FILEBOARD UPDATED'
+b'FILEBOARD UPDATED'
+b'FILEBOARD UPDATED'
+b'FILEBOARD UPDATED'
+b'FILEBOARD UPDATED'
+b'FILEBOARD UPDATED'
+b'ERR vault denied'
+b'FILEBOARD UPDATED'
+b'NEW PASSWORD'
+b'CONFIRM PASSWORD'
+b'FILEBOARD UPDATED'
+b'ERR vault denied'
+b'PASSWORD'
+b'FILEBOARD UNLOCKED 2 8'
+b'BOARD 3 Child'
+b'WITHDRAW SAVED 1'
+b'BOARD OPTIONS SAVED'
+b'BOARD GROUP MOVED'
+PASS stage64 inherited/scoped roles, subtree search, private import, checkpoints, vault passwords, profiles, reclaim and replay
+python3 tests/test_stage64_details.py ./runtime
+PASS stage64 4096-byte input, 256KiB article/mail/draft/buffer, reverse/relative reads, timed U, confirmation, generated IDs, detailed application and review/restart
+python3 tests/test_stage64_vault.py ./runtime ./vaultctl
+PASS stage64 inherited vault management, rename, retained receipts and totals, menu nodes, parent password revision/logout/restart, physical deletion
+python3 tests/test_stage64_persistence.py ./runtime ./vaultctl
+PASS: separate article/mail/file checkpoints, pagination completion, cancellation/restart, interrupted group intent recovery
+python3 tests/test_stage64_reclaim.py ./runtime
+PASS: management CLI backup/reclaim/restart; withdrawn body and old FTS removed, HIDE preserved, IDs and checkpoint retained, originals unchanged
+python3 tests/test_stage65.py ./runtime
+BOARDSET 2|1|all|all|Public|public b'BOARD UPDATED 2'
+BOARDSET 3|1|member|member|Other|other b'BOARD UPDATED 3'
+BOARDSET 4|2|all|all|Child|child b'BOARD UPDATED 4'
+SIGOP 2 2 b'SIGOP SET 2 2'
+BOARDGUEST 3 ON b'ERR admin required'
+boardguest 2 on b'BOARD GUEST SAVED'
+HANDLE visitor b'GUEST HANDLE guest:visitor'
+BOARD 2 b'BOARD 2 Public'
+BOARD 2 b'BOARD 2 Public'
+AUTHOR 1 3 CONFIRM b'ERR admin required'
+author 1 3 confirm b'AUTHOR CHANGED 1 3'
+BOARD 2 b'BOARD 2 Public'
+MOVEBRANCH 2 3 CONFIRM b'THREAD MOVED 2 3'
+BOARD 3 b'BOARD 3 Other'
+MENUMODE EXPERT b'MENU MODE SAVED'
+LANG ja b'\xe8\xa1\xa8\xe7\xa4\xba\xe8\xa8\x80\xe8\xaa\x9e: ja / LANG ja: \xe6\x97\xa5\xe6\x9c\xac\xe8\xaa\x9e / LANG en: English'
+PAGER ON b'PAGER ON'
+LOGOUT b'LOGGED OUT'
+PREFS b'PREFS STORED ja ON'
+BOARD 3 b'BOARD 3 Other'
+BOARDDELETEALL 2 CASCADE CONFIRM b'BOARD TREE DELETED'
+BOARD 2 b'ERR board unavailable'
+BOARD 4 b'ERR board unavailable'
+BOARD 3 b'BOARD 3 Other'
+BOARD 3 b'BOARD 3 Other'
+BOARD 2 b'ERR board unavailable'
+stage65 core permissions/restart/compaction passed
+python3 tests/test_stage65_delete_recovery.py ./runtime
+stage65 cascade intent recovery, deepest-first deletion, repeat restart and no duplicate withdrawals passed
+python3 tests/test_stage65_doors.py ./runtime
+stage65 native PTY door: auth, level, environment, return, escape passed
+python3 tests/test_door_resize.py ./runtime
+PASS live Door NAWS: existing 20..240 x 5..100 policy, missing/zero/invalid/duplicate/fragmented/refused notifications, SIGWINCH, identity/environment, independent sessions, quit/reentry/crash/escape/disconnect/timeout, BBS return, independent stty PTY app
+python3 tests/test_doors_generic.py ./runtime
+generic Door: menu, raw keys, private DORINFO, slots across runtimes, timeout/crash/escape/disconnect and descendants passed
+python3 tests/test_doors_config.py ./runtime
+PASS Door config validation, failed exec cleanup/retry, slots without dropfiles and empty menu
+python3 tests/test_stage65_terminal.py ./runtime
+stage65 Telnet PTY CRLF, connections, revocation cleanup, U clear/append confirmation passed
+python3 tests/test_stage65_ui.py ./runtime
+stage65 menu quantity and continuous reader passed
+python3 tests/test_stage65_scan_telnet.py ./runtime
+stage65 Telnet F/CRLF, pager entry, Ctrl-C cancellation and mail continuous reading passed
+python3 tests/test_stage65_database.py ./runtime ./vaultctl
+stage65 SQL cache: reuse, eviction, mail, crash replay, tamper rejection passed
+python3 tests/test_stage66_commands.py ./runtime ./vaultctl
+PASS stage66: native Telnet RTBBS main/board/read/mail/vault/settings/profile keys, confirmation, authorization, persistence
+python3 tests/test_stage71.py ./runtime
+PASS repeatable receipt creation/reuse/backup/atomic failure/symlink and non-mutating asset check
+PASS spool detail, explicit lost-ID binding, status reconciliation, preview, endpoint isolation and confirmed-only cleanup
+PASS structured profile/history rows, logical export/replay, reader S privacy and unchanged read position
+python3 tests/test_stage71_reconcile.py ./runtime ./vaultctl
+PASS real public/private reservation reconcile, lost reply binding, active cleanup refusal, owner isolation and published payload preservation
+python3 tests/test_stage67.py ./runtime ./vaultctl
+PASS stage67 permission, shared buffer, file scope, timezone/DST
+python3 tests/test_stage67_database.py ./runtime
+PASS stage67 authoritative DB: migration preserves originals, crash persistence, exclusive instance, no legacy dependency, missing block rejection
+python3 tests/test_stage67_ui.py ./runtime ./vaultctl
+PASS stage67 Telnet reading, shared buffer, role menus, scope, questions, timezone, goodbye
+python3 tests/test_stage67_limits_checks.py ./runtime ./vaultctl
+PASS stage67 quotas preserve existing data; scoped auto checkpoint waits for display and respects cancellation
+python3 tests/test_stage68.py ./runtime
+PASS stage68 scoped news, filtered P/L, disconnect preferences, journal and SQLite
+python3 tests/test_stage69.py ./runtime ./vaultctl
+PASS stage69 role boundaries, implicit groups, privacy opt-in, current-board DOS match, copy and protocol replay/compact
+python3 tests/test_stage69_ui.py ./runtime ./vaultctl
+PASS stage69 Telnet file/batch/hierarchy, profile forms, editor ranges/highlights/numbers, memo, W/#/one-shot T, birthday and registration confirmation
+python3 tests/test_stage70.py ./runtime
+PASS stage70 structured DB/restart/crash/logical backup, persistent editor/protocol, hourly fallback, spool preview/locks/publication/symlink safety
+python3 tests/test_stage70_gather.py ./runtime
+PASS Gather oldest-first retained messages, maximum 70 characters/10 lines, skip-to-compose and read-only exit
+python3 tests/test_transfer_timeouts.py
+PASS common idle timeout: active process send and legacy receive exceed total timeout; stalled peers fail TIMEOUT
+python3 tests/test_door_resize.py ./runtime
+PASS live Door NAWS: existing 20..240 x 5..100 policy, missing/zero/invalid/duplicate/fragmented/refused notifications, SIGWINCH, identity/environment, independent sessions, quit/reentry/crash/escape/disconnect/timeout, BBS return, independent stty PTY app
+python3 tests/test_doors_config.py ./runtime
+PASS Door config validation, failed exec cleanup/retry, slots without dropfiles and empty menu
+python3 tests/test_doors_generic.py ./runtime
+generic Door: menu, raw keys, private DORINFO, slots across runtimes, timeout/crash/escape/disconnect and descendants passed
+python3 tests/test_web_connector.py ./runtime
+PASS Web connector: real Telnet, password secrecy, member ACL, literal 4096-byte lines, article/mail bodies and chat synchronization
+python3 tests/test_web_blocks.py ./runtime ./vaultctl
+PASS connector blocks: size bounds, legacy line limit, token matching, guest refusal, command allowlist, owner checks, mid-download hiding, no premature receipt, private mail denies SYSOP
+python3 tests/test_web_http.py ./runtime ./vaultctl
+PASS Web HTTP: CSRF/Origin, session isolation, 256KiB drafts, Gather, literal posts, mail/privacy, public/private files with SHA256, one-use downloads, resume/retry, terminal login and real PTY door return
+python3 tests/test_web_transfers.py ./runtime ./vaultctl
+PASS block transfer, durable resume ID, owner isolation, mismatched source, mail editor preservation and private attachments
+python3 tests/test_web_install.py
+PASS Web installer: config preservation, samples-only pkg staging, permissions, rc syntax, symlink refusal
+python3 tests/test_web_errors.py
+PASS Web errors: missing template fallback, invalid UTF-8/permission errors=500, recovered template=200, BBS network failure=503
+python3 tests/test_stage73_database.py ./runtime
+PASS stage73 database: copy-only conversion, row storage, auth/read/mail/restart, structured restore, source hashes and live lock
+python3 tests/test_serial_connector.py ./runtime
+PASS serial PTY: binary round trip, fragmented Telnet/hidden password, modem RING/ATA/CONNECT, EOF drain, termios restore, real BBS registration and logout
+python3 tests/test_web_reports.py
+..
+----------------------------------------------------------------------
+Ran 2 tests in 0.010s
+
+OK
+python3 tests/test_link_store.py
+..
+----------------------------------------------------------------------
+Ran 2 tests in 1.511s
+
+OK
+python3 tests/test_link_tls.py
+Executing <Task pending name='Task-2' coro=<Transport.test_exchange() running at /home/ln74test/source/tests/test_link_tls.py:45> wait_for=<_GatheringFuture pending cb=[Task.task_wakeup()] created at /usr/lib64/python3.12/asyncio/tasks.py:712> cb=[_run_until_complete_cb() at /usr/lib64/python3.12/asyncio/base_events.py:181] created at /usr/lib64/python3.12/asyncio/runners.py:100> took 0.420 seconds
+..Executing <Task pending name='Task-21' coro=<Transport.test_rotation_keeps_pinned_identity() running at /home/ln74test/source/tests/test_link_tls.py:22> wait_for=<_GatheringFuture pending cb=[Task.task_wakeup()] created at /usr/lib64/python3.12/asyncio/tasks.py:712> cb=[_run_until_complete_cb() at /usr/lib64/python3.12/asyncio/base_events.py:181] created at /usr/lib64/python3.12/asyncio/runners.py:100> took 0.174 seconds
+.
+----------------------------------------------------------------------
+Ran 3 tests in 0.739s
+
+OK
+python3 tests/test_link_bbs.py ./runtime
+PASS three real BBS links: ring/star, origin author, reply mapping, retitle, withdraw, 256KiB payload, replay, restart, interrupted intent recovery, unauthorized-account refusal
+python3 tests/test_link_service.py ./runtime
+PASS separate link daemons: real BBS/mTLS with rotated TLS keys, persistent pause/resume/retry control, withdrawn historical parent, outage, restart, cursor reset/replay, maintenance lock
+python3 tests/test_stage74_links.py
+.
+----------------------------------------------------------------------
+Ran 1 test in 0.708s
+
+OK
+python3 tests/test_stage74_link_bbs.py ./runtime
+PASS real BBS checkpoint bootstrap, withdrawn parent, title after bootstrap, replay and paged metadata
+clang   -O2 -g  -std=c11 -Wall -Wextra -Werror tests/generate_scale.c src/storage_sqlite.c  -pthread -lcrypto -lsqlite3 -o generate-scale
+python3 tests/test_stage74_scale.py
+{"articles": 10050, "withdrawn": 1005, "removed_events": 11055, "snapshot_bytes": 13911630, "seconds": 124.86665546501172, "rss_increase_kib": 10980, "replay_duplicates": 0}
+python3 tests/test_stage74_scan.py ./runtime ./generate-scale
+Traceback (most recent call last):
+  File "/home/ln74test/source/tests/test_stage74_scan.py", line 31, in <module>
+    with tempfile.TemporaryDirectory() as tmp:asyncio.run(run(str(Path(sys.argv[1]).resolve()),str(Path(sys.argv[2]).resolve()),Path(tmp)))
+                                              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib64/python3.12/asyncio/runners.py", line 195, in run
+    return runner.run(main)
+           ^^^^^^^^^^^^^^^^
+  File "/usr/lib64/python3.12/asyncio/runners.py", line 118, in run
+    return self._loop.run_until_complete(task)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib64/python3.12/asyncio/base_events.py", line 691, in run_until_complete
+    return future.result()
+           ^^^^^^^^^^^^^^^
+  File "/home/ln74test/source/tests/test_stage74_scan.py", line 15, in run
+    server=Server(binary,p/'notes',members=p/'members',telnet=True,options=['--link-accounts',str(p/'accounts')])
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/ln74test/source/tests/test_board.py", line 25, in __init__
+    raise AssertionError(('startup', result, self.proc.stderr.read()))
+AssertionError: ('startup', [''], 'mailbox: cannot open/lock/validate journal\n')
+make: *** [Makefile:304: test-stage74-scale] Error 1

@@ -9,8 +9,8 @@ import tempfile
 ROOT=Path(__file__).resolve().parent
 
 
-def install(destdir='',prefix='/usr/local',python='/usr/local/bin/python3.12',samples_only=False):
-    for item in (prefix,python):
+def install(destdir='',prefix='/usr/local',python='/usr/local/bin/python3.12',samples_only=False,configdir=None,rc=True):
+    for item in (prefix,python,*([configdir] if configdir else [])):
         if not re.fullmatch(r'/[A-Za-z0-9_./-]+',item) or '..' in Path(item).parts:raise ValueError('Use an absolute path without spaces or ..')
     stage=Path(destdir).absolute() if destdir else Path('/')
     def directory(path):
@@ -34,7 +34,7 @@ def install(destdir='',prefix='/usr/local',python='/usr/local/bin/python3.12',sa
             with os.fdopen(fd,'wb') as stream:stream.write(data);stream.flush();os.fchmod(stream.fileno(),mode);os.fsync(stream.fileno())
             os.replace(temp,target)
         finally:Path(temp).unlink(missing_ok=True)
-    share=prefix+'/share/liner-notes/web';etc=prefix+'/etc/liner-notes/web'
+    share=prefix+'/share/liner-notes/web';etc=configdir or prefix+'/etc/liner-notes/web'
     # These directories contain public assets; config files retain their own 0640 mode.
     # Repair paths made inaccessible by older installers under umask 077.
     for name in (share,share+'/webui',share+'/webui/static',share+'/webui/templates',etc,etc+'/templates',etc+'/messages'):
@@ -54,11 +54,12 @@ def install(destdir='',prefix='/usr/local',python='/usr/local/bin/python3.12',sa
     write(etc+'/web.toml',config.encode(),0o640,sample=True)
     program='#!/bin/sh\ncd '+shlex.quote(share)+' || exit 1\nexec '+shlex.quote(python)+' -m webui "$@"\n'
     write(prefix+'/sbin/liner-notes-web',program.encode(),0o755)
-    rc=(ROOT/'deployment/liner_notes_web').read_text().replace('@PREFIX@',prefix)
-    write(prefix+'/etc/rc.d/liner_notes_web',rc.encode(),0o755)
+    if rc:
+        script=(ROOT/'deployment/liner_notes_web').read_text().replace('@PREFIX@',prefix)
+        write(prefix+'/etc/rc.d/liner_notes_web',script.encode(),0o755)
     write(share+'/apache.conf.sample',(ROOT/'deployment/apache.conf').read_bytes())
 
 
 if __name__=='__main__':
-    p=argparse.ArgumentParser(description=__doc__);p.add_argument('--destdir',default='');p.add_argument('--prefix',default='/usr/local');p.add_argument('--python',default='/usr/local/bin/python3.12');p.add_argument('--samples-only',action='store_true');args=p.parse_args()
-    install(args.destdir,args.prefix,args.python,args.samples_only)
+    p=argparse.ArgumentParser(description=__doc__);p.add_argument('--destdir',default='');p.add_argument('--prefix',default='/usr/local');p.add_argument('--python',default='/usr/local/bin/python3.12');p.add_argument('--samples-only',action='store_true');p.add_argument('--configdir');p.add_argument('--no-rc',action='store_true');args=p.parse_args()
+    install(args.destdir,args.prefix,args.python,args.samples_only,args.configdir,not args.no_rc)

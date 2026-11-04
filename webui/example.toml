@@ -13,6 +13,9 @@ timezone = "Asia/Tokyo"
 spool = "/var/db/liner-notes-web/spool"
 max_upload_bytes = 1073741824
 max_spool_bytes = 17179869184
+# Optional, administrator-only local link management. Grant this Web account
+# access to the link daemon's control socket group, not its private keys/DB.
+# link_control_socket = "/run/liner-notes-link/control.sock"
 
 [bbs]
 host = "127.0.0.1"

@@ -1,8 +1,8 @@
 PORTNAME=	liner-notes
-DISTVERSION=	0.73
+DISTVERSION=	0.74
 CATEGORIES=	comms
 MASTER_SITES=	https://github.com/matsuotakeshi/liner-notes/releases/download/v${DISTVERSION}/
-DISTNAME=	liner-notes-stage73
+DISTNAME=	liner-notes-stage74
 
 MAINTAINER=	ports@FreeBSD.org
 COMMENT=	HyperNotes-style BBS with Telnet, mail, chat, and file vaults

@@ -92,6 +92,27 @@ def create_app(config):
     app = web.Application(middlewares=[boundary],client_max_size=400000)
     app['sessions']=sessions
 
+    async def link_control(request):
+        session=current(request,mutate=request.method=='POST')
+        if any(session.bridge.state.get(k) for k in ('editing','secret','chat','gather','input','confirmation','talk','door','binary')):raise BridgeError('Finish the current dialogue before managing links')
+        await session.bridge.command('PING')
+        if not session.bridge.state.get('admin'):raise web.HTTPForbidden(text='Administrator required')
+        path=cfg.get('link_control_socket')
+        if not path:raise web.HTTPNotFound(text='Link management is not configured')
+        body=await object_body(request) if request.method=='POST' else {'action':'status'}
+        if set(body)-{'action','peer'} or body.get('action') not in ('status','pause','resume','retry'):raise ValueError('Unknown link action')
+        if body['action']!='status' and not re.fullmatch('[0-9a-f]{64}',str(body.get('peer',''))):raise ValueError('Invalid peer identity')
+        async with asyncio.timeout(8):
+            reader,writer=await asyncio.open_unix_connection(path,limit=1048576)
+            try:
+                writer.write(json.dumps(body).encode()+b'\n');await writer.drain()
+                raw=await reader.readline()
+                if len(raw)>1048576:raise ValueError('Link status too large')
+                result=json.loads(raw)
+                if 'error' in result:raise ValueError(result['error'])
+                return web.json_response(result)
+            finally:writer.close();await writer.wait_closed()
+
     async def object_body(request):
         value=await request.json()
         if not isinstance(value,dict):raise ValueError('Expected a JSON object')
@@ -110,6 +131,7 @@ def create_app(config):
         result = result or {'text':'','state':dict(session.bridge.state)}
         result['state']['vault_sigop']=session.vault_sigop
         result['state']['games']=session.games
+        result['state']['link_management']=bool(cfg.get('link_control_socket')) and bool(result['state'].get('admin'))
         result['data']=response_data(result['text'])
         result['csrf']=session.csrf
         result['actions']=[{k:v for k,v in item.items() if k!='command'} for item in COMMANDS.values() if visible(item,result['state'])]
@@ -521,6 +543,8 @@ def create_app(config):
     app.router.add_get(base+'assets/{name}',asset)
     for path,handler in [('session',new_session),('logout',logout),('auth',authenticate),('action',operate),('query',query),('input',input_line),('compose',compose),('gather',gather),('upload',upload),('download',download)]:app.router.add_post(base+'api/'+path,handler)
     app.router.add_get(base+'api/session',session_info)
+    app.router.add_get(base+'api/link',link_control)
+    app.router.add_post(base+'api/link',link_control)
     app.router.add_get(base+'api/messages',messages)
     app.router.add_get(base+'api/events',events)
     app.router.add_get(base+'api/terminal',terminal)

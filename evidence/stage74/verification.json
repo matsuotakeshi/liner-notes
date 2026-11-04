@@ -1,0 +1,42 @@
+{
+  "version": "0.74",
+  "date": "2026-11-04",
+  "base": "545af1ee43de387b2897c0f5e0f7a1ca3d95ad62",
+  "freebsd": {
+    "os": "15.1 amd64",
+    "full_port_options": [
+      "DOCS",
+      "WEBUI",
+      "LINK"
+    ],
+    "stage_check_plist_stage_qa_package": true,
+    "minimal_alternate_prefix": true,
+    "upgrade_from": "0.73",
+    "fresh_update_reinstall_delete_data_preserved": true,
+    "web_link_admin_installed_tests": true,
+    "host_package_database_and_accounts_unchanged": true
+  },
+  "linux": {
+    "os": "Rocky Linux 10.2 x86_64",
+    "rpm": "0.74-1.el10",
+    "update_from": "0.74-0.3.el10",
+    "config_preserved_no_automatic_restart": true,
+    "bbs_web_link_installed_tests": true,
+    "selinux": "Enforcing",
+    "boot_test": "See rpm-acceptance.json for the preceding 0.74-0.3 build; final 0.74-1 changes release metadata and documentation."
+  },
+  "regression_notes": [
+    "Linux large-start test passed using existing CI 180s timeout.",
+    "Scan fixture was corrected to include the generated mail recipient; final targeted test passed.",
+    "FreeBSD strict SQLite health SQL was corrected; final regression passed."
+  ],
+  "production_changed": false,
+  "files": {
+    "liner-notes-0.74-1.el10.src.rpm": "3979afdb8297be6246f880160443d16404c66e27a804e0f08d741e983ab8a9ca",
+    "liner-notes-0.74-1.el10.x86_64.rpm": "095dd7c6a89000c345516b3206ee8aa8511f0359a136c241952f0d439665efa7",
+    "liner-notes-0.74-FreeBSD15-amd64.pkg": "0370aa76c557a23a25a08b0a511f62ea7ff5bd84c9b3e125e8fb45cf94e69d95",
+    "liner-notes-link-0.74-1.el10.x86_64.rpm": "5de3c04d50fb60b57c5f5bed783374e4ce068928686ccd24338cce2c5342a061",
+    "liner-notes-stage74.tar.gz": "8df78dd752f2c0b95a0c700b20827ed049067007ea5280b2791075756ff4788a",
+    "liner-notes-web-0.74-1.el10.x86_64.rpm": "ea4f3ad6f230f5022974c61da56a1c1b90b73a0e2b6d569ab558324a33765789"
+  }
+}

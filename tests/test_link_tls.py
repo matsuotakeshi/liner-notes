@@ -7,6 +7,24 @@ from link_store import Store
 from cryptography.hazmat.primitives.serialization import load_pem_private_key
 
 class Transport(unittest.IsolatedAsyncioTestCase):
+ async def test_rotation_keeps_pinned_identity(self):
+  with tempfile.TemporaryDirectory() as tmp:
+   p=Path(tmp);ids=[tls.generate(p/str(i),'BBS '+str(i)) for i in range(2)];board='a'*64
+   origins={n:dict(public=tls.certificate_node(p/str(i)/'identity.crt')[1],boards={board}) for i,n in enumerate(ids)}
+   stores=[Store(p/f'db{i}',load_pem_private_key((p/str(i)/'identity.key').read_bytes(),None),origins,{ids[1-i]:origins[ids[1-i]]}) for i in range(2)]
+   first,changed=tls.rotate_tls(p/'0');self.assertTrue(changed)
+   same,changed=tls.rotate_tls(p/'0');self.assertFalse(changed);self.assertEqual(first,same)
+   new,changed=tls.rotate_tls(p/'0',True);self.assertTrue(changed);self.assertNotEqual(first,new)
+   self.assertNotEqual((first/'key.pem').read_bytes(),(new/'key.pem').read_bytes())
+   self.assertEqual(tls.certificate_node(p/'0/identity.crt')[0],ids[0])
+   event=dict(version=1,origin=ids[0],board=board,article='1'*64,parent=None,revision=1,kind='post',author='alice',title='rotation',body='same origin',created=1)
+   stores[0].accept(stores[0].sign(event))
+   server=await asyncio.start_server(lambda r,w:tls.serve(stores[0],r,w),'127.0.0.1',0,ssl=tls.rotated_context(p/'0',[p/'1/identity.crt'],True))
+   try:
+    self.assertEqual(await tls.pull(stores[1],ids[0],'127.0.0.1',server.sockets[0].getsockname()[1],tls.rotated_context(p/'1',[p/'0/identity.crt'])),1)
+   finally:
+    server.close();await server.wait_closed()
+    for s in stores:s.close()
  async def test_malformed_frames(self):
   for raw in (b'{"version":1,"version":1}',b'['*2000+b']'*2000,b'NaN'):
    reader=asyncio.StreamReader();reader.feed_data(struct.pack('!I',len(raw))+raw);reader.feed_eof()

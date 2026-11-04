@@ -1,0 +1,45 @@
+{
+  "previous_boot": "a9beac8f-ff16-409e-b481-8a43cd1a3faa",
+  "current_boot": "5789355c-0726-4a63-bf37-1c21555bfda7",
+  "reboot_verified": true,
+  "configuration_hashes_preserved": true,
+  "selinux": "Enforcing",
+  "packages": [
+    "liner-notes-0.74-0.3.el10.x86_64",
+    "liner-notes-web-0.74-0.3.el10.x86_64",
+    "liner-notes-link-0.74-0.3.el10.x86_64"
+  ],
+  "services": {
+    "liner-notes": [
+      "MainPID=1163",
+      "User=liner_notes",
+      "FragmentPath=/usr/lib/systemd/system/liner-notes.service"
+    ],
+    "liner-notes-web": [
+      "MainPID=1165",
+      "User=liner_notes_web",
+      "FragmentPath=/usr/lib/systemd/system/liner-notes-web.service"
+    ],
+    "liner-notes-link": [
+      "MainPID=1164",
+      "User=liner_notes_link",
+      "FragmentPath=/usr/lib/systemd/system/liner-notes-link.service"
+    ]
+  },
+  "bbs_acceptance": {
+    "phase": "verify",
+    "selinux": "Enforcing",
+    "non_root": true,
+    "persistence": true,
+    "boot_id": "5789355c-0726-4a63-bf37-1c21555bfda7"
+  },
+  "link_web_acceptance": {
+    "installed_services": true,
+    "web_admin_acl": true,
+    "control_pause_resume_retry": true,
+    "tls_rotation_enabled": true,
+    "peer_offline_expected": true,
+    "events": 1
+  },
+  "final_state": "Three test services stopped and disabled; packages, settings and test data retained."
+}

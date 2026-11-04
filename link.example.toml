@@ -5,6 +5,12 @@ database = "/var/db/liner-notes-link/link.sqlite"
 listen = "127.0.0.1"
 port = 9044
 interval = 5
+# Protocol 2 peers only. The pinned signing identity stays unchanged.
+rotate_tls = true
+scan_budget = 512
+pull_batches = 64
+# Optional local management socket; directory/group permissions limit access.
+# control_socket = "/var/run/liner-notes-link/control.sock"
 max_events = 1000000
 max_bytes = 1073741824
 

@@ -1,0 +1,24 @@
+[Unit]
+Description=Liner notes signed shared-board link
+After=network.target liner-notes.service
+
+[Service]
+Type=simple
+User=liner_notes_link
+Group=liner_notes_linkctl
+ExecStart=/usr/bin/liner-notes-link serve --config /etc/liner-notes/link.toml
+StateDirectory=liner-notes-link
+StateDirectoryMode=0700
+RuntimeDirectory=liner-notes-link
+RuntimeDirectoryMode=0750
+UMask=0077
+Restart=on-failure
+RestartSec=5
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectSystem=strict
+ProtectHome=yes
+ReadWritePaths=/var/lib/liner-notes-link /run/liner-notes-link
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,11 @@
+{"articles": 12000, "metadata_requests": 376, "seconds": 0.5644457989837974, "body_omitted": true}
+python3 tests/test_stage74_links.py
+.
+----------------------------------------------------------------------
+Ran 1 test in 0.406s
+
+OK
+python3 tests/test_stage74_link_bbs.py ./runtime
+PASS real BBS checkpoint bootstrap, withdrawn parent, title after bootstrap, replay and paged metadata
+PASS separate link daemons: real BBS/mTLS with rotated TLS keys, persistent pause/resume/retry control, withdrawn historical parent, outage, restart, cursor reset/replay, maintenance lock
+PASS Web HTTP: CSRF/Origin, session isolation, 256KiB drafts, Gather, literal posts, mail/privacy, public/private files with SHA256, one-use downloads, resume/retry, terminal login and real PTY door return

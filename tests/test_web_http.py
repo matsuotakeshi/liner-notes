@@ -3,6 +3,7 @@ import asyncio
 import base64
 import hashlib
 import json
+import os
 from pathlib import Path
 import socket
 import subprocess
@@ -11,6 +12,7 @@ import tempfile
 import aiohttp
 from aiohttp import web
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]))
+if os.environ.get('LINER_TEST_WEB_ROOT'):sys.path.insert(0,os.environ['LINER_TEST_WEB_ROOT'])
 from webui.app import create_app
 from webui.bridge import Bridge
 from test_board import Server
@@ -21,6 +23,12 @@ async def exercise(bbs,tmp):
     sock=socket.socket();sock.bind(('127.0.0.1',0));port=sock.getsockname()[1];sock.close()
     origin=f'http://127.0.0.1:{port}';base=origin+'/notes/api/'
     config={'web':{'listen':'127.0.0.1','origin':origin,'secure_cookies':False,'spool':str(tmp/'spool'),'messages':str(ROOT/'webui/messages')},'bbs':{'host':'127.0.0.1','port':bbs.port,'telnet':True}}
+    controls=[]
+    async def control(reader,writer):
+        controls.append(json.loads(await reader.readline()))
+        writer.write(json.dumps(dict(node='a'*64,events=1,pending=0,deferred=0,bytes=4096,peers=[],scans=[],retry_reasons=[])).encode()+b'\n');await writer.drain();writer.close();await writer.wait_closed()
+    config['web']['link_control_socket']=str(tmp/'control.sock')
+    controller=await asyncio.start_unix_server(control,str(tmp/'control.sock'))
     app=create_app(config);runner=web.AppRunner(app);await runner.setup();await web.TCPSite(runner,'127.0.0.1',port).start()
     clients=[]
     async def client(name):
@@ -32,6 +40,14 @@ async def exercise(bbs,tmp):
         r=await c.post(base+path,json=payload);assert r.status==200,(r.status,await r.text());return await r.json()
     try:
         a=await client('alice');b=await client('bob');outsider=await client('carol')
+        async with b.get(base+'link') as r:assert r.status==403
+        assert not controls
+        async with a.get(base+'link') as r:assert r.status==200;assert (await r.json())['pending']==0
+        async with a.post(base+'link',json={'action':'pause','peer':'b'*64},headers={'X-CSRF-Token':'wrong'}) as r:assert r.status==403
+        assert len(controls)==1
+        async with a.post(base+'link',json={'action':'pause','peer':'b'*64}) as r:assert r.status==200
+        assert controls[-1]==dict(action='pause',peer='b'*64)
+        async with a.post(base+'link',json={'action':'shell','peer':'b'*64}) as r:assert r.status==400
         for name in ('app.js','reports-ui.js','terminal-ui.js'):
             asset=await a.get(origin+'/notes/assets/'+name);assert asset.status==200,name
         r=await post(a,'action',{'action':'admin.connections','values':{}})
@@ -107,6 +123,7 @@ async def exercise(bbs,tmp):
         print('PASS Web HTTP: CSRF/Origin, session isolation, 256KiB drafts, Gather, literal posts, mail/privacy, public/private files with SHA256, one-use downloads, resume/retry, terminal login and real PTY door return')
     finally:
         await asyncio.gather(*(c.close() for c in clients));await runner.cleanup()
+        controller.close();await controller.wait_closed()
 
 if __name__=='__main__':
     with tempfile.TemporaryDirectory(prefix='ln-http-test-') as directory:
