@@ -1,6 +1,6 @@
 """Copy-only conversion, native structured backup/restore and source preservation."""
 from pathlib import Path
-import hashlib,sqlite3,subprocess,sys,tempfile
+import hashlib,os,sqlite3,subprocess,sys,tempfile
 from test_board import Server,post,read
 from test_runtime import Client
 from test_members import auth
@@ -16,7 +16,7 @@ def run(binary):
   assert (r.returncode==0)==success,(r.stdout,r.stderr)
   return r
  with tempfile.TemporaryDirectory(prefix='db73-') as tmp:
-  p=Path(tmp);source=p/'source';source.mkdir();db=source/'liner.sqlite'
+  p=Path(tmp);parent=p/'protected-parent';parent.mkdir();source=parent/'source';source.mkdir();db=source/'liner.sqlite'
   s=Server(binary,source/'notes',members=source/'members',options=['--database',str(db)]);c=Client(s.port)
   try:
    auth(c,'alice',True);post(c,'日本語','body 1');post(c,'large','x'*3000)
@@ -26,7 +26,11 @@ def run(binary):
   finally:c.close();s.close()
   before=hashlib.sha256(db.read_bytes()).digest()
   copy=p/'structured'
-  admin('db-structure','--root',source,'--database',db,'--board','notes','--members','members',copy)
+  # A service account may own its data directory while /var/db is read-only.
+  if os.name!='nt':parent.chmod(0o555)
+  try:admin('db-structure','--root',source,'--database',db,'--board','notes','--members','members',copy)
+  finally:
+   if os.name!='nt':parent.chmod(0o700)
   assert hashlib.sha256(db.read_bytes()).digest()==before
   admin('db-structure','--root',source,'--database',db,'--board','notes','--members','members',copy,success=False)
   for round in range(2):

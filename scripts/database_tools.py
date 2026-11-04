@@ -155,8 +155,10 @@ def import_copy(root,board,members,database='liner.sqlite',structured=False,tool
  return {'operation':'db-import','database':str(target),'streams':len(names),'layout':'structured' if structured else 'blocks','verified':'SHA-256 of every stream'}
 
 def backup(root,database,board,members,archive):
- root=Path(root).resolve();maintenance.outside(Path(archive),root)
- with tempfile.TemporaryDirectory(prefix='liner-db-backup-',dir=root.parent) as tmp:
+ root=Path(root).resolve();archive=Path(archive).absolute();maintenance.outside(archive,root)
+ # The service account owns root, not necessarily its parent (/var/db).
+ # Keep the private working copy beside the explicitly selected output.
+ with tempfile.TemporaryDirectory(prefix='liner-db-backup-',dir=archive.parent) as tmp:
   export_instance(root,database,board,Path(tmp)/'instance')
   result=maintenance.backup(Path(tmp)/'instance',board,members,archive)
   result['operation']='db-backup';return result
