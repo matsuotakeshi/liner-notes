@@ -1,0 +1,56 @@
+python3 tests/test_stage67.py ./runtime ./vaultctl
+PASS stage67 permission, shared buffer, file scope, timezone/DST
+python3 tests/test_stage67_database.py ./runtime
+PASS stage67 authoritative DB: migration preserves originals, crash persistence, exclusive instance, no legacy dependency, missing block rejection
+python3 tests/test_stage67_ui.py ./runtime ./vaultctl
+PASS stage67 Telnet reading, shared buffer, role menus, scope, questions, timezone, goodbye
+python3 tests/test_stage67_limits_checks.py ./runtime ./vaultctl
+PASS stage67 quotas preserve existing data; scoped auto checkpoint waits for display and respects cancellation
+python3 tests/test_stage68.py ./runtime
+PASS stage68 scoped news, filtered P/L, disconnect preferences, journal and SQLite
+python3 tests/test_stage69.py ./runtime ./vaultctl
+PASS stage69 role boundaries, implicit groups, privacy opt-in, current-board DOS match, copy and protocol replay/compact
+python3 tests/test_stage69_ui.py ./runtime ./vaultctl
+PASS stage69 Telnet file/batch/hierarchy, profile forms, editor ranges/highlights/numbers, memo, W/#/one-shot T, birthday and registration confirmation
+python3 tests/test_stage70.py ./runtime
+PASS stage70 structured DB/restart/crash/logical backup, persistent editor/protocol, hourly fallback, spool preview/locks/publication/symlink safety
+python3 tests/test_stage70_gather.py ./runtime
+PASS Gather oldest-first retained messages, maximum 70 characters/10 lines, skip-to-compose and read-only exit
+python3 tests/test_transfer_timeouts.py
+PASS common idle timeout: active process send and legacy receive exceed total timeout; stalled peers fail TIMEOUT
+python3 tests/test_stage71.py ./runtime
+PASS repeatable receipt creation/reuse/backup/atomic failure/symlink and non-mutating asset check
+PASS spool detail, explicit lost-ID binding, status reconciliation, preview, endpoint isolation and confirmed-only cleanup
+PASS structured profile/history rows, logical export/replay, reader S privacy and unchanged read position
+python3 tests/test_stage71_reconcile.py ./runtime ./vaultctl
+PASS real public/private reservation reconcile, lost reply binding, active cleanup refusal, owner isolation and published payload preservation
+python3 tests/test_stage73_database.py ./runtime
+PASS stage73 database: copy-only conversion, row storage, auth/read/mail/restart, structured restore, source hashes and live lock
+python3 tests/test_serial_connector.py ./runtime
+PASS serial PTY: binary round trip, fragmented Telnet/hidden password, modem RING/ATA/CONNECT, EOF drain, termios restore, real BBS registration and logout
+python3 tests/test_web_reports.py
+..
+----------------------------------------------------------------------
+Ran 2 tests in 0.002s
+
+OK
+python3 tests/test_link_store.py
+.
+----------------------------------------------------------------------
+Ran 1 test in 0.117s
+
+OK
+python3 tests/test_link_tls.py
+Executing <Task pending name='Task-2' coro=<Transport.test_exchange() running at /home/takeshi/liner-notes-stage73-link-20261104/port-check/comms/liner-notes/work/liner-notes-0.73.a1/tests/test_link_tls.py:27> wait_for=<_GatheringFuture pending cb=[Task.task_wakeup()] created at /usr/local/lib/python3.12/asyncio/tasks.py:712> cb=[_run_until_complete_cb() at /usr/local/lib/python3.12/asyncio/base_events.py:181] created at /usr/local/lib/python3.12/asyncio/runners.py:100> took 0.148 seconds
+..
+----------------------------------------------------------------------
+Ran 2 tests in 0.258s
+
+OK
+python3 tests/test_link_bbs.py ./runtime
+PASS three real BBS links: ring/star, origin author, reply mapping, retitle, withdraw, 256KiB payload, replay, restart, interrupted intent recovery, unauthorized-account refusal
+python3 tests/test_link_service.py ./runtime
+PASS separate link daemons: real BBS/mTLS, withdrawn historical parent, outage, restart, cursor reset/replay, maintenance lock
+python3 tests/test_stage70_scale.py ./runtime
+SCALE70 records=10050 articles+10050 mail RSS_DELTA_BYTES= 10424320 START_AND_READ_SECONDS= 6.55
+PASS large structured data, bounded resident memory and indexed unread count

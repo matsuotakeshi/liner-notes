@@ -1,0 +1,10 @@
+--- runtime ---
+--- vaultctl ---
+--- runtime ---
+cc  -I/usr/local/include -O2 -pipe  -std=c11 -Wall -Wextra -Werror -pthread src/doors.c src/zmodem_host.c src/runtime.c src/download.c src/userlog.c src/activity.c src/board.c src/members.c src/profile_store.c src/board_policy.c src/catalog.c src/ui.c src/menu.c src/messages.c src/session.c src/terminal.c src/telnet.c src/moderation.c src/extras.c src/vault.c src/vault_bridge.c src/identity_legacy.c src/vault_transfer.c src/transfer_line.c src/vault_worker.c src/chat.c src/mail_files.c src/mailbox.c -lutil -lcrypto -L/usr/local/lib -lsqlite3  src/storage_sqlite.c -I/usr/local/include -pthread -lcrypto -L/usr/local/lib -lsqlite3 -o runtime
+--- vaultctl ---
+cc  -I/usr/local/include -O2 -pipe  -std=c11 -Wall -Wextra -Werror src/vaultctl.c src/vault.c -lcrypto -L/usr/local/lib -lsqlite3  src/storage_sqlite.c -I/usr/local/include -pthread -lcrypto -L/usr/local/lib -lsqlite3 -o vaultctl
+--- memberctl ---
+cc  -I/usr/local/include -O2 -pipe  -std=c11 -Wall -Wextra -Werror src/memberctl.c src/members.c -lcrypto -L/usr/local/lib -lsqlite3  src/storage_sqlite.c -I/usr/local/include -pthread -lcrypto -L/usr/local/lib -lsqlite3 -o memberctl
+--- dbconvert ---
+cc  -I/usr/local/include -O2 -pipe  -std=c11 -Wall -Wextra -Werror src/dbconvert.c src/storage_sqlite.c -pthread -lcrypto -L/usr/local/lib -lsqlite3 -o dbconvert

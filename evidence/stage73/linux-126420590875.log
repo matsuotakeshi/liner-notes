@@ -1,0 +1,1225 @@
+﻿2026-11-04T06:09:03.1608803Z Current runner version: '2.338.2'
+2026-11-04T06:09:03.1638201Z ##[group]Runner Image Provisioner
+2026-11-04T06:09:03.1639141Z Hosted Compute Agent
+2026-11-04T06:09:03.1639857Z Version: 20261028.624
+2026-11-04T06:09:03.1640556Z Commit: 54898b74c23fde5556c9b3c3a2290865feef0dfe
+2026-11-04T06:09:03.1641353Z Build Date: 2026-10-28T21:51:42Z
+2026-11-04T06:09:03.1642087Z Worker ID: {1aea0473-11bd-4527-9c52-468f3c86ee01}
+2026-11-04T06:09:03.1642812Z Region: eastus
+2026-11-04T06:09:03.1643432Z Cloud: Azure
+2026-11-04T06:09:03.1644029Z ##[endgroup]
+2026-11-04T06:09:03.1645906Z ##[group]Operating System
+2026-11-04T06:09:03.1646908Z Ubuntu
+2026-11-04T06:09:03.1647465Z 24.04.5
+2026-11-04T06:09:03.1648052Z LTS
+2026-11-04T06:09:03.1648630Z ##[endgroup]
+2026-11-04T06:09:03.1649186Z ##[group]Runner Image
+2026-11-04T06:09:03.1649875Z Image: ubuntu-24.04
+2026-11-04T06:09:03.1650462Z Version: 20261101.360.1
+2026-11-04T06:09:03.1651863Z Included Software: https://github.com/actions/runner-images/blob/ubuntu24/20261101.360/images/ubuntu/Ubuntu2404-Readme.md
+2026-11-04T06:09:03.1653908Z Image Release: https://github.com/actions/runner-images/releases/tag/ubuntu24%2F20261101.360
+2026-11-04T06:09:03.1654974Z ##[endgroup]
+2026-11-04T06:09:03.1656571Z ##[group]GITHUB_TOKEN Permissions
+2026-11-04T06:09:03.1658910Z Contents: read
+2026-11-04T06:09:03.1659568Z Metadata: read
+2026-11-04T06:09:03.1660247Z ##[endgroup]
+2026-11-04T06:09:03.1662540Z Secret source: Actions
+2026-11-04T06:09:03.1663649Z Cache mode: write
+2026-11-04T06:09:03.1664622Z Prepare workflow directory
+2026-11-04T06:09:03.2012755Z Prepare all required actions
+2026-11-04T06:09:03.2064113Z Getting action download info
+2026-11-04T06:09:03.4141474Z Download action repository 'actions/checkout@v4' (SHA:11d5960a326750d5838078e36cf38b85af677262)
+2026-11-04T06:09:03.6244970Z Complete job name: linux (rockylinux/rockylinux:9)
+2026-11-04T06:09:03.7302015Z ##[group]Run actions/checkout@v4
+2026-11-04T06:09:03.7302966Z with:
+2026-11-04T06:09:03.7303573Z   repository: matsuotakeshi/liner-notes
+2026-11-04T06:09:03.7307728Z   token: ***
+2026-11-04T06:09:03.7308267Z   ssh-strict: true
+2026-11-04T06:09:03.7308742Z   ssh-user: git
+2026-11-04T06:09:03.7309205Z   persist-credentials: true
+2026-11-04T06:09:03.7309716Z   clean: true
+2026-11-04T06:09:03.7310184Z   sparse-checkout-cone-mode: true
+2026-11-04T06:09:03.7310722Z   fetch-depth: 1
+2026-11-04T06:09:03.7311169Z   fetch-tags: false
+2026-11-04T06:09:03.7311628Z   show-progress: true
+2026-11-04T06:09:03.7312090Z   lfs: false
+2026-11-04T06:09:03.7312515Z   submodules: false
+2026-11-04T06:09:03.7312976Z   set-safe-directory: true
+2026-11-04T06:09:03.7313500Z   allow-unsafe-pr-checkout: false
+2026-11-04T06:09:03.7314348Z ##[endgroup]
+2026-11-04T06:09:04.0189514Z Syncing repository: matsuotakeshi/liner-notes
+2026-11-04T06:09:04.0192135Z ##[group]Getting Git version info
+2026-11-04T06:09:04.0193405Z Working directory is '/home/runner/work/liner-notes/liner-notes'
+2026-11-04T06:09:04.0195152Z [command]/usr/bin/git version
+2026-11-04T06:09:04.0288456Z git version 2.56.0
+2026-11-04T06:09:04.0314463Z ##[endgroup]
+2026-11-04T06:09:04.0333409Z Temporarily overriding HOME='/home/runner/work/_temp/f93d5476-67ce-432b-a5bf-714b0dc9aefa' before making global git config changes
+2026-11-04T06:09:04.0338034Z Adding repository directory to the temporary git global config as a safe directory
+2026-11-04T06:09:04.0341763Z [command]/usr/bin/git config --global --add safe.directory /home/runner/work/liner-notes/liner-notes
+2026-11-04T06:09:04.0419872Z Deleting the contents of '/home/runner/work/liner-notes/liner-notes'
+2026-11-04T06:09:04.0430969Z ##[group]Initializing the repository
+2026-11-04T06:09:04.0437679Z [command]/usr/bin/git init /home/runner/work/liner-notes/liner-notes
+2026-11-04T06:09:04.0562310Z hint: Using 'master' as the name for the initial branch. This default branch name
+2026-11-04T06:09:04.0565281Z hint: will change to "main" in Git 3.0. To configure the initial branch name
+2026-11-04T06:09:04.0569254Z hint: to use in all of your new repositories, which will suppress this warning,
+2026-11-04T06:09:04.0571737Z hint: call:
+2026-11-04T06:09:04.0572711Z hint:
+2026-11-04T06:09:04.0574178Z hint: 	git config --global init.defaultBranch <name>
+2026-11-04T06:09:04.0576633Z hint:
+2026-11-04T06:09:04.0578771Z hint: Names commonly chosen instead of 'master' are 'main', 'trunk' and
+2026-11-04T06:09:04.0582468Z hint: 'development'. The just-created branch can be renamed via this command:
+2026-11-04T06:09:04.0585358Z hint:
+2026-11-04T06:09:04.0587258Z hint: 	git branch -m <name>
+2026-11-04T06:09:04.0589012Z hint:
+2026-11-04T06:09:04.0591516Z hint: Disable this message with "git config set advice.defaultBranchName false"
+2026-11-04T06:09:04.0595908Z Initialized empty Git repository in /home/runner/work/liner-notes/liner-notes/.git/
+2026-11-04T06:09:04.0602216Z [command]/usr/bin/git remote add origin https://github.com/matsuotakeshi/liner-notes
+2026-11-04T06:09:04.0656141Z ##[endgroup]
+2026-11-04T06:09:04.0659628Z ##[group]Disabling automatic garbage collection
+2026-11-04T06:09:04.0662937Z [command]/usr/bin/git config --local gc.auto 0
+2026-11-04T06:09:04.0704313Z ##[endgroup]
+2026-11-04T06:09:04.0707628Z ##[group]Setting up auth
+2026-11-04T06:09:04.0711435Z [command]/usr/bin/git config --local --name-only --get-regexp core\.sshCommand
+2026-11-04T06:09:04.0757060Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+2026-11-04T06:09:04.1213982Z [command]/usr/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+2026-11-04T06:09:04.1256015Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
+2026-11-04T06:09:04.1531700Z [command]/usr/bin/git config --local --name-only --get-regexp ^includeIf\.gitdir:
+2026-11-04T06:09:04.1598697Z [command]/usr/bin/git submodule foreach --recursive git config --local --show-origin --name-only --get-regexp remote.origin.url
+2026-11-04T06:09:04.1893582Z [command]/usr/bin/git config --local http.https://github.com/.extraheader AUTHORIZATION: basic ***
+2026-11-04T06:09:04.1957922Z ##[endgroup]
+2026-11-04T06:09:04.1960068Z ##[group]Fetching the repository
+2026-11-04T06:09:04.1982382Z [command]/usr/bin/git -c protocol.version=2 fetch --no-tags --prune --no-recurse-submodules --depth=1 origin +9f02a7cc276df4cd1dcb0d926ac78f223f20822a:refs/remotes/origin/release/0.73
+2026-11-04T06:09:04.5505361Z From https://github.com/matsuotakeshi/liner-notes
+2026-11-04T06:09:04.5507118Z  * [new ref]         9f02a7cc276df4cd1dcb0d926ac78f223f20822a -> origin/release/0.73
+2026-11-04T06:09:04.5509019Z ##[endgroup]
+2026-11-04T06:09:04.5509616Z ##[group]Determining the checkout info
+2026-11-04T06:09:04.5510327Z ##[endgroup]
+2026-11-04T06:09:04.5510758Z [command]/usr/bin/git sparse-checkout disable
+2026-11-04T06:09:04.5579745Z [command]/usr/bin/git config --local --unset-all extensions.worktreeConfig
+2026-11-04T06:09:04.5625806Z ##[group]Checking out the ref
+2026-11-04T06:09:04.5630098Z [command]/usr/bin/git checkout --progress --force -B release/0.73 refs/remotes/origin/release/0.73
+2026-11-04T06:09:04.6071850Z Switched to a new branch 'release/0.73'
+2026-11-04T06:09:04.6077263Z branch 'release/0.73' set up to track 'origin/release/0.73'.
+2026-11-04T06:09:04.6084978Z ##[endgroup]
+2026-11-04T06:09:04.6140118Z [command]/usr/bin/git log -1 --format=%H
+2026-11-04T06:09:04.6175782Z 9f02a7cc276df4cd1dcb0d926ac78f223f20822a
+2026-11-04T06:09:04.6443210Z ##[group]Run docker run --rm -v "$PWD:/source:ro" "$IMAGE" bash /source/ci/linux.sh
+2026-11-04T06:09:04.6444217Z [36;1mdocker run --rm -v "$PWD:/source:ro" "$IMAGE" bash /source/ci/linux.sh[0m
+2026-11-04T06:09:04.6469939Z shell: /usr/bin/bash -e {0}
+2026-11-04T06:09:04.6470520Z env:
+2026-11-04T06:09:04.6470989Z   IMAGE: rockylinux/rockylinux:9
+2026-11-04T06:09:04.6471480Z ##[endgroup]
+2026-11-04T06:09:04.7407753Z Unable to find image 'rockylinux/rockylinux:9' locally
+2026-11-04T06:09:04.9992553Z 9: Pulling from rockylinux/rockylinux
+2026-11-04T06:09:05.0890153Z 99c753a880cc: Pulling fs layer
+2026-11-04T06:09:05.5352566Z 99c753a880cc: Verifying Checksum
+2026-11-04T06:09:05.5353517Z 99c753a880cc: Download complete
+2026-11-04T06:09:08.3894415Z 99c753a880cc: Pull complete
+2026-11-04T06:09:08.3943259Z Digest: sha256:8101994123cf3d0a8fee517bee7f39e555c7d92bd2d9eb3303cc988a0eeed00f
+2026-11-04T06:09:08.3959794Z Status: Downloaded newer image for rockylinux/rockylinux:9
+2026-11-04T06:09:09.0207578Z NAME="Rocky Linux"
+2026-11-04T06:09:09.0208669Z VERSION="9.8 (Blue Onyx)"
+2026-11-04T06:09:09.0209484Z RELEASE_TYPE="stable"
+2026-11-04T06:09:09.0210001Z ID="rocky"
+2026-11-04T06:09:09.0210483Z ID_LIKE="rhel centos fedora"
+2026-11-04T06:09:09.0211024Z VERSION_ID="9.8"
+2026-11-04T06:09:09.0211533Z PLATFORM_ID="platform:el9"
+2026-11-04T06:09:09.0212090Z PRETTY_NAME="Rocky Linux 9.8 (Blue Onyx)"
+2026-11-04T06:09:09.0212742Z ANSI_COLOR="0;32"
+2026-11-04T06:09:09.0213325Z LOGO="fedora-logo-icon"
+2026-11-04T06:09:09.0220058Z CPE_NAME="cpe:/o:rocky:rocky:9::baseos"
+2026-11-04T06:09:09.0220959Z HOME_URL="https://rockylinux.org/"
+2026-11-04T06:09:09.0221979Z VENDOR_NAME="RESF"
+2026-11-04T06:09:09.0222882Z VENDOR_URL="https://resf.org/"
+2026-11-04T06:09:09.0223422Z BUG_REPORT_URL="https://bugs.rockylinux.org/"
+2026-11-04T06:09:09.0223874Z SUPPORT_END="2032-05-31"
+2026-11-04T06:09:09.0224208Z ROCKY_SUPPORT_PRODUCT="Rocky-Linux-9"
+2026-11-04T06:09:09.0224595Z ROCKY_SUPPORT_PRODUCT_VERSION="9.8"
+2026-11-04T06:09:09.0224989Z REDHAT_SUPPORT_PRODUCT="Rocky Linux"
+2026-11-04T06:09:09.0225337Z REDHAT_SUPPORT_PRODUCT_VERSION="9.8"
+2026-11-04T06:09:09.5807108Z Rocky Linux 9 - BaseOS                          115 MB/s |  45 MB     00:00    
+2026-11-04T06:09:14.3246469Z Rocky Linux 9 - AppStream                        30 MB/s |  30 MB     00:01    
+2026-11-04T06:09:19.3721956Z Rocky Linux 9 - Extras                           50 kB/s |  17 kB     00:00    
+2026-11-04T06:09:20.1293049Z Package tar-2:1.34-11.el9.x86_64 is already installed.
+2026-11-04T06:09:20.1296008Z Package gzip-1.12-1.el9.x86_64 is already installed.
+2026-11-04T06:09:20.1303987Z Package shadow-utils-2:4.9-16.el9.x86_64 is already installed.
+2026-11-04T06:09:20.1579092Z Dependencies resolved.
+2026-11-04T06:09:20.1632365Z ================================================================================
+2026-11-04T06:09:20.1633283Z  Package                        Arch   Version                  Repo       Size
+2026-11-04T06:09:20.1634078Z ================================================================================
+2026-11-04T06:09:20.1634523Z Installing:
+2026-11-04T06:09:20.1634807Z  clang                          x86_64 21.1.8-2.el9             appstream 7.3 M
+2026-11-04T06:09:20.1635328Z  gcc                            x86_64 11.5.0-14.el9            appstream  32 M
+2026-11-04T06:09:20.1635954Z  make                           x86_64 1:4.3-8.el9              baseos    529 k
+2026-11-04T06:09:20.1636522Z  openssl-devel                  x86_64 1:3.5.8-2.el9_8          appstream 3.5 M
+2026-11-04T06:09:20.1636981Z  procps-ng                      x86_64 3.3.17-14.el9            baseos    332 k
+2026-11-04T06:09:20.1637383Z  python3.11                     x86_64 3.11.13-10.el9_8         appstream  25 k
+2026-11-04T06:09:20.1637799Z  python3.11-pip                 noarch 22.3.1-6.el9             appstream 2.9 M
+2026-11-04T06:09:20.1638216Z  sqlite-devel                   x86_64 3.34.1-11.el9_8          appstream 133 k
+2026-11-04T06:09:20.1639040Z  systemd                        x86_64 252-67.el9_8.6.rocky.0.1 baseos    4.0 M
+2026-11-04T06:09:20.1639473Z  telnet                         x86_64 1:0.17-85.el9            appstream  63 k
+2026-11-04T06:09:20.1639794Z Upgrading:
+2026-11-04T06:09:20.1640044Z  gzip                           x86_64 1.12-2.el9_8             baseos    156 k
+2026-11-04T06:09:20.1640426Z  openssl                        x86_64 1:3.5.8-2.el9_8          baseos    1.4 M
+2026-11-04T06:09:20.1641027Z  openssl-fips-provider          x86_64 1:3.5.8-2.el9_8          baseos    813 k
+2026-11-04T06:09:20.1641510Z  openssl-libs                   x86_64 1:3.5.8-2.el9_8          baseos    2.3 M
+2026-11-04T06:09:20.1641918Z  sqlite-libs                    x86_64 3.34.1-11.el9_8          baseos    643 k
+2026-11-04T06:09:20.1642326Z  systemd-libs                   x86_64 252-67.el9_8.6.rocky.0.1 baseos    637 k
+2026-11-04T06:09:20.1642711Z  tar                            x86_64 2:1.34-13.el9_8          baseos    879 k
+2026-11-04T06:09:20.1643052Z Installing dependencies:
+2026-11-04T06:09:20.1643342Z  acl                            x86_64 2.3.1-4.el9              baseos     69 k
+2026-11-04T06:09:20.1643729Z  checkpolicy                    x86_64 3.6-1.el9                appstream 352 k
+2026-11-04T06:09:20.1644134Z  clang-libs                     x86_64 21.1.8-2.el9             appstream  31 M
+2026-11-04T06:09:20.1644582Z  clang-resource-filesystem      x86_64 21.1.8-2.el9             appstream  19 k
+2026-11-04T06:09:20.1645011Z  cpp                            x86_64 11.5.0-14.el9            appstream  11 M
+2026-11-04T06:09:20.1645377Z  dbus                           x86_64 1:1.12.20-8.el9          baseos    6.8 k
+2026-11-04T06:09:20.1646071Z  dbus-broker                    x86_64 28-9.el9_8               baseos    169 k
+2026-11-04T06:09:20.1646494Z  dbus-common                    noarch 1:1.12.20-8.el9          baseos     14 k
+2026-11-04T06:09:20.1646894Z  diffutils                      x86_64 3.7-12.el9               baseos    388 k
+2026-11-04T06:09:20.1647330Z  environment-modules            x86_64 5.3.0-2.el9_8.1          baseos    574 k
+2026-11-04T06:09:20.1647752Z  gcc-c++                        x86_64 11.5.0-14.el9            appstream  13 M
+2026-11-04T06:09:20.1648177Z  gcc-toolset-15-binutils        x86_64 2.44-5.el9               appstream 5.9 M
+2026-11-04T06:09:20.1648632Z  gcc-toolset-15-gcc             x86_64 15.2.1-7.1.el9_8         appstream  52 M
+2026-11-04T06:09:20.1649077Z  gcc-toolset-15-gcc-c++         x86_64 15.2.1-7.1.el9_8         appstream  16 M
+2026-11-04T06:09:20.1649575Z  gcc-toolset-15-libstdc++-devel x86_64 15.2.1-7.1.el9_8         appstream 3.6 M
+2026-11-04T06:09:20.1650064Z  gcc-toolset-15-runtime         x86_64 15.0-9.el9               appstream  23 k
+2026-11-04T06:09:20.1650499Z  glibc-devel                    x86_64 2.34-266.el9_8           appstream  37 k
+2026-11-04T06:09:20.1650931Z  glibc-headers                  x86_64 2.34-266.el9_8           appstream 443 k
+2026-11-04T06:09:20.1651362Z  groff-base                     x86_64 1.22.4-10.el9.0.1        baseos    1.1 M
+2026-11-04T06:09:20.1651754Z  jansson                        x86_64 2.14-1.el9.0.1           baseos     45 k
+2026-11-04T06:09:20.1652168Z  kernel-headers                 x86_64 5.14.0-687.64.1.el9_8    appstream 2.6 M
+2026-11-04T06:09:20.1652588Z  kmod-libs                      x86_64 28-11.el9                baseos     62 k
+2026-11-04T06:09:20.1652998Z  libatomic                      x86_64 11.5.0-14.el9            baseos     23 k
+2026-11-04T06:09:20.1653426Z  libedit                        x86_64 3.1-39.20210216cvs.el9   baseos    103 k
+2026-11-04T06:09:20.1653825Z  libmpc                         x86_64 1.2.1-4.el9              appstream  61 k
+2026-11-04T06:09:20.1654219Z  libnsl2                        x86_64 2.0.0-1.el9.0.1          appstream  30 k
+2026-11-04T06:09:20.1654621Z  libpipeline                    x86_64 1.5.3-4.el9              baseos     48 k
+2026-11-04T06:09:20.1655030Z  libpkgconf                     x86_64 1.7.3-10.el9             baseos     35 k
+2026-11-04T06:09:20.1656075Z  libseccomp                     x86_64 2.5.2-2.el9              baseos     71 k
+2026-11-04T06:09:20.1656567Z  libselinux-utils               x86_64 3.6-3.el9                baseos    161 k
+2026-11-04T06:09:20.1657021Z  libstdc++-devel                x86_64 11.5.0-14.el9            appstream 2.2 M
+2026-11-04T06:09:20.1657433Z  libtirpc                       x86_64 1.3.3-9.el9              baseos     93 k
+2026-11-04T06:09:20.1657917Z  libxcrypt-devel                x86_64 4.4.18-3.el9             appstream  28 k
+2026-11-04T06:09:20.1658852Z  llvm-filesystem                x86_64 21.1.8-2.el9             appstream  14 k
+2026-11-04T06:09:20.1659434Z  llvm-libs                      x86_64 21.1.8-2.el9             appstream  31 M
+2026-11-04T06:09:20.1659830Z  man-db                         x86_64 2.9.3-9.el9              baseos    1.1 M
+2026-11-04T06:09:20.1660221Z  mpdecimal                      x86_64 2.5.1-3.el9              appstream  85 k
+2026-11-04T06:09:20.1660643Z  pkgconf                        x86_64 1.7.3-10.el9             baseos     40 k
+2026-11-04T06:09:20.1661090Z  pkgconf-m4                     noarch 1.7.3-10.el9             baseos     14 k
+2026-11-04T06:09:20.1661589Z  pkgconf-pkg-config             x86_64 1.7.3-10.el9             baseos     10 k
+2026-11-04T06:09:20.1662030Z  policycoreutils                x86_64 3.6-5.el9                baseos    205 k
+2026-11-04T06:09:20.1662781Z  policycoreutils-python-utils   noarch 3.6-5.el9                appstream  70 k
+2026-11-04T06:09:20.1663277Z  python3-audit                  x86_64 3.1.5-8.el9              appstream  83 k
+2026-11-04T06:09:20.1664024Z  python3-distro                 noarch 1.5.0-7.el9              appstream  36 k
+2026-11-04T06:09:20.1664841Z  python3-libselinux             x86_64 3.6-3.el9                appstream 186 k
+2026-11-04T06:09:20.1665892Z  python3-libsemanage            x86_64 3.6-5.el9_6              appstream  78 k
+2026-11-04T06:09:20.1666424Z  python3-policycoreutils        noarch 3.6-5.el9                appstream 2.0 M
+2026-11-04T06:09:20.1666887Z  python3-setools                x86_64 4.4.4-1.el9              baseos    551 k
+2026-11-04T06:09:20.1667329Z  python3-setuptools             noarch 53.0.0-15.el9            baseos    831 k
+2026-11-04T06:09:20.1667769Z  python3.11-libs                x86_64 3.11.13-10.el9_8         appstream 9.6 M
+2026-11-04T06:09:20.1668209Z  python3.11-pip-wheel           noarch 22.3.1-6.el9             appstream 1.4 M
+2026-11-04T06:09:20.1668696Z  python3.11-setuptools-wheel    noarch 65.5.1-5.el9             appstream 712 k
+2026-11-04T06:09:20.1669150Z  scl-utils                      x86_64 1:2.0.3-4.el9            appstream  36 k
+2026-11-04T06:09:20.1669544Z  sqlite                         x86_64 3.34.1-11.el9_8          appstream 758 k
+2026-11-04T06:09:20.1669953Z  systemd-pam                    x86_64 252-67.el9_8.6.rocky.0.1 baseos    244 k
+2026-11-04T06:09:20.1670398Z  systemd-rpm-macros             noarch 252-67.el9_8.6.rocky.0.1 baseos     32 k
+2026-11-04T06:09:20.1670819Z  tcl                            x86_64 1:8.6.10-7.el9           baseos    1.1 M
+2026-11-04T06:09:20.1671219Z  vim-filesystem                 noarch 2:8.2.2637-26.el9_8.23   baseos     13 k
+2026-11-04T06:09:20.1671584Z Installing weak dependencies:
+2026-11-04T06:09:20.1671910Z  compiler-rt                    x86_64 21.1.8-2.el9             appstream 2.7 M
+2026-11-04T06:09:20.1672380Z  gcc-toolset-15-libatomic-devel x86_64 15.2.1-7.1.el9_8         appstream  30 k
+2026-11-04T06:09:20.1672834Z  libomp                         x86_64 21.1.8-2.el9             appstream 836 k
+2026-11-04T06:09:20.1673229Z  libomp-devel                   x86_64 21.1.8-2.el9             appstream 264 k
+2026-11-04T06:09:20.1673659Z  libxcrypt-compat               x86_64 4.4.18-3.el9             appstream  88 k
+2026-11-04T06:09:20.1674113Z  python3.11-setuptools          noarch 65.5.1-5.el9             appstream 1.5 M
+2026-11-04T06:09:20.1674410Z 
+2026-11-04T06:09:20.1674495Z Transaction Summary
+2026-11-04T06:09:20.1674925Z ================================================================================
+2026-11-04T06:09:20.1675242Z Install  74 Packages
+2026-11-04T06:09:20.1675464Z Upgrade   7 Packages
+2026-11-04T06:09:20.1675761Z 
+2026-11-04T06:09:20.1675908Z Total download size: 254 M
+2026-11-04T06:09:20.1676144Z Downloading Packages:
+2026-11-04T06:09:20.3445898Z (1/81): dbus-1.12.20-8.el9.x86_64.rpm            97 kB/s | 6.8 kB     00:00    
+2026-11-04T06:09:20.3791826Z (2/81): dbus-common-1.12.20-8.el9.noarch.rpm    398 kB/s |  14 kB     00:00    
+2026-11-04T06:09:20.4111350Z (3/81): acl-2.3.1-4.el9.x86_64.rpm              505 kB/s |  69 kB     00:00    
+2026-11-04T06:09:20.4464731Z (4/81): dbus-broker-28-9.el9_8.x86_64.rpm       982 kB/s | 169 kB     00:00    
+2026-11-04T06:09:20.5175074Z (5/81): diffutils-3.7-12.el9.x86_64.rpm         2.7 MB/s | 388 kB     00:00    
+2026-11-04T06:09:20.5462420Z (6/81): environment-modules-5.3.0-2.el9_8.1.x86 4.2 MB/s | 574 kB     00:00    
+2026-11-04T06:09:20.5518941Z (7/81): groff-base-1.22.4-10.el9.0.1.x86_64.rpm  10 MB/s | 1.1 MB     00:00    
+2026-11-04T06:09:20.5532972Z (8/81): jansson-2.14-1.el9.0.1.x86_64.rpm       1.2 MB/s |  45 kB     00:00    
+2026-11-04T06:09:20.5872189Z (9/81): libatomic-11.5.0-14.el9.x86_64.rpm      662 kB/s |  23 kB     00:00    
+2026-11-04T06:09:20.5947302Z (10/81): kmod-libs-28-11.el9.x86_64.rpm         1.3 MB/s |  62 kB     00:00    
+2026-11-04T06:09:20.5969845Z (11/81): libedit-3.1-39.20210216cvs.el9.x86_64. 2.3 MB/s | 103 kB     00:00    
+2026-11-04T06:09:20.6226069Z (12/81): libpipeline-1.5.3-4.el9.x86_64.rpm     1.4 MB/s |  48 kB     00:00    
+2026-11-04T06:09:20.6498807Z (13/81): libpkgconf-1.7.3-10.el9.x86_64.rpm     639 kB/s |  35 kB     00:00    
+2026-11-04T06:09:20.6513225Z (14/81): libseccomp-2.5.2-2.el9.x86_64.rpm      1.3 MB/s |  71 kB     00:00    
+2026-11-04T06:09:20.6582380Z (15/81): libselinux-utils-3.6-3.el9.x86_64.rpm  4.5 MB/s | 161 kB     00:00    
+2026-11-04T06:09:20.6854049Z (16/81): libtirpc-1.3.3-9.el9.x86_64.rpm        2.6 MB/s |  93 kB     00:00    
+2026-11-04T06:09:20.6994171Z (17/81): man-db-2.9.3-9.el9.x86_64.rpm           27 MB/s | 1.1 MB     00:00    
+2026-11-04T06:09:20.7208835Z (18/81): make-4.3-8.el9.x86_64.rpm              7.5 MB/s | 529 kB     00:00    
+2026-11-04T06:09:20.7215435Z (19/81): pkgconf-1.7.3-10.el9.x86_64.rpm        1.1 MB/s |  40 kB     00:00    
+2026-11-04T06:09:20.7341526Z (20/81): pkgconf-m4-1.7.3-10.el9.noarch.rpm     414 kB/s |  14 kB     00:00    
+2026-11-04T06:09:20.7567510Z (21/81): pkgconf-pkg-config-1.7.3-10.el9.x86_64 290 kB/s |  10 kB     00:00    
+2026-11-04T06:09:20.7589188Z (22/81): policycoreutils-3.6-5.el9.x86_64.rpm   5.5 MB/s | 205 kB     00:00    
+2026-11-04T06:09:20.7704427Z (23/81): procps-ng-3.3.17-14.el9.x86_64.rpm     9.0 MB/s | 332 kB     00:00    
+2026-11-04T06:09:20.7964513Z (24/81): python3-setools-4.4.4-1.el9.x86_64.rpm  14 MB/s | 551 kB     00:00    
+2026-11-04T06:09:20.8001823Z (25/81): python3-setuptools-53.0.0-15.el9.noarc  20 MB/s | 831 kB     00:00    
+2026-11-04T06:09:20.8324143Z (26/81): systemd-pam-252-67.el9_8.6.rocky.0.1.x 6.7 MB/s | 244 kB     00:00    
+2026-11-04T06:09:20.8349346Z (27/81): systemd-rpm-macros-252-67.el9_8.6.rock 927 kB/s |  32 kB     00:00    
+2026-11-04T06:09:20.8506925Z (28/81): systemd-252-67.el9_8.6.rocky.0.1.x86_6  50 MB/s | 4.0 MB     00:00    
+2026-11-04T06:09:20.8693676Z (29/81): vim-filesystem-8.2.2637-26.el9_8.23.no 396 kB/s |  13 kB     00:00    
+2026-11-04T06:09:20.9050154Z (30/81): tcl-8.6.10-7.el9.x86_64.rpm             15 MB/s | 1.1 MB     00:00    
+2026-11-04T06:09:21.3921222Z (31/81): checkpolicy-3.6-1.el9.x86_64.rpm       651 kB/s | 352 kB     00:00    
+2026-11-04T06:09:21.4650405Z (32/81): clang-resource-filesystem-21.1.8-2.el9 263 kB/s |  19 kB     00:00    
+2026-11-04T06:09:21.7779807Z (33/81): compiler-rt-21.1.8-2.el9.x86_64.rpm    8.7 MB/s | 2.7 MB     00:00    
+2026-11-04T06:09:21.8079894Z (34/81): clang-21.1.8-2.el9.x86_64.rpm          7.8 MB/s | 7.3 MB     00:00    
+2026-11-04T06:09:22.1153574Z (35/81): cpp-11.5.0-14.el9.x86_64.rpm            32 MB/s |  11 MB     00:00    
+2026-11-04T06:09:22.4170754Z (36/81): clang-libs-21.1.8-2.el9.x86_64.rpm      21 MB/s |  31 MB     00:01    
+2026-11-04T06:09:22.8686059Z (37/81): gcc-11.5.0-14.el9.x86_64.rpm            31 MB/s |  32 MB     00:01    
+2026-11-04T06:09:23.0439611Z (38/81): gcc-c++-11.5.0-14.el9.x86_64.rpm        14 MB/s |  13 MB     00:00    
+2026-11-04T06:09:23.1786036Z (39/81): gcc-toolset-15-binutils-2.44-5.el9.x86 7.7 MB/s | 5.9 MB     00:00    
+2026-11-04T06:09:24.1426570Z (40/81): gcc-toolset-15-gcc-c++-15.2.1-7.1.el9_  15 MB/s |  16 MB     00:01    
+2026-11-04T06:09:24.4261587Z (41/81): gcc-toolset-15-libatomic-devel-15.2.1-  24 kB/s |  30 kB     00:01    
+2026-11-04T06:09:24.6091279Z (42/81): gcc-toolset-15-gcc-15.2.1-7.1.el9_8.x8  30 MB/s |  52 MB     00:01    
+2026-11-04T06:09:24.6103884Z (43/81): gcc-toolset-15-runtime-15.0-9.el9.x86_ 126 kB/s |  23 kB     00:00    
+2026-11-04T06:09:24.6471551Z (44/81): gcc-toolset-15-libstdc++-devel-15.2.1- 7.2 MB/s | 3.6 MB     00:00    
+2026-11-04T06:09:24.6811833Z (45/81): glibc-devel-2.34-266.el9_8.x86_64.rpm  519 kB/s |  37 kB     00:00    
+2026-11-04T06:09:24.6931351Z (46/81): glibc-headers-2.34-266.el9_8.x86_64.rp 5.8 MB/s | 443 kB     00:00    
+2026-11-04T06:09:24.7397913Z (47/81): kernel-headers-5.14.0-687.64.1.el9_8.x  29 MB/s | 2.6 MB     00:00    
+2026-11-04T06:09:24.7557505Z (48/81): libmpc-1.2.1-4.el9.x86_64.rpm          826 kB/s |  61 kB     00:00    
+2026-11-04T06:09:24.7598980Z (49/81): libnsl2-2.0.0-1.el9.0.1.x86_64.rpm     416 kB/s |  30 kB     00:00    
+2026-11-04T06:09:24.8176297Z (50/81): libomp-21.1.8-2.el9.x86_64.rpm          11 MB/s | 836 kB     00:00    
+2026-11-04T06:09:24.8290595Z (51/81): libomp-devel-21.1.8-2.el9.x86_64.rpm   3.5 MB/s | 264 kB     00:00    
+2026-11-04T06:09:24.8488688Z (52/81): libstdc++-devel-11.5.0-14.el9.x86_64.r  25 MB/s | 2.2 MB     00:00    
+2026-11-04T06:09:24.8897505Z (53/81): libxcrypt-compat-4.4.18-3.el9.x86_64.r 1.2 MB/s |  88 kB     00:00    
+2026-11-04T06:09:24.9012738Z (54/81): libxcrypt-devel-4.4.18-3.el9.x86_64.rp 392 kB/s |  28 kB     00:00    
+2026-11-04T06:09:24.9206891Z (55/81): llvm-filesystem-21.1.8-2.el9.x86_64.rp 190 kB/s |  14 kB     00:00    
+2026-11-04T06:09:25.5744078Z (56/81): llvm-libs-21.1.8-2.el9.x86_64.rpm       45 MB/s |  31 MB     00:00    
+2026-11-04T06:09:25.5769844Z (57/81): mpdecimal-2.5.1-3.el9.x86_64.rpm       126 kB/s |  85 kB     00:00    
+2026-11-04T06:09:25.6102642Z (58/81): openssl-devel-3.5.8-2.el9_8.x86_64.rpm 5.0 MB/s | 3.5 MB     00:00    
+2026-11-04T06:09:25.6466179Z (59/81): policycoreutils-python-utils-3.6-5.el9 971 kB/s |  70 kB     00:00    
+2026-11-04T06:09:25.6487488Z (60/81): python3-audit-3.1.5-8.el9.x86_64.rpm   1.1 MB/s |  83 kB     00:00    
+2026-11-04T06:09:25.6818127Z (61/81): python3-distro-1.5.0-7.el9.noarch.rpm  505 kB/s |  36 kB     00:00    
+2026-11-04T06:09:25.7195289Z (62/81): python3-libselinux-3.6-3.el9.x86_64.rp 2.5 MB/s | 186 kB     00:00    
+2026-11-04T06:09:25.7208940Z (63/81): python3-libsemanage-3.6-5.el9_6.x86_64 1.1 MB/s |  78 kB     00:00    
+2026-11-04T06:09:25.7704685Z (64/81): python3-policycoreutils-3.6-5.el9.noar  23 MB/s | 2.0 MB     00:00    
+2026-11-04T06:09:25.7914580Z (65/81): python3.11-3.11.13-10.el9_8.x86_64.rpm 353 kB/s |  25 kB     00:00    
+2026-11-04T06:09:25.9747144Z (66/81): python3.11-libs-3.11.13-10.el9_8.x86_6  38 MB/s | 9.6 MB     00:00    
+2026-11-04T06:09:26.0378785Z (67/81): python3.11-pip-wheel-22.3.1-6.el9.noar 5.8 MB/s | 1.4 MB     00:00    
+2026-11-04T06:09:26.0775714Z (68/81): python3.11-pip-22.3.1-6.el9.noarch.rpm 9.3 MB/s | 2.9 MB     00:00    
+2026-11-04T06:09:26.0835378Z (69/81): python3.11-setuptools-65.5.1-5.el9.noa  14 MB/s | 1.5 MB     00:00    
+2026-11-04T06:09:26.1169644Z (70/81): python3.11-setuptools-wheel-65.5.1-5.e 9.1 MB/s | 712 kB     00:00    
+2026-11-04T06:09:26.1513656Z (71/81): scl-utils-2.0.3-4.el9.x86_64.rpm       510 kB/s |  36 kB     00:00    
+2026-11-04T06:09:26.1606497Z (72/81): sqlite-3.34.1-11.el9_8.x86_64.rpm      9.6 MB/s | 758 kB     00:00    
+2026-11-04T06:09:26.1894512Z (73/81): sqlite-devel-3.34.1-11.el9_8.x86_64.rp 1.8 MB/s | 133 kB     00:00    
+2026-11-04T06:09:26.2234775Z (74/81): telnet-0.17-85.el9.x86_64.rpm          881 kB/s |  63 kB     00:00    
+2026-11-04T06:09:26.2951929Z (75/81): gzip-1.12-2.el9_8.x86_64.rpm           1.1 MB/s | 156 kB     00:00    
+2026-11-04T06:09:26.4269979Z (76/81): openssl-3.5.8-2.el9_8.x86_64.rpm       6.0 MB/s | 1.4 MB     00:00    
+2026-11-04T06:09:26.4320886Z (77/81): openssl-fips-provider-3.5.8-2.el9_8.x8 3.8 MB/s | 813 kB     00:00    
+2026-11-04T06:09:26.4399356Z (78/81): openssl-libs-3.5.8-2.el9_8.x86_64.rpm   16 MB/s | 2.3 MB     00:00    
+2026-11-04T06:09:26.4651337Z (79/81): sqlite-libs-3.34.1-11.el9_8.x86_64.rpm  17 MB/s | 643 kB     00:00    
+2026-11-04T06:09:26.4693397Z (80/81): systemd-libs-252-67.el9_8.6.rocky.0.1.  17 MB/s | 637 kB     00:00    
+2026-11-04T06:09:26.4793654Z (81/81): tar-1.34-13.el9_8.x86_64.rpm            22 MB/s | 879 kB     00:00    
+2026-11-04T06:09:26.4819345Z --------------------------------------------------------------------------------
+2026-11-04T06:09:26.4823275Z Total                                            40 MB/s | 254 MB     00:06     
+2026-11-04T06:09:28.2490245Z Running transaction check
+2026-11-04T06:09:28.3229719Z Transaction check succeeded.
+2026-11-04T06:09:28.3247568Z Running transaction test
+2026-11-04T06:09:29.8457754Z Transaction test succeeded.
+2026-11-04T06:09:29.8462548Z Running transaction
+2026-11-04T06:09:31.3917071Z   Preparing        :                                                        1/1 
+2026-11-04T06:09:31.4005376Z   Installing       : libmpc-1.2.1-4.el9.x86_64                             1/88 
+2026-11-04T06:09:31.4044243Z   Upgrading        : sqlite-libs-3.34.1-11.el9_8.x86_64                    2/88 
+2026-11-04T06:09:31.4107435Z   Installing       : clang-resource-filesystem-21.1.8-2.el9.x86_64         3/88 
+2026-11-04T06:09:31.4153315Z   Installing       : python3-libselinux-3.6-3.el9.x86_64                   4/88 
+2026-11-04T06:09:31.5445548Z   Installing       : libxcrypt-compat-4.4.18-3.el9.x86_64                  5/88 
+2026-11-04T06:09:31.6055864Z   Installing       : libstdc++-devel-11.5.0-14.el9.x86_64                  6/88 
+2026-11-04T06:09:31.6151633Z   Installing       : python3-setuptools-53.0.0-15.el9.noarch               7/88 
+2026-11-04T06:09:31.6194766Z   Installing       : make-1:4.3-8.el9.x86_64                               8/88 
+2026-11-04T06:09:31.6226826Z   Installing       : libtirpc-1.3.3-9.el9.x86_64                           9/88 
+2026-11-04T06:09:31.6555034Z   Installing       : libnsl2-2.0.0-1.el9.0.1.x86_64                       10/88 
+2026-11-04T06:09:31.6615682Z   Installing       : python3-setools-4.4.4-1.el9.x86_64                   11/88 
+2026-11-04T06:09:31.6668666Z   Installing       : python3-distro-1.5.0-7.el9.noarch                    12/88 
+2026-11-04T06:09:31.6711623Z   Installing       : python3.11-pip-wheel-22.3.1-6.el9.noarch             13/88 
+2026-11-04T06:09:31.7617377Z   Installing       : python3-libsemanage-3.6-5.el9_6.x86_64               14/88 
+2026-11-04T06:09:31.7712918Z   Installing       : compiler-rt-21.1.8-2.el9.x86_64                      15/88 
+2026-11-04T06:09:31.8628946Z   Installing       : sqlite-3.34.1-11.el9_8.x86_64                        16/88 
+2026-11-04T06:09:31.8913767Z   Installing       : cpp-11.5.0-14.el9.x86_64                             17/88 
+2026-11-04T06:09:31.9016510Z   Upgrading        : openssl-libs-1:3.5.8-2.el9_8.x86_64                  18/88 
+2026-11-04T06:09:31.9119712Z   Upgrading        : openssl-fips-provider-1:3.5.8-2.el9_8.x86_64         19/88 
+2026-11-04T06:09:31.9144992Z   Upgrading        : systemd-libs-252-67.el9_8.6.rocky.0.1.x86_64         20/88 
+2026-11-04T06:09:31.9419637Z   Running scriptlet: systemd-libs-252-67.el9_8.6.rocky.0.1.x86_64         20/88 
+2026-11-04T06:09:31.9476211Z   Installing       : procps-ng-3.3.17-14.el9.x86_64                       21/88 
+2026-11-04T06:09:31.9540328Z   Installing       : kmod-libs-28-11.el9.x86_64                           22/88 
+2026-11-04T06:09:31.9593141Z   Upgrading        : gzip-1.12-2.el9_8.x86_64                             23/88 
+2026-11-04T06:09:31.9635161Z   Installing       : python3.11-setuptools-wheel-65.5.1-5.el9.noarch      24/88 
+2026-11-04T06:09:31.9671729Z   Installing       : python3-audit-3.1.5-8.el9.x86_64                     25/88 
+2026-11-04T06:09:31.9700517Z   Installing       : mpdecimal-2.5.1-3.el9.x86_64                         26/88 
+2026-11-04T06:09:32.3751611Z   Installing       : python3.11-3.11.13-10.el9_8.x86_64                   27/88 
+2026-11-04T06:09:32.4841688Z   Installing       : python3.11-libs-3.11.13-10.el9_8.x86_64              28/88 
+2026-11-04T06:09:32.4937557Z   Installing       : python3.11-setuptools-65.5.1-5.el9.noarch            29/88 
+2026-11-04T06:09:32.7336715Z   Installing       : llvm-filesystem-21.1.8-2.el9.x86_64                  30/88 
+2026-11-04T06:09:32.8078246Z   Installing       : kernel-headers-5.14.0-687.64.1.el9_8.x86_64          31/88 
+2026-11-04T06:09:32.8191930Z   Installing       : glibc-headers-2.34-266.el9_8.x86_64                  32/88 
+2026-11-04T06:09:32.8251096Z   Installing       : checkpolicy-3.6-1.el9.x86_64                         33/88 
+2026-11-04T06:09:32.8676293Z   Installing       : vim-filesystem-2:8.2.2637-26.el9_8.23.noarch         34/88 
+2026-11-04T06:09:32.8734220Z   Installing       : tcl-1:8.6.10-7.el9.x86_64                            35/88 
+2026-11-04T06:09:32.8757004Z   Installing       : systemd-rpm-macros-252-67.el9_8.6.rocky.0.1.noarch   36/88 
+2026-11-04T06:09:32.8865257Z   Installing       : pkgconf-m4-1.7.3-10.el9.noarch                       37/88 
+2026-11-04T06:09:32.8913649Z   Installing       : libselinux-utils-3.6-3.el9.x86_64                    38/88 
+2026-11-04T06:09:32.8945541Z   Installing       : libseccomp-2.5.2-2.el9.x86_64                        39/88 
+2026-11-04T06:09:32.8982752Z   Installing       : libpkgconf-1.7.3-10.el9.x86_64                       40/88 
+2026-11-04T06:09:32.9011438Z   Installing       : pkgconf-1.7.3-10.el9.x86_64                          41/88 
+2026-11-04T06:09:32.9061822Z   Installing       : pkgconf-pkg-config-1.7.3-10.el9.x86_64               42/88 
+2026-11-04T06:09:32.9092122Z   Installing       : glibc-devel-2.34-266.el9_8.x86_64                    43/88 
+2026-11-04T06:09:33.1434953Z   Installing       : libxcrypt-devel-4.4.18-3.el9.x86_64                  44/88 
+2026-11-04T06:09:33.2482245Z   Installing       : gcc-11.5.0-14.el9.x86_64                             45/88 
+2026-11-04T06:09:33.2527184Z   Installing       : gcc-c++-11.5.0-14.el9.x86_64                         46/88 
+2026-11-04T06:09:33.2563281Z   Installing       : libpipeline-1.5.3-4.el9.x86_64                       47/88 
+2026-11-04T06:09:33.5841275Z   Installing       : libedit-3.1-39.20210216cvs.el9.x86_64                48/88 
+2026-11-04T06:09:33.5973204Z   Installing       : llvm-libs-21.1.8-2.el9.x86_64                        49/88 
+2026-11-04T06:09:33.6076867Z   Installing       : libomp-21.1.8-2.el9.x86_64                           50/88 
+2026-11-04T06:09:33.6106192Z   Installing       : libomp-devel-21.1.8-2.el9.x86_64                     51/88 
+2026-11-04T06:09:33.6136208Z   Installing       : libatomic-11.5.0-14.el9.x86_64                       52/88 
+2026-11-04T06:09:33.6158430Z   Installing       : jansson-2.14-1.el9.0.1.x86_64                        53/88 
+2026-11-04T06:09:33.6614893Z   Running scriptlet: groff-base-1.22.4-10.el9.0.1.x86_64                  54/88 
+2026-11-04T06:09:33.6663931Z   Installing       : groff-base-1.22.4-10.el9.0.1.x86_64                  54/88 
+2026-11-04T06:09:33.6774461Z   Running scriptlet: groff-base-1.22.4-10.el9.0.1.x86_64                  54/88 
+2026-11-04T06:09:33.7070813Z   Running scriptlet: man-db-2.9.3-9.el9.x86_64                            55/88 
+2026-11-04T06:09:33.7122848Z   Installing       : man-db-2.9.3-9.el9.x86_64                            55/88 
+2026-11-04T06:09:33.7357911Z   Running scriptlet: man-db-2.9.3-9.el9.x86_64                            55/88 
+2026-11-04T06:09:33.7396299Z   Installing       : environment-modules-5.3.0-2.el9_8.1.x86_64           56/88 
+2026-11-04T06:09:33.7578773Z   Running scriptlet: environment-modules-5.3.0-2.el9_8.1.x86_64           56/88 
+2026-11-04T06:09:33.7656438Z   Installing       : scl-utils-1:2.0.3-4.el9.x86_64                       57/88 
+2026-11-04T06:09:33.7782064Z   Installing       : diffutils-3.7-12.el9.x86_64                          58/88 
+2026-11-04T06:09:33.7819140Z   Installing       : policycoreutils-3.6-5.el9.x86_64                     59/88 
+2026-11-04T06:09:33.8247841Z   Running scriptlet: policycoreutils-3.6-5.el9.x86_64                     59/88 
+2026-11-04T06:09:33.8318362Z   Installing       : python3-policycoreutils-3.6-5.el9.noarch             60/88 
+2026-11-04T06:09:33.8492390Z   Installing       : policycoreutils-python-utils-3.6-5.el9.noarch        61/88 
+2026-11-04T06:09:33.8540181Z   Installing       : gcc-toolset-15-runtime-15.0-9.el9.x86_64             62/88 
+2026-11-04T06:09:34.0158787Z   Running scriptlet: gcc-toolset-15-runtime-15.0-9.el9.x86_64             62/88 
+2026-11-04T06:09:34.0160096Z ValueError: SELinux policy is not managed or store cannot be accessed.
+2026-11-04T06:09:34.0160883Z 
+2026-11-04T06:09:34.0806720Z   Installing       : gcc-toolset-15-binutils-2.44-5.el9.x86_64            63/88 
+2026-11-04T06:09:34.5150506Z   Running scriptlet: gcc-toolset-15-binutils-2.44-5.el9.x86_64            63/88 
+2026-11-04T06:09:34.5227207Z   Installing       : gcc-toolset-15-gcc-15.2.1-7.1.el9_8.x86_64           64/88 
+2026-11-04T06:09:34.6812363Z   Installing       : gcc-toolset-15-libatomic-devel-15.2.1-7.1.el9_8.x8   65/88 
+2026-11-04T06:09:34.8215817Z   Installing       : gcc-toolset-15-libstdc++-devel-15.2.1-7.1.el9_8.x8   66/88 
+2026-11-04T06:09:35.1707260Z   Installing       : gcc-toolset-15-gcc-c++-15.2.1-7.1.el9_8.x86_64       67/88 
+2026-11-04T06:09:35.1786777Z   Installing       : clang-libs-21.1.8-2.el9.x86_64                       68/88 
+2026-11-04T06:09:35.1822716Z   Installing       : acl-2.3.1-4.el9.x86_64                               69/88 
+2026-11-04T06:09:35.1859660Z   Installing       : dbus-1:1.12.20-8.el9.x86_64                          70/88 
+2026-11-04T06:09:35.1892541Z   Installing       : systemd-pam-252-67.el9_8.6.rocky.0.1.x86_64          71/88 
+2026-11-04T06:09:35.3914637Z   Running scriptlet: systemd-252-67.el9_8.6.rocky.0.1.x86_64              72/88 
+2026-11-04T06:09:35.4003403Z   Installing       : systemd-252-67.el9_8.6.rocky.0.1.x86_64              72/88 
+2026-11-04T06:09:35.5775368Z   Running scriptlet: systemd-252-67.el9_8.6.rocky.0.1.x86_64              72/88 
+2026-11-04T06:09:35.5805138Z   Installing       : dbus-common-1:1.12.20-8.el9.noarch                   73/88 
+2026-11-04T06:09:35.6038744Z   Running scriptlet: dbus-common-1:1.12.20-8.el9.noarch                   73/88 
+2026-11-04T06:09:35.6040551Z Created symlink /etc/systemd/system/sockets.target.wants/dbus.socket → /usr/lib/systemd/system/dbus.socket.
+2026-11-04T06:09:35.6042341Z Created symlink /etc/systemd/user/sockets.target.wants/dbus.socket → /usr/lib/systemd/user/dbus.socket.
+2026-11-04T06:09:35.6043273Z 
+2026-11-04T06:09:35.6115872Z   Installing       : dbus-broker-28-9.el9_8.x86_64                        74/88 
+2026-11-04T06:09:35.6342360Z   Running scriptlet: dbus-broker-28-9.el9_8.x86_64                        74/88 
+2026-11-04T06:09:35.6343724Z Created symlink /etc/systemd/system/dbus.service → /usr/lib/systemd/system/dbus-broker.service.
+2026-11-04T06:09:35.6345081Z Created symlink /etc/systemd/user/dbus.service → /usr/lib/systemd/user/dbus-broker.service.
+2026-11-04T06:09:35.6345961Z 
+2026-11-04T06:09:35.8423928Z   Installing       : clang-21.1.8-2.el9.x86_64                            75/88 
+2026-11-04T06:09:35.8632785Z   Installing       : openssl-devel-1:3.5.8-2.el9_8.x86_64                 76/88 
+2026-11-04T06:09:36.0720594Z   Installing       : sqlite-devel-3.34.1-11.el9_8.x86_64                  77/88 
+2026-11-04T06:09:36.0900358Z   Installing       : python3.11-pip-22.3.1-6.el9.noarch                   78/88 
+2026-11-04T06:09:36.1005280Z   Upgrading        : openssl-1:3.5.8-2.el9_8.x86_64                       79/88 
+2026-11-04T06:09:36.1044849Z   Upgrading        : tar-2:1.34-13.el9_8.x86_64                           80/88 
+2026-11-04T06:09:36.1070201Z   Installing       : telnet-1:0.17-85.el9.x86_64                          81/88 
+2026-11-04T06:09:36.1122389Z   Cleanup          : openssl-1:3.5.5-2.el9_8.x86_64                       82/88 
+2026-11-04T06:09:36.1154216Z   Cleanup          : systemd-libs-252-67.el9.rocky.0.1.x86_64             83/88 
+2026-11-04T06:09:36.1186089Z   Cleanup          : openssl-fips-provider-1:3.5.5-2.el9_8.x86_64         84/88 
+2026-11-04T06:09:36.1303669Z   Cleanup          : openssl-libs-1:3.5.5-2.el9_8.x86_64                  85/88 
+2026-11-04T06:09:36.1364168Z   Cleanup          : tar-2:1.34-11.el9.x86_64                             86/88 
+2026-11-04T06:09:36.1389410Z   Cleanup          : sqlite-libs-3.34.1-9.el9_7.x86_64                    87/88 
+2026-11-04T06:09:36.1481344Z   Cleanup          : gzip-1.12-1.el9.x86_64                               88/88 
+2026-11-04T06:09:38.2993644Z   Running scriptlet: gzip-1.12-1.el9.x86_64                               88/88 
+2026-11-04T06:09:38.2994975Z   Verifying        : acl-2.3.1-4.el9.x86_64                                1/88 
+2026-11-04T06:09:38.2996019Z   Verifying        : dbus-1:1.12.20-8.el9.x86_64                           2/88 
+2026-11-04T06:09:38.2996832Z   Verifying        : dbus-broker-28-9.el9_8.x86_64                         3/88 
+2026-11-04T06:09:38.2997533Z   Verifying        : dbus-common-1:1.12.20-8.el9.noarch                    4/88 
+2026-11-04T06:09:38.2998194Z   Verifying        : diffutils-3.7-12.el9.x86_64                           5/88 
+2026-11-04T06:09:38.2998880Z   Verifying        : environment-modules-5.3.0-2.el9_8.1.x86_64            6/88 
+2026-11-04T06:09:38.2999553Z   Verifying        : groff-base-1.22.4-10.el9.0.1.x86_64                   7/88 
+2026-11-04T06:09:38.3004369Z   Verifying        : jansson-2.14-1.el9.0.1.x86_64                         8/88 
+2026-11-04T06:09:38.3006071Z   Verifying        : kmod-libs-28-11.el9.x86_64                            9/88 
+2026-11-04T06:09:38.3007199Z   Verifying        : libatomic-11.5.0-14.el9.x86_64                       10/88 
+2026-11-04T06:09:38.3008207Z   Verifying        : libedit-3.1-39.20210216cvs.el9.x86_64                11/88 
+2026-11-04T06:09:38.3009264Z   Verifying        : libpipeline-1.5.3-4.el9.x86_64                       12/88 
+2026-11-04T06:09:38.3010294Z   Verifying        : libpkgconf-1.7.3-10.el9.x86_64                       13/88 
+2026-11-04T06:09:38.3011377Z   Verifying        : libseccomp-2.5.2-2.el9.x86_64                        14/88 
+2026-11-04T06:09:38.3012214Z   Verifying        : libselinux-utils-3.6-3.el9.x86_64                    15/88 
+2026-11-04T06:09:38.3012785Z   Verifying        : libtirpc-1.3.3-9.el9.x86_64                          16/88 
+2026-11-04T06:09:38.3013240Z   Verifying        : make-1:4.3-8.el9.x86_64                              17/88 
+2026-11-04T06:09:38.3013699Z   Verifying        : man-db-2.9.3-9.el9.x86_64                            18/88 
+2026-11-04T06:09:38.3014343Z   Verifying        : pkgconf-1.7.3-10.el9.x86_64                          19/88 
+2026-11-04T06:09:38.3014807Z   Verifying        : pkgconf-m4-1.7.3-10.el9.noarch                       20/88 
+2026-11-04T06:09:38.3015381Z   Verifying        : pkgconf-pkg-config-1.7.3-10.el9.x86_64               21/88 
+2026-11-04T06:09:38.3016165Z   Verifying        : policycoreutils-3.6-5.el9.x86_64                     22/88 
+2026-11-04T06:09:38.3017066Z   Verifying        : procps-ng-3.3.17-14.el9.x86_64                       23/88 
+2026-11-04T06:09:38.3018002Z   Verifying        : python3-setools-4.4.4-1.el9.x86_64                   24/88 
+2026-11-04T06:09:38.3018898Z   Verifying        : python3-setuptools-53.0.0-15.el9.noarch              25/88 
+2026-11-04T06:09:38.3019760Z   Verifying        : systemd-252-67.el9_8.6.rocky.0.1.x86_64              26/88 
+2026-11-04T06:09:38.3020989Z   Verifying        : systemd-pam-252-67.el9_8.6.rocky.0.1.x86_64          27/88 
+2026-11-04T06:09:38.3021905Z   Verifying        : systemd-rpm-macros-252-67.el9_8.6.rocky.0.1.noarch   28/88 
+2026-11-04T06:09:38.3022718Z   Verifying        : tcl-1:8.6.10-7.el9.x86_64                            29/88 
+2026-11-04T06:09:38.3023548Z   Verifying        : vim-filesystem-2:8.2.2637-26.el9_8.23.noarch         30/88 
+2026-11-04T06:09:38.3024361Z   Verifying        : checkpolicy-3.6-1.el9.x86_64                         31/88 
+2026-11-04T06:09:38.3025459Z   Verifying        : clang-21.1.8-2.el9.x86_64                            32/88 
+2026-11-04T06:09:38.3026475Z   Verifying        : clang-libs-21.1.8-2.el9.x86_64                       33/88 
+2026-11-04T06:09:38.3027349Z   Verifying        : clang-resource-filesystem-21.1.8-2.el9.x86_64        34/88 
+2026-11-04T06:09:38.3028187Z   Verifying        : compiler-rt-21.1.8-2.el9.x86_64                      35/88 
+2026-11-04T06:09:38.3029101Z   Verifying        : cpp-11.5.0-14.el9.x86_64                             36/88 
+2026-11-04T06:09:38.3029876Z   Verifying        : gcc-11.5.0-14.el9.x86_64                             37/88 
+2026-11-04T06:09:38.3030662Z   Verifying        : gcc-c++-11.5.0-14.el9.x86_64                         38/88 
+2026-11-04T06:09:38.3031464Z   Verifying        : gcc-toolset-15-binutils-2.44-5.el9.x86_64            39/88 
+2026-11-04T06:09:38.3032340Z   Verifying        : gcc-toolset-15-gcc-15.2.1-7.1.el9_8.x86_64           40/88 
+2026-11-04T06:09:38.3033178Z   Verifying        : gcc-toolset-15-gcc-c++-15.2.1-7.1.el9_8.x86_64       41/88 
+2026-11-04T06:09:38.3034049Z   Verifying        : gcc-toolset-15-libatomic-devel-15.2.1-7.1.el9_8.x8   42/88 
+2026-11-04T06:09:38.3034957Z   Verifying        : gcc-toolset-15-libstdc++-devel-15.2.1-7.1.el9_8.x8   43/88 
+2026-11-04T06:09:38.3036052Z   Verifying        : gcc-toolset-15-runtime-15.0-9.el9.x86_64             44/88 
+2026-11-04T06:09:38.3036896Z   Verifying        : glibc-devel-2.34-266.el9_8.x86_64                    45/88 
+2026-11-04T06:09:38.3037718Z   Verifying        : glibc-headers-2.34-266.el9_8.x86_64                  46/88 
+2026-11-04T06:09:38.3038564Z   Verifying        : kernel-headers-5.14.0-687.64.1.el9_8.x86_64          47/88 
+2026-11-04T06:09:38.3039362Z   Verifying        : libmpc-1.2.1-4.el9.x86_64                            48/88 
+2026-11-04T06:09:38.3040090Z   Verifying        : libnsl2-2.0.0-1.el9.0.1.x86_64                       49/88 
+2026-11-04T06:09:38.3040746Z   Verifying        : libomp-21.1.8-2.el9.x86_64                           50/88 
+2026-11-04T06:09:38.3041354Z   Verifying        : libomp-devel-21.1.8-2.el9.x86_64                     51/88 
+2026-11-04T06:09:38.3041962Z   Verifying        : libstdc++-devel-11.5.0-14.el9.x86_64                 52/88 
+2026-11-04T06:09:38.3042581Z   Verifying        : libxcrypt-compat-4.4.18-3.el9.x86_64                 53/88 
+2026-11-04T06:09:38.3043199Z   Verifying        : libxcrypt-devel-4.4.18-3.el9.x86_64                  54/88 
+2026-11-04T06:09:38.3044094Z   Verifying        : llvm-filesystem-21.1.8-2.el9.x86_64                  55/88 
+2026-11-04T06:09:38.3044928Z   Verifying        : llvm-libs-21.1.8-2.el9.x86_64                        56/88 
+2026-11-04T06:09:38.3045958Z   Verifying        : mpdecimal-2.5.1-3.el9.x86_64                         57/88 
+2026-11-04T06:09:38.3046808Z   Verifying        : openssl-devel-1:3.5.8-2.el9_8.x86_64                 58/88 
+2026-11-04T06:09:38.3047700Z   Verifying        : policycoreutils-python-utils-3.6-5.el9.noarch        59/88 
+2026-11-04T06:09:38.3048594Z   Verifying        : python3-audit-3.1.5-8.el9.x86_64                     60/88 
+2026-11-04T06:09:38.3049444Z   Verifying        : python3-distro-1.5.0-7.el9.noarch                    61/88 
+2026-11-04T06:09:38.3050323Z   Verifying        : python3-libselinux-3.6-3.el9.x86_64                  62/88 
+2026-11-04T06:09:38.3051191Z   Verifying        : python3-libsemanage-3.6-5.el9_6.x86_64               63/88 
+2026-11-04T06:09:38.3052319Z   Verifying        : python3-policycoreutils-3.6-5.el9.noarch             64/88 
+2026-11-04T06:09:38.3053200Z   Verifying        : python3.11-3.11.13-10.el9_8.x86_64                   65/88 
+2026-11-04T06:09:38.3054028Z   Verifying        : python3.11-libs-3.11.13-10.el9_8.x86_64              66/88 
+2026-11-04T06:09:38.3054868Z   Verifying        : python3.11-pip-22.3.1-6.el9.noarch                   67/88 
+2026-11-04T06:09:38.3055964Z   Verifying        : python3.11-pip-wheel-22.3.1-6.el9.noarch             68/88 
+2026-11-04T06:09:38.3056925Z   Verifying        : python3.11-setuptools-65.5.1-5.el9.noarch            69/88 
+2026-11-04T06:09:38.3057565Z   Verifying        : python3.11-setuptools-wheel-65.5.1-5.el9.noarch      70/88 
+2026-11-04T06:09:38.3058061Z   Verifying        : scl-utils-1:2.0.3-4.el9.x86_64                       71/88 
+2026-11-04T06:09:38.3058495Z   Verifying        : sqlite-3.34.1-11.el9_8.x86_64                        72/88 
+2026-11-04T06:09:38.3058930Z   Verifying        : sqlite-devel-3.34.1-11.el9_8.x86_64                  73/88 
+2026-11-04T06:09:38.3059367Z   Verifying        : telnet-1:0.17-85.el9.x86_64                          74/88 
+2026-11-04T06:09:38.3059787Z   Verifying        : gzip-1.12-2.el9_8.x86_64                             75/88 
+2026-11-04T06:09:38.3060213Z   Verifying        : gzip-1.12-1.el9.x86_64                               76/88 
+2026-11-04T06:09:38.3060646Z   Verifying        : openssl-1:3.5.8-2.el9_8.x86_64                       77/88 
+2026-11-04T06:09:38.3061075Z   Verifying        : openssl-1:3.5.5-2.el9_8.x86_64                       78/88 
+2026-11-04T06:09:38.3061512Z   Verifying        : openssl-fips-provider-1:3.5.8-2.el9_8.x86_64         79/88 
+2026-11-04T06:09:38.3061963Z   Verifying        : openssl-fips-provider-1:3.5.5-2.el9_8.x86_64         80/88 
+2026-11-04T06:09:38.3062408Z   Verifying        : openssl-libs-1:3.5.8-2.el9_8.x86_64                  81/88 
+2026-11-04T06:09:38.3062839Z   Verifying        : openssl-libs-1:3.5.5-2.el9_8.x86_64                  82/88 
+2026-11-04T06:09:38.3063460Z   Verifying        : sqlite-libs-3.34.1-11.el9_8.x86_64                   83/88 
+2026-11-04T06:09:38.3063926Z   Verifying        : sqlite-libs-3.34.1-9.el9_7.x86_64                    84/88 
+2026-11-04T06:09:38.3064382Z   Verifying        : systemd-libs-252-67.el9_8.6.rocky.0.1.x86_64         85/88 
+2026-11-04T06:09:38.3064975Z   Verifying        : systemd-libs-252-67.el9.rocky.0.1.x86_64             86/88 
+2026-11-04T06:09:38.3065416Z   Verifying        : tar-2:1.34-13.el9_8.x86_64                           87/88 
+2026-11-04T06:09:38.3395466Z   Verifying        : tar-2:1.34-11.el9.x86_64                             88/88 
+2026-11-04T06:09:38.3396455Z 
+2026-11-04T06:09:38.3396638Z Upgraded:
+2026-11-04T06:09:38.3397278Z   gzip-1.12-2.el9_8.x86_64                                                      
+2026-11-04T06:09:38.3397996Z   openssl-1:3.5.8-2.el9_8.x86_64                                                
+2026-11-04T06:09:38.3398667Z   openssl-fips-provider-1:3.5.8-2.el9_8.x86_64                                  
+2026-11-04T06:09:38.3399360Z   openssl-libs-1:3.5.8-2.el9_8.x86_64                                           
+2026-11-04T06:09:38.3400001Z   sqlite-libs-3.34.1-11.el9_8.x86_64                                            
+2026-11-04T06:09:38.3400664Z   systemd-libs-252-67.el9_8.6.rocky.0.1.x86_64                                  
+2026-11-04T06:09:38.3401301Z   tar-2:1.34-13.el9_8.x86_64                                                    
+2026-11-04T06:09:38.3401778Z Installed:
+2026-11-04T06:09:38.3402145Z   acl-2.3.1-4.el9.x86_64                                                        
+2026-11-04T06:09:38.3402748Z   checkpolicy-3.6-1.el9.x86_64                                                  
+2026-11-04T06:09:38.3403364Z   clang-21.1.8-2.el9.x86_64                                                     
+2026-11-04T06:09:38.3404098Z   clang-libs-21.1.8-2.el9.x86_64                                                
+2026-11-04T06:09:38.3404889Z   clang-resource-filesystem-21.1.8-2.el9.x86_64                                 
+2026-11-04T06:09:38.3406072Z   compiler-rt-21.1.8-2.el9.x86_64                                               
+2026-11-04T06:09:38.3406543Z   cpp-11.5.0-14.el9.x86_64                                                      
+2026-11-04T06:09:38.3407077Z   dbus-1:1.12.20-8.el9.x86_64                                                   
+2026-11-04T06:09:38.3407534Z   dbus-broker-28-9.el9_8.x86_64                                                 
+2026-11-04T06:09:38.3408131Z   dbus-common-1:1.12.20-8.el9.noarch                                            
+2026-11-04T06:09:38.3408574Z   diffutils-3.7-12.el9.x86_64                                                   
+2026-11-04T06:09:38.3409036Z   environment-modules-5.3.0-2.el9_8.1.x86_64                                    
+2026-11-04T06:09:38.3409614Z   gcc-11.5.0-14.el9.x86_64                                                      
+2026-11-04T06:09:38.3410020Z   gcc-c++-11.5.0-14.el9.x86_64                                                  
+2026-11-04T06:09:38.3410482Z   gcc-toolset-15-binutils-2.44-5.el9.x86_64                                     
+2026-11-04T06:09:38.3410963Z   gcc-toolset-15-gcc-15.2.1-7.1.el9_8.x86_64                                    
+2026-11-04T06:09:38.3411443Z   gcc-toolset-15-gcc-c++-15.2.1-7.1.el9_8.x86_64                                
+2026-11-04T06:09:38.3412052Z   gcc-toolset-15-libatomic-devel-15.2.1-7.1.el9_8.x86_64                        
+2026-11-04T06:09:38.3412598Z   gcc-toolset-15-libstdc++-devel-15.2.1-7.1.el9_8.x86_64                        
+2026-11-04T06:09:38.3413122Z   gcc-toolset-15-runtime-15.0-9.el9.x86_64                                      
+2026-11-04T06:09:38.3413599Z   glibc-devel-2.34-266.el9_8.x86_64                                             
+2026-11-04T06:09:38.3414062Z   glibc-headers-2.34-266.el9_8.x86_64                                           
+2026-11-04T06:09:38.3414513Z   groff-base-1.22.4-10.el9.0.1.x86_64                                           
+2026-11-04T06:09:38.3414955Z   jansson-2.14-1.el9.0.1.x86_64                                                 
+2026-11-04T06:09:38.3415412Z   kernel-headers-5.14.0-687.64.1.el9_8.x86_64                                   
+2026-11-04T06:09:38.3416148Z   kmod-libs-28-11.el9.x86_64                                                    
+2026-11-04T06:09:38.3416571Z   libatomic-11.5.0-14.el9.x86_64                                                
+2026-11-04T06:09:38.3417102Z   libedit-3.1-39.20210216cvs.el9.x86_64                                         
+2026-11-04T06:09:38.3417580Z   libmpc-1.2.1-4.el9.x86_64                                                     
+2026-11-04T06:09:38.3417995Z   libnsl2-2.0.0-1.el9.0.1.x86_64                                                
+2026-11-04T06:09:38.3418418Z   libomp-21.1.8-2.el9.x86_64                                                    
+2026-11-04T06:09:38.3418882Z   libomp-devel-21.1.8-2.el9.x86_64                                              
+2026-11-04T06:09:38.3419332Z   libpipeline-1.5.3-4.el9.x86_64                                                
+2026-11-04T06:09:38.3419773Z   libpkgconf-1.7.3-10.el9.x86_64                                                
+2026-11-04T06:09:38.3420198Z   libseccomp-2.5.2-2.el9.x86_64                                                 
+2026-11-04T06:09:38.3420673Z   libselinux-utils-3.6-3.el9.x86_64                                             
+2026-11-04T06:09:38.3421124Z   libstdc++-devel-11.5.0-14.el9.x86_64                                          
+2026-11-04T06:09:38.3421579Z   libtirpc-1.3.3-9.el9.x86_64                                                   
+2026-11-04T06:09:38.3422030Z   libxcrypt-compat-4.4.18-3.el9.x86_64                                          
+2026-11-04T06:09:38.3422488Z   libxcrypt-devel-4.4.18-3.el9.x86_64                                           
+2026-11-04T06:09:38.3422947Z   llvm-filesystem-21.1.8-2.el9.x86_64                                           
+2026-11-04T06:09:38.3423383Z   llvm-libs-21.1.8-2.el9.x86_64                                                 
+2026-11-04T06:09:38.3423938Z   make-1:4.3-8.el9.x86_64                                                       
+2026-11-04T06:09:38.3424347Z   man-db-2.9.3-9.el9.x86_64                                                     
+2026-11-04T06:09:38.3424758Z   mpdecimal-2.5.1-3.el9.x86_64                                                  
+2026-11-04T06:09:38.3425189Z   openssl-devel-1:3.5.8-2.el9_8.x86_64                                          
+2026-11-04T06:09:38.3425787Z   pkgconf-1.7.3-10.el9.x86_64                                                   
+2026-11-04T06:09:38.3426366Z   pkgconf-m4-1.7.3-10.el9.noarch                                                
+2026-11-04T06:09:38.3426825Z   pkgconf-pkg-config-1.7.3-10.el9.x86_64                                        
+2026-11-04T06:09:38.3427300Z   policycoreutils-3.6-5.el9.x86_64                                              
+2026-11-04T06:09:38.3427794Z   policycoreutils-python-utils-3.6-5.el9.noarch                                 
+2026-11-04T06:09:38.3428274Z   procps-ng-3.3.17-14.el9.x86_64                                                
+2026-11-04T06:09:38.3428718Z   python3-audit-3.1.5-8.el9.x86_64                                              
+2026-11-04T06:09:38.3429171Z   python3-distro-1.5.0-7.el9.noarch                                             
+2026-11-04T06:09:38.3429635Z   python3-libselinux-3.6-3.el9.x86_64                                           
+2026-11-04T06:09:38.3430112Z   python3-libsemanage-3.6-5.el9_6.x86_64                                        
+2026-11-04T06:09:38.3430604Z   python3-policycoreutils-3.6-5.el9.noarch                                      
+2026-11-04T06:09:38.3431080Z   python3-setools-4.4.4-1.el9.x86_64                                            
+2026-11-04T06:09:38.3431547Z   python3-setuptools-53.0.0-15.el9.noarch                                       
+2026-11-04T06:09:38.3431999Z   python3.11-3.11.13-10.el9_8.x86_64                                            
+2026-11-04T06:09:38.3432433Z   python3.11-libs-3.11.13-10.el9_8.x86_64                                       
+2026-11-04T06:09:38.3432882Z   python3.11-pip-22.3.1-6.el9.noarch                                            
+2026-11-04T06:09:38.3433344Z   python3.11-pip-wheel-22.3.1-6.el9.noarch                                      
+2026-11-04T06:09:38.3433831Z   python3.11-setuptools-65.5.1-5.el9.noarch                                     
+2026-11-04T06:09:38.3434496Z   python3.11-setuptools-wheel-65.5.1-5.el9.noarch                               
+2026-11-04T06:09:38.3435084Z   scl-utils-1:2.0.3-4.el9.x86_64                                                
+2026-11-04T06:09:38.3435689Z   sqlite-3.34.1-11.el9_8.x86_64                                                 
+2026-11-04T06:09:38.3436252Z   sqlite-devel-3.34.1-11.el9_8.x86_64                                           
+2026-11-04T06:09:38.3436783Z   systemd-252-67.el9_8.6.rocky.0.1.x86_64                                       
+2026-11-04T06:09:38.3437286Z   systemd-pam-252-67.el9_8.6.rocky.0.1.x86_64                                   
+2026-11-04T06:09:38.3437768Z   systemd-rpm-macros-252-67.el9_8.6.rocky.0.1.noarch                            
+2026-11-04T06:09:38.3438218Z   tcl-1:8.6.10-7.el9.x86_64                                                     
+2026-11-04T06:09:38.3438615Z   telnet-1:0.17-85.el9.x86_64                                                   
+2026-11-04T06:09:38.3439173Z   vim-filesystem-2:8.2.2637-26.el9_8.23.noarch                                  
+2026-11-04T06:09:38.3439470Z 
+2026-11-04T06:09:38.3439593Z Complete!
+2026-11-04T06:09:38.5442531Z clang   -O2 -g  -std=c11 -Wall -Wextra -Werror -pthread src/doors.c src/zmodem_host.c src/runtime.c src/download.c src/userlog.c src/activity.c src/board.c src/members.c src/profile_store.c src/board_policy.c src/catalog.c src/ui.c src/menu.c src/messages.c src/session.c src/terminal.c src/telnet.c src/moderation.c src/extras.c src/vault.c src/vault_bridge.c src/identity_legacy.c src/vault_transfer.c src/transfer_line.c src/vault_worker.c src/chat.c src/mail_files.c src/mailbox.c -lutil -lcrypto -lsqlite3  src/storage_sqlite.c  -pthread -lcrypto -lsqlite3 -o runtime
+2026-11-04T06:09:38.5465833Z clang   -O2 -g  -std=c11 -Wall -Wextra -Werror src/vaultctl.c src/vault.c -lcrypto -lsqlite3  src/storage_sqlite.c  -pthread -lcrypto -lsqlite3 -o vaultctl
+2026-11-04T06:09:39.6470051Z clang   -O2 -g  -std=c11 -Wall -Wextra -Werror src/memberctl.c src/members.c -lcrypto -lsqlite3  src/storage_sqlite.c  -pthread -lcrypto -lsqlite3 -o memberctl
+2026-11-04T06:09:40.4713108Z clang   -O2 -g  -std=c11 -Wall -Wextra -Werror src/dbconvert.c src/storage_sqlite.c -pthread -lcrypto -lsqlite3 -o dbconvert
+2026-11-04T06:09:45.8808229Z Installed programs and samples. Existing settings preserved; accounts, data and services unchanged.
+2026-11-04T06:09:45.8809909Z Installed programs and samples. Existing settings preserved; accounts, data and services unchanged.
+2026-11-04T06:09:45.8811699Z PASS Linux staged install, repeat updates preserve config/help/banner/unit, no data mutation, wrapper syntax, symlink rejection
+2026-11-04T06:09:46.1037348Z Installed programs and samples. Existing settings preserved; accounts, data and services unchanged.
+2026-11-04T06:09:46.1952133Z usage: maintenance.py [-h]
+2026-11-04T06:09:46.1953249Z                       {backup,verify,restore,compact,db-backup,db-export,db-migrate,db-structure,db-restore,db-compact}
+2026-11-04T06:09:46.1954291Z                       ...
+2026-11-04T06:09:46.1954550Z 
+2026-11-04T06:09:46.1954949Z Offline Liner notes backup, verification, restore and copy-only compaction.
+2026-11-04T06:09:46.1956184Z Python 3.11+, standard library only. Stop the daemon AND transfer workers
+2026-11-04T06:09:46.1957010Z first. The root must contain the complete instance, including custom
+2026-11-04T06:09:46.1957882Z configuration, logs, public vault, private attachments and transfer spool. No
+2026-11-04T06:09:46.1958589Z symlinks.
+2026-11-04T06:09:46.1958777Z 
+2026-11-04T06:09:46.1958931Z positional arguments:
+2026-11-04T06:09:46.1959803Z   {backup,verify,restore,compact,db-backup,db-export,db-migrate,db-structure,db-restore,db-compact}
+2026-11-04T06:09:46.1960870Z     backup              Back up an entire stopped instance; output must be
+2026-11-04T06:09:46.1961456Z                         outside root
+2026-11-04T06:09:46.1961909Z     verify              Check archive inventory and every file SHA256
+2026-11-04T06:09:46.1962538Z     restore             Create a new directory; preserve the backup and
+2026-11-04T06:09:46.1963150Z                         original data
+2026-11-04T06:09:46.1963743Z     compact             Create a new directory; preserve the backup and
+2026-11-04T06:09:46.1964320Z                         original data
+2026-11-04T06:09:46.1964946Z     db-backup           Logical backup of a stopped SQLite instance and file
+2026-11-04T06:09:46.1965802Z                         payloads
+2026-11-04T06:09:46.1966404Z     db-export           Export SQLite records to a new portable legacy copy
+2026-11-04T06:09:46.1967203Z     db-migrate          Copy a legacy instance and migrate its records to
+2026-11-04T06:09:46.1967836Z                         SQLite
+2026-11-04T06:09:46.1968391Z     db-structure        Convert a stopped SQLite instance into a NEW
+2026-11-04T06:09:46.1969062Z                         structured copy, verifying every stream
+2026-11-04T06:09:46.1969731Z     db-restore          Restore a new SQLite instance from a logical backup
+2026-11-04T06:09:46.1970532Z     db-compact          Restore a new SQLite instance from a logical backup
+2026-11-04T06:09:46.1971007Z 
+2026-11-04T06:09:46.1971145Z options:
+2026-11-04T06:09:46.1971704Z   -h, --help            show this help message and exit
+2026-11-04T06:09:46.2426465Z usage: check-resume.py [-h] [--receipt RECEIPT] receiver sender
+2026-11-04T06:09:46.2427006Z 
+2026-11-04T06:09:46.2427366Z Prove actual ZCRC resume on a partial file, optionally write a private
+2026-11-04T06:09:46.2428026Z receipt.
+2026-11-04T06:09:46.2428207Z 
+2026-11-04T06:09:46.2428371Z positional arguments:
+2026-11-04T06:09:46.2428748Z   receiver
+2026-11-04T06:09:46.2429419Z   sender
+2026-11-04T06:09:46.2429617Z 
+2026-11-04T06:09:46.2429749Z options:
+2026-11-04T06:09:46.2430145Z   -h, --help         show this help message and exit
+2026-11-04T06:09:46.2430677Z   --receipt RECEIPT
+2026-11-04T06:09:46.3966116Z PASS installed Linux service arguments, unprivileged startup, Telnet menu/PING, SQLite creation and graceful SIGTERM
+2026-11-04T06:09:50.5881241Z Collecting aiohttp==3.14.5
+2026-11-04T06:09:50.8289352Z   Downloading aiohttp-3.14.5-cp311-cp311-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl (1.9 MB)
+2026-11-04T06:09:51.2333432Z      ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 1.9/1.9 MB 4.9 MB/s eta 0:00:00
+2026-11-04T06:09:51.6426701Z Collecting cryptography<51,>=43
+2026-11-04T06:09:51.7199236Z   Downloading cryptography-50.0.2-cp311-abi3-manylinux_2_34_x86_64.whl (4.8 MB)
+2026-11-04T06:09:51.8381372Z      ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 4.8/4.8 MB 41.0 MB/s eta 0:00:00
+2026-11-04T06:09:51.8836391Z Collecting aiohappyeyeballs>=2.5.0
+2026-11-04T06:09:51.9602654Z   Downloading aiohappyeyeballs-2.7.1-py3-none-any.whl (15 kB)
+2026-11-04T06:09:51.9779524Z Collecting aiosignal>=1.4.0
+2026-11-04T06:09:52.0551751Z   Downloading aiosignal-1.4.0-py3-none-any.whl (7.5 kB)
+2026-11-04T06:09:52.0816078Z Collecting attrs>=17.3.0
+2026-11-04T06:09:52.1583030Z   Downloading attrs-26.1.0-py3-none-any.whl (67 kB)
+2026-11-04T06:09:52.1621309Z      ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 67.5/67.5 kB 32.5 MB/s eta 0:00:00
+2026-11-04T06:09:52.2925448Z Collecting frozenlist>=1.1.1
+2026-11-04T06:09:52.3696861Z   Downloading frozenlist-1.8.0-cp311-cp311-manylinux1_x86_64.manylinux_2_28_x86_64.manylinux_2_5_x86_64.whl (231 kB)
+2026-11-04T06:09:52.3745183Z      ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 231.1/231.1 kB 83.3 MB/s eta 0:00:00
+2026-11-04T06:09:52.9935170Z Collecting multidict<8.0,>=4.5
+2026-11-04T06:09:53.0705095Z   Downloading multidict-7.2.1-cp311-cp311-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl (510 kB)
+2026-11-04T06:09:53.0785989Z      ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 510.1/510.1 kB 84.0 MB/s eta 0:00:00
+2026-11-04T06:09:53.2245436Z Collecting propcache>=0.2.0
+2026-11-04T06:09:53.3019170Z   Downloading propcache-0.5.4-cp311-cp311-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl (235 kB)
+2026-11-04T06:09:53.3065445Z      ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 235.4/235.4 kB 83.7 MB/s eta 0:00:00
+2026-11-04T06:09:53.3361730Z Collecting typing_extensions>=4.4
+2026-11-04T06:09:53.4129873Z   Downloading typing_extensions-4.16.0-py3-none-any.whl (45 kB)
+2026-11-04T06:09:53.4167205Z      ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 45.6/45.6 kB 20.0 MB/s eta 0:00:00
+2026-11-04T06:09:53.9705771Z Collecting yarl<2.0,>=1.25.1
+2026-11-04T06:09:54.0475460Z   Downloading yarl-1.25.1-cp311-cp311-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl (117 kB)
+2026-11-04T06:09:54.0519468Z      ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 117.7/117.7 kB 50.7 MB/s eta 0:00:00
+2026-11-04T06:09:54.3346561Z Collecting cffi>=2.0.0
+2026-11-04T06:09:54.4115491Z   Downloading cffi-2.1.1-cp311-cp311-manylinux2014_x86_64.manylinux_2_17_x86_64.whl (217 kB)
+2026-11-04T06:09:54.4162810Z      ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 217.8/217.8 kB 82.4 MB/s eta 0:00:00
+2026-11-04T06:09:54.4478585Z Collecting pycparser
+2026-11-04T06:09:54.5259399Z   Downloading pycparser-3.12-py3-none-any.whl (62 kB)
+2026-11-04T06:09:54.5304027Z      ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 62.6/62.6 kB 21.0 MB/s eta 0:00:00
+2026-11-04T06:09:54.5617763Z Collecting idna>=2.0
+2026-11-04T06:09:54.6387960Z   Downloading idna-3.20-py3-none-any.whl (69 kB)
+2026-11-04T06:09:54.6428669Z      ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 69.6/69.6 kB 30.4 MB/s eta 0:00:00
+2026-11-04T06:09:54.7177346Z Installing collected packages: typing_extensions, pycparser, propcache, multidict, idna, frozenlist, attrs, aiohappyeyeballs, yarl, cffi, aiosignal, cryptography, aiohttp
+2026-11-04T06:09:55.3455212Z Successfully installed aiohappyeyeballs-2.7.1 aiohttp-3.14.5 aiosignal-1.4.0 attrs-26.1.0 cffi-2.1.1 cryptography-50.0.2 frozenlist-1.8.0 idna-3.20 multidict-7.2.1 propcache-0.5.4 pycparser-3.12 typing_extensions-4.16.0 yarl-1.25.1
+2026-11-04T06:09:55.4554387Z 
+2026-11-04T06:09:55.4554949Z [notice] A new release of pip available: 22.3.1 -> 26.3
+2026-11-04T06:09:55.4555872Z [notice] To update, run: python3.11 -m pip install --upgrade pip
+2026-11-04T06:09:55.7594323Z /home/bbstest/source/.web-venv/bin/python tests/test_stage73_database.py ./runtime
+2026-11-04T06:09:57.1398171Z PASS stage73 database: copy-only conversion, row storage, auth/read/mail/restart, structured restore, source hashes and live lock
+2026-11-04T06:09:57.1472198Z /home/bbstest/source/.web-venv/bin/python tests/test_serial_connector.py ./runtime
+2026-11-04T06:09:57.5381504Z PASS serial PTY: binary round trip, fragmented Telnet/hidden password, modem RING/ATA/CONNECT, EOF drain, termios restore, real BBS registration and logout
+2026-11-04T06:09:57.5509066Z /home/bbstest/source/.web-venv/bin/python tests/test_web_reports.py
+2026-11-04T06:09:57.6294662Z ..
+2026-11-04T06:09:57.6295723Z ----------------------------------------------------------------------
+2026-11-04T06:09:57.6296548Z Ran 2 tests in 0.002s
+2026-11-04T06:09:57.6296915Z 
+2026-11-04T06:09:57.6297155Z OK
+2026-11-04T06:09:57.6402978Z /home/bbstest/source/.web-venv/bin/python tests/test_link_store.py
+2026-11-04T06:09:57.9178573Z ..
+2026-11-04T06:09:57.9179243Z ----------------------------------------------------------------------
+2026-11-04T06:09:57.9179867Z Ran 2 tests in 0.188s
+2026-11-04T06:09:57.9180067Z 
+2026-11-04T06:09:57.9180178Z OK
+2026-11-04T06:09:57.9324189Z /home/bbstest/source/.web-venv/bin/python tests/test_link_tls.py
+2026-11-04T06:09:58.0947067Z ..
+2026-11-04T06:09:58.0947507Z ----------------------------------------------------------------------
+2026-11-04T06:09:58.0948041Z Ran 2 tests in 0.062s
+2026-11-04T06:09:58.0948234Z 
+2026-11-04T06:09:58.0948342Z OK
+2026-11-04T06:09:58.1111060Z /home/bbstest/source/.web-venv/bin/python tests/test_link_bbs.py ./runtime
+2026-11-04T06:10:01.5440413Z PASS three real BBS links: ring/star, origin author, reply mapping, retitle, withdraw, 256KiB payload, replay, restart, interrupted intent recovery, unauthorized-account refusal
+2026-11-04T06:10:01.5597875Z /home/bbstest/source/.web-venv/bin/python tests/test_link_service.py ./runtime
+2026-11-04T06:10:08.7213265Z PASS separate link daemons: real BBS/mTLS, withdrawn historical parent, outage, restart, cursor reset/replay, maintenance lock
+2026-11-04T06:10:16.5239020Z lrz (GNU lrzsz) 0.13.1
+2026-11-04T06:10:16.5245843Z lsz (lrzsz) 0.13.1
+2026-11-04T06:10:16.5257328Z Installed to /home/bbstest/lrzsz-check/local; upstream license/source retained in /home/bbstest/lrzsz-check/lrzsz-0.13.1
+2026-11-04T06:10:16.5382532Z clang   -O2 -g  -std=c11 -Wall -Wextra -Werror -Isrc tests/test_zhost.c src/zmodem_host.c src/storage_sqlite.c  -pthread -lcrypto -lsqlite3 -o test-zhost
+2026-11-04T06:10:17.0085732Z ./test-zhost
+2026-11-04T06:10:17.1406651Z PASS: 16GiB receipt preserved across helper control channel
+2026-11-04T06:10:17.1407992Z PASS: host watchdog permits continuing activity beyond ten minutes and terminates an idle helper
+2026-11-04T06:10:17.1409483Z PASS: 24 concurrent ZMODEM children, twenty-fifth refused, all reaped and slots reusable
+2026-11-04T06:10:17.1410471Z python3.11 tests/test_system_control.py ./runtime ./vaultctl
+2026-11-04T06:10:19.7234153Z PASS: admin disconnect of ZMODEM and guest connections; announcements never enter transfer wire; scheduled stop reaps active child
+2026-11-04T06:10:19.7306859Z python3.11 tests/test_zmodem.py ./runtime ./vaultctl /home/bbstest/lrzsz-check/local/bin/lrz /home/bbstest/lrzsz-check/local/bin/lsz
+2026-11-04T06:11:12.8726091Z PASS: real lrzsz 0.13.1 send/receive, all-byte/empty roundtrip, SHA-256 publication, skipped files, batch/cancel/timeout rejection, PTY restoration and live member revocation
+2026-11-04T06:11:12.8835292Z python3.11 tests/test_zmodem_menu.py ./runtime ./vaultctl /home/bbstest/lrzsz-check/local/bin/lrz /home/bbstest/lrzsz-check/local/bin/lsz
+2026-11-04T06:11:42.2337477Z PASS: menu ZMODEM upload/download all bytes and empty files, original names, SHA-256, listing/search, JP/EN, skip/cancel, guest denial, revocation and spool cleanup
+2026-11-04T06:11:42.2413956Z python3.11 tests/test_zmodem_mail.py ./runtime ./vaultctl /home/bbstest/lrzsz-check/local/bin/lrz /home/bbstest/lrzsz-check/local/bin/lsz
+2026-11-04T06:11:45.6519196Z PASS: real ZMODEM mail attachment upload/download, receipt, SHA256, public-vault independence, SYSOP denial and revocation
+2026-11-04T06:11:45.6595817Z python3.11 tests/test_zmodem_batch_resume.py ./runtime ./vaultctl /home/bbstest/lrzsz-check/local/bin/lrz /home/bbstest/lrzsz-check/local/bin/lsz
+2026-11-04T06:12:15.8951763Z PASS: real Telnet batch upload/board ACL/description; TCP cut retained 1081344 bytes; resumed upload wire 1279866 < full payload 2097152; SHA-256 matches; batch/download/private-mail resume, path rejection and changed-prefix restart
+2026-11-04T06:12:15.9056514Z python3.11 tests/test_zupload_retry.py ./runtime ./vaultctl /home/bbstest/lrzsz-check/local/bin/lrz /home/bbstest/lrzsz-check/local/bin/lsz
+2026-11-04T06:12:23.3991955Z PASS: real timeout retains partial; next two ZUPLOADs on same Telnet connection start lrz and publish exact payload; original partial preserved
+2026-11-04T06:12:23.4067134Z python3.11 tests/test_zmodem_resume_defaults.py ./runtime ./vaultctl /home/bbstest/lrzsz-check/local/bin/lrz /home/bbstest/lrzsz-check/local/bin/lsz
+2026-11-04T06:12:52.6042305Z PASS: bare ZRESUME reuses current board and saved description; missing receipt/mismatch/no partial diagnosed; 2097152 bytes SHA256 91d3beb88a9b2f778a6c44a1c53b63d3c79931845a9aef84b3fb414610bd1938 resumed in 23.2s with 3s idle timeout; original name preserved
+2026-11-04T06:12:52.6143315Z clang   -O2 -g  -std=c11 -Wall -Wextra -Werror -Isrc tests/test_userlog.c src/userlog.c -lcrypto -lsqlite3  src/storage_sqlite.c  -pthread -lcrypto -lsqlite3 -o test-userlog
+2026-11-04T06:12:53.1792713Z clang   -O2 -g  -std=c11 -Wall -Wextra -Werror -Isrc tests/test_chat.c src/chat.c src/storage_sqlite.c  -pthread -lcrypto -lsqlite3 -o test-chat
+2026-11-04T06:12:53.7316864Z clang   -O2 -g  -std=c11 -Wall -Wextra -Werror -pthread -Isrc tests/test_adapters.c src/session.c src/terminal.c src/telnet.c src/ui.c src/menu.c src/messages.c src/download.c src/userlog.c src/activity.c src/board.c src/members.c src/profile_store.c src/board_policy.c src/catalog.c src/moderation.c src/extras.c src/vault.c src/vault_bridge.c src/identity_legacy.c src/vault_transfer.c src/transfer_line.c src/vault_worker.c src/chat.c src/mail_files.c src/mailbox.c -lutil -lcrypto -lsqlite3  src/storage_sqlite.c  -pthread -lcrypto -lsqlite3 -o test-adapters
+2026-11-04T06:13:00.1590884Z clang   -O2 -g  -std=c11 -Wall -Wextra -Werror -Isrc tests/test_vault_core.c src/vault.c -lcrypto -lsqlite3  src/storage_sqlite.c  -pthread -lcrypto -lsqlite3 -o test-vault-core
+2026-11-04T06:13:01.1647710Z clang   -O2 -g  -std=c11 -Wall -Wextra -Werror -Isrc tests/test_upload_core.c src/vault.c -lcrypto -lsqlite3  src/storage_sqlite.c  -pthread -lcrypto -lsqlite3 -o test-upload-core
+2026-11-04T06:13:02.1857921Z clang   -O2 -g  -std=c11 -Wall -Wextra -Werror -Isrc tests/test_transfer_connector.c src/transfer_line.c -lcrypto -lsqlite3  src/storage_sqlite.c  -pthread -lcrypto -lsqlite3 -o test-transfer-connector
+2026-11-04T06:13:02.6415394Z python3.11 tests/test_userlog.py ./test-userlog
+2026-11-04T06:13:02.6985097Z PASS: monotonic duration, checkpointed crash recovery, concurrent sessions and logout exclusion
+2026-11-04T06:13:02.7073288Z ./test-chat
+2026-11-04T06:13:02.7092611Z PASS: independent chat room, UTF-8/control validation, rate bound, 20-event history, participants and empty-room cleanup
+2026-11-04T06:13:02.7094035Z PASS: private routing has only two recipients, no shared history, shared rate limit and no stale target fallback
+2026-11-04T06:13:02.7095154Z PASS: account snapshots update all peers and reject stale settings revisions
+2026-11-04T06:13:02.7096632Z PASS: 64 registered chat peers; overflow refused and peers cleaned up
+2026-11-04T06:13:02.7106856Z ./test-adapters
+2026-11-04T06:13:02.7152964Z PASS: Telnet negotiation, duplicate suppression, NAWS escaping, NVT/binary output
+2026-11-04T06:13:02.7154087Z PASS: plain terminal adapter, UTF-8 erase, secret input, cleansing and raw maximum-length CRLF boundary
+2026-11-04T06:13:02.7155372Z PASS: transport-free session supports menus, language, timer, stale completion rejection and output failure
+2026-11-04T06:13:02.7157197Z PASS: transport-free revocation clears drafts/timers and rejects delayed authentication completion
+2026-11-04T06:13:02.7158389Z PASS: password change is transport-independent; revocation clears secrets and success advances session epoch
+2026-11-04T06:13:02.7159728Z PASS: adapter-supplied dimensions control paging and revocation clears retained article text
+2026-11-04T06:13:02.7160515Z PASS: all raw terminal bytes preserved; binary idle and partial-frame deadlines enforced
+2026-11-04T06:13:02.7161561Z PASS: deferred mail arrival preserves binary/password/editor/page/worker/chat states, aggregates once, isolates recipient/raw mode and clears on revocation
+2026-11-04T06:13:02.7162415Z ./test-transfer-connector
+2026-11-04T06:13:02.7175250Z PASS: line connector uses replaceable backend, preserves byte payload/principal and rejects malformed frames before dispatch
+2026-11-04T06:13:02.7177221Z python3.11 tests/test_vault_core.py ./test-vault-core
+2026-11-04T06:13:02.7527652Z PASS: standalone vault uses namespaced principals and capabilities without BBS/account/UI linkage
+2026-11-04T06:13:02.7587613Z python3.11 tests/test_vault.py ./runtime ./vaultctl
+2026-11-04T06:13:04.9236939Z PASS: standalone import/export, binary SHA-256 download, empty files, live publication, member/admin permissions, hide/restart, bilingual menus and Telnet
+2026-11-04T06:13:04.9238116Z PASS: suspension, lock contention, no path traversal, exclusive outputs, corrupt data refusal and BBS isolation
+2026-11-04T06:13:04.9312958Z python3.11 tests/test_vault_catalog.py ./runtime ./vaultctl
+2026-11-04T06:13:06.2429084Z PASS: independent category/search/audit, permissions, legacy unknown actor, no-op records, live changes, durable actors, bilingual Telnet, pagination and BBS store isolation
+2026-11-04T06:13:06.2431134Z PASS: truncated/rechecksummed journal refusal and event-limit writes fail without losing readable files
+2026-11-04T06:13:06.2501944Z python3.11 tests/test_vault_manage.py ./runtime ./vaultctl
+2026-11-04T06:13:07.1962774Z PASS: admin metadata editing, empty/maximum text, no-op persistence, hidden-file editing, integrity-checked restore, audit, UTC date boundaries, pagination, JP/EN Telnet and corrupted journal rejection
+2026-11-04T06:13:07.2035480Z python3.11 tests/test_vault_boards.py ./runtime ./vaultctl
+2026-11-04T06:13:09.5788569Z PASS: hierarchical vault ACL, inherited reads, independent uploads, no ID bypass, live revocation, private publication, restart and bilingual menus
+2026-11-04T06:13:09.5838364Z python3.11 tests/test_upload_core.py ./test-upload-core
+2026-11-04T06:13:09.6429716Z PASS: independent upload API, owner/capability checks, resume/retry, out-of-order commits, empty file, global/per-subject limits and administrative cancellation
+2026-11-04T06:13:09.6501933Z python3.11 tests/test_upload.py ./runtime ./vaultctl
+2026-11-04T06:13:10.9808694Z PASS: staged files remain private, retry/resume, no overwrite, hash rejection, empty files, durable publication/cancellation, bilingual audit and live BBS download
+2026-11-04T06:13:10.9809918Z PASS: reservation quota shared with import, cancel release and interrupted link recovery
+2026-11-04T06:13:10.9810583Z PASS: no-follow staging and POSIX partial-journal failure
+2026-11-04T06:13:10.9811249Z PASS: active uploads retain a final journal slot for commit or cancellation at the history limit
+2026-11-04T06:13:10.9912833Z python3.11 tests/test_network_transfer.py ./runtime ./vaultctl
+2026-11-04T06:13:14.7661303Z PASS: real raw/Telnet transfer, resume/progress/cancel, metadata/hash validation, ambiguous START and lost commit handling, ownership/admin isolation, suspension and secret-free state
+2026-11-04T06:13:14.7768553Z python3.11 tests/test_binary_transfer.py ./runtime ./vaultctl
+2026-11-04T06:13:18.1968703Z PASS: binary-v1 TCP/Telnet all-byte roundtrip, resume, fragmented frames, menu restore and malformed-frame isolation
+2026-11-04T06:13:18.2050470Z python3.11 tests/test_vault_worker.py ./runtime ./vaultctl
+2026-11-04T06:13:20.1284574Z PASS: blocked vault hash allows BBS read/write; suspend/disconnect deny publication; authorized retry succeeds
+2026-11-04T06:13:20.1363941Z python3.11 tests/test_transfer_workflows.py
+2026-11-04T06:13:20.1982734Z PASS: upload/download workflows accept an independent connector and chunk sizing; explicit refusal permits a safe retry
+2026-11-04T06:13:20.2057339Z python3.11 tests/test_zmodem_workflows.py
+2026-11-04T06:13:20.2526966Z PASS: replaceable ZMODEM engine, hash verification, no publication after cancellation/revocation, lost commit recovery and bilingual messages
+2026-11-04T06:13:20.2585740Z python3.11 tests/test_zmodem_recovery.py
+2026-11-04T06:13:20.3329447Z PASS: batch publication lost-receipt retry without duplication; private account/metadata binding; concurrent lock; staged integrity; retained single partial and continuation
+2026-11-04T06:13:20.3401191Z python3.11 tests/test_chat.py ./runtime
+2026-11-04T06:13:22.6157973Z PASS: chat raw/Telnet broadcasts, WHO/help/leave, history privacy, no BBS side effects, guest/suspended rejection, disconnect cleanup and UTF-8 input redraw
+2026-11-04T06:13:22.6232285Z python3.11 tests/test_talk.py ./runtime
+2026-11-04T06:13:25.8468366Z PASS: private sender/recipient routing, reply, no history/third-party/same-account leaks, stale target and suspension blocking, explicit public return, bilingual Telnet private prompts and draft redraw
+2026-11-04T06:13:25.8538824Z python3.11 tests/test_chat_controls.py ./runtime
+2026-11-04T06:13:27.7569810Z PASS: reception off/on, per-login private/public mute, same-account reconnection protection, unrelated delivery, offline unmute, visit persistence, bilingual controls and HELP TALK
+2026-11-04T06:13:27.7644001Z python3.11 tests/test_chat_preferences.py ./runtime
+2026-11-04T06:13:29.1494017Z PASS: short write does not acknowledge saved settings; damaged restart rejected unchanged
+2026-11-04T06:13:29.1496036Z PASS: durable receive/mute settings and removal, multi-session incremental updates, duplicate suppression, history filtering on rejoin, offline targets, malformed/truncated journal rejection
+2026-11-04T06:13:29.1595012Z python3.11 tests/test_chat_kick.py ./runtime
+2026-11-04T06:13:31.5479033Z PASS: admin-only kick, protected admins, all target chat connections closed, BBS peer unaffected, private target blocked, reconnect/preferences intact, durable filtered audit, malformed journal rejection and bilingual Telnet
+2026-11-04T06:13:31.5570957Z python3.11 tests/test_outside_talk.py ./runtime
+2026-11-04T06:13:34.4971773Z PASS: outside-room talk, online roster, reply/return, no public room leak, busy editor/password rejection, logout stale-target blocking and Telnet draft redraw
+2026-11-04T06:13:34.5048774Z python3.11 tests/test_stage67.py ./runtime ./vaultctl
+2026-11-04T06:13:35.9179200Z PASS stage67 permission, shared buffer, file scope, timezone/DST
+2026-11-04T06:13:35.9252688Z python3.11 tests/test_stage67_database.py ./runtime
+2026-11-04T06:13:37.5870748Z PASS stage67 authoritative DB: migration preserves originals, crash persistence, exclusive instance, no legacy dependency, missing block rejection
+2026-11-04T06:13:37.5955226Z python3.11 tests/test_stage67_ui.py ./runtime ./vaultctl
+2026-11-04T06:13:38.5288150Z PASS stage67 Telnet reading, shared buffer, role menus, scope, questions, timezone, goodbye
+2026-11-04T06:13:38.5369209Z python3.11 tests/test_news_contact.py ./runtime
+2026-11-04T06:13:40.3062595Z PASS: UTC article dates, invalid dates, hidden/withdrawn/ACL exclusion, search pagination and non-mutating mail/body privacy; connection memos, guest denial, SYSOP-only calls, cooldown, busy rejection, JP/EN Telnet
+2026-11-04T06:13:40.3136006Z python3.11 tests/test_large_content.py ./runtime
+2026-11-04T06:13:43.3473953Z PASS: 16 KiB article/mail/drafts, exact boundaries and 8192-line listing; raw/JP/EN Telnet paging; compact copy/restart/replies/privacy/deleted body removal; locks/collision/corruption/source invariance and legacy upgrade; POSIX partial-write rejection
+2026-11-04T06:13:43.3573060Z python3.11 tests/test_stage60.py ./runtime
+2026-11-04T06:13:49.6349156Z PASS stage60: locked-board isolation/revision, long info, node policies/quotas, article import, move/reply/read-state/restart/compaction, delete/nonreuse, scoped retained access logs and corrupt-tail refusal
+2026-11-04T06:13:49.6447054Z python3.11 tests/test_stage60_ui.py ./runtime
+2026-11-04T06:14:02.8191509Z PASS stage60 UI: global admin idle exemption, guest/member cutoff, uppercase command echo, case-sensitive content/passwords, JA/EN, lowercase editor commands, G import and long INFO
+2026-11-04T06:14:02.8292084Z python3.11 tests/test_stage60_safety.py ./runtime
+2026-11-04T06:14:10.6681133Z PASS stage60 safety: inherited passwords, ACL/SIGOP scope, username case, order, INFO boundary/UTF-8/incomplete commit, missing sidecars and disabled retention; POSIX move/read/post short-write handling
+2026-11-04T06:14:10.6782495Z python3.11 tests/test_stage59.py ./runtime ./vaultctl
+2026-11-04T06:14:26.8413458Z PASS stage59: reset short write fails closed; truncated credential/role journals refused
+2026-11-04T06:14:26.8414454Z PASS stage59: ownership/policy, scoped SIGOP, revocation/restart, secret password reset and idle disconnect
+2026-11-04T06:14:26.8512290Z python3.11 tests/test_log_retention.py ./runtime ./vaultctl
+2026-11-04T06:14:27.7041350Z PASS retention: stable totals/replay, whole sessions, receipt rejection, backup integrity, Gather, lock/corruption/state refusal
+2026-11-04T06:14:27.7124349Z python3.11 tests/test_stage58.py ./runtime ./vaultctl
+2026-11-04T06:14:31.0899237Z PASS: download receipts/counts/idempotence/privacy/partial and binary paths; online board policies/ACL/draft recheck/restart; USERLOG privacy/login counts/usage/crash and corrupt-tail refusal
+2026-11-04T06:14:31.0976493Z python3.11 tests/test_stage58_ui.py ./runtime ./vaultctl
+2026-11-04T06:14:32.0937347Z PASS: Japanese/English reports and HELP/menu roles; Telnet and report paging ON/OFF
+2026-11-04T06:14:32.1005585Z python3.11 tests/test_stage57.py ./runtime ./vaultctl
+2026-11-04T06:14:35.1984302Z PASS: Gather limits/retention; profiles/search; private guest mail+compaction; date search; physical delete/retry/restart; admin ACL, broadcast, disconnect, scheduled stop; persistent public chat
+2026-11-04T06:14:35.2058480Z python3.11 tests/test_stage57_limits.py ./runtime ./vaultctl
+2026-11-04T06:14:38.0262896Z PASS: member 9999, board 1024, 4096-byte input, 128 connections, file/attachment ID 2000, 256MiB file/capacity boundary and physical reclamation; monotonic IDs
+2026-11-04T06:14:38.0341909Z python3.11 tests/test_limits.py ./runtime
+2026-11-04T06:14:45.2432041Z PASS: >1000 per-author / >10000 article-mail IDs; reply/search/read/delete/moderation/compaction/restart; quotas and monotonic IDs
+2026-11-04T06:14:45.2518482Z python3.11 tests/test_stage56_ui.py ./runtime
+2026-11-04T06:14:46.6994581Z PASS: bilingual role menus/help, admin always visible, external/empty/missing banners; classic editor insert/replace/range quote/delete/undo/save/resume/article/mail
+2026-11-04T06:14:46.7069866Z python3.11 tests/test_mail.py ./runtime
+2026-11-04T06:14:48.0276417Z PASS: private mail send/read/recipient-only read flag/reply/delete confirmation, no third-party or admin access, paging, restart, malformed storage and bilingual interactive mail
+2026-11-04T06:14:48.0366125Z python3.11 tests/test_mail_attachments.py ./runtime
+2026-11-04T06:14:50.7364058Z PASS: private mail uploads, resume, owner/recipient-only reads, SYSOP denial, shared references, drafts, compaction/restart, deletion/reclamation and JP/EN menus
+2026-11-04T06:14:50.7443952Z python3.11 tests/test_mail_draft.py ./runtime
+2026-11-04T06:14:52.7473082Z PASS: mail draft empty/save/restart/resume, article isolation, owner isolation, concurrent stale-save/send rejection, atomic send removal, deleted reply target and revision-checked deletion
+2026-11-04T06:14:52.7562794Z python3.11 tests/test_mail_draft_notice.py ./runtime
+2026-11-04T06:14:56.8408351Z PASS: owner-only mail draft login notice, saved language, Japanese/English menu and Telnet, coexisting article/unread notices, failed-login and raw isolation, unchanged stores, no notice after send/delete
+2026-11-04T06:14:56.8482095Z python3.11 tests/test_mail_arrival.py ./runtime
+2026-11-04T06:15:00.9203927Z PASS: committed live arrivals on all recipient connections, no third-party/content leaks, partial input redraw, deferred editor/password aggregation, Japanese/English, failed send/logout/raw isolation
+2026-11-04T06:15:00.9281884Z python3.11 tests/test_mail_notify.py ./runtime
+2026-11-04T06:15:04.1877683Z PASS: default ON, owner-only persistent ON/OFF/query, idempotent writes, live peer updates, pending-notice cancellation, no replay on ON, restart, language/preferences isolation, malformed/truncated journal rejection
+2026-11-04T06:15:04.1970568Z python3.11 tests/test_runtime.py ./runtime
+2026-11-04T06:15:06.9825575Z PASS: partial input does not block another session
+2026-11-04T06:15:06.9826769Z PASS: timer yields; queued commands resume in order
+2026-11-04T06:15:06.9827608Z PASS: sequential command data remains intact
+2026-11-04T06:15:06.9828363Z PASS: disconnect/reconnect does not inherit old timer or input
+2026-11-04T06:15:06.9828924Z PASS: bounded input failure is isolated
+2026-11-04T06:15:06.9829314Z PASS: stalled output/flood does not block peer
+2026-11-04T06:15:06.9829712Z PASS: graceful quit drains output
+2026-11-04T06:15:06.9887811Z python3.11 tests/test_listener_restart.py ./runtime
+2026-11-04T06:15:07.1944585Z PASS listener 127.0.0.1: occupied-port diagnostic and four immediate restarts after accepted TCP sessions
+2026-11-04T06:15:07.1946065Z PASS listener 0.0.0.0: occupied-port diagnostic and four immediate restarts after accepted TCP sessions
+2026-11-04T06:15:07.1995868Z python3.11 tests/test_bind.py ./runtime
+2026-11-04T06:15:07.6636022Z PASS: explicit loopback/wildcard binding, Telnet menus, invalid address rejection and bind conflict
+2026-11-04T06:15:07.6703331Z python3.11 tests/test_ssh_entry.py ./runtime
+2026-11-04T06:15:07.7098869Z SKIP: bundled SSH entry uses the FreeBSD Telnet client
+2026-11-04T06:15:07.7158256Z python3.11 tests/test_daemon.py ./runtime
+2026-11-04T06:15:07.7567097Z SKIP: daemon service test requires FreeBSD
+2026-11-04T06:15:07.7629390Z python3.11 tests/test_board.py ./runtime
+2026-11-04T06:15:08.6502462Z PASS: draft isolation/cancel, UTF-8 bytes, multiline read, two replies
+2026-11-04T06:15:08.6503201Z PASS: invalid parent/id/title and empty body do not create articles
+2026-11-04T06:15:08.6503775Z PASS: concurrent posts receive unique contiguous IDs; list pagination
+2026-11-04T06:15:08.6504272Z PASS: second process cannot open the same store
+2026-11-04T06:15:08.6504797Z PASS: clean restart and forced process termination retain acknowledged posts
+2026-11-04T06:15:08.6505288Z PASS: disconnected draft is not saved
+2026-11-04T06:15:08.6506079Z PASS: corrupt/truncated/unknown-version files rejected without modification
+2026-11-04T06:15:08.6506720Z PASS: real OS short-write failure is not acknowledged/published; peers survive
+2026-11-04T06:15:08.6592726Z python3.11 tests/test_notes.py ./runtime
+2026-11-04T06:15:10.6365172Z PASS: branched DFS, parent/child/sibling navigation, current reply and session isolation
+2026-11-04T06:15:10.6366498Z PASS: concurrent same-parent replies, tree/notes pagination, reply totals and UTC timestamps
+2026-11-04T06:15:10.6367446Z PASS: tree, ordering, navigation and timestamps restored after restart
+2026-11-04T06:15:10.6368312Z PASS: 10000-level legacy fixture loads without recursion, bounded indent, no data rewrite
+2026-11-04T06:15:10.6454250Z python3.11 tests/test_members.py ./runtime
+2026-11-04T06:15:12.6616064Z PASS: member-only posting, authors, per-article unread holes, thread filter and explicit acknowledgement
+2026-11-04T06:15:12.6617001Z PASS: logout, wrong password and reconnect preserve isolation
+2026-11-04T06:15:12.6617629Z PASS: two connections of same account merge read acknowledgements
+2026-11-04T06:15:12.6618409Z PASS: forced restart restores accounts and independent read sets; no plaintext password stored
+2026-11-04T06:15:12.6619161Z PASS: truncated member journal rejected without alteration
+2026-11-04T06:15:12.6619965Z PASS: OS short-write in read journal does not acknowledge or mark article seen
+2026-11-04T06:15:12.6708003Z python3.11 tests/test_catalog.py ./runtime
+2026-11-04T06:15:15.1022608Z PASS: hierarchy visibility, ancestor read inheritance, read-only and named-ID posting ACLs
+2026-11-04T06:15:15.1023772Z PASS: direct ID, reply, tree and read-state operations cannot cross current board
+2026-11-04T06:15:15.1024683Z PASS: concurrent posts stay in selected boards; unread sets follow board selection
+2026-11-04T06:15:15.1025718Z PASS: board membership and per-user read state survive restart
+2026-11-04T06:15:15.1026578Z PASS: invalid ACL/cycle/missing stored board rejected unchanged; restart applies revocation
+2026-11-04T06:15:15.1100153Z python3.11 tests/test_rights.py ./runtime
+2026-11-04T06:15:18.4827563Z PASS: levels 0..5, groups 1..32, combined and ancestor ACLs, read/write distinction, revocation, persistence, approval and closed registration, disabled features and malformed storage/config rejection
+2026-11-04T06:15:18.4914046Z python3.11 tests/test_ui.py ./runtime
+2026-11-04T06:15:21.7584484Z PASS: guided registration/login, UTF-8 post/reply, cancel, navigation and saved-then-next unread
+2026-11-04T06:15:21.7585382Z PASS: board selection, denied access/post, independent pagination, raw/menu switching and quit
+2026-11-04T06:15:21.7586356Z PASS: opt-in MENU works on default raw server after restart
+2026-11-04T06:15:21.7586953Z PASS: real short-write on seen journal stops menu traversal and preserves unread article
+2026-11-04T06:15:21.7671016Z python3.11 tests/test_i18n.py ./runtime
+2026-11-04T06:15:22.3892606Z PASS: complete UTF-8 catalogs, unique IDs, printf signatures and all protocol error mappings
+2026-11-04T06:15:22.3893412Z PASS: per-session languages, default, invalid locale, reconnect and RAW/MENU persistence
+2026-11-04T06:15:22.3894262Z PASS: English registration/post/reply/navigation/unread/ACL; language switch preserves current article and page
+2026-11-04T06:15:22.3895023Z PASS: UTF-8 titles/body unchanged; LANG inside editor is stored as text
+2026-11-04T06:15:22.3895821Z PASS: unsupported or missing startup language rejected
+2026-11-04T06:15:22.3968728Z python3.11 tests/test_telnet.py ./runtime
+2026-11-04T06:15:23.9975972Z PASS: fragmented Telnet/IAC, negotiation, echo, UTF-8 erase, EC/EL, CRLF/CRNUL/LF and subnegotiation filtering
+2026-11-04T06:15:23.9977785Z PASS: pipelined and edited passwords never echoed; real register/login/post/read/language operations
+2026-11-04T06:15:23.9978955Z PASS: incomplete control sequences do not block other sessions
+2026-11-04T06:15:23.9980027Z PASS: reconnect isolation, bounded subnegotiation/line rejection and refused-echo login closure
+2026-11-04T06:15:24.0044105Z python3.11 tests/test_telnet_client.py ./runtime
+2026-11-04T06:15:24.3455265Z PASS: native Telnet client via PTY: register, no local password echo, post/read and quit
+2026-11-04T06:15:24.3537249Z python3.11 tests/test_moderation.py ./runtime
+2026-11-04T06:15:27.0453403Z PASS: explicit admin bootstrap, worker-side authority, board ACLs and read-only-board moderation
+2026-11-04T06:15:27.0454689Z PASS: hidden content excluded from READ/LIST/NOTES/TREE/navigation/unread; children and IDs preserved
+2026-11-04T06:15:27.0455934Z PASS: draft commit rechecks hidden parent; admin-only inspection and idempotent hide
+2026-11-04T06:15:27.0457034Z PASS: forced restart retains hides; restore preserves exact source and unread state; durable actor/time audit
+2026-11-04T06:15:27.0458633Z PASS: revoked roles, invalid admin config, damaged/truncated/mismatched journals fail without rewriting originals
+2026-11-04T06:15:27.0459751Z PASS: Japanese/English menus and real Telnet share moderation authority and behavior
+2026-11-04T06:15:27.0460825Z PASS: OS short-write never acknowledges restore; board access stops, corrupt restart refused, other I/O survives
+2026-11-04T06:15:27.0540771Z python3.11 tests/test_suspension.py ./runtime
+2026-11-04T06:15:30.3246168Z PASS: admin-only listing/status/suspend/resume, protected admins, pagination and idempotent operations
+2026-11-04T06:15:30.3247358Z PASS: all logged-in sessions including drafts/timers close; immediate resume does not revive them
+2026-11-04T06:15:30.3248026Z PASS: new login required after resume; suspension does not delete posts or read state
+2026-11-04T06:15:30.3248649Z PASS: forced restart retains suspension; existing password and unread holes survive restore
+2026-11-04T06:15:30.3249388Z PASS: account audit actor/time/target validated; malformed records and suspended-admin config rejected unchanged
+2026-11-04T06:15:30.3250121Z PASS: English/Japanese member management and Telnet victim notification/closure
+2026-11-04T06:15:30.3250821Z PASS: OS short-write cannot acknowledge suspension; board access and new logins fail closed, corrupt restart refused
+2026-11-04T06:15:30.3337593Z python3.11 tests/test_audit.py ./runtime
+2026-11-04T06:15:32.8962565Z PASS: admin-only history, per-board read ACLs, four actions, actor ID/name, UTC and newest-first pagination
+2026-11-04T06:15:32.8963565Z PASS: history inspection, denied requests and invalid cursors never rewrite data or add audit records
+2026-11-04T06:15:32.8964522Z PASS: reads preserve later article/account appends; paging remains stable across new events and restart
+2026-11-04T06:15:32.8965355Z PASS: localized Japanese/English history, numeric history navigation and Telnet
+2026-11-04T06:15:32.8966618Z PASS: history above 10000 entries, uint32 cursors, bounded 256-record scans and isolated connections
+2026-11-04T06:15:32.8967509Z PASS: runtime history read failure fails closed without further writes; other I/O survives
+2026-11-04T06:15:32.9034747Z python3.11 tests/test_content_audit.py ./runtime
+2026-11-04T06:15:34.5308682Z PASS: mixed history order, actors, UTC, ACLs, restart, stable cursors, localized UI and no title/body disclosure
+2026-11-04T06:15:34.5310261Z PASS: legacy undated records, append after history reads and restart; POSIX read failure closes board access
+2026-11-04T06:15:34.5311500Z PASS: invalid history metadata rejected without rewriting the journal
+2026-11-04T06:15:34.5382426Z python3.11 tests/test_audit_filters.py ./runtime
+2026-11-04T06:15:36.2568329Z PASS: combined article/actor filters, actor vs target, ACLs, invalid queries, session isolation, paging, languages, Telnet and restart
+2026-11-04T06:15:36.2569559Z PASS: bounded scan returns an empty page with a usable filtered continuation
+2026-11-04T06:15:36.2640858Z python3.11 tests/test_menu_files.py ./runtime
+2026-11-04T06:15:36.6899386Z PASS: UTF-8/BOM/LF/CRLF, literal percent signs, language isolation, RAW/MENU, Telnet and restart reload
+2026-11-04T06:15:36.6900345Z PASS: invalid, empty, oversized and missing explicit files fail before data creation without modifying menus
+2026-11-04T06:15:36.6900989Z PASS: default menus directory and backwards-compatible fallback when absent
+2026-11-04T06:15:36.6901538Z PASS: optional RTBBS sections, language fallback, startup snapshot and validation
+2026-11-04T06:15:36.6968801Z python3.11 tests/test_password.py ./runtime
+2026-11-04T06:15:51.7675278Z PASS: current-password check, confirmation, cancel at every step, length and unchanged rejection, one durable salted change
+2026-11-04T06:15:51.7676507Z PASS: peer draft revoked, initiating session remains valid, old login rejected, new login works, posts/read state preserved
+2026-11-04T06:15:51.7677222Z PASS: restart replays credential replacement; 128-byte password accepted
+2026-11-04T06:15:51.7677881Z PASS: Japanese/English Telnet prompts and secret input, repeated changes preserve journal and article data
+2026-11-04T06:15:51.7678950Z PASS: OS short-write never acknowledges change; further board/auth access fails closed; truncated restart refused
+2026-11-04T06:15:51.7679642Z PASS: truncated password journal rejected without rewriting it
+2026-11-04T06:15:51.7763331Z python3.11 tests/test_search.py ./runtime
+2026-11-04T06:16:04.6133779Z PASS: title/body UTF-8 literal matching, replies, guest search, case sensitivity, board isolation, hidden exclusion and restore
+2026-11-04T06:16:04.6135207Z PASS: bounded candidate scans, indexed gaps, invalid input, connection isolation and unchanged unread state
+2026-11-04T06:16:04.6136784Z PASS: restart, Japanese/English menus, per-session query pagination, result-to-article/tree navigation, Telnet and byte-identical stores
+2026-11-04T06:16:04.6208885Z python3.11 tests/test_pager.py ./runtime
+2026-11-04T06:16:05.1004029Z PASS: default OFF, per-session toggle, Enter/stop/flush, Japanese/English, raw bypass and reconnect isolation
+2026-11-04T06:16:05.1005444Z PASS: long UTF-8 lines wrap without splitting characters, all article text delivered once, other connections remain usable
+2026-11-04T06:16:05.1006901Z PASS: Telnet NAWS dimensions, resize during paging, zero-size fallback and unchanged article storage
+2026-11-04T06:16:05.1077921Z python3.11 tests/test_preferences.py ./runtime
+2026-11-04T06:16:06.3134682Z PASS: guest rejection, missing defaults, explicit save/load, duplicate suppression and multi-session isolation
+2026-11-04T06:16:06.3135999Z PASS: restart and Telnet restore each account language before login response; article bytes preserved
+2026-11-04T06:16:06.3136796Z PASS: invalid member/language/pager/reserved bytes and truncated records rejected without rewrite
+2026-11-04T06:16:06.3137588Z PASS: actual short-write never acknowledges save; board/auth fail closed and truncated restart refused
+2026-11-04T06:16:06.3222372Z python3.11 tests/test_list_pager.py ./runtime
+2026-11-04T06:16:09.1434648Z PASS: all eight list types, screen/result pagination, saved preference, cancel/select/tree, OFF, Japanese and raw bypass
+2026-11-04T06:16:09.1436308Z PASS: Telnet resize during list display, continuation cursor and byte-identical article/member/moderation files
+2026-11-04T06:16:09.1504227Z python3.11 tests/test_preview.py ./runtime
+2026-11-04T06:16:10.4648063Z PASS: empty/reply previews, exact UTF-8 body and slash/dot escaping, repeated preview/cancel/disconnect without any store changes
+2026-11-04T06:16:10.4649315Z PASS: append after preview saves once; final commit still rechecks hidden reply parent
+2026-11-04T06:16:10.4650405Z PASS: Japanese/English Telnet, pager Enter/Q/OFF, return to editor and preview cancellation preserves draft
+2026-11-04T06:16:10.4722033Z python3.11 tests/test_draft_edit.py ./runtime
+2026-11-04T06:16:11.4631483Z PASS: title and line edits, renumbering, empty replacement, invalid-operation atomicity, escapes, 262144-byte boundary and 512-line display; no persistence before save
+2026-11-04T06:16:11.4632825Z PASS: Japanese/English Telnet, numbered-list paging/cancel, save after editing, correct reply parent and restart persistence
+2026-11-04T06:16:11.4704469Z python3.11 tests/test_draft_undo.py ./runtime
+2026-11-04T06:16:11.8972354Z PASS: first/middle/end/empty insert, one-step undo of every edit type, failures/no-ops preserve history, byte limit, escaped commands, per-session/reset isolation
+2026-11-04T06:16:11.8973770Z PASS: Japanese/English Telnet, final save and restart preserve only committed content
+2026-11-04T06:16:11.9045380Z python3.11 tests/test_saved_draft.py ./runtime
+2026-11-04T06:16:13.8189404Z PASS: member/board isolation, save/resume, UTF-8 and escape, stale-session conflict, exact revision delete and unchanged unread state
+2026-11-04T06:16:13.8190480Z PASS: forced restart retains saved draft; resume/save/post recheck hidden parent and ACL; explicit removal works after ACL loss
+2026-11-04T06:16:13.8191492Z PASS: empty/max-size drafts, revision sequence after deletion, English/Japanese Telnet, corrupt/truncated journal rejected unchanged
+2026-11-04T06:16:13.8192849Z PASS: actual partial draft write never acknowledges success; subsequent member operations/auth stop and restart rejects partial record
+2026-11-04T06:16:13.8280096Z python3.11 tests/test_draft_notice.py ./runtime
+2026-11-04T06:16:17.7009475Z PASS: owner-only login reminder, restored language, Japanese/English menus and Telnet, no secret contents or automatic resume
+2026-11-04T06:16:17.7010995Z PASS: failed login, absent/deleted draft, ACL loss, raw compatibility and byte-identical stores on login
+2026-11-04T06:16:17.7082779Z python3.11 tests/test_board_unread.py ./runtime
+2026-11-04T06:16:18.9845771Z PASS: per-member counts, replies, explicit SEEN/UNSEEN, hidden/restore, direct-board totals, ACL inheritance, guests and multiple result pages
+2026-11-04T06:16:18.9846952Z PASS: restart, Japanese/English menus and Telnet, localized counts and byte-identical article/member/moderation stores
+2026-11-04T06:16:18.9917106Z python3.11 tests/test_next_board.py ./runtime
+2026-11-04T06:16:20.2718918Z PASS: hierarchy order, wraparound, skip current/seen/hidden/inaccessible boards, read-only destination and per-member isolation
+2026-11-04T06:16:20.2720117Z PASS: no-target state retention, successful selection reset, guest rejection, restart, Japanese/English menus and Telnet; stores unchanged
+2026-11-04T06:16:20.2788203Z python3.11 tests/test_thread_unread.py ./runtime
+2026-11-04T06:16:21.7178324Z PASS: parent/reply/deep counts, member isolation, explicit read state, hidden/restore, hidden parent placeholder, guests and multiple pages
+2026-11-04T06:16:21.7179856Z PASS: restart, Japanese/English menus and Telnet, no implicit acknowledgement and byte-identical stores
+2026-11-04T06:16:21.7248104Z python3.11 tests/test_unread_threads.py ./runtime
+2026-11-04T06:16:23.3202661Z PASS: unread-only membership, deep replies, per-member isolation, hide/restore, hidden roots, empty/all-seen, strict cursor and retained current article
+2026-11-04T06:16:23.3204083Z PASS: filtered pagination, N resets, independent sessions, Japanese/English, PAGER ON/OFF, numeric selection, Telnet and byte-identical stores
+2026-11-04T06:16:23.3273168Z python3.11 tests/test_login_unread.py ./runtime
+2026-11-04T06:16:26.6378614Z PASS: per-member visible unread totals, reply/hidden handling, ancestor ACL and read-only boards, zero counts and restart ACL changes
+2026-11-04T06:16:26.6380234Z PASS: saved language, Japanese/English and Telnet, draft notice coexistence, failed/suspended login privacy, raw compatibility and unchanged stores
+2026-11-04T06:16:26.6450417Z python3.11 tests/test_help.py ./runtime
+2026-11-04T06:16:27.8647047Z PASS: all help topics in Japanese/English, guest access, unknown topics, unchanged list cursor, screen paging/cancel/OFF and session isolation
+2026-11-04T06:16:27.8648108Z PASS: Telnet editor help, preserved body/Undo, literal /HELP, raw END HELP framing and unchanged stores
+2026-11-04T06:16:27.8719332Z python3.11 tests/test_extended.py ./runtime
+2026-11-04T06:16:31.5945091Z PASS: reserved anonymous author text cannot be claimed by a same-name account
+2026-11-04T06:16:31.5946464Z PASS: author withdrawal confirmation/ownership, preserved replies, no visibility/search/unread leaks, author/admin title edits and durable journal
+2026-11-04T06:16:31.5947665Z PASS: cross-board and exact-author search, ACL/hidden exclusion, bounded result pages, sequential reading without marking, INFO and member profiles
+2026-11-04T06:16:31.5948824Z PASS: restart, public profile pagination, Japanese/English menus and Telnet, global result selection, paging, scan stop and read-only store invariance
+2026-11-04T06:16:31.5949945Z PASS: malformed/rechecksummed and truncated extras rejected unchanged; POSIX partial write blocks access/authentication and restart
+2026-11-04T06:16:31.6039621Z clang   -O2 -g  -std=c11 -Wall -Wextra -Werror -Isrc tests/test_stage61_userlog.c src/userlog.c -lcrypto -lsqlite3  src/storage_sqlite.c  -pthread -lcrypto -lsqlite3 -o test-stage61-userlog
+2026-11-04T06:16:32.1756317Z python3.11 tests/test_userlog.py ./test-stage61-userlog
+2026-11-04T06:16:32.4645386Z PASS retained complete connections, concurrent slots, lifetime totals and restart
+2026-11-04T06:16:32.4748775Z python3.11 tests/test_stage61.py ./runtime ./vaultctl
+2026-11-04T06:16:33.6301784Z stage61 profiles/vault: PASS
+2026-11-04T06:16:33.6374048Z python3.11 tests/test_stage61_ui.py ./runtime
+2026-11-04T06:16:40.9034212Z PASS stage61 level limits/admin exemption/public USERLOG/external HELP/menu and banner
+2026-11-04T06:16:40.9107543Z python3.11 tests/test_stage61_safety.py ./runtime ./vaultctl
+2026-11-04T06:16:43.1297099Z PASS stage61 restart/privacy/missing and incomplete journals/group99/editor isolation/UTF8 text
+2026-11-04T06:16:43.1390142Z python3.11 tests/test_maintenance.py ./runtime ./vaultctl ./memberctl
+2026-11-04T06:16:47.8802660Z PASS SQLite backup probe: closed WAL source unchanged; authoritative WAL detected without source SHM mutation
+2026-11-04T06:16:47.8803818Z PASS maintenance: hashes, corruption/truncation/CRC, traversal, links, locks, changed source, exclusive output, copy-only failures
+2026-11-04T06:16:47.8805236Z PASS maintenance runtime: restore + compact restart, moved replies, monotonic IDs, deleted mail, draft, group100, private profile/attachment, public vault, original unchanged
+2026-11-04T06:16:47.8952083Z clang   -O2 -g  -std=c11 -Wall -Wextra -Werror tests/generate_scale.c src/storage_sqlite.c  -pthread -lcrypto -lsqlite3 -o generate-scale
+2026-11-04T06:16:48.2751645Z python3.11 tests/test_state_compact.py
+2026-11-04T06:16:48.3245202Z PASS state compaction: superseded invalid password, guide control, birthday and extras padding are rejected
+2026-11-04T06:16:48.3302459Z python3.11 tests/test_stage63_read_errors.py ./runtime
+2026-11-04T06:16:49.5181470Z PASS lazy body faults: article/mail searches reject disk read failure; peer commands survive
+2026-11-04T06:16:49.5260214Z python3.11 tests/test_stage63.py ./runtime ./vaultctl ./memberctl
+2026-11-04T06:16:57.3259757Z PASS stage63: connection status, protected lifecycle, pending rejection/deletion, retire, 16 attachments, restart/draft/privacy/reclamation, full state compaction
+2026-11-04T06:16:57.3353579Z python3.11 tests/test_stage63_limits.py ./runtime ./vaultctl
+2026-11-04T06:16:58.5572275Z PASS stage63 quotas: IDs >2000, events >10000, physical total >256MiB, zero unlimited, lowering quotas, invalid config, private attachments
+2026-11-04T06:16:58.5649240Z python3.11 tests/test_stage63_memory.py ./runtime ./generate-scale
+2026-11-04T06:17:03.6870261Z {"articles": 12000, "mails": 12000, "body_bytes": 4096, "baseline_rss": 77967360, "loaded_rss": 84979712, "growth": 7012352}
+2026-11-04T06:17:03.6871191Z PASS stage63 memory: body storage on disk; 12000 article/mail read/search/reply/send/seen; RSS growth <48MiB
+2026-11-04T06:17:03.6944619Z python3.11 tests/test_index_fault.py ./runtime
+2026-11-04T06:17:04.0126985Z PASS: real file-size quota fails SQLite startup closed; original journals unchanged
+2026-11-04T06:17:04.0213087Z python3.11 tests/test_stage64_batch_names.py
+2026-11-04T06:17:04.0669885Z PASS: duplicate/max-byte UTF-8 attachment names and prefix collisions preserve all files
+2026-11-04T06:17:04.0734277Z python3.11 tests/test_stage64.py ./runtime ./vaultctl
+2026-11-04T06:17:05.1552434Z b'BOARD UPDATED 2'
+2026-11-04T06:17:05.1556360Z b'BOARD UPDATED 3'
+2026-11-04T06:17:05.1562269Z b'BOARD UPDATED 4'
+2026-11-04T06:17:05.1574461Z b'SIGOP SET 2 2'
+2026-11-04T06:17:05.2667352Z b'BOARD OPTIONS SAVED'
+2026-11-04T06:17:05.2669676Z b'ERR admin required'
+2026-11-04T06:17:05.2674260Z b'BOARD UPDATED 3'
+2026-11-04T06:17:05.2678260Z b'BOARD 3 Child'
+2026-11-04T06:17:05.2687935Z b'RIGHTS 3 LEVEL 2 GROUPS 10 STATUS active'
+2026-11-04T06:17:05.2703761Z b'SIGOP GROUP SAVED'
+2026-11-04T06:17:05.2706551Z b'RIGHTS 3 LEVEL 2 GROUPS 10 STATUS active'
+2026-11-04T06:17:05.3814794Z b'ERR admin required'
+2026-11-04T06:17:05.3815104Z b'ERR admin required'
+2026-11-04T06:17:05.3818890Z b'BOARD 3 Child'
+2026-11-04T06:17:05.4248056Z b'BOARD 4 Elsewhere'
+2026-11-04T06:17:05.4671836Z b'BOARD 2 Forum'
+2026-11-04T06:17:05.4676264Z b'ERR profile permission or value'
+2026-11-04T06:17:05.4689853Z b'PROFILE SAVED'
+2026-11-04T06:17:05.4694152Z b'MAIL EDIT end with . or /CANCEL'
+2026-11-04T06:17:05.5113075Z b'MAIL SENT 1'
+2026-11-04T06:17:05.5122967Z b'MAIL IMPORTED TO BUFFER'
+2026-11-04T06:17:05.5125013Z b'MAIL ERROR unavailable'
+2026-11-04T06:17:05.5125988Z b'MAIL CLOSED'
+2026-11-04T06:17:05.5127005Z b'MAIL CLOSED'
+2026-11-04T06:17:05.5137261Z b'CHECK CANCELLED'
+2026-11-04T06:17:05.5152037Z b'CHECKPOINT SAVED'
+2026-11-04T06:17:05.5162871Z b'FILEBOARD UPDATED'
+2026-11-04T06:17:05.5170164Z b'FILEBOARD UPDATED'
+2026-11-04T06:17:05.5176112Z b'FILEBOARD UPDATED'
+2026-11-04T06:17:05.5182142Z b'FILEBOARD UPDATED'
+2026-11-04T06:17:05.5188030Z b'FILEBOARD UPDATED'
+2026-11-04T06:17:05.5194406Z b'FILEBOARD UPDATED'
+2026-11-04T06:17:05.5198837Z b'ERR vault denied'
+2026-11-04T06:17:05.5205403Z b'FILEBOARD UPDATED'
+2026-11-04T06:17:05.5206366Z b'NEW PASSWORD'
+2026-11-04T06:17:05.5209541Z b'CONFIRM PASSWORD'
+2026-11-04T06:17:05.6293898Z b'FILEBOARD UPDATED'
+2026-11-04T06:17:05.6295107Z b'ERR vault denied'
+2026-11-04T06:17:05.6297760Z b'PASSWORD'
+2026-11-04T06:17:05.7371645Z b'FILEBOARD UNLOCKED 2 8'
+2026-11-04T06:17:05.7379049Z b'BOARD 3 Child'
+2026-11-04T06:17:05.7391137Z b'WITHDRAW SAVED 1'
+2026-11-04T06:17:06.0443053Z b'BOARD OPTIONS SAVED'
+2026-11-04T06:17:06.0477249Z b'BOARD GROUP MOVED'
+2026-11-04T06:17:06.0840022Z PASS stage64 inherited/scoped roles, subtree search, private import, checkpoints, vault passwords, profiles, reclaim and replay
+2026-11-04T06:17:06.0920865Z python3.11 tests/test_stage64_details.py ./runtime
+2026-11-04T06:17:11.3187446Z PASS stage64 4096-byte input, 256KiB article/mail/draft/buffer, reverse/relative reads, timed U, confirmation, generated IDs, detailed application and review/restart
+2026-11-04T06:17:11.3266327Z python3.11 tests/test_stage64_vault.py ./runtime ./vaultctl
+2026-11-04T06:17:14.3549058Z PASS stage64 inherited vault management, rename, retained receipts and totals, menu nodes, parent password revision/logout/restart, physical deletion
+2026-11-04T06:17:14.3622868Z python3.11 tests/test_stage64_persistence.py ./runtime ./vaultctl
+2026-11-04T06:17:16.8956201Z PASS: separate article/mail/file checkpoints, pagination completion, cancellation/restart, interrupted group intent recovery
+2026-11-04T06:17:16.9026755Z python3.11 tests/test_stage64_reclaim.py ./runtime
+2026-11-04T06:17:17.8425134Z PASS: management CLI backup/reclaim/restart; withdrawn body and old FTS removed, HIDE preserved, IDs and checkpoint retained, originals unchanged
+2026-11-04T06:17:17.8516019Z python3.11 tests/test_stage65.py ./runtime
+2026-11-04T06:17:18.7092584Z BOARDSET 2|1|all|all|Public|public b'BOARD UPDATED 2'
+2026-11-04T06:17:18.7096805Z BOARDSET 3|1|member|member|Other|other b'BOARD UPDATED 3'
+2026-11-04T06:17:18.7101576Z BOARDSET 4|2|all|all|Child|child b'BOARD UPDATED 4'
+2026-11-04T06:17:18.7112137Z SIGOP 2 2 b'SIGOP SET 2 2'
+2026-11-04T06:17:18.8206303Z BOARDGUEST 3 ON b'ERR admin required'
+2026-11-04T06:17:18.8215367Z boardguest 2 on b'BOARD GUEST SAVED'
+2026-11-04T06:17:18.8217106Z HANDLE visitor b'GUEST HANDLE guest:visitor'
+2026-11-04T06:17:18.8219385Z BOARD 2 b'BOARD 2 Public'
+2026-11-04T06:17:18.8654986Z BOARD 2 b'BOARD 2 Public'
+2026-11-04T06:17:18.9491323Z AUTHOR 1 3 CONFIRM b'ERR admin required'
+2026-11-04T06:17:18.9500326Z author 1 3 confirm b'AUTHOR CHANGED 1 3'
+2026-11-04T06:17:18.9503486Z BOARD 2 b'BOARD 2 Public'
+2026-11-04T06:17:18.9534505Z MOVEBRANCH 2 3 CONFIRM b'THREAD MOVED 2 3'
+2026-11-04T06:17:18.9535312Z BOARD 3 b'BOARD 3 Other'
+2026-11-04T06:17:18.9556471Z MENUMODE EXPERT b'MENU MODE SAVED'
+2026-11-04T06:17:18.9557584Z LANG ja b'\xe8\xa1\xa8\xe7\xa4\xba\xe8\xa8\x80\xe8\xaa\x9e: ja / LANG ja: \xe6\x97\xa5\xe6\x9c\xac\xe8\xaa\x9e / LANG en: English'
+2026-11-04T06:17:18.9559195Z PAGER ON b'PAGER ON'
+2026-11-04T06:17:18.9571070Z LOGOUT b'LOGGED OUT'
+2026-11-04T06:17:20.1158552Z PREFS b'PREFS STORED ja ON'
+2026-11-04T06:17:20.3105446Z BOARD 3 b'BOARD 3 Other'
+2026-11-04T06:17:20.3154214Z BOARDDELETEALL 2 CASCADE CONFIRM b'BOARD TREE DELETED'
+2026-11-04T06:17:20.5070107Z BOARD 2 b'ERR board unavailable'
+2026-11-04T06:17:20.5071597Z BOARD 4 b'ERR board unavailable'
+2026-11-04T06:17:20.5072457Z BOARD 3 b'BOARD 3 Other'
+2026-11-04T06:17:20.8895129Z BOARD 3 b'BOARD 3 Other'
+2026-11-04T06:17:20.8900926Z BOARD 2 b'ERR board unavailable'
+2026-11-04T06:17:20.9297150Z stage65 core permissions/restart/compaction passed
+2026-11-04T06:17:20.9370859Z python3.11 tests/test_stage65_delete_recovery.py ./runtime
+2026-11-04T06:17:21.9513140Z stage65 cascade intent recovery, deepest-first deletion, repeat restart and no duplicate withdrawals passed
+2026-11-04T06:17:21.9601209Z python3.11 tests/test_stage65_doors.py ./runtime
+2026-11-04T06:17:23.7427762Z stage65 native PTY door: auth, level, environment, return, escape passed
+2026-11-04T06:17:23.7483773Z python3.11 tests/test_door_resize.py ./runtime
+2026-11-04T06:17:27.4168692Z PASS live Door NAWS: existing 20..240 x 5..100 policy, missing/zero/invalid/duplicate/fragmented/refused notifications, SIGWINCH, identity/environment, independent sessions, quit/reentry/crash/escape/disconnect/timeout, BBS return, independent stty PTY app
+2026-11-04T06:17:27.4237140Z python3.11 tests/test_doors_generic.py ./runtime
+2026-11-04T06:17:29.9861998Z generic Door: menu, raw keys, private DORINFO, slots across runtimes, timeout/crash/escape/disconnect and descendants passed
+2026-11-04T06:17:29.9933225Z python3.11 tests/test_doors_config.py ./runtime
+2026-11-04T06:17:31.2605815Z PASS Door config validation, failed exec cleanup/retry, slots without dropfiles and empty menu
+2026-11-04T06:17:31.2675311Z python3.11 tests/test_stage65_terminal.py ./runtime
+2026-11-04T06:17:38.8711083Z stage65 Telnet PTY CRLF, connections, revocation cleanup, U clear/append confirmation passed
+2026-11-04T06:17:38.8783935Z python3.11 tests/test_stage65_ui.py ./runtime
+2026-11-04T06:17:39.8328142Z stage65 menu quantity and continuous reader passed
+2026-11-04T06:17:39.8400914Z python3.11 tests/test_stage65_scan_telnet.py ./runtime
+2026-11-04T06:17:41.3679158Z stage65 Telnet F/CRLF, pager entry, Ctrl-C cancellation and mail continuous reading passed
+2026-11-04T06:17:41.3752638Z python3.11 tests/test_stage65_database.py ./runtime ./vaultctl
+2026-11-04T06:17:48.3987989Z stage65 SQL cache: reuse, eviction, mail, crash replay, tamper rejection passed
+2026-11-04T06:17:48.4069592Z python3.11 tests/test_stage66_commands.py ./runtime ./vaultctl
+2026-11-04T06:17:49.4398132Z PASS stage66: native Telnet RTBBS main/board/read/mail/vault/settings/profile keys, confirmation, authorization, persistence
+2026-11-04T06:17:49.4472977Z python3.11 tests/test_stage71.py ./runtime
+2026-11-04T06:17:50.8369235Z PASS repeatable receipt creation/reuse/backup/atomic failure/symlink and non-mutating asset check
+2026-11-04T06:17:50.8370841Z PASS spool detail, explicit lost-ID binding, status reconciliation, preview, endpoint isolation and confirmed-only cleanup
+2026-11-04T06:17:50.8372288Z PASS structured profile/history rows, logical export/replay, reader S privacy and unchanged read position
+2026-11-04T06:17:50.8503470Z python3.11 tests/test_stage71_reconcile.py ./runtime ./vaultctl
+2026-11-04T06:17:52.5659925Z PASS real public/private reservation reconcile, lost reply binding, active cleanup refusal, owner isolation and published payload preservation
+2026-11-04T06:17:52.5738452Z python3.11 tests/test_stage67.py ./runtime ./vaultctl
+2026-11-04T06:17:53.9765216Z PASS stage67 permission, shared buffer, file scope, timezone/DST
+2026-11-04T06:17:53.9840890Z python3.11 tests/test_stage67_database.py ./runtime
+2026-11-04T06:17:55.6472873Z PASS stage67 authoritative DB: migration preserves originals, crash persistence, exclusive instance, no legacy dependency, missing block rejection
+2026-11-04T06:17:55.6552300Z python3.11 tests/test_stage67_ui.py ./runtime ./vaultctl
+2026-11-04T06:17:56.5864328Z PASS stage67 Telnet reading, shared buffer, role menus, scope, questions, timezone, goodbye
+2026-11-04T06:17:56.5937708Z python3.11 tests/test_stage67_limits_checks.py ./runtime ./vaultctl
+2026-11-04T06:17:58.2794848Z PASS stage67 quotas preserve existing data; scoped auto checkpoint waits for display and respects cancellation
+2026-11-04T06:17:58.2873106Z python3.11 tests/test_stage68.py ./runtime
+2026-11-04T06:18:00.1855802Z PASS stage68 scoped news, filtered P/L, disconnect preferences, journal and SQLite
+2026-11-04T06:18:00.1933249Z python3.11 tests/test_stage69.py ./runtime ./vaultctl
+2026-11-04T06:18:03.2606995Z PASS stage69 role boundaries, implicit groups, privacy opt-in, current-board DOS match, copy and protocol replay/compact
+2026-11-04T06:18:03.2689449Z python3.11 tests/test_stage69_ui.py ./runtime ./vaultctl
+2026-11-04T06:18:05.3044825Z PASS stage69 Telnet file/batch/hierarchy, profile forms, editor ranges/highlights/numbers, memo, W/#/one-shot T, birthday and registration confirmation
+2026-11-04T06:18:05.3123641Z python3.11 tests/test_stage70.py ./runtime
+2026-11-04T06:18:07.2393264Z PASS stage70 structured DB/restart/crash/logical backup, persistent editor/protocol, hourly fallback, spool preview/locks/publication/symlink safety
+2026-11-04T06:18:07.2482441Z python3.11 tests/test_stage70_gather.py ./runtime
+2026-11-04T06:18:07.7693161Z PASS Gather oldest-first retained messages, maximum 70 characters/10 lines, skip-to-compose and read-only exit
+2026-11-04T06:18:07.7765439Z python3.11 tests/test_transfer_timeouts.py
+2026-11-04T06:18:13.0963973Z PASS common idle timeout: active process send and legacy receive exceed total timeout; stalled peers fail TIMEOUT
+2026-11-04T06:18:13.1068372Z /home/bbstest/source/.web-venv/bin/python tests/test_door_resize.py ./runtime
+2026-11-04T06:18:16.7866327Z PASS live Door NAWS: existing 20..240 x 5..100 policy, missing/zero/invalid/duplicate/fragmented/refused notifications, SIGWINCH, identity/environment, independent sessions, quit/reentry/crash/escape/disconnect/timeout, BBS return, independent stty PTY app
+2026-11-04T06:18:16.7932727Z /home/bbstest/source/.web-venv/bin/python tests/test_doors_config.py ./runtime
+2026-11-04T06:18:18.0650781Z PASS Door config validation, failed exec cleanup/retry, slots without dropfiles and empty menu
+2026-11-04T06:18:18.0723007Z /home/bbstest/source/.web-venv/bin/python tests/test_doors_generic.py ./runtime
+2026-11-04T06:18:20.6306887Z generic Door: menu, raw keys, private DORINFO, slots across runtimes, timeout/crash/escape/disconnect and descendants passed
+2026-11-04T06:18:20.6382509Z /home/bbstest/source/.web-venv/bin/python tests/test_web_connector.py ./runtime
+2026-11-04T06:18:22.0927866Z PASS Web connector: real Telnet, password secrecy, member ACL, literal 4096-byte lines, article/mail bodies and chat synchronization
+2026-11-04T06:18:22.1033386Z /home/bbstest/source/.web-venv/bin/python tests/test_web_blocks.py ./runtime ./vaultctl
+2026-11-04T06:18:22.7955309Z PASS connector blocks: size bounds, legacy line limit, token matching, guest refusal, command allowlist, owner checks, mid-download hiding, no premature receipt, private mail denies SYSOP
+2026-11-04T06:18:22.8068021Z /home/bbstest/source/.web-venv/bin/python tests/test_web_http.py ./runtime ./vaultctl
+2026-11-04T06:18:24.1001131Z PASS Web HTTP: CSRF/Origin, session isolation, 256KiB drafts, Gather, literal posts, mail/privacy, public/private files with SHA256, one-use downloads, resume/retry, terminal login and real PTY door return
+2026-11-04T06:18:24.1283511Z /home/bbstest/source/.web-venv/bin/python tests/test_web_transfers.py ./runtime ./vaultctl
+2026-11-04T06:18:24.8713861Z PASS block transfer, durable resume ID, owner isolation, mismatched source, mail editor preservation and private attachments
+2026-11-04T06:18:24.9355470Z /home/bbstest/source/.web-venv/bin/python tests/test_web_install.py
+2026-11-04T06:18:25.0889197Z PASS Web installer: config preservation, samples-only pkg staging, permissions, rc syntax, symlink refusal
+2026-11-04T06:18:25.0953326Z /home/bbstest/source/.web-venv/bin/python tests/test_web_errors.py
+2026-11-04T06:18:25.2888340Z PASS Web errors: missing template fallback, invalid UTF-8/permission errors=500, recovered template=200, BBS network failure=503
+2026-11-04T06:18:26.7282983Z Post job cleanup.
+2026-11-04T06:18:26.8220495Z [command]/usr/bin/git version
+2026-11-04T06:18:26.8268909Z git version 2.56.0
+2026-11-04T06:18:26.8311531Z Temporarily overriding HOME='/home/runner/work/_temp/beba9386-5d3c-45bf-8e38-b8d02eb2f466' before making global git config changes
+2026-11-04T06:18:26.8312870Z Adding repository directory to the temporary git global config as a safe directory
+2026-11-04T06:18:26.8317472Z [command]/usr/bin/git config --global --add safe.directory /home/runner/work/liner-notes/liner-notes
+2026-11-04T06:18:26.8361711Z [command]/usr/bin/git config --local --name-only --get-regexp core\.sshCommand
+2026-11-04T06:18:26.8401387Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+2026-11-04T06:18:26.8670615Z [command]/usr/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+2026-11-04T06:18:26.8702954Z http.https://github.com/.extraheader
+2026-11-04T06:18:26.8716080Z [command]/usr/bin/git config --local --unset-all http.https://github.com/.extraheader
+2026-11-04T06:18:26.8754003Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
+2026-11-04T06:18:26.9076309Z [command]/usr/bin/git config --local --name-only --get-regexp ^includeIf\.gitdir:
+2026-11-04T06:18:26.9127235Z [command]/usr/bin/git submodule foreach --recursive git config --local --show-origin --name-only --get-regexp remote.origin.url
+2026-11-04T06:18:26.9620629Z Cleaning up orphan processes
+2026-11-04T06:18:27.0104786Z ##[warning]Node.js 20 is deprecated. The following actions target Node.js 20 but are being forced to run on Node.js 24: actions/checkout@v4. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/

@@ -1,0 +1,26 @@
+python3 tests/test_stage73_database.py ./runtime
+PASS stage73 database: copy-only conversion, row storage, auth/read/mail/restart, structured restore, source hashes and live lock
+python3 tests/test_serial_connector.py ./runtime
+PASS serial PTY: binary round trip, fragmented Telnet/hidden password, modem RING/ATA/CONNECT, EOF drain, termios restore, real BBS registration and logout
+python3 tests/test_web_reports.py
+..
+----------------------------------------------------------------------
+Ran 2 tests in 0.003s
+
+OK
+python3 tests/test_link_store.py
+..
+----------------------------------------------------------------------
+Ran 2 tests in 0.293s
+
+OK
+python3 tests/test_link_tls.py
+..
+----------------------------------------------------------------------
+Ran 2 tests in 0.119s
+
+OK
+python3 tests/test_link_bbs.py ./runtime
+PASS three real BBS links: ring/star, origin author, reply mapping, retitle, withdraw, 256KiB payload, replay, restart, interrupted intent recovery, unauthorized-account refusal
+python3 tests/test_link_service.py ./runtime
+PASS separate link daemons: real BBS/mTLS, withdrawn historical parent, outage, restart, cursor reset/replay, maintenance lock

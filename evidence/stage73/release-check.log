@@ -1,0 +1,416 @@
+cc  -I/usr/local/include -O2 -pipe  -std=c11 -Wall -Wextra -Werror -Isrc tests/test_userlog.c src/userlog.c -lcrypto -L/usr/local/lib -lsqlite3  src/storage_sqlite.c -I/usr/local/include -pthread -lcrypto -L/usr/local/lib -lsqlite3 -o test-userlog
+cc  -I/usr/local/include -O2 -pipe  -std=c11 -Wall -Wextra -Werror -Isrc tests/test_chat.c src/chat.c src/storage_sqlite.c -I/usr/local/include -pthread -lcrypto -L/usr/local/lib -lsqlite3 -o test-chat
+cc  -I/usr/local/include -O2 -pipe  -std=c11 -Wall -Wextra -Werror -pthread -Isrc tests/test_adapters.c src/session.c src/terminal.c src/telnet.c src/ui.c src/menu.c src/messages.c src/download.c src/userlog.c src/activity.c src/board.c src/members.c src/profile_store.c src/board_policy.c src/catalog.c src/moderation.c src/extras.c src/vault.c src/vault_bridge.c src/identity_legacy.c src/vault_transfer.c src/transfer_line.c src/vault_worker.c src/chat.c src/mail_files.c src/mailbox.c -lutil -lcrypto -L/usr/local/lib -lsqlite3  src/storage_sqlite.c -I/usr/local/include -pthread -lcrypto -L/usr/local/lib -lsqlite3 -o test-adapters
+cc  -I/usr/local/include -O2 -pipe  -std=c11 -Wall -Wextra -Werror -Isrc tests/test_vault_core.c src/vault.c -lcrypto -L/usr/local/lib -lsqlite3  src/storage_sqlite.c -I/usr/local/include -pthread -lcrypto -L/usr/local/lib -lsqlite3 -o test-vault-core
+cc  -I/usr/local/include -O2 -pipe  -std=c11 -Wall -Wextra -Werror -Isrc tests/test_upload_core.c src/vault.c -lcrypto -L/usr/local/lib -lsqlite3  src/storage_sqlite.c -I/usr/local/include -pthread -lcrypto -L/usr/local/lib -lsqlite3 -o test-upload-core
+cc  -I/usr/local/include -O2 -pipe  -std=c11 -Wall -Wextra -Werror -Isrc tests/test_transfer_connector.c src/transfer_line.c -lcrypto -L/usr/local/lib -lsqlite3  src/storage_sqlite.c -I/usr/local/include -pthread -lcrypto -L/usr/local/lib -lsqlite3 -o test-transfer-connector
+python3 tests/test_userlog.py ./test-userlog
+PASS: monotonic duration, checkpointed crash recovery, concurrent sessions and logout exclusion
+./test-chat
+PASS: independent chat room, UTF-8/control validation, rate bound, 20-event history, participants and empty-room cleanup
+PASS: private routing has only two recipients, no shared history, shared rate limit and no stale target fallback
+PASS: account snapshots update all peers and reject stale settings revisions
+PASS: 64 registered chat peers; overflow refused and peers cleaned up
+./test-adapters
+PASS: Telnet negotiation, duplicate suppression, NAWS escaping, NVT/binary output
+PASS: plain terminal adapter, UTF-8 erase, secret input, cleansing and raw maximum-length CRLF boundary
+PASS: transport-free session supports menus, language, timer, stale completion rejection and output failure
+PASS: transport-free revocation clears drafts/timers and rejects delayed authentication completion
+PASS: password change is transport-independent; revocation clears secrets and success advances session epoch
+PASS: adapter-supplied dimensions control paging and revocation clears retained article text
+PASS: all raw terminal bytes preserved; binary idle and partial-frame deadlines enforced
+PASS: deferred mail arrival preserves binary/password/editor/page/worker/chat states, aggregates once, isolates recipient/raw mode and clears on revocation
+./test-transfer-connector
+PASS: line connector uses replaceable backend, preserves byte payload/principal and rejects malformed frames before dispatch
+python3 tests/test_vault_core.py ./test-vault-core
+PASS: standalone vault uses namespaced principals and capabilities without BBS/account/UI linkage
+python3 tests/test_vault.py ./runtime ./vaultctl
+PASS: standalone import/export, binary SHA-256 download, empty files, live publication, member/admin permissions, hide/restart, bilingual menus and Telnet
+PASS: suspension, lock contention, no path traversal, exclusive outputs, corrupt data refusal and BBS isolation
+python3 tests/test_vault_catalog.py ./runtime ./vaultctl
+PASS: independent category/search/audit, permissions, legacy unknown actor, no-op records, live changes, durable actors, bilingual Telnet, pagination and BBS store isolation
+PASS: truncated/rechecksummed journal refusal and event-limit writes fail without losing readable files
+python3 tests/test_vault_manage.py ./runtime ./vaultctl
+PASS: admin metadata editing, empty/maximum text, no-op persistence, hidden-file editing, integrity-checked restore, audit, UTC date boundaries, pagination, JP/EN Telnet and corrupted journal rejection
+python3 tests/test_vault_boards.py ./runtime ./vaultctl
+PASS: hierarchical vault ACL, inherited reads, independent uploads, no ID bypass, live revocation, private publication, restart and bilingual menus
+python3 tests/test_upload_core.py ./test-upload-core
+PASS: independent upload API, owner/capability checks, resume/retry, out-of-order commits, empty file, global/per-subject limits and administrative cancellation
+python3 tests/test_upload.py ./runtime ./vaultctl
+PASS: staged files remain private, retry/resume, no overwrite, hash rejection, empty files, durable publication/cancellation, bilingual audit and live BBS download
+PASS: reservation quota shared with import, cancel release and interrupted link recovery
+PASS: no-follow staging and POSIX partial-journal failure
+PASS: active uploads retain a final journal slot for commit or cancellation at the history limit
+python3 tests/test_network_transfer.py ./runtime ./vaultctl
+PASS: real raw/Telnet transfer, resume/progress/cancel, metadata/hash validation, ambiguous START and lost commit handling, ownership/admin isolation, suspension and secret-free state
+python3 tests/test_binary_transfer.py ./runtime ./vaultctl
+PASS: binary-v1 TCP/Telnet all-byte roundtrip, resume, fragmented frames, menu restore and malformed-frame isolation
+python3 tests/test_vault_worker.py ./runtime ./vaultctl
+PASS: blocked vault hash allows BBS read/write; suspend/disconnect deny publication; authorized retry succeeds
+python3 tests/test_transfer_workflows.py
+PASS: upload/download workflows accept an independent connector and chunk sizing; explicit refusal permits a safe retry
+python3 tests/test_zmodem_workflows.py
+PASS: replaceable ZMODEM engine, hash verification, no publication after cancellation/revocation, lost commit recovery and bilingual messages
+python3 tests/test_zmodem_recovery.py
+PASS: batch publication lost-receipt retry without duplication; private account/metadata binding; concurrent lock; staged integrity; retained single partial and continuation
+python3 tests/test_chat.py ./runtime
+PASS: chat raw/Telnet broadcasts, WHO/help/leave, history privacy, no BBS side effects, guest/suspended rejection, disconnect cleanup and UTF-8 input redraw
+python3 tests/test_talk.py ./runtime
+PASS: private sender/recipient routing, reply, no history/third-party/same-account leaks, stale target and suspension blocking, explicit public return, bilingual Telnet private prompts and draft redraw
+python3 tests/test_chat_controls.py ./runtime
+PASS: reception off/on, per-login private/public mute, same-account reconnection protection, unrelated delivery, offline unmute, visit persistence, bilingual controls and HELP TALK
+python3 tests/test_chat_preferences.py ./runtime
+PASS: short write does not acknowledge saved settings; damaged restart rejected unchanged
+PASS: durable receive/mute settings and removal, multi-session incremental updates, duplicate suppression, history filtering on rejoin, offline targets, malformed/truncated journal rejection
+python3 tests/test_chat_kick.py ./runtime
+PASS: admin-only kick, protected admins, all target chat connections closed, BBS peer unaffected, private target blocked, reconnect/preferences intact, durable filtered audit, malformed journal rejection and bilingual Telnet
+python3 tests/test_outside_talk.py ./runtime
+PASS: outside-room talk, online roster, reply/return, no public room leak, busy editor/password rejection, logout stale-target blocking and Telnet draft redraw
+python3 tests/test_stage67.py ./runtime ./vaultctl
+PASS stage67 permission, shared buffer, file scope, timezone/DST
+python3 tests/test_stage67_database.py ./runtime
+PASS stage67 authoritative DB: migration preserves originals, crash persistence, exclusive instance, no legacy dependency, missing block rejection
+python3 tests/test_stage67_ui.py ./runtime ./vaultctl
+PASS stage67 Telnet reading, shared buffer, role menus, scope, questions, timezone, goodbye
+python3 tests/test_news_contact.py ./runtime
+PASS: UTC article dates, invalid dates, hidden/withdrawn/ACL exclusion, search pagination and non-mutating mail/body privacy; connection memos, guest denial, SYSOP-only calls, cooldown, busy rejection, JP/EN Telnet
+python3 tests/test_large_content.py ./runtime
+PASS: 16 KiB article/mail/drafts, exact boundaries and 8192-line listing; raw/JP/EN Telnet paging; compact copy/restart/replies/privacy/deleted body removal; locks/collision/corruption/source invariance and legacy upgrade; POSIX partial-write rejection
+python3 tests/test_stage60.py ./runtime
+PASS stage60: locked-board isolation/revision, long info, node policies/quotas, article import, move/reply/read-state/restart/compaction, delete/nonreuse, scoped retained access logs and corrupt-tail refusal
+python3 tests/test_stage60_ui.py ./runtime
+PASS stage60 UI: global admin idle exemption, guest/member cutoff, uppercase command echo, case-sensitive content/passwords, JA/EN, lowercase editor commands, G import and long INFO
+python3 tests/test_stage60_safety.py ./runtime
+PASS stage60 safety: inherited passwords, ACL/SIGOP scope, username case, order, INFO boundary/UTF-8/incomplete commit, missing sidecars and disabled retention; POSIX move/read/post short-write handling
+python3 tests/test_stage59.py ./runtime ./vaultctl
+PASS stage59: reset short write fails closed; truncated credential/role journals refused
+PASS stage59: ownership/policy, scoped SIGOP, revocation/restart, secret password reset and idle disconnect
+python3 tests/test_log_retention.py ./runtime ./vaultctl
+PASS retention: stable totals/replay, whole sessions, receipt rejection, backup integrity, Gather, lock/corruption/state refusal
+python3 tests/test_stage58.py ./runtime ./vaultctl
+PASS: download receipts/counts/idempotence/privacy/partial and binary paths; online board policies/ACL/draft recheck/restart; USERLOG privacy/login counts/usage/crash and corrupt-tail refusal
+python3 tests/test_stage58_ui.py ./runtime ./vaultctl
+PASS: Japanese/English reports and HELP/menu roles; Telnet and report paging ON/OFF
+python3 tests/test_stage57.py ./runtime ./vaultctl
+PASS: Gather limits/retention; profiles/search; private guest mail+compaction; date search; physical delete/retry/restart; admin ACL, broadcast, disconnect, scheduled stop; persistent public chat
+python3 tests/test_stage57_limits.py ./runtime ./vaultctl
+PASS: member 9999, board 1024, 4096-byte input, 128 connections, file/attachment ID 2000, 256MiB file/capacity boundary and physical reclamation; monotonic IDs
+python3 tests/test_limits.py ./runtime
+PASS: >1000 per-author / >10000 article-mail IDs; reply/search/read/delete/moderation/compaction/restart; quotas and monotonic IDs
+python3 tests/test_stage56_ui.py ./runtime
+PASS: bilingual role menus/help, admin always visible, external/empty/missing banners; classic editor insert/replace/range quote/delete/undo/save/resume/article/mail
+python3 tests/test_mail.py ./runtime
+PASS: private mail send/read/recipient-only read flag/reply/delete confirmation, no third-party or admin access, paging, restart, malformed storage and bilingual interactive mail
+python3 tests/test_mail_attachments.py ./runtime
+PASS: private mail uploads, resume, owner/recipient-only reads, SYSOP denial, shared references, drafts, compaction/restart, deletion/reclamation and JP/EN menus
+python3 tests/test_mail_draft.py ./runtime
+PASS: mail draft empty/save/restart/resume, article isolation, owner isolation, concurrent stale-save/send rejection, atomic send removal, deleted reply target and revision-checked deletion
+python3 tests/test_mail_draft_notice.py ./runtime
+PASS: owner-only mail draft login notice, saved language, Japanese/English menu and Telnet, coexisting article/unread notices, failed-login and raw isolation, unchanged stores, no notice after send/delete
+python3 tests/test_mail_arrival.py ./runtime
+PASS: committed live arrivals on all recipient connections, no third-party/content leaks, partial input redraw, deferred editor/password aggregation, Japanese/English, failed send/logout/raw isolation
+python3 tests/test_mail_notify.py ./runtime
+PASS: default ON, owner-only persistent ON/OFF/query, idempotent writes, live peer updates, pending-notice cancellation, no replay on ON, restart, language/preferences isolation, malformed/truncated journal rejection
+python3 tests/test_runtime.py ./runtime
+PASS: partial input does not block another session
+PASS: timer yields; queued commands resume in order
+PASS: sequential command data remains intact
+PASS: disconnect/reconnect does not inherit old timer or input
+PASS: bounded input failure is isolated
+PASS: stalled output/flood does not block peer
+PASS: graceful quit drains output
+python3 tests/test_listener_restart.py ./runtime
+PASS listener 127.0.0.1: occupied-port diagnostic and four immediate restarts after accepted TCP sessions
+PASS listener 0.0.0.0: occupied-port diagnostic and four immediate restarts after accepted TCP sessions
+python3 tests/test_bind.py ./runtime
+PASS: explicit loopback/wildcard binding, Telnet menus, invalid address rejection and bind conflict
+python3 tests/test_ssh_entry.py ./runtime
+PASS: native Telnet client via PTY: register, no local password echo, post/read and quit
+PASS: SSH entry validates arguments, requires a PTY and provides a working BBS terminal without Telnet escapes
+python3 tests/test_daemon.py ./runtime
+PASS: detached rc.d start/status/restart/stop, duplicate prevention, quoted paths, login/post/read persistence and private logs
+PASS: rc registration and feature settings, invalid policy rejection
+PASS: stale PID recovery, failed bind/config startup returns failure, data preserved, enable/one-command semantics
+python3 tests/test_board.py ./runtime
+PASS: draft isolation/cancel, UTF-8 bytes, multiline read, two replies
+PASS: invalid parent/id/title and empty body do not create articles
+PASS: concurrent posts receive unique contiguous IDs; list pagination
+PASS: second process cannot open the same store
+PASS: clean restart and forced process termination retain acknowledged posts
+PASS: disconnected draft is not saved
+PASS: corrupt/truncated/unknown-version files rejected without modification
+PASS: real OS short-write failure is not acknowledged/published; peers survive
+python3 tests/test_notes.py ./runtime
+PASS: branched DFS, parent/child/sibling navigation, current reply and session isolation
+PASS: concurrent same-parent replies, tree/notes pagination, reply totals and UTC timestamps
+PASS: tree, ordering, navigation and timestamps restored after restart
+PASS: 10000-level legacy fixture loads without recursion, bounded indent, no data rewrite
+python3 tests/test_members.py ./runtime
+PASS: member-only posting, authors, per-article unread holes, thread filter and explicit acknowledgement
+PASS: logout, wrong password and reconnect preserve isolation
+PASS: two connections of same account merge read acknowledgements
+PASS: forced restart restores accounts and independent read sets; no plaintext password stored
+PASS: truncated member journal rejected without alteration
+PASS: OS short-write in read journal does not acknowledge or mark article seen
+python3 tests/test_catalog.py ./runtime
+PASS: hierarchy visibility, ancestor read inheritance, read-only and named-ID posting ACLs
+PASS: direct ID, reply, tree and read-state operations cannot cross current board
+PASS: concurrent posts stay in selected boards; unread sets follow board selection
+PASS: board membership and per-user read state survive restart
+PASS: invalid ACL/cycle/missing stored board rejected unchanged; restart applies revocation
+python3 tests/test_rights.py ./runtime
+PASS: levels 0..5, groups 1..32, combined and ancestor ACLs, read/write distinction, revocation, persistence, approval and closed registration, disabled features and malformed storage/config rejection
+python3 tests/test_ui.py ./runtime
+PASS: guided registration/login, UTF-8 post/reply, cancel, navigation and saved-then-next unread
+PASS: board selection, denied access/post, independent pagination, raw/menu switching and quit
+PASS: opt-in MENU works on default raw server after restart
+PASS: real short-write on seen journal stops menu traversal and preserves unread article
+python3 tests/test_i18n.py ./runtime
+PASS: complete UTF-8 catalogs, unique IDs, printf signatures and all protocol error mappings
+PASS: per-session languages, default, invalid locale, reconnect and RAW/MENU persistence
+PASS: English registration/post/reply/navigation/unread/ACL; language switch preserves current article and page
+PASS: UTF-8 titles/body unchanged; LANG inside editor is stored as text
+PASS: unsupported or missing startup language rejected
+python3 tests/test_telnet.py ./runtime
+PASS: fragmented Telnet/IAC, negotiation, echo, UTF-8 erase, EC/EL, CRLF/CRNUL/LF and subnegotiation filtering
+PASS: pipelined and edited passwords never echoed; real register/login/post/read/language operations
+PASS: incomplete control sequences do not block other sessions
+PASS: reconnect isolation, bounded subnegotiation/line rejection and refused-echo login closure
+python3 tests/test_telnet_client.py ./runtime
+PASS: native Telnet client via PTY: register, no local password echo, post/read and quit
+python3 tests/test_moderation.py ./runtime
+PASS: explicit admin bootstrap, worker-side authority, board ACLs and read-only-board moderation
+PASS: hidden content excluded from READ/LIST/NOTES/TREE/navigation/unread; children and IDs preserved
+PASS: draft commit rechecks hidden parent; admin-only inspection and idempotent hide
+PASS: forced restart retains hides; restore preserves exact source and unread state; durable actor/time audit
+PASS: revoked roles, invalid admin config, damaged/truncated/mismatched journals fail without rewriting originals
+PASS: Japanese/English menus and real Telnet share moderation authority and behavior
+PASS: OS short-write never acknowledges restore; board access stops, corrupt restart refused, other I/O survives
+python3 tests/test_suspension.py ./runtime
+PASS: admin-only listing/status/suspend/resume, protected admins, pagination and idempotent operations
+PASS: all logged-in sessions including drafts/timers close; immediate resume does not revive them
+PASS: new login required after resume; suspension does not delete posts or read state
+PASS: forced restart retains suspension; existing password and unread holes survive restore
+PASS: account audit actor/time/target validated; malformed records and suspended-admin config rejected unchanged
+PASS: English/Japanese member management and Telnet victim notification/closure
+PASS: OS short-write cannot acknowledge suspension; board access and new logins fail closed, corrupt restart refused
+python3 tests/test_audit.py ./runtime
+PASS: admin-only history, per-board read ACLs, four actions, actor ID/name, UTC and newest-first pagination
+PASS: history inspection, denied requests and invalid cursors never rewrite data or add audit records
+PASS: reads preserve later article/account appends; paging remains stable across new events and restart
+PASS: localized Japanese/English history, numeric history navigation and Telnet
+PASS: history above 10000 entries, uint32 cursors, bounded 256-record scans and isolated connections
+PASS: runtime history read failure fails closed without further writes; other I/O survives
+python3 tests/test_content_audit.py ./runtime
+PASS: mixed history order, actors, UTC, ACLs, restart, stable cursors, localized UI and no title/body disclosure
+PASS: legacy undated records, append after history reads and restart; POSIX read failure closes board access
+PASS: invalid history metadata rejected without rewriting the journal
+python3 tests/test_audit_filters.py ./runtime
+PASS: combined article/actor filters, actor vs target, ACLs, invalid queries, session isolation, paging, languages, Telnet and restart
+PASS: bounded scan returns an empty page with a usable filtered continuation
+python3 tests/test_menu_files.py ./runtime
+PASS: UTF-8/BOM/LF/CRLF, literal percent signs, language isolation, RAW/MENU, Telnet and restart reload
+PASS: invalid, empty, oversized and missing explicit files fail before data creation without modifying menus
+PASS: default menus directory and backwards-compatible fallback when absent
+PASS: optional RTBBS sections, language fallback, startup snapshot and validation
+python3 tests/test_password.py ./runtime
+PASS: current-password check, confirmation, cancel at every step, length and unchanged rejection, one durable salted change
+PASS: peer draft revoked, initiating session remains valid, old login rejected, new login works, posts/read state preserved
+PASS: restart replays credential replacement; 128-byte password accepted
+PASS: Japanese/English Telnet prompts and secret input, repeated changes preserve journal and article data
+PASS: OS short-write never acknowledges change; further board/auth access fails closed; truncated restart refused
+PASS: truncated password journal rejected without rewriting it
+python3 tests/test_search.py ./runtime
+PASS: title/body UTF-8 literal matching, replies, guest search, case sensitivity, board isolation, hidden exclusion and restore
+PASS: bounded candidate scans, indexed gaps, invalid input, connection isolation and unchanged unread state
+PASS: restart, Japanese/English menus, per-session query pagination, result-to-article/tree navigation, Telnet and byte-identical stores
+python3 tests/test_pager.py ./runtime
+PASS: default OFF, per-session toggle, Enter/stop/flush, Japanese/English, raw bypass and reconnect isolation
+PASS: long UTF-8 lines wrap without splitting characters, all article text delivered once, other connections remain usable
+PASS: Telnet NAWS dimensions, resize during paging, zero-size fallback and unchanged article storage
+python3 tests/test_preferences.py ./runtime
+PASS: guest rejection, missing defaults, explicit save/load, duplicate suppression and multi-session isolation
+PASS: restart and Telnet restore each account language before login response; article bytes preserved
+PASS: invalid member/language/pager/reserved bytes and truncated records rejected without rewrite
+PASS: actual short-write never acknowledges save; board/auth fail closed and truncated restart refused
+python3 tests/test_list_pager.py ./runtime
+PASS: all eight list types, screen/result pagination, saved preference, cancel/select/tree, OFF, Japanese and raw bypass
+PASS: Telnet resize during list display, continuation cursor and byte-identical article/member/moderation files
+python3 tests/test_preview.py ./runtime
+PASS: empty/reply previews, exact UTF-8 body and slash/dot escaping, repeated preview/cancel/disconnect without any store changes
+PASS: append after preview saves once; final commit still rechecks hidden reply parent
+PASS: Japanese/English Telnet, pager Enter/Q/OFF, return to editor and preview cancellation preserves draft
+python3 tests/test_draft_edit.py ./runtime
+PASS: title and line edits, renumbering, empty replacement, invalid-operation atomicity, escapes, 262144-byte boundary and 512-line display; no persistence before save
+PASS: Japanese/English Telnet, numbered-list paging/cancel, save after editing, correct reply parent and restart persistence
+python3 tests/test_draft_undo.py ./runtime
+PASS: first/middle/end/empty insert, one-step undo of every edit type, failures/no-ops preserve history, byte limit, escaped commands, per-session/reset isolation
+PASS: Japanese/English Telnet, final save and restart preserve only committed content
+python3 tests/test_saved_draft.py ./runtime
+PASS: member/board isolation, save/resume, UTF-8 and escape, stale-session conflict, exact revision delete and unchanged unread state
+PASS: forced restart retains saved draft; resume/save/post recheck hidden parent and ACL; explicit removal works after ACL loss
+PASS: empty/max-size drafts, revision sequence after deletion, English/Japanese Telnet, corrupt/truncated journal rejected unchanged
+PASS: actual partial draft write never acknowledges success; subsequent member operations/auth stop and restart rejects partial record
+python3 tests/test_draft_notice.py ./runtime
+PASS: owner-only login reminder, restored language, Japanese/English menus and Telnet, no secret contents or automatic resume
+PASS: failed login, absent/deleted draft, ACL loss, raw compatibility and byte-identical stores on login
+python3 tests/test_board_unread.py ./runtime
+PASS: per-member counts, replies, explicit SEEN/UNSEEN, hidden/restore, direct-board totals, ACL inheritance, guests and multiple result pages
+PASS: restart, Japanese/English menus and Telnet, localized counts and byte-identical article/member/moderation stores
+python3 tests/test_next_board.py ./runtime
+PASS: hierarchy order, wraparound, skip current/seen/hidden/inaccessible boards, read-only destination and per-member isolation
+PASS: no-target state retention, successful selection reset, guest rejection, restart, Japanese/English menus and Telnet; stores unchanged
+python3 tests/test_thread_unread.py ./runtime
+PASS: parent/reply/deep counts, member isolation, explicit read state, hidden/restore, hidden parent placeholder, guests and multiple pages
+PASS: restart, Japanese/English menus and Telnet, no implicit acknowledgement and byte-identical stores
+python3 tests/test_unread_threads.py ./runtime
+PASS: unread-only membership, deep replies, per-member isolation, hide/restore, hidden roots, empty/all-seen, strict cursor and retained current article
+PASS: filtered pagination, N resets, independent sessions, Japanese/English, PAGER ON/OFF, numeric selection, Telnet and byte-identical stores
+python3 tests/test_login_unread.py ./runtime
+PASS: per-member visible unread totals, reply/hidden handling, ancestor ACL and read-only boards, zero counts and restart ACL changes
+PASS: saved language, Japanese/English and Telnet, draft notice coexistence, failed/suspended login privacy, raw compatibility and unchanged stores
+python3 tests/test_help.py ./runtime
+PASS: all help topics in Japanese/English, guest access, unknown topics, unchanged list cursor, screen paging/cancel/OFF and session isolation
+PASS: Telnet editor help, preserved body/Undo, literal /HELP, raw END HELP framing and unchanged stores
+python3 tests/test_extended.py ./runtime
+PASS: reserved anonymous author text cannot be claimed by a same-name account
+PASS: author withdrawal confirmation/ownership, preserved replies, no visibility/search/unread leaks, author/admin title edits and durable journal
+PASS: cross-board and exact-author search, ACL/hidden exclusion, bounded result pages, sequential reading without marking, INFO and member profiles
+PASS: restart, public profile pagination, Japanese/English menus and Telnet, global result selection, paging, scan stop and read-only store invariance
+PASS: malformed/rechecksummed and truncated extras rejected unchanged; POSIX partial write blocks access/authentication and restart
+cc  -I/usr/local/include -O2 -pipe  -std=c11 -Wall -Wextra -Werror -Isrc tests/test_stage61_userlog.c src/userlog.c -lcrypto -L/usr/local/lib -lsqlite3  src/storage_sqlite.c -I/usr/local/include -pthread -lcrypto -L/usr/local/lib -lsqlite3 -o test-stage61-userlog
+python3 tests/test_userlog.py ./test-stage61-userlog
+PASS retained complete connections, concurrent slots, lifetime totals and restart
+python3 tests/test_stage61.py ./runtime ./vaultctl
+stage61 profiles/vault: PASS
+python3 tests/test_stage61_ui.py ./runtime
+PASS stage61 level limits/admin exemption/public USERLOG/external HELP/menu and banner
+python3 tests/test_stage61_safety.py ./runtime ./vaultctl
+PASS stage61 restart/privacy/missing and incomplete journals/group99/editor isolation/UTF8 text
+python3 tests/test_maintenance.py ./runtime ./vaultctl ./memberctl
+PASS maintenance: hashes, corruption/truncation/CRC, traversal, links, locks, changed source, exclusive output, copy-only failures
+PASS maintenance runtime: restore + compact restart, moved replies, monotonic IDs, deleted mail, draft, group100, private profile/attachment, public vault, original unchanged
+cc  -I/usr/local/include -O2 -pipe  -std=c11 -Wall -Wextra -Werror tests/generate_scale.c src/storage_sqlite.c -I/usr/local/include -pthread -lcrypto -L/usr/local/lib -lsqlite3 -o generate-scale
+python3 tests/test_state_compact.py
+PASS state compaction: superseded invalid password, guide control, birthday and extras padding are rejected
+python3 tests/test_stage63_read_errors.py ./runtime
+PASS lazy body faults: article/mail searches reject disk read failure; peer commands survive
+python3 tests/test_stage63.py ./runtime ./vaultctl ./memberctl
+PASS stage63: connection status, protected lifecycle, pending rejection/deletion, retire, 16 attachments, restart/draft/privacy/reclamation, full state compaction
+python3 tests/test_stage63_limits.py ./runtime ./vaultctl
+PASS stage63 quotas: IDs >2000, events >10000, physical total >256MiB, zero unlimited, lowering quotas, invalid config, private attachments
+python3 tests/test_stage63_memory.py ./runtime ./generate-scale
+{"articles": 12000, "mails": 12000, "body_bytes": 4096, "baseline_rss": 83120128, "loaded_rss": 89038848, "growth": 5918720}
+PASS stage63 memory: body storage on disk; 12000 article/mail read/search/reply/send/seen; RSS growth <48MiB
+python3 tests/test_index_fault.py ./runtime
+PASS: real file-size quota fails SQLite startup closed; original journals unchanged
+python3 tests/test_stage64_batch_names.py
+PASS: duplicate/max-byte UTF-8 attachment names and prefix collisions preserve all files
+python3 tests/test_stage64.py ./runtime ./vaultctl
+b'BOARD UPDATED 2'
+b'BOARD UPDATED 3'
+b'BOARD UPDATED 4'
+b'SIGOP SET 2 2'
+b'BOARD OPTIONS SAVED'
+b'ERR admin required'
+b'BOARD UPDATED 3'
+b'BOARD 3 Child'
+b'RIGHTS 3 LEVEL 2 GROUPS 10 STATUS active'
+b'SIGOP GROUP SAVED'
+b'RIGHTS 3 LEVEL 2 GROUPS 10 STATUS active'
+b'ERR admin required'
+b'ERR admin required'
+b'BOARD 3 Child'
+b'BOARD 4 Elsewhere'
+b'BOARD 2 Forum'
+b'ERR profile permission or value'
+b'PROFILE SAVED'
+b'MAIL EDIT end with . or /CANCEL'
+b'MAIL SENT 1'
+b'MAIL IMPORTED TO BUFFER'
+b'MAIL ERROR unavailable'
+b'MAIL CLOSED'
+b'MAIL CLOSED'
+b'CHECK CANCELLED'
+b'CHECKPOINT SAVED'
+b'FILEBOARD UPDATED'
+b'FILEBOARD UPDATED'
+b'FILEBOARD UPDATED'
+b'FILEBOARD UPDATED'
+b'FILEBOARD UPDATED'
+b'FILEBOARD UPDATED'
+b'ERR vault denied'
+b'FILEBOARD UPDATED'
+b'NEW PASSWORD'
+b'CONFIRM PASSWORD'
+b'FILEBOARD UPDATED'
+b'ERR vault denied'
+b'PASSWORD'
+b'FILEBOARD UNLOCKED 2 8'
+b'BOARD 3 Child'
+b'WITHDRAW SAVED 1'
+b'BOARD OPTIONS SAVED'
+b'BOARD GROUP MOVED'
+PASS stage64 inherited/scoped roles, subtree search, private import, checkpoints, vault passwords, profiles, reclaim and replay
+python3 tests/test_stage64_details.py ./runtime
+PASS stage64 4096-byte input, 256KiB article/mail/draft/buffer, reverse/relative reads, timed U, confirmation, generated IDs, detailed application and review/restart
+python3 tests/test_stage64_vault.py ./runtime ./vaultctl
+PASS stage64 inherited vault management, rename, retained receipts and totals, menu nodes, parent password revision/logout/restart, physical deletion
+python3 tests/test_stage64_persistence.py ./runtime ./vaultctl
+PASS: separate article/mail/file checkpoints, pagination completion, cancellation/restart, interrupted group intent recovery
+python3 tests/test_stage64_reclaim.py ./runtime
+PASS: management CLI backup/reclaim/restart; withdrawn body and old FTS removed, HIDE preserved, IDs and checkpoint retained, originals unchanged
+python3 tests/test_stage65.py ./runtime
+BOARDSET 2|1|all|all|Public|public b'BOARD UPDATED 2'
+BOARDSET 3|1|member|member|Other|other b'BOARD UPDATED 3'
+BOARDSET 4|2|all|all|Child|child b'BOARD UPDATED 4'
+SIGOP 2 2 b'SIGOP SET 2 2'
+BOARDGUEST 3 ON b'ERR admin required'
+boardguest 2 on b'BOARD GUEST SAVED'
+HANDLE visitor b'GUEST HANDLE guest:visitor'
+BOARD 2 b'BOARD 2 Public'
+BOARD 2 b'BOARD 2 Public'
+AUTHOR 1 3 CONFIRM b'ERR admin required'
+author 1 3 confirm b'AUTHOR CHANGED 1 3'
+BOARD 2 b'BOARD 2 Public'
+MOVEBRANCH 2 3 CONFIRM b'THREAD MOVED 2 3'
+BOARD 3 b'BOARD 3 Other'
+MENUMODE EXPERT b'MENU MODE SAVED'
+LANG ja b'\xe8\xa1\xa8\xe7\xa4\xba\xe8\xa8\x80\xe8\xaa\x9e: ja / LANG ja: \xe6\x97\xa5\xe6\x9c\xac\xe8\xaa\x9e / LANG en: English'
+PAGER ON b'PAGER ON'
+LOGOUT b'LOGGED OUT'
+PREFS b'PREFS STORED ja ON'
+BOARD 3 b'BOARD 3 Other'
+BOARDDELETEALL 2 CASCADE CONFIRM b'BOARD TREE DELETED'
+BOARD 2 b'ERR board unavailable'
+BOARD 4 b'ERR board unavailable'
+BOARD 3 b'BOARD 3 Other'
+BOARD 3 b'BOARD 3 Other'
+BOARD 2 b'ERR board unavailable'
+stage65 core permissions/restart/compaction passed
+python3 tests/test_stage65_delete_recovery.py ./runtime
+stage65 cascade intent recovery, deepest-first deletion, repeat restart and no duplicate withdrawals passed
+python3 tests/test_stage65_doors.py ./runtime
+stage65 native PTY door: auth, level, environment, return, escape passed
+python3 tests/test_door_resize.py ./runtime
+PASS live Door NAWS: existing 20..240 x 5..100 policy, missing/zero/invalid/duplicate/fragmented/refused notifications, SIGWINCH, identity/environment, independent sessions, quit/reentry/crash/escape/disconnect/timeout, BBS return, independent stty PTY app
+python3 tests/test_doors_generic.py ./runtime
+generic Door: menu, raw keys, private DORINFO, slots across runtimes, timeout/crash/escape/disconnect and descendants passed
+python3 tests/test_doors_config.py ./runtime
+PASS Door config validation, failed exec cleanup/retry, slots without dropfiles and empty menu
+python3 tests/test_stage65_terminal.py ./runtime
+stage65 Telnet PTY CRLF, connections, revocation cleanup, U clear/append confirmation passed
+python3 tests/test_stage65_ui.py ./runtime
+stage65 menu quantity and continuous reader passed
+python3 tests/test_stage65_scan_telnet.py ./runtime
+stage65 Telnet F/CRLF, pager entry, Ctrl-C cancellation and mail continuous reading passed
+python3 tests/test_stage65_database.py ./runtime ./vaultctl
+stage65 SQL cache: reuse, eviction, mail, crash replay, tamper rejection passed
+python3 tests/test_stage66_commands.py ./runtime ./vaultctl
+PASS stage66: native Telnet RTBBS main/board/read/mail/vault/settings/profile keys, confirmation, authorization, persistence
+python3 tests/test_stage71.py ./runtime
+PASS repeatable receipt creation/reuse/backup/atomic failure/symlink and non-mutating asset check
+PASS spool detail, explicit lost-ID binding, status reconciliation, preview, endpoint isolation and confirmed-only cleanup
+PASS structured profile/history rows, logical export/replay, reader S privacy and unchanged read position
+python3 tests/test_stage71_reconcile.py ./runtime ./vaultctl
+PASS real public/private reservation reconcile, lost reply binding, active cleanup refusal, owner isolation and published payload preservation

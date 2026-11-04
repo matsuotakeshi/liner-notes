@@ -1,0 +1,18 @@
+/home/takeshi/liner-notes-release72-20261103/.web-venv/bin/python tests/test_door_resize.py ./runtime
+PASS live Door NAWS: existing 20..240 x 5..100 policy, missing/zero/invalid/duplicate/fragmented/refused notifications, SIGWINCH, identity/environment, independent sessions, quit/reentry/crash/escape/disconnect/timeout, BBS return, independent stty PTY app
+/home/takeshi/liner-notes-release72-20261103/.web-venv/bin/python tests/test_doors_config.py ./runtime
+PASS Door config validation, failed exec cleanup/retry, slots without dropfiles and empty menu
+/home/takeshi/liner-notes-release72-20261103/.web-venv/bin/python tests/test_doors_generic.py ./runtime
+generic Door: menu, raw keys, private DORINFO, slots across runtimes, timeout/crash/escape/disconnect and descendants passed
+/home/takeshi/liner-notes-release72-20261103/.web-venv/bin/python tests/test_web_connector.py ./runtime
+PASS Web connector: real Telnet, password secrecy, member ACL, literal 4096-byte lines, article/mail bodies and chat synchronization
+/home/takeshi/liner-notes-release72-20261103/.web-venv/bin/python tests/test_web_blocks.py ./runtime ./vaultctl
+PASS connector blocks: size bounds, legacy line limit, token matching, guest refusal, command allowlist, owner checks, mid-download hiding, no premature receipt, private mail denies SYSOP
+/home/takeshi/liner-notes-release72-20261103/.web-venv/bin/python tests/test_web_http.py ./runtime ./vaultctl
+PASS Web HTTP: CSRF/Origin, session isolation, 256KiB drafts, Gather, literal posts, mail/privacy, public/private files with SHA256, one-use downloads, resume/retry, terminal login and real PTY door return
+/home/takeshi/liner-notes-release72-20261103/.web-venv/bin/python tests/test_web_transfers.py ./runtime ./vaultctl
+PASS block transfer, durable resume ID, owner isolation, mismatched source, mail editor preservation and private attachments
+/home/takeshi/liner-notes-release72-20261103/.web-venv/bin/python tests/test_web_install.py
+PASS Web installer: config preservation, samples-only pkg staging, permissions, rc syntax, symlink refusal
+/home/takeshi/liner-notes-release72-20261103/.web-venv/bin/python tests/test_web_errors.py
+PASS Web errors: missing template fallback, invalid UTF-8/permission errors=500, recovered template=200, BBS network failure=503

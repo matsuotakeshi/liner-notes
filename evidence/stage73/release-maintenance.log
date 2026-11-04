@@ -1,0 +1,3 @@
+PASS SQLite backup probe: closed WAL source unchanged; authoritative WAL detected without source SHM mutation
+PASS maintenance: hashes, corruption/truncation/CRC, traversal, links, locks, changed source, exclusive output, copy-only failures
+PASS maintenance runtime: restore + compact restart, moved replies, monotonic IDs, deleted mail, draft, group100, private profile/attachment, public vault, original unchanged

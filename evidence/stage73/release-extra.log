@@ -1,0 +1,20 @@
+python3 tests/test_stage67.py ./runtime ./vaultctl
+PASS stage67 permission, shared buffer, file scope, timezone/DST
+python3 tests/test_stage67_database.py ./runtime
+PASS stage67 authoritative DB: migration preserves originals, crash persistence, exclusive instance, no legacy dependency, missing block rejection
+python3 tests/test_stage67_ui.py ./runtime ./vaultctl
+PASS stage67 Telnet reading, shared buffer, role menus, scope, questions, timezone, goodbye
+python3 tests/test_stage67_limits_checks.py ./runtime ./vaultctl
+PASS stage67 quotas preserve existing data; scoped auto checkpoint waits for display and respects cancellation
+python3 tests/test_stage68.py ./runtime
+PASS stage68 scoped news, filtered P/L, disconnect preferences, journal and SQLite
+python3 tests/test_stage69.py ./runtime ./vaultctl
+PASS stage69 role boundaries, implicit groups, privacy opt-in, current-board DOS match, copy and protocol replay/compact
+python3 tests/test_stage69_ui.py ./runtime ./vaultctl
+PASS stage69 Telnet file/batch/hierarchy, profile forms, editor ranges/highlights/numbers, memo, W/#/one-shot T, birthday and registration confirmation
+python3 tests/test_stage70.py ./runtime
+PASS stage70 structured DB/restart/crash/logical backup, persistent editor/protocol, hourly fallback, spool preview/locks/publication/symlink safety
+python3 tests/test_stage70_gather.py ./runtime
+PASS Gather oldest-first retained messages, maximum 70 characters/10 lines, skip-to-compose and read-only exit
+python3 tests/test_transfer_timeouts.py
+PASS common idle timeout: active process send and legacy receive exceed total timeout; stalled peers fail TIMEOUT

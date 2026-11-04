@@ -1,6 +1,6 @@
 # Rocky Linux / AlmaLinux
 
-Liner notes 0.72のソース構築手順です。対象はRocky Linux 9 / AlmaLinux 9、x86_64、Clang、Python 3.11です。FreeBSD向けのports/pkgはLinuxにはインストールしません。Linux用RPMはまだ提供していません。
+Liner notes 0.73のソース構築手順です。対象はRocky Linux 9 / AlmaLinux 9、x86_64、Clang、Python 3.11です。FreeBSD向けのports/pkgはLinuxにはインストールしません。Linux用RPMはまだ提供していません。
 
 ## ビルド
 
@@ -8,7 +8,7 @@ Liner notes 0.72のソース構築手順です。対象はRocky Linux 9 / AlmaLi
 
 ```sh
 sudo dnf install clang gcc make openssl-devel sqlite-devel python3.11 git tar gzip telnet
-git clone --branch v0.72 https://github.com/matsuotakeshi/liner-notes.git
+git clone --branch v0.73 https://github.com/matsuotakeshi/liner-notes.git
 cd liner-notes
 make CC=clang PYTHON=python3.11
 ```
@@ -78,9 +78,27 @@ sudo -u liner_notes /usr/local/bin/liner-notes-check-resume \
 
 ゲームを使用する場合は、`/etc/liner-notes/doors.conf`のサンプルを編集し、`LINER_NOTES_OPTIONS`へ`--doors /etc/liner-notes/doors.conf`を追加します。ゲーム用作業ディレクトリをサービス所有者で作成してください。付属サンプルは`/usr/local/share/liner-notes/scripts/door_guess.py`です。Windows/DOS用ゲームの互換実行は含みません。
 
+## COMと共有ボードリンク
+
+COMは `liner-notes-serial --platform linux` を使用します。速度・デバイス・
+モデムの設定は [SERIAL.md](SERIAL.md) を参照してください。
+共有ボードは専用Python環境へ依存を入れ、BBSとは別ユーザーで実行します。
+ソースディレクトリでの準備例です。
+
+```sh
+sudo python3.11 -m venv /opt/liner-notes-link-python
+sudo /opt/liner-notes-link-python/bin/pip install -r link-requirements.txt
+```
+
+[共有ボードの設定手順](BBS_LINKS.md)中の `liner-notes-link` は、この構成では
+`/opt/liner-notes-link-python/bin/python /usr/local/share/liner-notes/scripts/link_service.py`
+に置き換えます。設定は `/etc/liner-notes/link.toml`、保存先は
+`/var/lib/liner-notes-link` 等を使います。鍵・接続先を設定する前に自動起動しません。
+システム標準Pythonへ追加パッケージを入れる必要はありません。
+
 ## 更新と検証範囲
 
-2026-11-01、コミット`2f9629a`の[Linux CI](https://github.com/matsuotakeshi/liner-notes/actions/runs/41272810028)はRocky Linux 9／AlmaLinux 9の両方で成功しました。`make test test-stage65 test-stage70 test-stage71`、実lrzsz 0.13.1を使う`make test-zmodem`、配置・設定保持・導入後起動の試験を実施しています。保管庫とメール添付の送受信、実データの途中再開、SHA-256一致、中断後の同じ接続での再アップロード、PTYドアゲームも対象です。Linuxでの1GiB実転送試験とFreeBSD専用SSH入口・rc.d試験は含みません。
+0.73の [Linux CI](https://github.com/matsuotakeshi/liner-notes/actions/runs/41783614429) はRocky Linux 9／AlmaLinux 9を対象に、`make check`、stage67〜73の追加試験、実lrzsz 0.13.1を使うZMODEM、配置・設定保持・導入後起動を検査します。新しいCOMは疑似端末、共有ボードは複数BBSと相互TLSで検査します。実行結果とログは配布物の `evidence/stage73/` を参照してください。Linuxでの1GiB実転送とFreeBSD専用SSH入口・rc.d試験は対象外です。
 
 更新前にサービス・外部転送を停止し、データと`/etc/liner-notes`、編集済み`/usr/local/share/liner-notes`をバックアップしてください。新しいソースを別ディレクトリで構築し、`install-linux`を実行します。
 

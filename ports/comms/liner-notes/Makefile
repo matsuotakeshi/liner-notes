@@ -1,10 +1,8 @@
 PORTNAME=	liner-notes
-DISTVERSION=	0.73.a1
+DISTVERSION=	0.73
 CATEGORIES=	comms
-# Review build: use the accompanying verified source archive in DISTDIR.
-# No public release URL is assigned until release validation is complete.
-MASTER_SITES=
-DISTNAME=	liner-notes-stage73-review
+MASTER_SITES=	https://github.com/matsuotakeshi/liner-notes/releases/download/v${DISTVERSION}/
+DISTNAME=	liner-notes-stage73
 
 MAINTAINER=	ports@FreeBSD.org
 COMMENT=	HyperNotes-style BBS with Telnet, mail, chat, and file vaults

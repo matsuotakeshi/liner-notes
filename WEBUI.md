@@ -1,10 +1,10 @@
 > stage73の管理帳票・検索結果・機能対応は [WEBUI_COVERAGE.md](WEBUI_COVERAGE.md)、転送性能と検証範囲は [STAGE73.md](STAGE73.md) を参照してください。
 
-# Liner notes WebUI 0.72
+# Liner notes WebUI 0.73
 
 初回導入は [詳細導入マニュアルのWebUI・Apache手順](INSTALL.md#webui-setup)を順に実施してください。設定全体、Host/Originの合わせ方、テンプレート権限、Forbidden等の切り分けをまとめています。この文書は構成・機能・開発用起動の補足です。
 
-0.72のBBS本体と組み合わせる別プロセスのWebコネクタです。
+0.73のBBS本体と組み合わせる別プロセスのWebコネクタです。
 0.71のruntimeには必要な同期機能がないため、本体とWebUIを揃えて更新します。
 
 ## FreeBSD portsでの導入
@@ -258,6 +258,6 @@ PythonやBBS本体を再ビルドする必要はありません。
 - 1GiB以上の一括運用・同時接続の負荷試験、転送のさらなる高速化。
 - 設置環境ごとのApache/HTTPS経由の大容量転送確認。
 
-0.72には現在の機能を収録しています。上記の性能・全操作の受入確認まで完了したという意味ではありません。
+0.73には現在の機能を収録しています。上記の性能・全操作の受入確認まで完了したという意味ではありません。
 公式資料: [ApacheのWebSocket転送](https://httpd.apache.org/docs/2.4/mod/mod_proxy_wstunnel.html)、
 [xterm.jsの組み込み上の注意](https://xtermjs.org/docs/guides/security/)。

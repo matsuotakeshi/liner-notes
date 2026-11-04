@@ -1,0 +1,1 @@
+PASS Web rc.d: actual rc.subr/daemon start, HTTP response, status, duplicate rejection, restart, stop, startup failure; paths with spaces; caller UID=1001, service UID=1001

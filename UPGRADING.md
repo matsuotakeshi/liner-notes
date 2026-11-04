@@ -1,10 +1,10 @@
 > stage73では、structured形式のバックアップ・復元を保持し、`db-structure` による別コピー変換を追加しました。[DATABASE_STRUCTURED.md](DATABASE_STRUCTURED.md)を参照してください。既存DBは自動変換しません。追加のCOM／BBSリンクも明示的に起動するまで無効です。
 
-# 0.72への更新
+# 0.73への更新
 
 文書改訂: 2026-11-04。[詳細導入マニュアル](INSTALL.md)と併せて使用します。
 
-0.71およびWeb/Doorレビュー版からの更新です。本番で利用者へ停止を案内してから行います。
+主に0.72からの更新です。旧Web/Doorレビュー版の起動先を使っている場合も確認してください。本番で利用者へ停止を案内してから行います。
 ゲームの初期化や既存DBの形式変更は不要です。
 
 先に [配布物の取得・SHA-256照合](INSTALL.md#install-package)を済ませ、展開した配布物のルートを控えます。この段階で新規構築のmake install、保管庫init、REGISTERを繰り返す必要はありません。
@@ -107,7 +107,7 @@ sysrc liner_notes_web_program=/usr/local/sbin/liner-notes-web
 
 ## 3. 再開検査と起動
 
-同梱pkgで更新する場合は、上のmakeによる構築・導入の代わりに、配布物のルートから `pkg delete liner-notes` → `pkg add packages/liner-notes-0.72.pkg` を実行します。必要な依存関係は [導入マニュアル](INSTALL.md#install-package)を参照してください。古いpkgの削除前に、新pkgと依存ソフトが揃っていることを確認します。`pkg autoremove`や依存関係を無視する強制削除は行いません。
+同梱pkgで更新する場合は、上のmakeによる構築・導入の代わりに、配布物のルートから `pkg delete liner-notes` → `pkg add packages/liner-notes-0.73.pkg` を実行します。必要な依存関係は [導入マニュアル](INSTALL.md#install-package)を参照してください。古いpkgの削除前に、新pkgと依存ソフトが揃っていることを確認します。`pkg autoremove`や依存関係を無視する強制削除は行いません。
 
 `upgrade-check`は差分の検出であり、自動統合しません。運用ファイルを直接編集した場合は、その内容を残しながら `.sample` の新しい要素を取り込みます。WebのHTMLに新しいフォームがなければ、本体だけ更新しても新機能の入口は出ません。
 

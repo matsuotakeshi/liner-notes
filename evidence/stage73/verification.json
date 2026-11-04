@@ -1,0 +1,65 @@
+{
+  "release": "0.73",
+  "source_sha256": "d6e03ab28324fdfc16741045f9c81e9f01cc8ba0ac91b990e7b7c1aef9e185f1",
+  "package_sha256": "6d5449a4fcf8a5c612f702e45fd872f517a28a30d7f48e7a43bec724f03641f8",
+  "linux_ci": {
+    "url": "https://github.com/matsuotakeshi/liner-notes/actions/runs/41783614429",
+    "commit": "9f02a7cc276df4cd1dcb0d926ac78f223f20822a",
+    "status": "completed",
+    "conclusion": "success",
+    "jobs": [
+      {
+        "id": 126420590875,
+        "name": "linux (rockylinux/rockylinux:9)",
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "id": 126420591325,
+        "name": "linux (almalinux:9)",
+        "status": "completed",
+        "conclusion": "success"
+      }
+    ]
+  },
+  "production_changed": false,
+  "freebsd": "15.1/amd64, Python 3.12.15",
+  "checks": {
+    "make_check": 0,
+    "stage67_68_69_70": 0,
+    "stage72_web_door": 0,
+    "stage73_database_serial_reports_links": 0,
+    "maintenance_after_fixes": 0,
+    "web_rc_service": 0,
+    "package_lifecycle": 0,
+    "installed_web_tls_dbconvert": 0,
+    "ports_stage_plist_qa_package": 0
+  },
+  "package_lifecycle": "Fresh 0.73 install; 0.72 seeded accounts/articles/mail to 0.73; repeat install/delete/reinstall; data hashes and custom settings/templates/game entries preserved; unprivileged installed runtime and connectors.",
+  "ports_options": [
+    "DOCS",
+    "WEBUI",
+    "LINK"
+  ],
+  "ports_qa_warning": "you may not need USES=ssl",
+  "linux_scope": "Rocky Linux 9 and AlmaLinux 9 containers on GitHub Ubuntu host, x86_64/Clang/Python 3.11; native compile and real socket/PTY/transfer tests, staged installer preservation, installed service arguments as unprivileged user. No systemd boot or SELinux enforcing deployment test.",
+  "fixes_found": [
+    "Temporary backup directory now follows chosen output rather than requiring /var/db write permission.",
+    "SQLite format probing uses a private DB/WAL copy to avoid changing original SHM.",
+    "Offline migration fixture closes the link store before backup."
+  ],
+  "code_match": {
+    "linux_tested_commit": "9f02a7cc276df4cd1dcb0d926ac78f223f20822a",
+    "release_implementation_matches": true,
+    "differences_after_ci": "Release docs, packaging metadata and evidence only"
+  },
+  "review_evidence": "Browser, large transfer and ZMODEM test records retained from the identical feature implementation; later production changes affect backup helpers only.",
+  "limitations": [
+    "Physical serial/modem DCD/DTR/RTSCTS",
+    "Production HTTPS concurrent large transfers",
+    "Maximum 1GiB x 16 transfer stress",
+    "Solaris/illumos",
+    "Linux systemd boot and SELinux deployment",
+    "Every browser/permission combination"
+  ]
+}

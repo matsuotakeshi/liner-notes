@@ -1,8 +1,8 @@
-# stage73 開発版
+# Liner notes 0.73（stage73）
 
 0.72から独立した開発・検証領域で変更しました。本番のサービス、データ、
 既存StarRoute Traders/The Clansの設定は変更していません。
-このチェックアウトとレビュー用portsは開発版であり、正式リリースではありません。
+共有ボード・COMは任意機能です。既存環境の設定やDBを自動変換しません。
 
 ## 実装
 
@@ -24,6 +24,9 @@
 - Door: 既存の汎用PTY連携を回帰確認し、追加・排他・異常終了・復旧の
   [運用手順](DOOR_OPERATIONS.md)を整理しました。
 - 文書: 新機能の入口と過去の設計記録を区別し、portsのファイル一覧と対応。
+- 導入試験で、DBバックアップの一時領域を出力先側へ変更しました。
+  `/var/db`へ書き込めないサービスユーザーでも別コピーへ変換できます。
+  SQLiteの形式判定はWALを含む一時コピー上で行い、元DBの補助ファイルを変更しません。
 
 ## 確認済みの範囲
 
@@ -48,28 +51,20 @@ FreeBSD 15.1/amd64、Python 3.12.15の独立領域で検証しています。
   子プロセス終了とBBSへの復帰。ゲーム本体の保存データは使っていません。
 - ZMODEM: lrzsz 0.13.1との実送受信、バッチ、メール添付、中断・途中再開、
   同一接続での失敗後の再試行、同時転送枠、権限取り消し、子プロセス回収。
+- パッケージ: 独立chrootで新規導入、0.72→0.73、再導入・削除、編集済み
+  設定・Webテンプレート・ゲーム登録・DBの保持。導入された実行ファイルで
+  一般サービスユーザーのログイン・記事／メール、Web HTTP、相互TLS、
+  管理ツールによるDB変換と再読出しを確認しました。
+- FreeBSDの `make check`、追加回帰、Web/Door、rc.dの起動・再起動・停止。
+  その後の保守処理の修正は、専用の元データ不変試験と実BBSの往復試験で再確認しました。
 
-## レビュー用portsの構築
+## 配布と導入
 
-ソースとportsは対になる2つのアーカイブです。ソースアーカイブは展開せず、
-`DISTDIR`へ置きます。portsアーカイブだけを空の作業ディレクトリへ展開します。
-既存の `/usr/ports` や本番設定を上書きする必要はありません。
-
-```sh
-mkdir -p ~/liner-notes-73-review/distfiles ~/liner-notes-73-review/port
-cp /path/to/liner-notes-stage73-review.tar.gz ~/liner-notes-73-review/distfiles/
-tar -xzf /path/to/liner-notes-ports-stage73-review.tar.gz -C ~/liner-notes-73-review/port
-cd ~/liner-notes-73-review/port/comms/liner-notes
-make BATCH=yes OPTIONS_SET="DOCS WEBUI LINK" \
-    DISTDIR="$HOME/liner-notes-73-review/distfiles" stage check-plist stage-qa package
-```
-
-`/path/to` は受け取ったファイルの所在へ置き換えます。FreeBSD portsツリーと
-必要な依存パッケージが必要です。ZMODEMを依存関係に含める場合は
-`OPTIONS_SET`へ `ZMODEM` も追加します。独自lrzsz portは同梱していません。
-この操作はパッケージ作成までで、既存BBSの更新・再起動は行いません。
-レビュー版には公開ダウンロードURLを設定していないため、対応するソースを
-`DISTDIR`に置かないと取得できません。
+[INSTALL.md](INSTALL.md)にtar展開・照合・ports構築・初期設定、
+[UPGRADING.md](UPGRADING.md)に0.72からの更新と戻し方をまとめました。
+配布portsセットにはソースdistfile、FreeBSD 15/amd64のpkg、文書、検証記録を含みます。
+同梱pkgはDOCS/WEBUI/LINK有効、ZMODEM依存は無効です。本家lrzszは別途導入します。
+Linuxは [LINUX.md](LINUX.md)のソース構築を使います。Linux用RPMは含みません。
 
 ### 転送の測定
 
@@ -87,7 +82,7 @@ Apache/HTTPS・利用者回線を通した本番速度や最大1GiB×16ファイ
 ## 残る検証・将来対応
 
 - 物理COM／モデムのDCD/DTR・RTS/CTS・再着信。FreeBSD/Linux選択は実装済みですが、
-  この開発環境でLinuxの実機を起動してはいません。Rocky/AlmaLinux CIに試験を追加しています。
+  Rocky/AlmaLinuxの疑似端末試験と、実機のモデム制御は別の検証です。
 - 本番HTTPSでの大容量・複数同時転送、全Web操作と各権限の組合せ。
 - 大規模共有ボードの初回同期・変更検出は巡回型。1周期128件に制限し、
   進捗を保存します。リンク履歴の間引き・鍵の自動更新・新規参加用スナップショットは今後です。
@@ -95,4 +90,7 @@ Apache/HTTPS・利用者回線を通した本番速度や最大1GiB×16ファイ
   起動時検査や一部集計・全文検索を定数時間にする変更ではありません。
 - Solaris/illumos、物理モデム、FidoNet、DOSドア互換は今後。Solaris対応済みとは扱いません。
 
-正式公開前には配布物での導入・更新と対象Linux CIの完了を確認します。
+Linuxの実行ログは [0.73 CI](https://github.com/matsuotakeshi/liner-notes/actions/runs/41783614429)、配布・導入・更新の結果は
+`evidence/stage73/verification.json` と個別ログを参照してください。
+LinuxはRocky Linux 9／AlmaLinux 9のコンテナ上で一般ユーザーとして実行します。
+OS起動時のsystemd・SELinux・ファイアウォールの実機運用は検証範囲に含みません。

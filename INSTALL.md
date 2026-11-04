@@ -1,10 +1,10 @@
-> stage73の追加機能: [DBの別コピー変換](DATABASE_STRUCTURED.md) / [COM・モデム](SERIAL.md) / [鍵認証の共有ボード](BBS_LINKS.md) / [Door運用](DOOR_OPERATIONS.md)。以下の0.72導入手順と配布URLは正式公開済みの0.72用です。開発版は本番へ自動適用しません。
+> stage73の追加機能: [DBの別コピー変換](DATABASE_STRUCTURED.md) / [COM・モデム](SERIAL.md) / [鍵認証の共有ボード](BBS_LINKS.md) / [Door運用](DOOR_OPERATIONS.md)。本番への適用は設置者がバックアップ後に行います。
 
-> 現行版は0.72です。[変更内容](STAGE72.md)、[更新手順](UPGRADING.md)を参照してください。既存DB形式は自動変換しません。
+> 現行版は0.73です。[変更内容](STAGE73.md)、[更新手順](UPGRADING.md)を参照してください。既存DB形式は自動変換しません。
 
-# Liner notes 0.72 導入・運用開始マニュアル
+# Liner notes 0.73 導入・運用開始マニュアル
 
-文書改訂: 2026-11-04。対象プログラムは正式版0.72です。
+文書改訂: 2026-11-04。対象プログラムは正式版0.73です。
 
 **すでに会員・記事・ゲームがある環境は、新規初期化を行わず [既存環境の更新](UPGRADING.md) から進んでください。** 本文の新規構築は空の保存先向けです。WebUIだけを追加する場合は [12 WebUI](#webui-setup)、ゲームだけ追加する場合は [13 ゲーム](#doors-setup)へ進みます。
 
@@ -17,7 +17,7 @@
 5. [StarRoute・The Clans](#doors-setup) → [更新と戻し方](#upgrade-entry) → [公開前の最終確認](#acceptance)
 6. 困ったとき: [BBS起動](#troubleshooting)、[WebUI](#web-troubleshooting)、[設定一覧](#config-reference)
 
-Liner notes 0.72をFreeBSD 15.1/amd64へ新規に構築する手順です。portsでインストールし、SQLite保存、Telnetメニュー、ファイル保管庫、ZMODEMを有効にします。最初はサーバー内だけで接続し、管理者登録と動作確認を済ませてから公開します。
+Liner notes 0.73をFreeBSD 15.1/amd64へ新規に構築する手順です。portsでインストールし、SQLite保存、Telnetメニュー、ファイル保管庫、ZMODEMを有効にします。最初はサーバー内だけで接続し、管理者登録と動作確認を済ませてから公開します。
 
 OSのコマンドは、特記のない限り **BBSを設置するFreeBSDサーバー上のrootの `/bin/sh`** で実行します。WindowsのPowerShellやBBSの入力欄へ貼り付けないでください。`sh` のコード枠はOSのコマンド、`text` のコード枠はBBS内の入力か設定例です。行頭のプロンプトは省いています。
 
@@ -69,32 +69,32 @@ test -f /usr/ports/Mk/bsd.port.mk && echo 'ports framework OK'
 <a id="install-package"></a>
 ## 2 配布物とportsのインストール
 
-配布物は `liner-notes-ports-stage72.tar.gz`、portsの版は **0.72**です。[正式リリース](https://github.com/matsuotakeshi/liner-notes/releases/tag/v0.72)から取得します。以下は空の作業ディレクトリでダウンロードと照合を行う例です。
+配布物は `liner-notes-ports-stage73.tar.gz`、portsの版は **0.73**です。[正式リリース](https://github.com/matsuotakeshi/liner-notes/releases/tag/v0.73)から取得します。以下は空の作業ディレクトリでダウンロードと照合を行う例です。
 
 途中でエラーが出たら、その手順を解決してから次へ進みます。以下では `$()` を使うため、rootのログインシェルがcsh/tcshの場合も、最初に `sh` を起動してください。
 
 ```sh
 /bin/sh
-LN_WORK=$(mktemp -d /root/liner-notes-0.72.XXXXXXXX)
+LN_WORK=$(mktemp -d /root/liner-notes-0.73.XXXXXXXX)
 cd "$LN_WORK"
 (
   set -eu
-  fetch -o liner-notes-ports-stage72.tar.gz https://github.com/matsuotakeshi/liner-notes/releases/download/v0.72/liner-notes-ports-stage72.tar.gz
-  fetch -o SHA256SUMS https://github.com/matsuotakeshi/liner-notes/releases/download/v0.72/SHA256SUMS
-  LN_EXPECTED=$(awk '$2 == "liner-notes-ports-stage72.tar.gz" {print $1}' SHA256SUMS)
+  fetch -o liner-notes-ports-stage73.tar.gz https://github.com/matsuotakeshi/liner-notes/releases/download/v0.73/liner-notes-ports-stage73.tar.gz
+  fetch -o SHA256SUMS https://github.com/matsuotakeshi/liner-notes/releases/download/v0.73/SHA256SUMS
+  LN_EXPECTED=$(awk '$2 == "liner-notes-ports-stage73.tar.gz" {print $1}' SHA256SUMS)
   test -n "$LN_EXPECTED"
-  test "$(sha256 -q liner-notes-ports-stage72.tar.gz)" = "$LN_EXPECTED"
+  test "$(sha256 -q liner-notes-ports-stage73.tar.gz)" = "$LN_EXPECTED"
   echo 'SHA256 OK'
-  tar -xzf liner-notes-ports-stage72.tar.gz
+  tar -xzf liner-notes-ports-stage73.tar.gz
 )
 ```
 
 `SHA256 OK`と展開成功を確認したら進みます。ファイルをWindowsから転送した場合も、同じ `SHA256SUMS` で照合します。接続し直した場合は、作業先へ `cd` し直してください。`pwd`の出力も控えておくと便利です。
 
 ```sh
-cd "$LN_WORK/liner-notes-ports-stage72"
+cd "$LN_WORK/liner-notes-ports-stage73"
 pwd
-ls comms/liner-notes/Makefile distfiles/liner-notes-stage72.tar.gz
+ls comms/liner-notes/Makefile distfiles/liner-notes-stage73.tar.gz
 ```
 
 配布物には `comms/liner-notes`、ソースを収めた `distfiles`、マニュアル、検証記録があります。
@@ -119,13 +119,13 @@ pkg info liner-notes
 
 インストール直後はサービスを自動起動しません。配布物の検証済みソースを使う場合は、`distfiles` と `DISTDIR` を指定します。未指定時はGitHub Releasesから取得します。
 
-Web不要なら `OPTIONS_SET="DOCS ZMODEM" OPTIONS_UNSET=WEBUI` を指定します。ZMODEM不要なら `OPTIONS_SET="DOCS WEBUI" OPTIONS_UNSET=ZMODEM` とし、後のlrzsz検査とhelper設定を省略します。保管庫のWeb転送にlrzszは不要です。
+Web不要なら `OPTIONS_SET="DOCS ZMODEM" OPTIONS_UNSET=WEBUI` を指定します。ZMODEM不要なら `OPTIONS_SET="DOCS WEBUI" OPTIONS_UNSET=ZMODEM` とし、後のlrzsz検査とhelper設定を省略します。保管庫のWeb転送にlrzszは不要です。共有ボードリンクも使う場合は `OPTIONS_SET` に `LINK` を追加し、[BBS_LINKS.md](BBS_LINKS.md)の専用会員・鍵・共有設定を行ってください。
 
-**pkgで導入する場合は、上のmake installとどちらか一方を選びます。** 同梱pkgはFreeBSD 15/amd64・Python 3.12用、DOCS/WEBUI有効です。ZMODEMの依存指定は無効なので、使う場合は本家lrzszを別途導入します。配布物のルートから実行します。
+**pkgで導入する場合は、上のmake installとどちらか一方を選びます。** 同梱pkgはFreeBSD 15/amd64・Python 3.12用、DOCS/WEBUI/LINK有効です。ZMODEMの依存指定は無効なので、使う場合は本家lrzszを別途導入します。配布物のルートから実行します。
 
 ```sh
-pkg install python312 py312-sqlite3 py312-aiohttp sqlite3
-pkg add packages/liner-notes-0.72.pkg
+pkg install python312 py312-sqlite3 py312-aiohttp py312-cryptography sqlite3
+pkg add packages/liner-notes-0.73.pkg
 pkg info liner-notes
 ```
 
@@ -313,7 +313,7 @@ FILEINFOEDIT -
 
 ファイル転送は、Telnet BINARYとZMODEMに対応した端末を使います。通常のコマンドラインtelnetは画面確認用で、ZMODEM受信機能は備えていません。サーバーの完了表示まで確認してください。
 
-ZMODEM以外の方式を使う場合は、使用する端末がその方式・変種に対応していることも確認します。0.72の実転送の検証記録はリリース同梱の `evidence/stage72/` にあります。
+ZMODEM以外の方式を使う場合は、使用する端末がその方式・変種に対応していることも確認します。0.73の実転送の検証記録はリリース同梱の `evidence/stage73/` にあります。
 
 <a id="backup-restore"></a>
 ## 8 初期バックアップと復元確認
@@ -364,7 +364,7 @@ liner-notes-admin db-restore \
 
 DBには設定先がデータ領域外の論理ログも含まれます。これらは復元先の `external/元の絶対パス` 以下に対応するため、別の場所で起動するときはUSERLOGとチャットログの指定も合わせます。具体的な移行・復元・整理の仕様は [STAGE67.md](STAGE67.md) を参照してください。元データやバックアップを先に消さないでください。
 
-**0.72の `db-restore` / `db-compact` は、元がstructuredでもschema 1（blocks形式）へ復元します。** 復元先の起動には `--database`、rc.dなら `liner_notes_database_mode=blocks`を使います。`--database-structured`では復元先を変換できません。structured形式のまま戻す必要がある場合は、停止中に取得したデータディレクトリ全体の物理バックアップも保持してください。[保存・復元形式の仕様](STAGE71.md)を参照してください。
+**0.73の `db-restore` / `db-compact` は、元がstructuredでもschema 1（blocks形式）へ復元します。** 復元先の起動には `--database`、rc.dなら `liner_notes_database_mode=blocks`を使います。`--database-structured`では復元先を変換できません。structured形式のまま戻す必要がある場合は、停止中に取得したデータディレクトリ全体の物理バックアップも保持してください。[保存・復元形式の仕様](STAGE71.md)を参照してください。
 
 記事・会員の読出しを確認するため、復元コピーを前景で起動する例です。12222が未使用であることを確認して実行します。再帰的な所有者変更の対象は、直前に作成した復元コピーだけです。
 
@@ -547,7 +547,7 @@ FreeBSDのサービス管理の基本は [FreeBSD Handbookの設定とサービ�
                     → BBS 127.0.0.1:2222（23運用なら23）
 ```
 
-WebコネクタとBBSは別サービスです。WebはDBを直接開かず、通常の会員認証・権限判定をBBSへ依頼します。まずTelnetでログインできることを確認します。BBS本体とWebUIは0.72に揃えます。
+WebコネクタとBBSは別サービスです。WebはDBを直接開かず、通常の会員認証・権限判定をBBSへ依頼します。まずTelnetでログインできることを確認します。BBS本体とWebUIは0.73に揃えます。
 
 ```sh
 service liner_notes status
@@ -733,7 +733,7 @@ curl -I https://bbs.example.org/notes/
 
 「ブラウザーからの送信完了」と「BBSへの登録完了」は別です。登録中の進捗と最終結果を確認してから公開一覧を見ます。失敗した場合は保管庫の再開候補から対象を選び、同じファイルを選び直します。Web→BBSは確定済み位置から再開しますが、ブラウザー→WebのHTTP送信はファイルを送り直します。名前・サイズ・SHA-256の異なるファイルでは再開しません。
 
-タイムアウトを増やす前に、どの段階で止まったか、BBS/Webのログ、空き容量、取得ファイルのSHA-256を確認します。小さいファイル、数十MiB、実際に使う大きさの順に試してください。1GiB×16・長時間の同時大量転送は0.72での検証完了を宣言していません。
+タイムアウトを増やす前に、どの段階で止まったか、BBS/Webのログ、空き容量、取得ファイルのSHA-256を確認します。小さいファイル、数十MiB、実際に使う大きさの順に試してください。1GiB×16・長時間の同時大量転送は0.73での検証完了を宣言していません。
 
 <a id="web-troubleshooting"></a>
 ### 12.7 Webのトラブルを層ごとに切り分ける
@@ -749,13 +749,13 @@ tail -n 80 /var/log/httpd-bbs-error.log
 
 | 症状 | 確認・対処 |
 | --- | --- |
-| ページ全体が `BBS connection unavailable` | `[bbs] host/port/telnet`、実runtime、接続枠、BBSが0.72かを確認。Webプロセスの起動だけではBBS接続成功を意味しない |
+| ページ全体が `BBS connection unavailable` | `[bbs] host/port/telnet`、実runtime、接続枠、BBSが0.73かを確認。Webプロセスの起動だけではBBS接続成功を意味しない |
 | `Unexpected Host` | `origin`のホスト名とHostヘッダー、ApacheのProxyPreserveHostを一致させる |
 | `Origin rejected` / CSRFエラー | HTTPSの公開元を揃え、古い画面を再読込してログイン。検査自体を無効化しない |
 | Apacheの403 | `apachectl -S`で対象VirtualHostを確認。`/`から`/notes/`への案内、Location、既存認証規則を確認 |
 | 502・503でWebのログに到達しない | Webの8088待受とProxyPass先、Apacheログを確認 |
-| `Web template unavailable` / `Web file access failed` | ファイルの存在・UTF-8・親ディレクトリの通過権限・Webユーザーの読み取りを確認。0.72はファイルの問題を500で区別する |
-| `unrecognized arguments: -P ...` | 旧rc.dが残っている。0.72の `/usr/local/etc/rc.d/liner_notes_web`へ更新する |
+| `Web template unavailable` / `Web file access failed` | ファイルの存在・UTF-8・親ディレクトリの通過権限・Webユーザーの読み取りを確認。0.73はファイルの問題を500で区別する |
+| `unrecognized arguments: -P ...` | 旧rc.dが残っている。0.73の `/usr/local/etc/rc.d/liner_notes_web`へ更新する |
 | ログインできてもすぐ戻る | 公開origin、HTTPS、secure cookie、Web再起動によるセッション失効を確認 |
 | アップロード413 | ApacheとWebの上限を確認。上の1GiBを超えていないか確認 |
 | 登録中に止まる | BBS側の上限・権限・空き容量・最終照合時間、spool所有者を確認 |
@@ -901,6 +901,6 @@ Webではゲーム用の補助端末内でもログインします。画面サ�
 - [ ] 予定した保守時間にOS再起動後の自動起動・ポート23・Webを確認した。
 - [ ] 配布物・旧pkg・バックアップ・設定した値を保管した。
 
-0.72のリリース検証はFreeBSD 15.1/amd64、portsの標準/別PREFIX構成、0.71からの更新・再導入、WebUI、汎用Door、実lrzsz送受信・再開を含みます。Rocky Linux 9/AlmaLinux 9のコンテナCIも成功しています。記録は配布セットの `evidence/stage72/verification.json`、または [GitHubの検証記録](https://github.com/matsuotakeshi/liner-notes/tree/v0.72/evidence/stage72)にあります。
+0.73のリリース検証はFreeBSD 15.1/amd64、portsの標準/別PREFIX構成、0.71からの更新・再導入、WebUI、汎用Door、実lrzsz送受信・再開を含みます。Rocky Linux 9/AlmaLinux 9のコンテナCIも成功しています。記録は配布セットの `evidence/stage73/verification.json`、または [GitHubの検証記録](https://github.com/matsuotakeshi/liner-notes/tree/v0.73/evidence/stage73)にあります。
 
-この改訂は0.72のソース・配置・設定に照合した導入文書です。各設置先のDNS、証明書、ファイアウォール、既存ゲーム世界まで自動検証したものではありません。Linuxを使う場合はFreeBSD用rc.d・sysrc・pkgのコマンドを実行せず、[Rocky Linux / AlmaLinux手順](LINUX.md)を使ってください。
+この改訂は0.73のソース・配置・設定に照合した導入文書です。各設置先のDNS、証明書、ファイアウォール、既存ゲーム世界まで自動検証したものではありません。Linuxを使う場合はFreeBSD用rc.d・sysrc・pkgのコマンドを実行せず、[Rocky Linux / AlmaLinux手順](LINUX.md)を使ってください。
