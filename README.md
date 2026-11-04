@@ -1,3 +1,5 @@
+> このチェックアウトはstage73開発版です。正式公開済みの版は0.72です。今回の実装・検証範囲は [STAGE73.md](STAGE73.md)、DB変換は [DATABASE_STRUCTURED.md](DATABASE_STRUCTURED.md)、COMは [SERIAL.md](SERIAL.md)、共有ボードは [BBS_LINKS.md](BBS_LINKS.md) を参照してください。
+
 > 現行版は0.72です。[変更内容](STAGE72.md)、[更新手順](UPGRADING.md)を参照してください。既存DB形式は自動変換しません。
 
 # Liner notes 0.72

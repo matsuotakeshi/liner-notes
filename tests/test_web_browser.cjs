@@ -33,6 +33,12 @@ const out=path.resolve(process.argv[3]||'web-browser-results');fs.mkdirSync(out,
   await page.locator('#dialog input[type=file]').setInputFiles({name:'browser-添付.bin',mimeType:'application/octet-stream',buffer:payload});
   assert.equal(await page.locator('#dialog input[name=attachments]').count(),0);await page.locator('#dialog button[type=submit]').click();await page.locator('#dialog').waitFor({state:'hidden',timeout:60000});await page.locator('#main').getByRole('button',{name:new RegExp('Browser attachment '+suffix)}).click();
   const dl=page.waitForEvent('download');await page.getByRole('button',{name:'↓ browser-添付.bin',exact:true}).click();const download=await dl;const target=path.join(out,'browser-attachment.bin');await download.saveAs(target);assert(fs.readFileSync(target).equals(payload));
+  await nav('管理');assert.equal(await page.locator('.operation-sections > section').count(),5);
+  await page.getByRole('button',{name:'接続管理',exact:false}).click();await page.locator('.report-table').waitFor();
+  assert((await page.locator('.report-table tbody tr').count())>=1);
+  const search=page.locator('.report-view input[type=search]');await search.fill('no-such-user');assert.equal(await page.locator('.report-table tbody tr').count(),0);await search.fill('');
+  await page.screenshot({path:path.join(out,'admin-connections.png'),fullPage:true});
+  await nav('個人設定');await page.locator('.report-view dl').waitFor();
   await nav('ホーム');await page.getByRole('button',{name:'管理者へ連絡',exact:true}).click();await page.locator('#dialog input[name=title]').fill('Browser SYSOP contact');await page.locator('#dialog button[type=submit]').click();await page.locator('#dialog textarea[name=body]').waitFor();await page.locator('#dialog textarea[name=body]').fill('Return to home.');await page.locator('#dialog button[type=submit]').click();await page.locator('#dialog').waitFor({state:'hidden'});await page.locator('.hero').waitFor();
   await nav('チャット・トーク');await page.locator('.chat-form input').fill('Left aligned message');await page.locator('.chat-form button[type=submit]').click();await page.locator('.chat-message.own').waitFor();
   assert.equal(await page.locator('.chat-message.own').evaluate(e=>getComputedStyle(e).alignSelf),'flex-start');await page.locator('.page-header').getByRole('button',{name:'その他の操作'}).click();await page.locator('#dialog').getByRole('button',{name:/^状態/}).click();await page.locator('#chat-results .result').waitFor();

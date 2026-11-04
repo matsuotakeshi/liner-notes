@@ -78,7 +78,10 @@ def run(binary,ctl):
             assert not (vault/f'{ident:08d}.bin').exists();assert counts(a,ident)==1
             assert cmd(c,f'FILEDELETE {ident} CONFIRM')==f'FILE DELETED {ident}'.encode()
             assert cmd(a,f'FILERESTORE {ident} CONFIRM')==b'ERR no file'
-            assert cmd(a,'RESETPASS 1')==b'ERR protected member'
+            # Faster worker wakeups can reach this before the one-second
+            # post-login credential throttle. Test authorization after it.
+            time.sleep(1.05)
+            reply=cmd(a,'RESETPASS 1');assert reply==b'ERR protected member',reply
             assert cmd(a,'RESETPASS 3')==b'NEW PASSWORD'
             assert cmd(a,NEW)==b'CONFIRM PASSWORD';assert cmd(a,'wrong-confirmation')==b'ERR password mismatch'
             time.sleep(1.05);assert cmd(a,'RESETPASS 3')==b'NEW PASSWORD';assert cmd(a,'/CANCEL')==b'CANCELLED'

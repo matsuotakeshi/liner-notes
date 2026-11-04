@@ -1,9 +1,10 @@
 PORTNAME=	liner-notes
-DISTVERSION=	0.72
+DISTVERSION=	0.73.a1
 CATEGORIES=	comms
-# Release source archive; DISTDIR may also use the verified bundle.
-MASTER_SITES=	https://github.com/matsuotakeshi/liner-notes/releases/download/v0.72/
-DISTNAME=	liner-notes-stage72
+# Review build: use the accompanying verified source archive in DISTDIR.
+# No public release URL is assigned until release validation is complete.
+MASTER_SITES=
+DISTNAME=	liner-notes-stage73-review
 
 MAINTAINER=	ports@FreeBSD.org
 COMMENT=	HyperNotes-style BBS with Telnet, mail, chat, and file vaults
@@ -32,15 +33,17 @@ UID_FILES=	${FILESDIR}/UIDs
 GID_FILES=	${FILESDIR}/GIDs
 
 SUB_FILES=	liner-notes-admin liner-notes-maintenance \
-		liner-notes-zmodem liner-notes-check-resume \
+		liner-notes-zmodem liner-notes-check-resume liner-notes-link liner-notes-serial \
 		liner_notes.conf doors.conf pkg-message
 SUB_LIST=	PYTHON_CMD=${PYTHON_CMD}
 
-OPTIONS_DEFINE=	DOCS WEBUI ZMODEM
+OPTIONS_DEFINE=	DOCS WEBUI ZMODEM LINK
 OPTIONS_DEFAULT=	DOCS WEBUI
 OPTIONS_SUB=	yes
 WEBUI_DESC=	Install the separate HTTP/WebSocket connector
 WEBUI_RUN_DEPENDS=	${PYTHON_PKGNAMEPREFIX}aiohttp>=3.11:www/py-aiohttp@${PY_FLAVOR}
+LINK_DESC=	Install the optional public-key shared-board connector
+LINK_RUN_DEPENDS=	${PYTHON_PKGNAMEPREFIX}cryptography>=43:security/py-cryptography@${PY_FLAVOR}
 
 .include <bsd.port.options.mk>
 .if ${PORT_OPTIONS:MWEBUI}
@@ -58,13 +61,14 @@ do-install:
 	${MKDIR} ${STAGEDIR}${PREFIX}/bin ${STAGEDIR}${PREFIX}/sbin
 	${MKDIR} ${STAGEDIR}${DATADIR}/scripts
 	${INSTALL_PROGRAM} ${WRKSRC}/runtime ${STAGEDIR}${PREFIX}/sbin/liner-notes
-.for binary in vaultctl memberctl
+.for binary in vaultctl memberctl dbconvert
 	${INSTALL_PROGRAM} ${WRKSRC}/${binary} ${STAGEDIR}${PREFIX}/bin/liner-notes-${binary}
 .endfor
 	${INSTALL_DATA} ${WRKSRC}/scripts/*.py ${STAGEDIR}${DATADIR}/scripts/
+	${INSTALL_DATA} ${WRKSRC}/webui/bbs_transport.py ${STAGEDIR}${DATADIR}/scripts/bbs_transport.py
 	${INSTALL_DATA} ${WRKSRC}/ports/test-resume.py ${STAGEDIR}${DATADIR}/scripts/check-resume.py
 	${INSTALL_SCRIPT} ${WRKSRC}/scripts/liner-notes-ssh ${STAGEDIR}${PREFIX}/bin/liner-notes-ssh
-.for wrapper in admin maintenance zmodem check-resume
+.for wrapper in admin maintenance zmodem check-resume serial
 	${INSTALL_SCRIPT} ${WRKDIR}/liner-notes-${wrapper} ${STAGEDIR}${PREFIX}/bin/
 .endfor
 	${MKDIR} ${STAGEDIR}${ETCDIR} ${STAGEDIR}${DATADIR}/menus ${STAGEDIR}${DATADIR}/help/ja ${STAGEDIR}${DATADIR}/help/en
@@ -94,6 +98,11 @@ do-install:
 do-install-WEBUI-on:
 	${PYTHON_CMD} ${WRKSRC}/webui/install.py --destdir ${STAGEDIR} --prefix ${PREFIX} --python ${PYTHON_CMD} --samples-only
 	${MKDIR} ${STAGEDIR}/var/db/liner-notes-web/spool
+
+do-install-LINK-on:
+	${INSTALL_SCRIPT} ${WRKDIR}/liner-notes-link ${STAGEDIR}${PREFIX}/bin/
+	${INSTALL_DATA} ${WRKSRC}/link.example.toml ${STAGEDIR}${ETCDIR}/link.toml.sample
+	${INSTALL_DATA} ${WRKSRC}/link-accounts.example.conf ${STAGEDIR}${ETCDIR}/link-accounts.conf.sample
 
 do-install-DOCS-on:
 	${MKDIR} ${STAGEDIR}${DOCSDIR}

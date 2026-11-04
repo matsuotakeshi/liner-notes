@@ -1,3 +1,5 @@
+> stage73: `db-structure` とstructured形式を保持する復元を追加しました。[別コピー変換手順](DATABASE_STRUCTURED.md)を参照してください。共有ボードのリンクDBはBBSの保存領域と別なので、[リンクのバックアップ手順](BBS_LINKS.md)も必要です。
+
 > 現行のSQLite運用手順は [INSTALL.md](INSTALL.md) のバックアップ・復元確認を使用してください。以下は旧保存形式を中心とした開発時の詳細です。
 
 > この文書は機能追加時点の記録です。現行の導入入口は [README](README.md)、今回の変更は [STAGE65](STAGE65.md) を参照してください。古い段階名・上限・未実装事項は当時のものです。

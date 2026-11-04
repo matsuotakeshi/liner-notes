@@ -15,6 +15,7 @@ sbin/liner-notes
 %%DATADIR%%/scripts/zmodem_host.py
 bin/liner-notes-ssh
 bin/liner-notes-admin
+bin/liner-notes-dbconvert
 bin/liner-notes-maintenance
 bin/liner-notes-vaultctl
 bin/liner-notes-memberctl
@@ -73,6 +74,7 @@ bin/liner-notes-check-resume
 @sample %%DATADIR%%/menus/settings-en.txt.sample
 @sample %%DATADIR%%/menus/profile-en.txt.sample
 %%DATADIR%%/scripts/database_tools.py
+%%DATADIR%%/scripts/serial_connector.py
 @sample %%ETCDIR%%/limits.conf.sample
 @sample %%DATADIR%%/sysinfo.txt.sample
 @sample %%DATADIR%%/goodbye.txt.sample
@@ -187,10 +189,12 @@ bin/liner-notes-check-resume
 %%WEBUI%%%%DATADIR%%/web/webui/__main__.py
 %%WEBUI%%%%DATADIR%%/web/webui/app.py
 %%WEBUI%%%%DATADIR%%/web/webui/bridge.py
+%%WEBUI%%%%DATADIR%%/web/webui/reports.py
 %%WEBUI%%%%DATADIR%%/web/webui/commands.py
 %%WEBUI%%%%DATADIR%%/web/webui/install.py
 %%WEBUI%%%%DATADIR%%/web/webui/presentation.py
 %%WEBUI%%%%DATADIR%%/web/webui/static/app.js
+%%WEBUI%%%%DATADIR%%/web/webui/static/reports-ui.js
 %%WEBUI%%%%DATADIR%%/web/webui/static/style.css
 %%WEBUI%%%%DATADIR%%/web/webui/static/terminal-ui.js
 %%WEBUI%%%%DATADIR%%/web/webui/static/xterm-fit-LICENSE
@@ -216,3 +220,19 @@ bin/liner-notes-check-resume
 %%WEBUI%%@dir(root,wheel,0755) %%DATADIR%%/web
 %%WEBUI%%@dir(liner_notes_web,liner_notes_web,0700) /var/db/liner-notes-web/spool
 %%WEBUI%%@dir(liner_notes_web,liner_notes_web,0700) /var/db/liner-notes-web
+bin/liner-notes-serial
+%%LINK%%bin/liner-notes-link
+%%LINK%%@sample %%ETCDIR%%/link.toml.sample
+%%LINK%%@sample %%ETCDIR%%/link-accounts.conf.sample
+%%WEBUI%%%%DATADIR%%/web/webui/bbs_transport.py
+%%DATADIR%%/scripts/link_service.py
+%%DATADIR%%/scripts/link_store.py
+%%DATADIR%%/scripts/link_bbs.py
+%%DATADIR%%/scripts/link_transport.py
+%%DATADIR%%/scripts/bbs_transport.py
+%%PORTDOCS%%%%DOCSDIR%%/BBS_LINKS.md
+%%PORTDOCS%%%%DOCSDIR%%/DATABASE_STRUCTURED.md
+%%PORTDOCS%%%%DOCSDIR%%/DOOR_OPERATIONS.md
+%%PORTDOCS%%%%DOCSDIR%%/SERIAL.md
+%%PORTDOCS%%%%DOCSDIR%%/STAGE73.md
+%%PORTDOCS%%%%DOCSDIR%%/WEBUI_COVERAGE.md

@@ -9,7 +9,12 @@ SQLITE_CFLAGS?=-I/usr/local/include
 SQLITE_LIBS?=-L/usr/local/lib -lsqlite3
 LDLIBS?=
 
-all: runtime vaultctl memberctl
+all: runtime vaultctl memberctl dbconvert
+
+runtime test-adapters: src/board_link.inc src/link_schema.h
+
+dbconvert: src/dbconvert.c src/storage_sqlite.c src/storage_sqlite.h src/storage_records.inc
+	$(CC) $(CPPFLAGS) $(SQLITE_CFLAGS) $(CFLAGS) $(LDFLAGS) -std=c11 -Wall -Wextra -Werror src/dbconvert.c src/storage_sqlite.c -pthread -lcrypto $(SQLITE_LIBS) -o dbconvert
 
 runtime: src/classic_commands.inc src/doors.c src/doors.h src/db_index.h src/features64.inc src/mail_attachments.h src/profile_store.h src/download.h src/userlog.h src/app_limits.h src/durable.h src/activity.h src/store_limits.h src/content_limits.h src/date_filter.h src/zmodem_host.c src/zmodem_host.h src/runtime.c src/download.c src/userlog.c src/activity.c src/board_features.inc src/board.c src/board.h src/members.c src/members.h src/profile_store.c src/board_policy.c src/board_policy.h src/catalog.c src/catalog.h src/ui.c src/menu.c src/menu.h src/ui.h src/messages.c src/messages.h src/locales/ja.def src/locales/en.def src/session.c src/session.h src/terminal.c src/terminal.h src/telnet.c src/telnet.h src/moderation.c src/extras.c src/vault.c src/vault_bridge.c src/identity_legacy.c src/vault_transfer.c src/transfer_line.c src/vault_worker.c src/chat.c src/moderation.h src/extras.h src/vault.h src/vault_bridge.h src/principal.h src/identity_legacy.h src/transfer.h src/transfer_line.h src/vault_worker.h src/chat.h src/chat_preferences.h src/mail_files.c src/mail_files.h src/mailbox.c src/mailbox.h
 	$(CC) $(CPPFLAGS) $(SQLITE_CFLAGS) $(CFLAGS) $(LDFLAGS) -std=c11 -Wall -Wextra -Werror -pthread src/doors.c src/zmodem_host.c src/runtime.c src/download.c src/userlog.c src/activity.c src/board.c src/members.c src/profile_store.c src/board_policy.c src/catalog.c src/ui.c src/menu.c src/messages.c src/session.c src/terminal.c src/telnet.c src/moderation.c src/extras.c src/vault.c src/vault_bridge.c src/identity_legacy.c src/vault_transfer.c src/transfer_line.c src/vault_worker.c src/chat.c src/mail_files.c src/mailbox.c -lutil -lcrypto $(SQLITE_LIBS) $(LDLIBS) src/storage_sqlite.c $(SQLITE_CFLAGS) -pthread -lcrypto $(SQLITE_LIBS) -o runtime
@@ -161,7 +166,7 @@ test-legacy-transfers: runtime vaultctl
 	$(PYTHON) tests/test_stage61_transfer_menu.py ./runtime ./vaultctl $(LRZ) $(LSZ)
 
 clean:
-	rm -f runtime vaultctl memberctl generate-scale generate-members test-adapters test-chat test-vault-core test-upload-core test-transfer-connector test-userlog test-stage61-userlog test-zhost
+	rm -f runtime vaultctl memberctl dbconvert generate-scale generate-members test-adapters test-chat test-vault-core test-upload-core test-transfer-connector test-userlog test-stage61-userlog test-zhost
 
 memberctl: src/db_index.h src/memberctl.c src/members.c src/members.h src/app_limits.h src/store_limits.h
 	$(CC) $(CPPFLAGS) $(SQLITE_CFLAGS) $(CFLAGS) $(LDFLAGS) -std=c11 -Wall -Wextra -Werror src/memberctl.c src/members.c -lcrypto $(SQLITE_LIBS) $(LDLIBS) src/storage_sqlite.c $(SQLITE_CFLAGS) -pthread -lcrypto $(SQLITE_LIBS) -o memberctl
@@ -277,3 +282,14 @@ test-doors: runtime
 	$(PYTHON) tests/test_doors_config.py ./runtime
 	$(PYTHON) tests/test_doors_generic.py ./runtime
 test-stage72: test-doors test-web
+
+# The optional link tests need link-requirements.txt; web tests need aiohttp.
+.PHONY: test-stage73
+test-stage73: all
+	$(PYTHON) tests/test_stage73_database.py ./runtime
+	$(PYTHON) tests/test_serial_connector.py ./runtime
+	$(PYTHON) tests/test_web_reports.py
+	$(PYTHON) tests/test_link_store.py
+	$(PYTHON) tests/test_link_tls.py
+	$(PYTHON) tests/test_link_bbs.py ./runtime
+	$(PYTHON) tests/test_link_service.py ./runtime

@@ -62,6 +62,28 @@ static pthread_t worker;
 #define SEEK(fd,n,w) storage_seek(fd,n,w)
 #endif
 #include "store_limits.h"
+/* Completion notifications wake the socket loop without busy polling. A full
+ * pipe already represents pending work; notifications may safely coalesce. */
+#ifndef _WIN32
+static int completion_pipe[2]={-1,-1};
+static void completion_close(void) {
+    for(unsigned i=0;i<2;i++)if(completion_pipe[i]>=0) { close(completion_pipe[i]);completion_pipe[i]=-1; }
+}
+static int completion_open(void) {
+    if(pipe(completion_pipe))return 0;
+    for(unsigned i=0;i<2;i++)if(fcntl(completion_pipe[i],F_SETFL,O_NONBLOCK) || fcntl(completion_pipe[i],F_SETFD,FD_CLOEXEC)) { completion_close();return 0; }
+    return 1;
+}
+int board_completion_fd(void) { return completion_pipe[0]; }
+void board_completion_notify(void) { if(completion_pipe[1]>=0) { int saved=errno;char byte=1;ssize_t n;do { n=write(completion_pipe[1],&byte,1); }while(n<0 && errno==EINTR);errno=saved; } }
+void board_completion_drain(void) { if(completion_pipe[0]>=0) { char bytes[128];while(read(completion_pipe[0],bytes,sizeof(bytes))>0) {} } }
+#else
+static int completion_open(void) { return 1; }
+static void completion_close(void) {}
+int board_completion_fd(void) { return -1; }
+void board_completion_notify(void) {}
+void board_completion_drain(void) {}
+#endif
 uint32_t limit_articles,limit_mail,limit_user_posts;
 #define QUEUE 32
 /* Disk format: magic(8), then fixed-size records, explicit little endian.
@@ -461,7 +483,46 @@ static void mail_execute(const BoardRequest *q,BoardResult *r) {
 unavailable:snprintf(r->text,sizeof(r->text),"%s",mail_text(q,MSG_MAIL_UNAVAILABLE,"MAIL ERROR unavailable\r\n"));return;
 storage:snprintf(r->text,sizeof(r->text),"%s",mail_text(q,MSG_MAIL_STORAGE,"MAIL ERROR storage\r\n"));
 }
+#include "link_schema.h"
 #include "features64.inc"
+static void post_article(const BoardRequest *q,BoardResult *r,const char *remote_author,uint64_t remote_stamp,int validate_only) {
+        if(members_enabled() && !members_name(q->user) && !feature_setting("guest_boards",q->board)) { strcpy(r->text,"ERR login required\r\n"); return; }
+        if(members_enabled() && version<3) { strcpy(r->text,"ERR member posting needs RTBOARD3\r\n"); return; }
+        if(failed) { strcpy(r->text,"ERR storage unavailable\r\n"); return; }
+        if(q->number>article_count) { strcpy(r->text,"ERR no parent\r\n"); return; }
+        if(strlen(q->body)>ln_limit("BODY",BOARD_BODY)) { strcpy(r->text,"ERR body limit\r\n");return; }
+        if(article_count>=CONTENT_ID_MAX || (limit_articles && article_count>=limit_articles) || (!remote_author && limit_user_posts && q->user && user_posts[q->user]>=limit_user_posts)) { strcpy(r->text,"ERR board full\r\n"); return; }
+        size_t tl=strlen(q->title),bl=strlen(q->body);
+        if(!board_usage(q->board,1,bl)) { strcpy(r->text,"ERR board full\r\n");return; }
+        if(!tl || tl>BOARD_TITLE || !bl || bl>BOARD_BODY) { strcpy(r->text,"ERR draft\r\n"); return; }
+        if(validate_only) { r->selected=article_count+1;return; }
+        unsigned char raw[RECORD_MAX]={0};
+        if(bl>1024 && version!=4) { strcpy(r->text,"ERR legacy board capacity; compact to RTBOARD4 first\r\n");return; }
+        int compact=bl>1024;
+        size_t base=compact?100+bl:RECORD_SIZE;
+        size_t record_size=base+(version>=2?8:0)+(version>=3?32:0)+(version==4?4:0);
+        time_t clock_now=time(NULL);
+        uint64_t stamp=remote_author?remote_stamp:version>=2 && clock_now>0?(uint64_t)clock_now:0;
+        put32(raw,(article_count+1)|(compact?0x80000000u:0)); put32(raw+4,q->number);
+        put32(raw+8,(uint32_t)tl); put32(raw+12,(uint32_t)bl);
+        memcpy(raw+16,q->title,tl); memcpy(raw+16+BOARD_TITLE,q->body,bl);
+        if(version>=2) { put32(raw+base-4,(uint32_t)stamp); put32(raw+base,(uint32_t)(stamp>>32)); }
+        const char *author=remote_author?remote_author:members_name(q->user); if(!author) author=*q->username?q->username:"guest";
+        if(version>=3) memcpy(raw+base+4,author,strlen(author));
+        if(version==4) put32(raw+base+36,q->board);
+        put32(raw+record_size-4,checksum(raw,record_size-4));
+        int64_t record_offset=SEEK(store,0,SEEK_END);
+        if(record_offset<0 || !write_all(raw,record_size) || SYNC(store)) {
+            failed=1; strcpy(r->text,"ERR storage uncertain; restart inspection required\r\n"); return;
+        }
+        Article *a=&(*article_at(article_count++)); a->parent=q->number;
+        strcpy(a->title,q->title); a->body_size=(uint32_t)bl;a->body_offset=(uint64_t)record_offset+96;
+        if(version>=3) strcpy(a->author,author);
+        a->board=q->board;a->origin=q->board;
+        a->created=stamp;db_search_set(&article_db,article_count,a->title,q->body,bl); if(q->user && !remote_author)user_posts[q->user]++; index_article(article_count); r->selected=article_count;
+        snprintf(r->text,sizeof(r->text),"SAVED %u\r\n",article_count);
+}
+#include "board_link.inc"
 static void execute(const BoardRequest *q,BoardResult *r) {
     memset(r,0,sizeof(*r));
     policy_context(q->board_grants);
@@ -521,6 +582,7 @@ static void execute(const BoardRequest *q,BoardResult *r) {
         r->revoked=1; strcpy(r->text,"ERR session revoked\r\n"); return;
     }
     if(q->op=='}') { advanced_execute(q,r);return; }
+    if(q->op==BOARD_LINK) { link_execute(q,r);return; }
     if(q->op==BOARD_MEMBER_LIFECYCLE) {
         uint32_t target=q->action==3?q->user:q->number;
         if(q->action!=3 && !moderation_admin(q->user)) { strcpy(r->text,"ERR admin required\r\n");return; }
@@ -857,40 +919,7 @@ static void execute(const BoardRequest *q,BoardResult *r) {
         return;
     }
     if(q->op=='P') {
-        if(members_enabled() && !members_name(q->user) && !feature_setting("guest_boards",q->board)) { strcpy(r->text,"ERR login required\r\n"); return; }
-        if(members_enabled() && version<3) { strcpy(r->text,"ERR member posting needs RTBOARD3\r\n"); return; }
-        if(failed) { strcpy(r->text,"ERR storage unavailable\r\n"); return; }
-        if(q->number>article_count) { strcpy(r->text,"ERR no parent\r\n"); return; }
-        if(strlen(q->body)>ln_limit("BODY",BOARD_BODY)) { strcpy(r->text,"ERR body limit\r\n");return; }
-        if(article_count>=CONTENT_ID_MAX || (limit_articles && article_count>=limit_articles) || (limit_user_posts && q->user && user_posts[q->user]>=limit_user_posts)) { strcpy(r->text,"ERR board full\r\n"); return; }
-        size_t tl=strlen(q->title),bl=strlen(q->body);
-        if(!board_usage(q->board,1,bl)) { strcpy(r->text,"ERR board full\r\n");return; }
-        if(!tl || tl>BOARD_TITLE || !bl || bl>BOARD_BODY) { strcpy(r->text,"ERR draft\r\n"); return; }
-        unsigned char raw[RECORD_MAX]={0};
-        if(bl>1024 && version!=4) { strcpy(r->text,"ERR legacy board capacity; compact to RTBOARD4 first\r\n");return; }
-        int compact=bl>1024;
-        size_t base=compact?100+bl:RECORD_SIZE;
-        size_t record_size=base+(version>=2?8:0)+(version>=3?32:0)+(version==4?4:0);
-        time_t clock_now=time(NULL);
-        uint64_t stamp=version>=2 && clock_now>0?(uint64_t)clock_now:0;
-        put32(raw,(article_count+1)|(compact?0x80000000u:0)); put32(raw+4,q->number);
-        put32(raw+8,(uint32_t)tl); put32(raw+12,(uint32_t)bl);
-        memcpy(raw+16,q->title,tl); memcpy(raw+16+BOARD_TITLE,q->body,bl);
-        if(version>=2) { put32(raw+base-4,(uint32_t)stamp); put32(raw+base,(uint32_t)(stamp>>32)); }
-        const char *author=members_name(q->user); if(!author) author=*q->username?q->username:"guest";
-        if(version>=3) memcpy(raw+base+4,author,strlen(author));
-        if(version==4) put32(raw+base+36,q->board);
-        put32(raw+record_size-4,checksum(raw,record_size-4));
-        int64_t record_offset=SEEK(store,0,SEEK_END);
-        if(record_offset<0 || !write_all(raw,record_size) || SYNC(store)) {
-            failed=1; strcpy(r->text,"ERR storage uncertain; restart inspection required\r\n"); return;
-        }
-        Article *a=&(*article_at(article_count++)); a->parent=q->number;
-        strcpy(a->title,q->title); a->body_size=(uint32_t)bl;a->body_offset=(uint64_t)record_offset+96;
-        if(version>=3) strcpy(a->author,author);
-        a->board=q->board;a->origin=q->board;
-        a->created=stamp;db_search_set(&article_db,article_count,a->title,q->body,bl); if(q->user)user_posts[q->user]++; index_article(article_count); r->selected=article_count;
-        snprintf(r->text,sizeof(r->text),"SAVED %u\r\n",article_count);
+        post_article(q,r,NULL,0,0);
     } else if(q->op=='R') {
         if(q->number==0 || q->number>article_count) { strcpy(r->text,"ERR no article\r\n"); return; }
         display_article(q->number,r,0);
@@ -995,6 +1024,7 @@ static void *work(void *unused)
         OPENSSL_cleanse(jobs[job].request.password,sizeof(jobs[job].request.password));
         OPENSSL_cleanse(jobs[job].request.new_password,sizeof(jobs[job].request.new_password));
         LOCK(); jobs[job].state=jobs[job].result.deferred?0:3;
+        if(jobs[job].state==3)board_completion_notify();
     }
     UNLOCK();
 #ifdef _WIN32
@@ -1046,17 +1076,19 @@ int board_start_config(const char *path,const char *members,const char *catalog,
     if(!mailbox_open(members)) { fprintf(stderr,"mailbox: cannot open/lock/validate journal\n");extras_close();moderation_close();members_close();CLOSE(store);store=-1;return 0; }
     if(!profile_store_open(members)) { fprintf(stderr,"profile: cannot open/validate journal\n");return 0; }
     if(!features_open(path)) { fprintf(stderr,"settings database: cannot open/recover\n");return 0; }
+    if(!link_open()) { fprintf(stderr,"link: configuration or recovery failed\n");return 0; }
     for(uint32_t b=1;b<=CATALOG_MAX;b++)catalog_guest(b,(int)feature_setting("guest_boards",b));
     if(!activity_open(path)) { fprintf(stderr,"activity: cannot open/lock/validate journal\n");mailbox_close();extras_close();moderation_close();members_close();CLOSE(store);store=-1;return 0; }
     if(!access_prune(1)) { fprintf(stderr,"board access: retention failed\n");return 0; }
     for(uint32_t id=1;id<=article_count;id++) if(*extras_title(id)) strcpy((*article_at(id-1)).title,extras_title(id));
+    if(!completion_open())return 0;
 #ifdef _WIN32
     InitializeCriticalSection(&mutex); InitializeConditionVariable(&condition);
     worker=(HANDLE)_beginthreadex(NULL,32*1024*1024,work,NULL,0,NULL);
     if(!worker) { mail_files_close();mailbox_close(); extras_close(); moderation_close(); members_close(); CLOSE(store); store=-1; DeleteCriticalSection(&mutex); return 0; }
 #else
     pthread_attr_t attr;pthread_attr_init(&attr);pthread_attr_setstacksize(&attr,32*1024*1024);int created=pthread_create(&worker,&attr,work,NULL);pthread_attr_destroy(&attr);
-    if(created) { mail_files_close();mailbox_close(); extras_close(); moderation_close(); members_close(); CLOSE(store); store=-1; return 0; }
+    if(created) { completion_close();mail_files_close();mailbox_close(); extras_close(); moderation_close(); members_close(); CLOSE(store); store=-1; return 0; }
 #endif
     if(!vault_worker_start()) { running=1;board_stop();return 0; }
     running=1; return 1;
@@ -1092,6 +1124,7 @@ void board_stop(void) {
     pthread_join(worker,NULL);
 #endif
     vault_worker_stop();
+    completion_close();
     if(!failed && !move_journal.broken) { uint32_t meta[]={article_count,(uint32_t)version,(uint32_t)format5};int sources[]={store,move_journal.fd,extras_descriptor()};db_cache_store(&article_db,sources,3,meta,sizeof(meta)); }
     policy_close();dj_close(&move_journal);dj_close(&access_journal);db_close(&moves_db);db_close(&accesses_db);move_count=move_replayed=0;access_count=0;
     sqlite3_close(features_db);features_db=NULL;profile_store_close();catalog_close_changes();activity_close();mail_files_close();mailbox_close(); extras_close(); moderation_close(); members_close(); db_close(&article_db);CLOSE(store); running=0;article_count=0;memset(user_posts,0,sizeof(user_posts));

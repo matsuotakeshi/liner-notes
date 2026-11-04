@@ -1,3 +1,5 @@
+> stage73では、structured形式のバックアップ・復元を保持し、`db-structure` による別コピー変換を追加しました。[DATABASE_STRUCTURED.md](DATABASE_STRUCTURED.md)を参照してください。既存DBは自動変換しません。追加のCOM／BBSリンクも明示的に起動するまで無効です。
+
 # 0.72への更新
 
 文書改訂: 2026-11-04。[詳細導入マニュアル](INSTALL.md)と併せて使用します。

@@ -1,30 +1,24 @@
-> 現行版は0.72です。[変更内容](STAGE72.md)、[更新手順](UPGRADING.md)を参照してください。既存DB形式は自動変換しません。
+> これはstage73レビュー版です。[変更内容・構築方法](STAGE73.md)を参照してください。正式公開と本番切替は未実施です。既存DB形式は自動変換しません。
 
-# Liner notes FreeBSD port 0.72
+# Liner notes FreeBSD port 0.73.a1（レビュー版）
 
-新規構築は [インストールと運用開始](INSTALL.md) を順に実施してください。この文書は配置・既存環境の更新・独自構成の補足です。今回の変更は [STAGE72.md](STAGE72.md) を参照してください。以前の再開修正も含みます。
+サービス配置の基礎は [インストールと運用開始](INSTALL.md)、今回の差分は [STAGE73.md](STAGE73.md) を参照してください。INSTALLにある0.72公開アーカイブの取得例は、今回のレビュー版の取得方法ではありません。
 
 > stage67: 正式なSQLite保存を使う場合の移行・バックアップ・復元・整理と新しいrc.conf項目はSTAGE67.mdを参照してください。旧backup/compactではなくdb-backup/db-compactを使用します。
 
-stage71の更新対策・転送照合・プロフィール/履歴SQL保存を含むportです。stage65-r1のインストール配置を維持しています。管理ツールは設置先のCLI名とbinディレクトリに対応しています。
+stage72までの機能にWebUI帳票・転送改善・DB変換・シリアル／共有ボードコネクタを追加しました。stage65-r1のインストール配置を維持しています。
 
-## インストール
+## レビュー版の構築
 
-FreeBSDのportsツリーと依存パッケージが必要です。配布物を展開し、rootで実行します。
-
-```sh
-cd liner-notes-ports-stage72/comms/liner-notes
-make BATCH=yes DISTDIR="$(realpath ../../distfiles)" install clean
-```
-
-GitHub ReleasesのソースURLを指定したportです。オフライン配置用に検証済みの `distfiles/liner-notes-stage72.tar.gz` を同梱しています。ビルドだけなら一般ユーザーで `make BATCH=yes DISTDIR="$(realpath ../../distfiles)" stage check-plist stage-qa package` を実行できます。
-
-同梱pkgはFreeBSD 15/amd64用です。15.1-RELEASE、base OpenSSLのlibcrypto.so.35を使用してビルドしています。他のABIではportからビルドしてください。pkgで導入する場合:
+FreeBSDのportsツリーと依存パッケージが必要です。portsアーカイブを空のディレクトリへ展開し、ソースアーカイブを指定するDISTDIRへ置きます。
 
 ```sh
-pkg install python312 py312-sqlite3 py312-aiohttp sqlite3
-pkg add packages/liner-notes-0.72.pkg
+cd /path/to/extracted-port/comms/liner-notes
+make BATCH=yes OPTIONS_SET="DOCS WEBUI LINK" \
+    DISTDIR=/absolute/path/to/distfiles stage check-plist stage-qa package
 ```
+
+DISTDIRには `liner-notes-stage73-review.tar.gz` が必要です。公開取得URLは設定していません。上の操作はstage/packageまでで本番にはインストールしません。今回の配布物はソースとportsで、依存関係を含む導入済みシステム一式ではありません。
 
 ## 配置
 
@@ -34,6 +28,7 @@ pkg add packages/liner-notes-0.72.pkg
 | バックアップ・検証・復元・整理 | `/usr/local/bin/liner-notes-admin` |
 | 会員・保管庫の管理CLI | `/usr/local/bin/liner-notes-memberctl`、`liner-notes-vaultctl` |
 | その他の公開コマンド | `/usr/local/bin/liner-notes-maintenance`、`liner-notes-zmodem`、`liner-notes-check-resume`、`liner-notes-ssh` |
+| 追加コネクタ・DB変換 | `/usr/local/bin/liner-notes-serial`、`liner-notes-link`（LINK有効時）、`liner-notes-dbconvert` |
 | バナー、HELP、メニュー、補助スクリプト | `/usr/local/share/liner-notes/` |
 | 設定 | `/usr/local/etc/liner-notes/` |
 | データ | `/var/db/liner-notes/` |
@@ -89,7 +84,7 @@ service liner_notes stop
 
 1. 旧rcスクリプトで `service liner_notes stop` を実行し、転送ワーカーも停止していることを確認します。
 2. 旧データ全体、旧設定、編集したバナー・HELP・メニュー、既存ログを保存します。
-3. ローカルpkgでの更新は、停止・バックアップ後に `pkg delete liner-notes` で旧プログラムを除去し、続けて `pkg add packages/liner-notes-0.72.pkg` で導入します。依存パッケージのautoremoveは行いません。portから導入する場合も、旧パッケージを除去してから冒頭のinstallを実行します。編集済み `liner_notes.conf` は維持されるため、`.sample` と比較し、`rc.conf` にある旧指定も更新します。以前の配置移行の検証では `pkg add -f` だけでは旧libexecのファイルが残ったため、この置換手順を確認しています。
+3. ローカルpkgの置換は、対象版のインストール・削除試験を別環境で完了してから行います。以前の配置移行では旧パッケージを除去して新パッケージを導入しました。今回のレビュー版では本番向けの置換試験は未完了です。依存パッケージのautoremoveは行わず、編集済み `liner_notes.conf` と `.sample`、`rc.conf` にある旧指定を比較します。
 4. 旧 `liner_notes_home="/usr/local/libexec/liner-notes"` は削除し、必要ならデータディレクトリを指定します。本体の指定は `/usr/local/sbin/liner-notes` へ変更します。
 5. 編集済み表示ファイルは旧 `/usr/local/etc/liner-notes/` 配下から `/usr/local/share/liner-notes/` の対応箇所へコピーします。旧配置を使い続ける場合はmenu/help/bannerの変数で明示できます。
 6. 旧 `/var/db/liner_notes/` を新 `/var/db/liner-notes/` へ、属性を保って**コピー**します。新側に運用データがある場合は混ぜず、別の空ディレクトリで検証してください。移動しない場合は `liner_notes_data_dir="/var/db/liner_notes"` を明示します。旧 `liner_notes_board` 等の個別指定があれば、それらも確認します。
@@ -129,7 +124,7 @@ su -m liner_notes -c '/usr/local/bin/liner-notes-vaultctl init /var/db/liner-not
 
 ## ZMODEM・外部ゲーム
 
-DOCSとWEBUIは既定ON、ZMODEM依存は既定OFFです。ZMODEMを選ぶと本家FreeBSDのcomms/lrzszを依存に記録します。独自lrzsz portsは同梱しません。WEBUIを無効にする場合はOPTIONS_UNSET=WEBUIを指定します。
+DOCSとWEBUIは既定ON、ZMODEMとLINK依存は既定OFFです。ZMODEMを選ぶと本家FreeBSDのcomms/lrzszを依存に記録します。独自lrzsz portsは同梱しません。WEBUIを無効にする場合はOPTIONS_UNSET=WEBUIを指定します。LINKはcryptographyを依存に追加します。鍵・共有設定は [BBS_LINKS.md](BBS_LINKS.md)、COMは [SERIAL.md](SERIAL.md) を参照してください。
 
 ```sh
 su -m liner_notes -c '/usr/local/bin/liner-notes-check-resume /usr/local/bin/lrz /usr/local/bin/lsz --receipt /var/db/liner-notes/lrz-resume.json'
@@ -148,6 +143,6 @@ liner_notes_doors="/usr/local/etc/liner-notes/doors.conf"
 
 ## 検証・公開準備
 
-今回の機能・転送・ports検査は配布物内 `evidence/stage72/` を参照してください。旧版の機能試験とは分けて記録します。既存の稼働BBSやホストのrc.confは変更しません。
+今回の機能・転送・ports検査は [STAGE73.md](STAGE73.md) と別添のstage73検証記録を参照してください。旧版の機能試験とは分けて記録します。既存の稼働BBSやホストのrc.confは変更しません。
 
-公開URLとGPL-3.0-only表記は設定済みです。公式Ports Collectionへの提出は別作業で、担当者の連絡先と公式UID/GID割当の確定が残ります。現在は私用UID/GIDの配布portです。poudriereや他FreeBSD版・他ABIでの検証とは区別してください。
+GPL-3.0-only表記は維持しています。レビュー版には公開ソース取得URLを設定していません。公式Ports Collectionへの提出は別作業で、担当者の連絡先と公式UID/GID割当の確定が残ります。現在は私用UID/GIDの配布portです。poudriereや他FreeBSD版・他ABIでの検証とは区別してください。

@@ -18,7 +18,7 @@ async def run():
             with patch.object(Path,'read_text',side_effect=PermissionError('test template permission')):
                 r=await client.get('/notes/');assert r.status==500;assert 'BBS connection unavailable' not in await r.text()
             r=await client.get('/notes/');assert r.status==200 and 'Custom template' in await r.text()
-            with patch('webui.bridge.asyncio.open_connection',new=AsyncMock(side_effect=OSError('test network failure'))):
+            with patch('webui.bbs_transport.asyncio.open_connection',new=AsyncMock(side_effect=OSError('test network failure'))):
                 r=await client.post('/notes/api/session',json={});assert r.status==503;assert (await r.json())['error']=='BBS connection unavailable'
     print('PASS Web errors: missing template fallback, invalid UTF-8/permission errors=500, recovered template=200, BBS network failure=503')
 

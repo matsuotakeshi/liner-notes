@@ -484,3 +484,7 @@ MESSAGE(CLASSIC_SIGOP_MENU, "SIGOP 担当ボード管理\r\n 1 担当者用の�
 MESSAGE(ERR_BODY_QUOTA, "本文が設定された容量上限を超えています。")
 MESSAGE(ERR_PROTOCOL_SINGLE, "この転送方式では1ファイルずつ転送してください。")
 MESSAGE(ERR_CONNECTOR_EDITOR_STATE, "本文を入力できる編集状態ではありません。")
+MESSAGE(ERR_LINK_DENIED, "この会員またはボードではBBS間リンクを利用できません。")
+MESSAGE(ERR_LINK_SYNTAX, "BBS間リンクの入力形式が正しくありません。")
+MESSAGE(ERR_LINK_PREDECESSOR, "対象記事または前の版を利用できません。リンクの状態を確認してください。")
+MESSAGE(ERR_LINK_STORAGE, "リンクの保存を確認できません。管理者による保存領域の確認が必要です。")

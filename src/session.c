@@ -16,6 +16,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
+#include <openssl/evp.h>
 #include <limits.h>
 #include <openssl/crypto.h>
 void session_abort(Session *s) { s->active=0; }
@@ -1736,7 +1737,49 @@ static void connector_transfer(Session *s,const char *line) {
     else q.op='$';
     snprintf(q.body,sizeof(q.body),"%s",line);submit(s,&q);
 }
+static int link_decode(const char *in,char *out,size_t capacity) {
+    if(!strcmp(in,"-")) { out[0]=0;return 1; }
+    size_t n=strlen(in);if(!n || n%4 || n>4*((capacity-1+2)/3))return 0;
+    unsigned char *raw=malloc(n/4*3+1);if(!raw)return 0;
+    int length=EVP_DecodeBlock(raw,(const unsigned char *)in,(int)n);
+    if(length>=0) { if(in[n-1]=='=')length--;if(n>1 && in[n-2]=='=')length--; }
+    int ok=length>=0 && (size_t)length<capacity && !memchr(raw,0,(size_t)(length<0?0:length));
+    if(ok) { memcpy(out,raw,(size_t)length);out[length]=0; }
+    free(raw);return ok;
+}
+static void connector_link(Session *s,char *line) {
+    if(!s->user || s->editing || session_secret(s) || s->chatting || s->gather_mode || !board_link_enabled(s->board,s->user)) { queue_text(s,"ERR link denied\r\n");return; }
+    BoardRequest q={0};q.op=BOARD_LINK;
+    if(!strncmp(line,"LINKSNAP ",9) || !strncmp(line,"LINKSCAN ",9)) {
+        const char *end;if(!number_arg(line+9,&q.cursor,&end) || *end)goto bad;q.action=line[5]=='N'?'S':'M';
+    } else if(!strncmp(line,"LINKLOOKUP ",11)) {
+        char extra;if(sscanf(line+11,"%64s %64s %c",q.link_origin,q.link_article,&extra)!=2)goto bad;q.action='L';
+    } else if(!strncmp(line,"LINKAPPLY ",10)) {
+        char *fields[10],*at=line+10;unsigned count=0;
+        while(at && count<10) { fields[count++]=at;char *space=strchr(at,' ');if(space)*space++=0;at=space; }
+        if(count!=9 || at || strlen(fields[0])!=64 || strlen(fields[1])!=64 || !connector_hex(fields[0],64) || !connector_hex(fields[1],64))goto bad;
+        strcpy(q.link_origin,fields[0]);strcpy(q.link_article,fields[1]);const char *end;
+        if(!number_arg(fields[2],&q.cursor,&end) || *end)goto bad;
+        if(strcmp(fields[3],"0") && (!number_arg(fields[3],&q.number,&end) || *end))goto bad;
+        if(!*fields[4] || strlen(fields[4])>12)goto bad;
+        for(const char *p=fields[4];*p;p++)if(*p<'0' || *p>'9')goto bad;
+        q.since=strtoull(fields[4],NULL,10);if(!q.since || q.since>253402300799ULL)goto bad;
+        if(strlen(fields[5])!=1 || !strchr("PTD",fields[5][0]))goto bad;q.action=fields[5][0];
+        if(!link_decode(fields[6],q.username,sizeof(q.username)) || !link_decode(fields[7],q.title,sizeof(q.title)) || !link_decode(fields[8],q.body,sizeof(q.body)))goto bad;
+        if(!safe_text(q.username) || !safe_text(q.title))goto bad;
+        for(const unsigned char *p=(const unsigned char *)q.body;*p;p++)if((*p<32 && *p!='\r' && *p!='\n' && *p!='\t') || *p==127)goto bad;
+    } else goto bad;
+    submit(s,&q);return;
+bad:queue_text(s,"ERR link syntax\r\n");
+}
 static int connector_line(Session *s,char *line,size_t size) {
+    if(*s->connector_token && (!strncmp(line,"LINKSNAP ",9) || !strncmp(line,"LINKSCAN ",9) || !strncmp(line,"LINKLOOKUP ",11) || !strncmp(line,"LINKAPPLY ",10))) { connector_link(s,line);return 1; }
+    if(*s->connector_token && !strncmp(line,"CONNECTOR LINKBLOCK ",20) && size>85 && !memcmp(line+20,s->connector_token,64) && line[84]==' ') {
+        const char *end;uint32_t n;free(s->connector_block);s->connector_block=NULL;
+        if(!s->user || s->editing || session_secret(s) || s->chatting || s->gather_mode || !board_link_enabled(s->board,s->user) || !number_arg(line+85,&n,&end) || *end || !n || n>360000) { queue_text(s,"ERR link syntax\r\n");return 1; }
+        s->connector_block=malloc((size_t)n+1);if(!s->connector_block) { session_abort(s);return 1; }
+        s->connector_link_block=1;s->connector_block_size=n;s->connector_block_used=0;s->connector_block_until=s->now+60000;return 1;
+    }
     if(*s->connector_token && size>84 && !memcmp(line,"CONNECTOR TRANSFER ",19) &&
        !memcmp(line+19,s->connector_token,64) && line[83]==' ') {
         char *cmd=line+84;
@@ -1752,7 +1795,7 @@ static int connector_line(Session *s,char *line,size_t size) {
         if(!s->user || (s->editing && s->draft.op!='m') || s->password_mode || s->chatting || s->gather_mode ||
            !number_arg(line+81,&n,&end) || *end || !n || n>90000) { queue_text(s,"ERR vault syntax\r\n");return 1; }
         s->connector_block=malloc((size_t)n+1);if(!s->connector_block) { session_abort(s);return 1; }
-        s->connector_block_size=n;s->connector_block_used=0;s->connector_block_until=s->now+60000;return 1;
+        s->connector_link_block=0;s->connector_block_size=n;s->connector_block_used=0;s->connector_block_until=s->now+60000;return 1;
     }
     if(*s->connector_token && !strncmp(line,"CONNECTOR DATA ",15) && size>80 &&
        !memcmp(line+15,s->connector_token,64) && line[79]==' ') {
@@ -1763,7 +1806,8 @@ static int connector_line(Session *s,char *line,size_t size) {
         memcpy(s->connector_block+s->connector_block_used,line+80,n);s->connector_block_used+=n;
         if(s->connector_block_used==s->connector_block_size) {
             char *command=s->connector_block;s->connector_block=NULL;command[s->connector_block_used]=0;
-            if((!s->editing && !strncmp(command,"FILEPUTBLOCK ",13)) || !strncmp(command,"MFILEPUTBLOCK ",14))connector_transfer(s,command);
+            if(s->connector_link_block && !strncmp(command,"LINKAPPLY ",10))connector_link(s,command);
+            else if(!s->connector_link_block && ((!s->editing && !strncmp(command,"FILEPUTBLOCK ",13)) || !strncmp(command,"MFILEPUTBLOCK ",14)))connector_transfer(s,command);
             else queue_text(s,"ERR vault syntax\r\n");
             free(command);
         }return 1;

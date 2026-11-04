@@ -23,7 +23,8 @@ Upstream: https://github.com/xtermjs/xterm.js . These notices are installed
 with the Web assets. Original copyright notices must be retained.
 
 External dependencies (not copied into the source release): OpenSSL/libcrypto,
-SQLite, Python, aiohttp, and optional lrzsz. Their own licenses apply. FreeBSD
+SQLite, Python, aiohttp, optional cryptography (shared-board links), and optional
+lrzsz. Their own licenses apply. FreeBSD
 packages record the dependencies; install lrzsz using the official port/package.
 `scripts/build-lrzsz.py` is an optional isolated development tool which fetches
 and patches an external upstream archive; the fetched engine is not bundled.

@@ -32,6 +32,15 @@ async def exercise(bbs,tmp):
         r=await c.post(base+path,json=payload);assert r.status==200,(r.status,await r.text());return await r.json()
     try:
         a=await client('alice');b=await client('bob');outsider=await client('carol')
+        for name in ('app.js','reports-ui.js','terminal-ui.js'):
+            asset=await a.get(origin+'/notes/assets/'+name);assert asset.status==200,name
+        r=await post(a,'action',{'action':'admin.connections','values':{}})
+        assert r['data']['report']['title']=='CONNECTIONS' and len(r['data']['report']['rows'])>=3,r
+        r=await post(a,'action',{'action':'admin.members','values':{}})
+        assert r['data']['report']['title']=='MEMBERS' and len(r['data']['report']['rows'])==3,r
+        r=await post(b,'action',{'action':'userstats','values':{}})
+        assert r['data']['report']['title']=='USERSTATS',r
+        assert not any(x['id']=='admin.connections' for x in r['actions']),r
         info=await post(a,'query',{'kind':'boards'});assert info['state']['games']==[{'id':1,'title':'Web test game'}],info
         invalid=await a.post(base+'query',json=[]);assert invalid.status==400
         for path in ('-','games','games/child','other'):

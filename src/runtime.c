@@ -41,6 +41,7 @@ static uint64_t now_ms(void) { return GetTickCount64(); }
 #else
 #include <sys/socket.h>
 #include <netinet/in.h>
+#include <netinet/tcp.h>
 #include <arpa/inet.h>
 #include <unistd.h>
 #include <fcntl.h>
@@ -97,6 +98,7 @@ static uint32_t account_epochs[MEMBER_MAX+1];
 static int board_enabled,member_mode,menu_mode;
 static TerminalMode terminal_mode=TERMINAL_RAW;
 static const char *admins_path;
+static const char *link_accounts_path;
 static Language default_language=LANGUAGE_JA;
 static uint64_t shutdown_at,shutdown_drain;static char shutdown_reason[513];
 static volatile sig_atomic_t stopping;
@@ -398,6 +400,7 @@ int main(int argc,char **argv) {
         }
         else if(!strcmp(argv[1],"--zmodem-helper") && argc>2) { zhelper=argv[2];argc-=2;argv+=2; }
         else if(!strcmp(argv[1],"--admins") && argc>2) { admins_path=argv[2]; argc-=2; argv+=2; }
+        else if(!strcmp(argv[1],"--link-accounts") && argc>2) { link_accounts_path=argv[2];argc-=2;argv+=2; }
         else if(!strcmp(argv[1],"--vault-dir") && argc>2) { vault_directory=argv[2]; argc-=2; argv+=2; }
         else if(!strcmp(argv[1],"--bind") && argc>2) { bind_address=argv[2]; argc-=2; argv+=2; }
         else if(!strcmp(argv[1],"--login-text-dir") && argc>2) { login_directory=argv[2];argc-=2;argv+=2; }
@@ -413,7 +416,7 @@ int main(int argc,char **argv) {
     if(!doors_config(doors_path)) { fprintf(stderr,"invalid doors configuration\n");return 2; }
     long port=(argc>=2 && argc<=5) ? strtol(argv[1],&end,10) : -1;
     if(port<0 || port>65535 || !end || end==argv[1] || *end) {
-        fprintf(stderr,"usage: runtime [--database FILE | --database-structured FILE] [--level-seconds LEVEL:SECONDS] [--time-warning N] [--time-grace N] [--userlog-public] [--userlog-keep N] [--idle-seconds N] [--user-log FILE|-] [--gather-count N] [--chat-log FILE|-] [--max-articles N] [--max-mail N] [--max-user-posts N] [--banner FILE] [--disable chat|mail|vault] [--registration open|approval|closed] [--id-mode free|auto] [--id-prefix PREFIX] [--id-digits 1..8] [--id-first NAME] [--rtbbs-member-policy] [--login-text-dir DIR] [--registration-form simple|detailed] [--doors FILE] [--zmodem-helper FILE] [--vault-dir DIR] [--bind IPv4] [--menu] [--menu-dir DIR] [--help-dir DIR] [--telnet] [--lang ja|en] [--admins FILE] PORT [BOARD_FILE [MEMBERS_FILE [CATALOG_FILE]]] (default bind: 127.0.0.1)\n"); return 2;
+        fprintf(stderr,"usage: runtime [--database FILE | --database-structured FILE] [--level-seconds LEVEL:SECONDS] [--time-warning N] [--time-grace N] [--userlog-public] [--userlog-keep N] [--idle-seconds N] [--user-log FILE|-] [--gather-count N] [--chat-log FILE|-] [--max-articles N] [--max-mail N] [--max-user-posts N] [--banner FILE] [--disable chat|mail|vault] [--registration open|approval|closed] [--id-mode free|auto] [--id-prefix PREFIX] [--id-digits 1..8] [--id-first NAME] [--rtbbs-member-policy] [--login-text-dir DIR] [--registration-form simple|detailed] [--doors FILE] [--link-accounts FILE] [--zmodem-helper FILE] [--vault-dir DIR] [--bind IPv4] [--menu] [--menu-dir DIR] [--help-dir DIR] [--telnet] [--lang ja|en] [--admins FILE] PORT [BOARD_FILE [MEMBERS_FILE [CATALOG_FILE]]] (default bind: 127.0.0.1)\n"); return 2;
     }
 #ifdef _WIN32
     WSADATA data; if(WSAStartup(MAKEWORD(2,2),&data)) return 1;
@@ -447,6 +450,7 @@ int main(int argc,char **argv) {
     if(vault_directory && (argc<4 || !vault_bridge_open(vault_directory))) { fprintf(stderr,"vault: requires initialized directory and board/member files\n"); return 2; }
     signal(SIGINT,stop); signal(SIGTERM,stop);
     if(admins_path && argc<4) { fprintf(stderr,"admins: requires board and member files\n"); return 2; }
+    if(link_accounts_path && (argc<4 || !board_link_config(link_accounts_path))) { fprintf(stderr,"link: invalid board/account allowlist\n");return 2; }
     if(argc>=3) { if(!board_start_config(argv[2],argc>=4?argv[3]:NULL,argc==5?argv[4]:NULL,admins_path)) return 1; board_enabled=1; member_mode=argc>=4; }
     if(board_enabled && (!user_log || strcmp(user_log,"-")) && !(user_log?userlog_open_file(user_log):userlog_open(argc>=4?argv[3]:argv[2]))) { fprintf(stderr,"userlog: cannot open/lock/validate\n");board_stop();return 1; }
     if(!chat_log && argc>=4) { int n=snprintf(chat_default,sizeof(chat_default),"%s.chatlog",argv[3]);if(n<0 || (size_t)n>=sizeof(chat_default))return 2;chat_log=chat_default; }
@@ -489,6 +493,7 @@ int main(int argc,char **argv) {
         if(shutdown_drain && clock>=shutdown_drain) { stopping=1;break; }
         zhost_reap(now_ms());
         BoardResult completion;
+        board_completion_drain();
         while(board_poll(&completion)) {
             service_result(&completion);
             if(completion.zcontrol) {
@@ -552,9 +557,11 @@ int main(int argc,char **argv) {
             }
         }
         doors_reap();
-        pollfd_t fds[SLOTS+1]; int map[SLOTS+1]; unsigned count=1;
+        pollfd_t fds[SLOTS+2]; int map[SLOTS+2]; unsigned count=1;
         memset(fds,0,sizeof(fds));
         fds[0].fd=listener; fds[0].events=POLLIN;
+        int notification=board_completion_fd();
+        if(notification>=0) { fds[count].fd=notification;fds[count].events=POLLIN;map[count++]=-1; }
         uint64_t now=now_ms(); int timeout=50;
         for(int i=0;i<SLOTS;i++) {
             Connection *c=&connections[i]; if(c->fd==INVALID) continue;
@@ -599,6 +606,7 @@ int main(int argc,char **argv) {
         int ready=poll_sockets(fds,count,timeout);
         if(ready<0) { if(retryable()) continue; result=1; break; }
         for(unsigned j=1;j<count;j++) {
+            if(map[j]<0)continue;
             Connection *c=&connections[map[j]]; short ev=fds[j].revents;
             if(ev&(POLLERR|POLLNVAL)) { drop(c); continue; }
             if(ev&POLLOUT) {
@@ -622,6 +630,10 @@ int main(int argc,char **argv) {
                 for(int i=0;i<SLOTS;i++) if(connections[i].fd==INVALID) { slot=i; break; }
                 if(slot<0 || online(NULL)>=ln_limit("CONNECTIONS",CONNECTION_MAX) || shutdown_drain || next_id>CONTENT_ID_MAX || nonblock(fd)) close_socket(fd);
                 else {
+                    /* Interactive commands and connector receipts must not wait
+                     * for a delayed ACK on a preceding short response. */
+                    int no_delay=1;
+                    if(setsockopt(fd,IPPROTO_TCP,TCP_NODELAY,(const char *)&no_delay,sizeof(no_delay))) { close_socket(fd);continue; }
                     Connection *c=&connections[slot]; c->fd=fd;char address[48];if(inet_ntop(AF_INET,&peer.sin_addr,address,sizeof(address)))snprintf(c->peer,sizeof(c->peer),"%s:%u",address,(unsigned)ntohs(peer.sin_port));
                     if(!terminal_init(&c->terminal,terminal_mode,queue_bytes,c)) { drop(c); continue; }
                     SessionIO io={c,app_write,online,app_drained};

@@ -63,7 +63,7 @@ static void *work(void *unused)
         vault_bridge_guard(NULL,NULL);
         if(q->op=='Y' && (q->action==VAULT_CMD_PASSWORD || q->action==VAULT_CMD_UNLOCK))OPENSSL_cleanse(q->body,sizeof(q->body));
         if(!guard(j)) { r->binary_size=0;r->revoked=1;strcpy(r->text,"ERR session revoked\r\n"); }
-        LOCK();j->state=3;
+        LOCK();j->state=3;board_completion_notify();
     }
     UNLOCK();
 #ifdef _WIN32

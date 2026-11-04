@@ -1,3 +1,5 @@
+> stage73の追加機能: [DBの別コピー変換](DATABASE_STRUCTURED.md) / [COM・モデム](SERIAL.md) / [鍵認証の共有ボード](BBS_LINKS.md) / [Door運用](DOOR_OPERATIONS.md)。以下の0.72導入手順と配布URLは正式公開済みの0.72用です。開発版は本番へ自動適用しません。
+
 > 現行版は0.72です。[変更内容](STAGE72.md)、[更新手順](UPGRADING.md)を参照してください。既存DB形式は自動変換しません。
 
 # Liner notes 0.72 導入・運用開始マニュアル

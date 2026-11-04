@@ -1,0 +1,98 @@
+# stage73 開発版
+
+0.72から独立した開発・検証領域で変更しました。本番のサービス、データ、
+既存StarRoute Traders/The Clansの設定は変更していません。
+このチェックアウトとレビュー用portsは開発版であり、正式リリースではありません。
+
+## 実装
+
+- WebUI: 管理操作の分類、接続・利用・記事・保管庫の帳票、絞り込み、対象への
+  操作、検索結果からの閲覧・取得、設定・巡回・グループ検索の入口。
+  [機能対応表](WEBUI_COVERAGE.md)に専用画面／フォーム／端末の役割を整理しました。
+- 転送: コネクタの送信をまとめ、TCP_NODELAYとワーカー完了通知のpipeで
+  1ブロックごとの固定待ちを解消。既存の容量制限・認証・ハッシュ照合を保持。
+- DB: C側のレコード検証を再利用する `db-structure`、別コピーへの変換、
+  全ストリームの照合、structured形式を保持したバックアップ・復元。
+  [DATABASE_STRUCTURED.md](DATABASE_STRUCTURED.md)を参照。
+- COM: 別プロセスのシリアル／Hayesコネクタ。`--platform auto|freebsd|linux`、
+  速度・RTS/CTS・キャリア・DTR、排他、切断時の設定復元。
+  [SERIAL.md](SERIAL.md)を参照。
+- BBSリンク: Ed25519の発信元署名、TLS相互認証、明示した共有ボード、
+  スター／リング中継、耐久キュー、再送・重複防止、親記事の対応、題名変更・
+  取り消し。専用会員のボード許可は既定で無効です。
+  [BBS_LINKS.md](BBS_LINKS.md)を参照。
+- Door: 既存の汎用PTY連携を回帰確認し、追加・排他・異常終了・復旧の
+  [運用手順](DOOR_OPERATIONS.md)を整理しました。
+- 文書: 新機能の入口と過去の設計記録を区別し、portsのファイル一覧と対応。
+
+## 確認済みの範囲
+
+FreeBSD 15.1/amd64、Python 3.12.15の独立領域で検証しています。
+
+- 実BBSとWeb HTTP: 投稿、256KiB本文、下書き、Gather、メール添付の権限、
+  ファイルの中断／再開、完了照合、CSRF/Origin、管理者と一般会員の境界。
+- Edgeの実ブラウザー: ゲスト導線、ボード／投稿先／パンくず、プロフィール、
+  添付送受信、管理者宛てメール後の戻り、管理帳票・検索、チャット配置、
+  1440px／390px幅での端末枠。
+- DB変換: 稼働中ロック拒否、元DBのSHA-256不変、項目別テーブル、ログイン、
+  記事・メール・取り消し、再起動、structured復元、リンク記事対応表の移行。
+- structured DB: 記事10,050件＋メール10,050件で起動・閲覧・追加投稿・
+  メール取り込みを確認。常駐メモリの増分は約9.9MiB、起動から確認まで6.55秒。
+  別の12,000件ずつの試験でも本文の非常駐化と検索・既読操作を確認。
+- COMの疑似端末: 全256値の双方向転送、分割Telnet制御、パスワード非表示、
+  RING→ATA→CONNECT、終了時の出力と端末設定復元、実BBSへの登録・ログイン。
+- リンク: 3つの実BBSのスター／リング、返信・題名変更・取り消し・256KiB本文、
+  再送、再起動、適用途中からの復旧、不許可会員の拒否。別プロセス2台で
+  相互TLS、通信中断、復旧、カーソルの再取得、二重投稿防止、排他を確認。
+- Door: 設定、NAWS/PTYサイズ、専用dropfile、複数接続、異常終了・切断後の
+  子プロセス終了とBBSへの復帰。ゲーム本体の保存データは使っていません。
+- ZMODEM: lrzsz 0.13.1との実送受信、バッチ、メール添付、中断・途中再開、
+  同一接続での失敗後の再試行、同時転送枠、権限取り消し、子プロセス回収。
+
+## レビュー用portsの構築
+
+ソースとportsは対になる2つのアーカイブです。ソースアーカイブは展開せず、
+`DISTDIR`へ置きます。portsアーカイブだけを空の作業ディレクトリへ展開します。
+既存の `/usr/ports` や本番設定を上書きする必要はありません。
+
+```sh
+mkdir -p ~/liner-notes-73-review/distfiles ~/liner-notes-73-review/port
+cp /path/to/liner-notes-stage73-review.tar.gz ~/liner-notes-73-review/distfiles/
+tar -xzf /path/to/liner-notes-ports-stage73-review.tar.gz -C ~/liner-notes-73-review/port
+cd ~/liner-notes-73-review/port/comms/liner-notes
+make BATCH=yes OPTIONS_SET="DOCS WEBUI LINK" \
+    DISTDIR="$HOME/liner-notes-73-review/distfiles" stage check-plist stage-qa package
+```
+
+`/path/to` は受け取ったファイルの所在へ置き換えます。FreeBSD portsツリーと
+必要な依存パッケージが必要です。ZMODEMを依存関係に含める場合は
+`OPTIONS_SET`へ `ZMODEM` も追加します。独自lrzsz portは同梱していません。
+この操作はパッケージ作成までで、既存BBSの更新・再起動は行いません。
+レビュー版には公開ダウンロードURLを設定していないため、対応するソースを
+`DISTDIR`に置かないと取得できません。
+
+### 転送の測定
+
+同一FreeBSD検証機のループバック接続で生成データを測定しました。
+
+| データ | 登録 | 取得 | 照合 |
+|---|---:|---:|---|
+| 159,809,104バイト | 55.41秒 / 2.75MiB/s | 16.05秒 / 9.50MiB/s | SHA-256一致 |
+
+SHA-256: `0d81a6fa12d12702e7a8adaa385b380df99d38daa046beddabbb819fefc91e27`。
+これはOBSと同じ容量の生成データで、OBS配布ファイル自体の試験ではありません。
+初期の4MiB比較では登録約0.50→2.78MiB/s、取得約1.05→9.03MiB/sでした。
+Apache/HTTPS・利用者回線を通した本番速度や最大1GiB×16ファイルを保証する値ではありません。
+
+## 残る検証・将来対応
+
+- 物理COM／モデムのDCD/DTR・RTS/CTS・再着信。FreeBSD/Linux選択は実装済みですが、
+  この開発環境でLinuxの実機を起動してはいません。Rocky/AlmaLinux CIに試験を追加しています。
+- 本番HTTPSでの大容量・複数同時転送、全Web操作と各権限の組合せ。
+- 大規模共有ボードの初回同期・変更検出は巡回型。1周期128件に制限し、
+  進捗を保存します。リンク履歴の間引き・鍵の自動更新・新規参加用スナップショットは今後です。
+- 項目別DBでも未対応ストリームはblocksに保持し、ファイル本体は外部保存。
+  起動時検査や一部集計・全文検索を定数時間にする変更ではありません。
+- Solaris/illumos、物理モデム、FidoNet、DOSドア互換は今後。Solaris対応済みとは扱いません。
+
+正式公開前には配布物での導入・更新と対象Linux CIの完了を確認します。

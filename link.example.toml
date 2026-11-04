@@ -1,0 +1,31 @@
+# Replace sample identities and boards; no service is enabled on installation.
+[node]
+identity = "/var/db/liner-notes-link/identity"
+database = "/var/db/liner-notes-link/link.sqlite"
+listen = "127.0.0.1"
+port = 9044
+interval = 5
+max_events = 1000000
+max_bytes = 1073741824
+
+[bbs]
+host = "127.0.0.1"
+port = 23
+login = "bbslink"
+password_file = "/var/db/liner-notes-link/bbs-password"
+
+[[boards]]
+id = "0000000000000000000000000000000000000000000000000000000000000001"
+local = 2
+
+# Every origin (including nodes reached through a relay) needs explicit trust.
+[[origins]]
+certificate = "/usr/local/etc/liner-notes/link-peers/peer.crt"
+boards = ["0000000000000000000000000000000000000000000000000000000000000001"]
+
+# Only direct neighbors need endpoint entries; certificates are public.
+[[peers]]
+certificate = "/usr/local/etc/liner-notes/link-peers/peer.crt"
+host = "192.0.2.1"
+port = 9044
+boards = ["0000000000000000000000000000000000000000000000000000000000000001"]

@@ -50,6 +50,7 @@ fi
 : ${liner_notes_child_pidfile:=/var/run/liner-notes.child.pid}
 : ${liner_notes_logfile:=${liner_notes_log_dir}/daemon.log}
 : ${liner_notes_doors:=}
+: ${liner_notes_link_accounts:=}
 : ${liner_notes_admins:=}
 : ${liner_notes_catalog:=}
 : ${liner_notes_vault_dir:=}
@@ -103,7 +104,7 @@ liner_notes_validate()
         "$liner_notes_login_text_dir" "$liner_notes_data_dir" "$liner_notes_log_dir" "$liner_notes_sysinfo" "$liner_notes_goodbye"; do
         case "$_ln_path" in /*) ;; *) echo "Use absolute paths in liner_notes configuration." >&2; return 1 ;; esac
     done
-    for _ln_path in "$liner_notes_admins" "$liner_notes_catalog" "$liner_notes_vault_dir" "$liner_notes_zmodem_helper" "$liner_notes_help_dir" "$liner_notes_doors" "$liner_notes_limits"; do
+    for _ln_path in "$liner_notes_admins" "$liner_notes_catalog" "$liner_notes_vault_dir" "$liner_notes_zmodem_helper" "$liner_notes_help_dir" "$liner_notes_doors" "$liner_notes_limits" "$liner_notes_link_accounts"; do
         case "$_ln_path" in '') ;; /*) [ -r "$_ln_path" ] || return 1 ;; *) return 1 ;; esac
     done
     case "$liner_notes_database_mode" in blocks|structured) ;; *) return 1 ;; esac
@@ -177,6 +178,7 @@ liner_notes_start()
     [ -z "$liner_notes_vault_dir" ] || set -- "$@" --vault-dir "$liner_notes_vault_dir"
     [ -z "$liner_notes_zmodem_helper" ] || set -- "$@" --zmodem-helper "$liner_notes_zmodem_helper"
     [ -z "$liner_notes_doors" ] || set -- "$@" --doors "$liner_notes_doors"
+    [ -z "$liner_notes_link_accounts" ] || set -- "$@" --link-accounts "$liner_notes_link_accounts"
     [ -z "$liner_notes_help_dir" ] || set -- "$@" --help-dir "$liner_notes_help_dir"
     set -- "$@" --userlog-keep "$liner_notes_userlog_keep" --time-warning "$liner_notes_time_warning" --time-grace "$liner_notes_time_grace" \
         --level-seconds "0:$liner_notes_level0_seconds" --level-seconds "1:$liner_notes_level1_seconds" \

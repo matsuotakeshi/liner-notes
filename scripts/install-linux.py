@@ -34,10 +34,11 @@ def install(destdir,prefix,python):
             os.replace(name,out)
         finally:
             if os.path.exists(name):os.unlink(name)
-    for source,installed in [('runtime','sbin/liner-notes'),('memberctl','bin/liner-notes-memberctl'),('vaultctl','bin/liner-notes-vaultctl')]:
+    for source,installed in [('runtime','sbin/liner-notes'),('memberctl','bin/liner-notes-memberctl'),('vaultctl','bin/liner-notes-vaultctl'),('dbconvert','bin/liner-notes-dbconvert')]:
         put(prefix+'/'+installed,(ROOT/source).read_bytes(),0o755)
     for p in (ROOT/'scripts').glob('*.py'):
         put(share+'/scripts/'+p.name,p.read_bytes(),0o755 if p.name=='door_guess.py' else 0o644)
+    put(share+'/scripts/bbs_transport.py',(ROOT/'webui/bbs_transport.py').read_bytes())
     put(share+'/scripts/check-resume.py',(ROOT/'ports/test-resume.py').read_bytes())
     put(share+'/scripts/door_clans.sh',(ROOT/'scripts/door_clans.sh').read_bytes(),0o755)
     def wrapper(name,script,setup='',arguments=''):
@@ -45,6 +46,8 @@ def install(destdir,prefix,python):
         put(prefix+'/bin/'+name,text.encode(),0o755)
     wrapper('liner-notes-admin','maintenance.py','export LINER_NOTES_TOOLS_DIR='+shlex.quote(prefix+'/bin')+'\n')
     wrapper('liner-notes-check-resume','check-resume.py')
+    wrapper('liner-notes-serial','serial_connector.py')
+    wrapper('liner-notes-link','link_service.py')
     wrapper('liner-notes-zmodem','zmodem_host.py',
             'export LINER_NOTES_RESUME_RECEIPT="${LINER_NOTES_RESUME_RECEIPT:-/var/lib/liner-notes/lrz-resume.json}"\n',
             '--receiver "${LINER_NOTES_LRZ:-'+prefix+'/bin/lrz}" --sender "${LINER_NOTES_LSZ:-'+prefix+'/bin/lsz}" --spool-root "${LINER_NOTES_SPOOL_ROOT:-/var/lib/liner-notes/spool}" --')
@@ -57,6 +60,8 @@ def install(destdir,prefix,python):
         if name=='doors':content=('# id|minimum-level|seconds|absolute-executable|absolute-work-directory|title\n# 1|0|600|'+share+'/scripts/door_guess.py|/var/lib/liner-notes/games|Number guessing\n').encode()
         put(config+'/'+name+'.conf',content,sample=True)
     for p in ROOT.glob('*.md'):put(prefix+'/share/doc/liner-notes/'+p.name,p.read_bytes())
+    put(config+'/link.toml',(ROOT/'link.example.toml').read_bytes(),sample=True)
+    put(config+'/link-accounts.conf',(ROOT/'link-accounts.example.conf').read_bytes(),sample=True)
     put(share+'/LICENSE',(ROOT/'LICENSE').read_bytes())
     put(share+'/THIRD_PARTY.md',(ROOT/'THIRD_PARTY.md').read_bytes())
     for name,path in [('liner-notes.env','/etc/liner-notes/liner-notes.env'),('liner-notes.service','/usr/local/lib/systemd/system/liner-notes.service')]:

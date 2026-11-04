@@ -23,6 +23,8 @@ liner_notes_registration_form="simple"
 
 # Optional native games; leave unset to disable.
 # liner_notes_doors="%%ETCDIR%%/doors.conf"
+# Optional shared-board connector account allowlist (board ID and member ID):
+# liner_notes_link_accounts="%%ETCDIR%%/link-accounts.conf"
 
 # rc.conf may override these; derived log filenames follow liner_notes_log_dir.
 liner_notes_log_dir="/var/log/liner-notes"

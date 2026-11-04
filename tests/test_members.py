@@ -16,7 +16,13 @@ PASSWORD='test-only-secret-8721'
 
 def auth(c,name,create=False,password=PASSWORD):
     c.sock.settimeout(10)
-    c.send(f'{"REGISTER" if create else "LOGIN"} {name}\n'.encode()); c.expect(b'PASSWORD')
+    command=f'{"REGISTER" if create else "LOGIN"} {name}\n'.encode()
+    c.send(command);reply=c.line()
+    # Re-login after fast operations may still be inside the documented
+    # one-second credential throttle. Raw throttle tests do not use auth().
+    if reply==b'ERR try later':
+        time.sleep(1.05);c.send(command);reply=c.line()
+    assert reply==b'PASSWORD',reply
     c.send((password+'\n').encode())
     c.expect(f'LOGGED IN {name}'.encode())
 

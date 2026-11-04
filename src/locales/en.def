@@ -484,3 +484,7 @@ MESSAGE(CLASSIC_SIGOP_MENU, "SIGOP board administration\r\n 1 Scoped operation g
 MESSAGE(ERR_BODY_QUOTA, "Body exceeds the configured limit.")
 MESSAGE(ERR_PROTOCOL_SINGLE, "This protocol transfers one file at a time.")
 MESSAGE(ERR_CONNECTOR_EDITOR_STATE, "The editor is not ready for text input.")
+MESSAGE(ERR_LINK_DENIED, "Shared-board linking is not allowed for this account or board.")
+MESSAGE(ERR_LINK_SYNTAX, "Invalid shared-board link input.")
+MESSAGE(ERR_LINK_PREDECESSOR, "Article or preceding revision unavailable. Check link state.")
+MESSAGE(ERR_LINK_STORAGE, "Link storage uncertain. Administrator inspection is required.")

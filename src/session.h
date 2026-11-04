@@ -46,6 +46,7 @@ typedef struct {
     char connector_token[65];
     int connector_literal;
     char *connector_block;
+    int connector_link_block;
     size_t connector_block_size,connector_block_used;
     uint64_t connector_block_until;
     char old_password[129], new_password[129];

@@ -15,3 +15,6 @@
 /.web-venv/
 /webui/local.toml
 /.preview/
+
+/dbconvert
+/web-browser-results/

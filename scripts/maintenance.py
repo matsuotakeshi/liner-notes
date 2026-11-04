@@ -16,6 +16,8 @@ import os
 from pathlib import Path, PurePosixPath
 import re
 import stat
+import sqlite3
+import subprocess
 import tarfile
 import tempfile
 import time
@@ -366,24 +368,29 @@ def main():
     p.add_argument('--root',required=True);p.add_argument('--database',required=True);p.add_argument('--board',required=True);p.add_argument('directory')
     p=sub.add_parser('db-migrate',help='Copy a legacy instance and migrate its records to SQLite')
     p.add_argument('--root',required=True);p.add_argument('--board',required=True);p.add_argument('--members',required=True);p.add_argument('--database',default='liner.sqlite');p.add_argument('directory')
+    p.add_argument('--structured',action='store_true',default=None);p.add_argument('--tools-dir')
+    p=sub.add_parser('db-structure',help='Convert a stopped SQLite instance into a NEW structured copy, verifying every stream')
+    p.add_argument('--root',required=True);p.add_argument('--database',required=True);p.add_argument('--board',required=True);p.add_argument('--members',required=True);p.add_argument('--tools-dir');p.add_argument('directory')
     for operation in ('db-restore','db-compact'):
         p=sub.add_parser(operation,help='Restore a new SQLite instance from a logical backup')
         p.add_argument('archive');p.add_argument('directory');p.add_argument('--database',default='liner.sqlite')
+        p.add_argument('--structured',action='store_true',default=None);p.add_argument('--tools-dir')
         if operation=='db-compact':
-            p.add_argument('--reclaim-withdrawn',action='store_true');p.add_argument('--all-stores',action='store_true');p.add_argument('--tools-dir')
+            p.add_argument('--reclaim-withdrawn',action='store_true');p.add_argument('--all-stores',action='store_true')
     args = parser.parse_args()
     try:
         if args.operation.startswith('db-'):
             import database_tools as database
             if args.operation=='db-backup':result=database.backup(args.root,args.database,args.board,args.members,args.archive)
+            elif args.operation=='db-structure':result=database.structure(args.root,args.database,args.board,args.members,args.directory,args.tools_dir)
             elif args.operation=='db-export':result=database.export_instance(args.root,args.database,args.board,args.directory)
             elif args.operation=='db-migrate':
                 source=Path(args.root).resolve();destination=Path(args.directory).absolute();outside(destination,source)
                 # Existing backup validation and locks also guard initial migration.
                 with tempfile.TemporaryDirectory(prefix='liner-migrate-',dir=destination.parent) as tmp:
                     archive=Path(tmp)/'source.tar.gz';backup(source,args.board,args.members,archive)
-                    result=database.restore(archive,destination,database=args.database)
-            else:result=database.restore(args.archive,args.directory,args.operation=='db-compact',getattr(args,'reclaim_withdrawn',False),getattr(args,'all_stores',False),getattr(args,'tools_dir',None),args.database)
+                    result=database.restore(archive,destination,database=args.database,structured=args.structured,tools_dir=args.tools_dir)
+            else:result=database.restore(args.archive,args.directory,args.operation=='db-compact',getattr(args,'reclaim_withdrawn',False),getattr(args,'all_stores',False),args.tools_dir,args.database,args.structured)
         elif args.operation == 'backup':
             result = backup(args.root, args.board, args.members, args.archive)
         elif args.operation == 'verify':
@@ -392,7 +399,7 @@ def main():
             result = restore(args.archive, args.directory, args.operation == 'compact', getattr(args, 'log', ()), getattr(args, 'keep_log_days', None), getattr(args, 'gather_count', 16), getattr(args, 'all_stores', False), getattr(args, 'tools_dir', None), getattr(args, 'reclaim_withdrawn', False))
         result.pop('manifest', None)
         print(json.dumps(result, ensure_ascii=True, indent=2))
-    except (OSError, ValueError, tarfile.TarError, EOFError) as error:
+    except (OSError, ValueError, tarfile.TarError, EOFError, sqlite3.Error, subprocess.CalledProcessError) as error:
         parser.exit(1, 'Maintenance failed: ' + str(error) + '\n')
 
 

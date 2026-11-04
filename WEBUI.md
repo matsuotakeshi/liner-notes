@@ -1,3 +1,5 @@
+> stage73の管理帳票・検索結果・機能対応は [WEBUI_COVERAGE.md](WEBUI_COVERAGE.md)、転送性能と検証範囲は [STAGE73.md](STAGE73.md) を参照してください。
+
 # Liner notes WebUI 0.72
 
 初回導入は [詳細導入マニュアルのWebUI・Apache手順](INSTALL.md#webui-setup)を順に実施してください。設定全体、Host/Originの合わせ方、テンプレート権限、Forbidden等の切り分けをまとめています。この文書は構成・機能・開発用起動の補足です。

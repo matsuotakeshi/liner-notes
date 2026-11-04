@@ -3,5 +3,5 @@ Telnet access, member mail, chat, file vaults, and optional external transfer
 connectors. It includes Japanese and English menus, configurable help files,
 offline backup and compaction tools, and a daemon rc.d service.
 
-This local port packages the stage64 release. It does not deploy or migrate an
+This local port packages the stage73 review build. It does not migrate an
 existing BBS instance and does not enable the service automatically.

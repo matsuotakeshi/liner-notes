@@ -495,7 +495,7 @@ def create_app(config):
         return web.Response(text=template('index.html').replace('{{components}}',template('components.html')),content_type='text/html')
     async def asset(request):
         name=request.match_info['name']
-        if name not in ('app.js','style.css','xterm.js','xterm-fit.js','xterm.css','terminal-ui.js'):raise web.HTTPNotFound()
+        if name not in ('app.js','reports-ui.js','style.css','xterm.js','xterm-fit.js','xterm.css','terminal-ui.js'):raise web.HTTPNotFound()
         return web.FileResponse(ROOT/'static'/name)
 
     async def lifetime(app):

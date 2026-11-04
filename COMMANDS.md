@@ -1,3 +1,5 @@
+> stage73の追加コネクタ・外部管理ツールは [STAGE73.md](STAGE73.md)、Web画面の対応表は [WEBUI_COVERAGE.md](WEBUI_COVERAGE.md) を参照してください。通常のRTBBS風キーは維持します。
+
 > stage69更新: ファイル選択画面・階層・バッチ・XMODEM・プロフィール画面・T/W/#の追加差分は [STAGE69.md](STAGE69.md) を参照してください。チャットのTは一言送信、継続会話は /TALK です。
 
 # RTBBS風コマンド整理 — Liner notes stage67

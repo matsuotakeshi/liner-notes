@@ -33,7 +33,8 @@ def run(binary,ctl):
   try:
    a.until();c.until();a.cmd('LOGIN admin',b'> ');a.cmd(PASSWORD);c.cmd('LOGIN bob',b'> ');c.cmd(PASSWORD)
    a.cmd('PAGER OFF');c.cmd('PAGER OFF')
-   assert b'SITE INFO 67' in c.cmd('S');assert b'0.72' in c.cmd('V')
+   assert b'SITE INFO 67' in c.cmd('S')
+   version=c.cmd('V');assert b'Liner notes ' in version and b'SITE INFO 67' not in version
    assert b'Administrator' not in c.cmd('MENU')
    assert b'admin' in c.cmd('HELP ADMINSTORAGE').lower()
    assert b'1' in a.cmd('$');assert b'db-backup' in a.cmd('5');a.cmd('MENU')
