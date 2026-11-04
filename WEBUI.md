@@ -1,5 +1,7 @@
 # Liner notes WebUI 0.72
 
+初回導入は [詳細導入マニュアルのWebUI・Apache手順](INSTALL.md#webui-setup)を順に実施してください。設定全体、Host/Originの合わせ方、テンプレート権限、Forbidden等の切り分けをまとめています。この文書は構成・機能・開発用起動の補足です。
+
 0.72のBBS本体と組み合わせる別プロセスのWebコネクタです。
 0.71のruntimeには必要な同期機能がないため、本体とWebUIを揃えて更新します。
 

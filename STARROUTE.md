@@ -1,5 +1,7 @@
 # StarRoute Traders → Liner notes 本番導入手順
 
+> この文書は2026-11-02のStarRoute 0.18.0単独導入キットの記録です。Liner notes 0.72には必要なPTY連携を収録済みです。既存の宇宙を使う場合は [現在の導入マニュアル](INSTALL.md#doors-setup)に従い、initを再実行しません。別版のStarRouteを新規導入・更新する場合は、その配布物の手順を優先してください。
+
 対象: srv.ysni.org / FreeBSD 15.1 amd64、単独BBSの新規宇宙。
 StarRoute Traders 0.18.0 Phase 5を同梱。既存Liner notesのDoor機構を使用し、
 ゲーム専用の常駐daemon・マスターサーバー・TLS証明書・追加待受ポートは不要です。
@@ -30,7 +32,7 @@ pkg install python312 py312-sqlite3
 SQLiteモジュールはFreeBSD Portsの[databases/py-sqlite3](https://github.com/freebsd/freebsd-ports/blob/main/databases/py-sqlite3/Makefile)です。
 ゲーム実行にpipパッケージは必要ありません。
 
-Liner notesは先の`liner-notes-web-review-20261102.zip`相当を推奨します。
+このキットの検証時は`liner-notes-web-review-20261102.zip`相当を使用しました。現在はLiner notes 0.72に対応を収録しています。
 Door実行中のNAWS→PTYサイズ伝達を取り込み済みです。古いstage70でも起動自体は可能ですが、
 起動後の端末サイズ変更に追従しません。StarRoute側のコピー用パッチを本番へ直接適用しないでください。
 本体更新が必要なら、BBSの既存導入手順に従い、使用中のruntimeだけを更新します。
@@ -138,8 +140,8 @@ service liner_notes status
 Telnetで普段の会員としてログインして、次を入力します。
 
 ```text
-GAMES
-DOOR 1
+GAME
+1
 status
 market
 map
@@ -147,7 +149,7 @@ help
 quit
 ```
 
-ゲーム内は`SRT>`です。`quit`でLiner notesへ戻り、もう一度`DOOR 1`で同じプレイヤーへ
+ゲーム内は`SRT>`です。`quit`でゲーム一覧へ戻り、もう一度`1`で同じプレイヤーへ
 復帰することを確認します。売買も試す場合は市場に表示された商品IDを使ってください。
 端末の横幅を変更し、再度`map`を入力して星図が追従することも確認してください。
 

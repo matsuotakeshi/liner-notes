@@ -1,5 +1,7 @@
 # FreeBSD外部ゲーム
 
+初回設定と既存StarRoute/Clansを保持した追加手順は [詳細導入マニュアルのゲーム設定](INSTALL.md#doors-setup)を参照してください。この文書は設定形式・動作・ゲーム別の補足です。
+
 `--doors /絶対パス/doors.conf`、rc.dでは `liner_notes_doors` で設定ファイルを指定します。省略時は登録ゲームなしです。変更は再起動で反映します。
 
 ```text

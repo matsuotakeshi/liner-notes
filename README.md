@@ -10,9 +10,10 @@ FreeBSD向けのC製BBSです。Rocky Linux／AlmaLinux向けの構築・イン�
 
 ## 最初に読む文書
 
+- **[詳細導入マニュアル（0.72・2026-11-04改訂）](INSTALL.md)** — ダウンロード照合、管理者登録、ポート23、Apache/WebUI、ゲーム、バックアップ、トラブル対応。
+- [オフライン文書セット（HTML・Markdown）](https://github.com/matsuotakeshi/liner-notes/releases/download/v0.72/liner-notes-0.72-manual-20261104.zip) — 展開して `index.html` を開きます。プログラムを含まない文書の改訂版です。
 - [WebUI・別プロセス構成と導入](WEBUI.md)
 - [Rocky Linux / AlmaLinuxでの構築・systemd](LINUX.md) / [対応OSの見通し](PLATFORMS.md)
-- [新規インストールから運用開始](INSTALL.md)
 - [今回の変更](STAGE72.md) / [既存環境の更新](UPGRADING.md)
 - [旧RTBBS互換モード](STAGE69.md)
 - [SQLite移行・バックアップの仕様](STAGE67.md)
@@ -48,7 +49,7 @@ SQLite原本保存、タイムゾーン、運用上限は[stage67](STAGE67.md)�
 
 ## 検証
 
-`make check` が通常の回帰試験です。`make test-stage69 test-stage70 test-stage71` で操作・権限と今回の機能の試験、実ZMODEMは `make test-zmodem LRZ=/path/lrz LSZ=/path/lsz` です。今回の結果は配布物の `evidence/stage71/` を参照してください。
+`make check` が通常の回帰試験です。`make test-stage69 test-stage70 test-stage71` で操作・権限の試験、`make test-stage72 PYTHON=/path/to/web-venv/bin/python` でDoor/WebUI、実ZMODEMは `make test-zmodem LRZ=/path/lrz LSZ=/path/lsz` です。0.72の結果はports配布セットまたはリポジトリの `evidence/stage72/` を参照してください。
 
 ## ライセンス
 
