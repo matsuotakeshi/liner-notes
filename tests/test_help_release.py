@@ -1,6 +1,6 @@
 """Read shipped bilingual HELP through real sessions, including LOGOUT behavior."""
 from pathlib import Path
-import json,sys,tempfile
+import json,sys,tempfile,os,itertools
 from test_board import Server
 from test_runtime import Client
 from test_members import auth
@@ -11,8 +11,14 @@ binary=str(Path(sys.argv[1]).resolve())
 helpdir=Path(sys.argv[2]).resolve() if len(sys.argv)>2 else root/'help'
 with tempfile.TemporaryDirectory(prefix='help-release-') as temp:
     data=Path(temp)
-    for lang in ('ja','en'):
-        server=Server(binary,data/('notes-'+lang),members=data/('members-'+lang),language=lang,options=['--help-dir',str(helpdir)])
+    for lang,external in itertools.product(('ja','en'),(True,False)):
+        # With no help/ directory, runtime must use the same corrected built-in text.
+        oldcwd=Path.cwd()
+        os.chdir(data)
+        try:
+            suffix=lang+str(external)
+            server=Server(binary,data/('notes-'+suffix),members=data/('members-'+suffix),language=lang,options=['--help-dir',str(helpdir)] if external else [])
+        finally:os.chdir(oldcwd)
         c=Client(server.port)
         try:
             auth(c,'reader',True)
@@ -39,4 +45,4 @@ with tempfile.TemporaryDirectory(prefix='help-release-') as temp:
         version=json.loads((root/'docs/manual/manifest.json').read_text(encoding='utf8'))['version']
         assert 'Liner notes '+version in text and '(stage' not in text,text
     finally:c.close();server.close()
-print('PASS shipped ja/en HELP, SIGOP/subtree descriptions, logout keeps connection, release version')
+print('PASS external and built-in ja/en HELP, SIGOP/subtree descriptions, logout keeps connection, release version')

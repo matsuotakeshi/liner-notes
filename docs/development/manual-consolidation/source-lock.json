@@ -39,7 +39,7 @@
   "ports/comms/liner-notes/files/PORTS.md": "c5e0496ca5e2367cd142de2f505aefefd22a2127ace3ebf45a5596890fd843d7",
   "ports/comms/liner-notes/files/liner_notes.conf.in": "a02965ea8d2505101ef90efec584946b95200c2430bf6ab0207d4836f68341c2",
   "ports/comms/liner-notes/files/liner_notes.in": "e42460c324202635956856b6bc605f38dd004de3c3c67fe14396a08fdec500e2",
-  "ports/comms/liner-notes/pkg-plist": "41a6cfbae148ef4be2ce5740f18da50507be4e225502a36229146e75f6586638",
+  "ports/comms/liner-notes/pkg-plist": "fd826bc74c1a56c802da57dcb213209c8fd35dd5eda46bc5cfa2648d202ac2be",
   "scripts/configure-zmodem.py": "2abc3c427aa5f93a8920cfce7a390bc8624b5958d72ddd3f8b4df4244c7dc838",
   "scripts/door_clans.sh": "42d098ab56618024c6fa89a86c7f575a41a18082cf0ef1e71797b83675026fc5",
   "scripts/install-linux.py": "af955a635e058ac54e875b0de95282e091e6489e18665606ecf27a21dfcda032",
@@ -65,7 +65,7 @@
   "src/userlog.c": "989a93c9993e7b93aba2815214a1075b3cd37ddfa0712803eab4d9f940f6e58e",
   "src/vault.c": "797c144ebaca5938ba0c523227b654c41e3d6c83aa5042e756dc60d479ad6340",
   "src/vault.h": "9c8e22630fe3bc38aba5736455b067d272654b6c3f5884676f09283da591121e",
-  "tests/test_help_release.py": "840b25f1e18b810665b8a245deee188731ed37816f31d5cae6bbe99645a8f39f",
+  "tests/test_help_release.py": "cad9e7d7f46bb4c31a36a867b36afa72bed209cd4d5eed35a35559c29382f61f",
   "tests/test_linux_install.py": "4afc0f8d6742b0e26776133ce8045cbcc0cd3749919b20b59c3e6235529e8159",
   "tests/test_serial_connector.py": "8f8c1b2562c9c149e8d5952993e6908b39a5006aa6790bc47f3e3753742715dd",
   "vault-limits.example.conf": "2df07d23b398c82196b0ef7457b9f711bd3f191b889d2905da1ab521030e66aa",
@@ -75,5 +75,7 @@
   "webui/commands.py": "acb64d545475a64920cb92c79fe0320afe6a97445995ea63ee7150b9b3215916",
   "webui/deployment/apache.conf": "725cd6feb187808111277812b946eb208b4e94ff685bd5e340eda49c96e60f7f",
   "webui/example.toml": "a97e62182dc86eddaa67c7efe5df5d41426346d1ccc5d7a469d04591451fd27c",
-  "webui/static/reports-ui.js": "44f7d9cdbec2eb1a0bfb7f01942b767593697e3f29385805a2e792ad31752065"
+  "webui/static/reports-ui.js": "44f7d9cdbec2eb1a0bfb7f01942b767593697e3f29385805a2e792ad31752065",
+  "src/locales/ja.def": "730faea899ed9cc60571f13f9b08a029369af1847de9c3f74eeba6f668aba098",
+  "src/locales/en.def": "29ecfe63606659d8c193ce98b131acaac5567bd2ebcbeb87f0f155a9f5647897"
 }
