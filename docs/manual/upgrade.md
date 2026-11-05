@@ -4,8 +4,17 @@
 
 [詳細導入マニュアル](install-freebsd.md)と併せて使用します。
 
+## 0.74から0.74.1への更新
+
+HELPとマニュアルを訂正した修正版です。既存DBの変換、ボードやゲームの作り直しは不要です。本体の版表示は0.74.1になります。
+
+未編集のHELPはパッケージ更新で新版へ置き換わります。編集済みのHELPは保持されるため、`help/ja/` と `help/en/` の `content.txt`、`settings.txt`、`unread.txt` を新しい `.sample` と比較し、必要な訂正を手動で取り込んでください。サイト用ZIPの更新だけではBBS内HELPは変わりません。
+
+Linuxのソース導入でも、旧 `.sample` と同じ内容のHELPは更新します。編集済み、または比較用の旧sampleがない既存HELPは保持します。新しいマニュアルの入口はFreeBSDで `/usr/local/share/doc/liner-notes/index.html`、RPMで `/usr/share/doc/liner-notes/index.html` です。Gitから直接ソース導入する場合はHTML未生成なら `index.md` を使用します。
+
+以下の停止・バックアップ・更新手順に従ってください。サービスや利用者データを自動的に初期化する処理はありません。
+
 更新前に利用者へ停止を案内してください。ゲームの初期化や既存DBの形式変更は不要です。
-ゲームの初期化や既存DBの形式変更は不要です。
 
 先に [配布物の取得・SHA-256照合](install-freebsd.md#install-package)を済ませ、展開した配布物のルートを控えます。この段階で新規構築のmake install、保管庫init、REGISTERを繰り返す必要はありません。
 
@@ -107,7 +116,7 @@ sysrc liner_notes_web_program=/usr/local/sbin/liner-notes-web
 
 ## 3. 再開検査と起動
 
-同梱pkgで更新する場合は、上のmakeによる構築・導入の代わりに、配布物のルートから `pkg delete liner-notes` → `pkg add packages/liner-notes-0.74.pkg` を実行します。必要な依存関係は [導入マニュアル](install-freebsd.md#install-package)を参照してください。古いpkgの削除前に、新pkgと依存ソフトが揃っていることを確認します。`pkg autoremove`や依存関係を無視する強制削除は行いません。
+同梱pkgで更新する場合は、上のmakeによる構築・導入の代わりに、配布物のルートから `pkg delete liner-notes` → `pkg add packages/liner-notes-0.74.1.pkg` を実行します。必要な依存関係は [導入マニュアル](install-freebsd.md#install-package)を参照してください。古いpkgの削除前に、新pkgと依存ソフトが揃っていることを確認します。`pkg autoremove`や依存関係を無視する強制削除は行いません。
 
 `upgrade-check`は差分の検出であり、自動統合しません。運用ファイルを直接編集した場合は、その内容を残しながら `.sample` の新しい要素を取り込みます。WebのHTMLに新しいフォームがなければ、本体だけ更新しても新機能の入口は出ません。
 

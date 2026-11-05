@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """Install Linux programs/assets; preserve configuration and never start services."""
-import argparse,os,re,shlex,sys,tempfile
+import argparse,json,os,re,shlex,sys,tempfile
 from pathlib import Path
 
 ROOT=Path(__file__).resolve().parents[1]
@@ -22,11 +22,14 @@ def install(destdir,prefix,python,unitdir='/usr/local/lib/systemd/system'):
             if part.is_symlink():raise ValueError('Refusing symlink destination: '+str(part))
             if part==stage:break
         return out
-    def put(path,data,mode=0o644,sample=False):
+    def put(path,data,mode=0o644,sample=False,update_default=False):
         out=target(path);out.parent.mkdir(parents=True,exist_ok=True)
         if sample:
+            previous=out.with_name(out.name+'.sample')
+            replace_default=(update_default and out.is_file() and previous.is_file()
+                             and out.read_bytes()==previous.read_bytes())
             put(path+'.sample',data,mode)
-            if out.exists():return
+            if out.exists() and not replace_default:return
         if out.exists() and not out.is_file():raise ValueError('Destination is not a regular file: '+str(out))
         fd,name=tempfile.mkstemp(prefix='.install-',dir=out.parent)
         try:
@@ -52,14 +55,32 @@ def install(destdir,prefix,python,unitdir='/usr/local/lib/systemd/system'):
             'export LINER_NOTES_RESUME_RECEIPT="${LINER_NOTES_RESUME_RECEIPT:-/var/lib/liner-notes/lrz-resume.json}"\n',
             '--receiver "${LINER_NOTES_LRZ:-'+prefix+'/bin/lrz}" --sender "${LINER_NOTES_LSZ:-'+prefix+'/bin/lsz}" --spool-root "${LINER_NOTES_SPOOL_ROOT:-/var/lib/liner-notes/spool}" --')
     for directory in ('help','menus'):
-        for p in (ROOT/directory).rglob('*.txt'):put(share+'/'+p.relative_to(ROOT).as_posix(),p.read_bytes(),sample=True)
+        for p in (ROOT/directory).rglob('*.txt'):put(share+'/'+p.relative_to(ROOT).as_posix(),p.read_bytes(),sample=True,update_default=directory=='help')
     for name in ('banner','sysinfo','goodbye','welcome','systemnews','birthday','greeting-06','greeting-12','greeting-18'):
         put(share+'/'+name+'.txt',(ROOT/(name+'.txt')).read_bytes(),sample=True)
     for name in ('limits','vault-limits','doors'):
         content=(ROOT/(name+'.example.conf')).read_bytes()
         if name=='doors':content=('# id|minimum-level|seconds|absolute-executable|absolute-work-directory|title\n# 1|0|600|'+share+'/scripts/door_guess.py|/var/lib/liner-notes/games|Number guessing\n').encode()
         put(config+'/'+name+'.conf',content,sample=True)
-    for p in ROOT.glob('*.md'):put(prefix+'/share/doc/liner-notes/'+p.name,p.read_bytes())
+    docdir=prefix+'/share/doc/liner-notes'
+    book=ROOT/'docs/book'
+    if book.is_dir():
+        for p in book.rglob('*'):
+            if p.is_file():put(docdir+'/'+p.relative_to(book).as_posix(),p.read_bytes())
+    else:
+        # A Git checkout can install the canonical Markdown without a renderer.
+        manual=ROOT/'docs/manual'
+        manifest=json.loads((manual/'manifest.json').read_text(encoding='utf8'))
+        index='# Liner Notes '+manifest['version']+' 統合マニュアル\n\n'
+        for no,title in enumerate(manifest['chapters'],1):
+            index+='## '+title+'\n\n'
+            for page in manifest['pages']:
+                if page['chapter']==no:index+='- ['+page['title']+'](manual/'+page['id']+'.md)\n'
+            index+='\n'
+        for page in manifest['pages']:
+            name=page['id']+'.md';put(docdir+'/manual/'+name,(manual/name).read_bytes())
+        put(docdir+'/manual/LICENSE',(ROOT/'LICENSE').read_bytes())
+        put(docdir+'/index.md',index.encode('utf8'))
     put(config+'/link.toml',(ROOT/'link.example.toml').read_bytes(),sample=True)
     put(config+'/link-accounts.conf',(ROOT/'link-accounts.example.conf').read_bytes(),sample=True)
     put(share+'/LICENSE',(ROOT/'LICENSE').read_bytes())

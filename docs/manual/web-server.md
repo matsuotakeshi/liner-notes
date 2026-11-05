@@ -12,7 +12,7 @@
                     → BBS 127.0.0.1:2222（23運用なら23）
 ```
 
-WebコネクタとBBSは別サービスです。WebはDBを直接開かず、通常の会員認証・権限判定をBBSへ依頼します。まずTelnetでログインできることを確認します。BBS本体とWebUIは0.74に揃えます。
+WebコネクタとBBSは別サービスです。WebはDBを直接開かず、通常の会員認証・権限判定をBBSへ依頼します。まずTelnetでログインできることを確認します。BBS本体とWebUIは0.74.1に揃えます。
 
 ```sh
 service liner_notes status
@@ -198,7 +198,7 @@ curl -I https://bbs.example.org/notes/
 
 「ブラウザーからの送信完了」と「BBSへの登録完了」は別です。登録中の進捗と最終結果を確認してから公開一覧を見ます。失敗した場合は保管庫の再開候補から対象を選び、同じファイルを選び直します。Web→BBSは確定済み位置から再開しますが、ブラウザー→WebのHTTP送信はファイルを送り直します。名前・サイズ・SHA-256の異なるファイルでは再開しません。
 
-タイムアウトを増やす前に、どの段階で止まったか、BBS/Webのログ、空き容量、取得ファイルのSHA-256を確認します。小さいファイル、数十MiB、実際に使う大きさの順に試してください。1GiB×16・長時間の同時大量転送は0.74での検証完了を宣言していません。
+タイムアウトを増やす前に、どの段階で止まったか、BBS/Webのログ、空き容量、取得ファイルのSHA-256を確認します。小さいファイル、数十MiB、実際に使う大きさの順に試してください。1GiB×16・長時間の同時大量転送は0.74.1での検証完了を宣言していません。
 
 <a id="web-troubleshooting"></a>
 ### Webのトラブルを層ごとに切り分ける
@@ -214,13 +214,13 @@ tail -n 80 /var/log/httpd-bbs-error.log
 
 | 症状 | 確認・対処 |
 | --- | --- |
-| ページ全体が `BBS connection unavailable` | `[bbs] host/port/telnet`、実runtime、接続枠、BBSが0.74かを確認。Webプロセスの起動だけではBBS接続成功を意味しない |
+| ページ全体が `BBS connection unavailable` | `[bbs] host/port/telnet`、実runtime、接続枠、BBSが0.74.1かを確認。Webプロセスの起動だけではBBS接続成功を意味しない |
 | `Unexpected Host` | `origin`のホスト名とHostヘッダー、ApacheのProxyPreserveHostを一致させる |
 | `Origin rejected` / CSRFエラー | HTTPSの公開元を揃え、古い画面を再読込してログイン。検査自体を無効化しない |
 | Apacheの403 | `apachectl -S`で対象VirtualHostを確認。`/`から`/notes/`への案内、Location、既存認証規則を確認 |
 | 502・503でWebのログに到達しない | Webの8088待受とProxyPass先、Apacheログを確認 |
-| `Web template unavailable` / `Web file access failed` | ファイルの存在・UTF-8・親ディレクトリの通過権限・Webユーザーの読み取りを確認。0.74はファイルの問題を500で区別する |
-| `unrecognized arguments: -P ...` | 旧rc.dが残っている。0.74の `/usr/local/etc/rc.d/liner_notes_web`へ更新する |
+| `Web template unavailable` / `Web file access failed` | ファイルの存在・UTF-8・親ディレクトリの通過権限・Webユーザーの読み取りを確認。0.74.1はファイルの問題を500で区別する |
+| `unrecognized arguments: -P ...` | 旧rc.dが残っている。0.74.1の `/usr/local/etc/rc.d/liner_notes_web`へ更新する |
 | ログインできてもすぐ戻る | 公開origin、HTTPS、secure cookie、Web再起動によるセッション失効を確認 |
 | アップロード413 | ApacheとWebの上限を確認。上の1GiBを超えていないか確認 |
 | 登録中に止まる | BBS側の上限・権限・空き容量・最終照合時間、spool所有者を確認 |

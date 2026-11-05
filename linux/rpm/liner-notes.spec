@@ -6,7 +6,7 @@
 %endif
 
 Name:           liner-notes
-Version:        0.74
+Version:        0.74.1
 Release:        1%{?dist}
 Summary:        Liner notes multi-user bulletin board system
 License:        GPL-3.0-only
@@ -26,7 +26,8 @@ Requires(pre):  shadow-utils
 Native bulletin board with threaded articles, private mail, files, chat and
 POSIX Door games. Includes offline administration and a systemd service.
 Installing or upgrading this package does not start or restart the service.
-Web and signed-link Python dependencies are installed separately; see LINUX.md.
+Web and signed-link Python dependencies are installed separately; see the
+integrated manual in /usr/share/doc/liner-notes/.
 
 %if 0%{?rhel} >= 10
 %package web
@@ -120,5 +121,8 @@ if [ -d /run/systemd/system ]; then systemctl daemon-reload >/dev/null 2>&1 || :
 %endif
 
 %changelog
+* Thu Nov 05 2026 Liner notes contributors - 0.74.1-1
+- Correct bilingual HELP and ship the canonical seven-chapter manual.
+- Preserve customized HELP while updating unchanged defaults.
 * Wed Nov 04 2026 Liner notes contributors - 0.74-1
 - Initial RPM; preserve local configuration and instance data across updates.

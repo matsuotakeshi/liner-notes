@@ -1,8 +1,8 @@
 PORTNAME=	liner-notes
-DISTVERSION=	0.74
+DISTVERSION=	0.74.1
 CATEGORIES=	comms
 MASTER_SITES=	https://github.com/matsuotakeshi/liner-notes/releases/download/v${DISTVERSION}/
-DISTNAME=	liner-notes-stage74
+DISTNAME=	liner-notes-${DISTVERSION}
 
 MAINTAINER=	ports@FreeBSD.org
 COMMENT=	HyperNotes-style BBS with Telnet, mail, chat, and file vaults
@@ -104,7 +104,6 @@ do-install-LINK-on:
 
 do-install-DOCS-on:
 	${MKDIR} ${STAGEDIR}${DOCSDIR}
-	${INSTALL_DATA} ${WRKSRC}/*.md ${STAGEDIR}${DOCSDIR}/
-	${INSTALL_DATA} ${FILESDIR}/PORTS.md ${STAGEDIR}${DOCSDIR}/
+	cd ${WRKSRC}/docs/book && ${COPYTREE_SHARE} . ${STAGEDIR}${DOCSDIR}
 
 .include <bsd.port.mk>

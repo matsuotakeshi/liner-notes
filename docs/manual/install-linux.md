@@ -33,10 +33,10 @@ Web用`python3-aiohttp`は検証機ではEPELから、`python3-cryptography`はb
 RPMスクリプトでpipや外部ネットワークからライブラリを取得することはありません。
 
 ```sh
-dnf install ./liner-notes-0.74-*.x86_64.rpm
+dnf install ./liner-notes-0.74.1-*.x86_64.rpm
 # 必要な場合のみ追加する（debuginfo/debugsourceは通常不要）。
-dnf install ./liner-notes-web-0.74-*.x86_64.rpm
-dnf install ./liner-notes-link-0.74-*.x86_64.rpm
+dnf install ./liner-notes-web-0.74.1-*.x86_64.rpm
+dnf install ./liner-notes-link-0.74.1-*.x86_64.rpm
 
 systemctl start liner-notes
 systemctl status liner-notes
@@ -82,7 +82,7 @@ SELinuxを無効にして解決する手順は採用しません。なお本体�
 
 ```sh
 sudo dnf install clang gcc make openssl-devel sqlite-devel python3.11 git tar gzip telnet
-git clone --branch v0.74 https://github.com/matsuotakeshi/liner-notes.git
+git clone --branch v0.74.1 https://github.com/matsuotakeshi/liner-notes.git
 cd liner-notes
 make CC=clang PYTHON=python3.11
 ```

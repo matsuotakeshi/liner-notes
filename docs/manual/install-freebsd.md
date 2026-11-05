@@ -43,32 +43,32 @@ test -f /usr/ports/Mk/bsd.port.mk && echo 'ports framework OK'
 <a id="install-package"></a>
 ## 配布物とportsのインストール
 
-配布物は `liner-notes-ports-stage74.tar.gz`、portsの版は **0.74**です。[正式リリース](https://github.com/matsuotakeshi/liner-notes/releases/tag/v0.74)から取得します。以下は空の作業ディレクトリでダウンロードと照合を行う例です。
+配布物は `liner-notes-ports-0.74.1.tar.gz`、portsの版は **0.74.1**です。[正式リリース](https://github.com/matsuotakeshi/liner-notes/releases/tag/v0.74.1)から取得します。以下は空の作業ディレクトリでダウンロードと照合を行う例です。
 
 途中でエラーが出たら、その手順を解決してから次へ進みます。以下では `$()` を使うため、rootのログインシェルがcsh/tcshの場合も、最初に `sh` を起動してください。
 
 ```sh
 /bin/sh
-LN_WORK=$(mktemp -d /root/liner-notes-0.74.XXXXXXXX)
+LN_WORK=$(mktemp -d /root/liner-notes-0.74.1.XXXXXXXX)
 cd "$LN_WORK"
 (
   set -eu
-  fetch -o liner-notes-ports-stage74.tar.gz https://github.com/matsuotakeshi/liner-notes/releases/download/v0.74/liner-notes-ports-stage74.tar.gz
-  fetch -o SHA256SUMS https://github.com/matsuotakeshi/liner-notes/releases/download/v0.74/SHA256SUMS
-  LN_EXPECTED=$(awk '$2 == "liner-notes-ports-stage74.tar.gz" {print $1}' SHA256SUMS)
+  fetch -o liner-notes-ports-0.74.1.tar.gz https://github.com/matsuotakeshi/liner-notes/releases/download/v0.74.1/liner-notes-ports-0.74.1.tar.gz
+  fetch -o SHA256SUMS https://github.com/matsuotakeshi/liner-notes/releases/download/v0.74.1/SHA256SUMS
+  LN_EXPECTED=$(awk '$2 == "liner-notes-ports-0.74.1.tar.gz" {print $1}' SHA256SUMS)
   test -n "$LN_EXPECTED"
-  test "$(sha256 -q liner-notes-ports-stage74.tar.gz)" = "$LN_EXPECTED"
+  test "$(sha256 -q liner-notes-ports-0.74.1.tar.gz)" = "$LN_EXPECTED"
   echo 'SHA256 OK'
-  tar -xzf liner-notes-ports-stage74.tar.gz
+  tar -xzf liner-notes-ports-0.74.1.tar.gz
 )
 ```
 
 `SHA256 OK`と展開成功を確認したら進みます。ファイルをWindowsから転送した場合も、同じ `SHA256SUMS` で照合します。接続し直した場合は、作業先へ `cd` し直してください。`pwd`の出力も控えておくと便利です。
 
 ```sh
-cd "$LN_WORK/liner-notes-ports-stage74"
+cd "$LN_WORK/liner-notes-ports-0.74.1"
 pwd
-ls comms/liner-notes/Makefile distfiles/liner-notes-stage74.tar.gz
+ls comms/liner-notes/Makefile distfiles/liner-notes-0.74.1.tar.gz
 ```
 
 配布物には `comms/liner-notes`、ソースを収めた `distfiles`、マニュアル、検証記録があります。
@@ -99,7 +99,7 @@ Web不要なら `OPTIONS_SET="DOCS ZMODEM" OPTIONS_UNSET=WEBUI` を指定しま�
 
 ```sh
 pkg install python312 py312-sqlite3 py312-aiohttp py312-cryptography sqlite3
-pkg add packages/liner-notes-0.74.pkg
+pkg add packages/liner-notes-0.74.1.pkg
 pkg info liner-notes
 ```
 
