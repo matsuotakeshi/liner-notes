@@ -1,0 +1,32 @@
+{
+  "ok": true,
+  "kind": "JavaScript logic only; no browser rendering",
+  "cases": 8,
+  "results": [
+    {
+      "term": "ZRESUME",
+      "visible": 4,
+      "status": "4件の項目が見つかりました。"
+    },
+    {
+      "term": "SIGOP",
+      "visible": 19,
+      "status": "19件の項目が見つかりました。"
+    },
+    {
+      "term": "添付 再開",
+      "visible": 10,
+      "status": "10件の項目が見つかりました。"
+    },
+    {
+      "term": "DB",
+      "visible": 40,
+      "status": "58件の項目が見つかりました。 先頭40件を表示します。"
+    },
+    {
+      "term": "INSTALL",
+      "visible": 18,
+      "status": "18件の項目が見つかりました。"
+    }
+  ]
+}

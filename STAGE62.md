@@ -1,14 +1,5 @@
-# Stage62: 外部バックアップ・復元・データ整理
+# 文書の移転
 
-daemon運用を前提とし、専用管理画面は作成しません。
-`scripts/maintenance.py` に backup / verify / restore / compact を追加しました。
-利用方法と制約は [MAINTENANCE.md](MAINTENANCE.md) を参照してください。
+この文書の現行仕様・操作手順は [Liner Notes 0.74 統合マニュアル](https://linernotes.site/manual/member-admin.html) に統合しました。
 
-- 停止した1インスタンスのディレクトリ全体を保存。添付・保管庫・sidecar・設定を含みます。
-- SHA256一覧と圧縮ファイル検証、稼働中ロック、変更検知、既存出力の上書き拒否。
-- 復元・整理は新しいディレクトリへ。元データとバックアップは残します。
-- 整理は記事・メール、明示指定されたログを対象とし、業務IDを維持します。
-- `make test-maintenance` を追加し `make check` に統合しました。
-
-BBS本体、データ形式、転送方式、daemon起動方法は変更していません。
-本番サービスの停止・データ置換・運用先の切替はこの改修では行いません。
+[統合Markdown原本](https://github.com/matsuotakeshi/liner-notes/tree/main/docs/manual)が正本です。過去の実装・検証記録は[開発アーカイブ](https://github.com/matsuotakeshi/liner-notes/blob/main/docs/development/archive/0.74/STAGE62.md)に保存しています。

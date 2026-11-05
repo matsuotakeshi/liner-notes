@@ -6,11 +6,11 @@ Closing help preserves article selection and result-page position.
 PAGER SIZE columns rows sets dimensions; Telnet also supports NAWS.
 PREFS summarizes saved settings. PREFS SAVE stores language, paging, editor type, line numbers, transfer protocol and screen dimensions.
 PREFS LOAD reloads them. Login restores them too.
-RAW selects protocol output; MENU returns to menus. QUIT / O / Q disconnects at the normal prompt.
+RAW selects protocol output; MENU returns to menus. At the main prompt O/Q asks for confirmation; QUIT disconnects immediately.
 Use D in Settings to inspect all current values.
 
 MENUMODE BEGINNER / STANDARD / EXPERT: home menu always / initially / explicitly; saved per account.
-LOGOUT / QUIT saves before leaving. Network disconnects also queue a save; process failure or revocation can prevent it.
+LOGOUT saves settings and returns to guest; QUIT saves and disconnects. Network disconnects also queue a save; process failure or revocation can prevent it.
 GAME / GAMES opens the game menu. Enter a number to play; exit returns to the game list. Enter/L relists; 0 returns to main. DOOR id also starts a game directly.
 
 D in Settings displays actual language, editor, menu verbosity, paging, screen dimensions, timezone and transfer protocol. S reads external sysinfo.txt; V shows version. O/Q ask Y/N; QUIT is immediate. goodbye.txt is displayed on exit.
