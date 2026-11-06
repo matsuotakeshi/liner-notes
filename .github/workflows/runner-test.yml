@@ -1,0 +1,36 @@
+
+name: CI Runner Test
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: Local Runner Test
+    runs-on: [self-hosted, Linux, X64]
+
+    timeout-minutes: 5
+
+    steps:
+      - name: Runner information
+        run: |
+          echo "=== CI Runner Test ==="
+          hostname
+          whoami
+          uname -a
+
+      - name: System resources
+        run: |
+          echo "=== CPU ==="
+          nproc
+          echo "=== Memory ==="
+          free -h
+          echo "=== Disk ==="
+          df -h /
+
+      - name: Test result
+        run: |
+          echo "GitHub Actions Runner: OK"
