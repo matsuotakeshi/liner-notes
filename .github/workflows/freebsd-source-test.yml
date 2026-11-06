@@ -1,0 +1,56 @@
+
+name: FreeBSD Source Transfer Test
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: Transfer Source to FreeBSD
+    runs-on: [self-hosted, Linux, X64]
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Verify checkout
+        run: |
+          echo "Commit: $GITHUB_SHA"
+          git rev-parse HEAD
+          ls -la
+
+      - name: Transfer source to FreeBSD
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          SSH=(
+            ssh
+            -i /home/ci/.ssh/id_ed25519_freebsd_ci
+            -o BatchMode=yes
+            -o StrictHostKeyChecking=yes
+            -o ConnectTimeout=10
+          )
+
+          "${SSH[@]}" takeshi@10.0.0.50 \
+            'mkdir -p "$HOME/ci/liner-notes"'
+
+          tar --exclude=.git -czf - \
+            -C "$GITHUB_WORKSPACE" . |
+            "${SSH[@]}" takeshi@10.0.0.50 \
+            'tar -xzf - -C "$HOME/ci/liner-notes"'
+
+      - name: Verify remote files
+        run: |
+          ssh \
+            -i /home/ci/.ssh/id_ed25519_freebsd_ci \
+            -o BatchMode=yes \
+            -o StrictHostKeyChecking=yes \
+            takeshi@10.0.0.50 \
+            'find "$HOME/ci/liner-notes" -maxdepth 2 -type f | sed -n "1,30p"'
+
+          echo "FreeBSD source transfer: OK"
