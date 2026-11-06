@@ -1,0 +1,64 @@
+
+name: FreeBSD Build and Test
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: freebsd-build-test
+  cancel-in-progress: false
+
+jobs:
+  test:
+    name: FreeBSD Native Tests
+    runs-on: [self-hosted, Linux, X64]
+    timeout-minutes: 60
+
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v7
+
+      - name: Transfer clean source
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          SSH=(
+            ssh
+            -i /home/ci/.ssh/id_ed25519_freebsd_ci
+            -o BatchMode=yes
+            -o StrictHostKeyChecking=yes
+            -o ConnectTimeout=10
+          )
+
+          "${SSH[@]}" takeshi@10.0.0.50 \
+            'mkdir -p "$HOME/ci"; rm -rf "$HOME/ci/liner-notes"; mkdir -p "$HOME/ci/liner-notes"'
+
+          tar --exclude=.git -czf - \
+            -C "$GITHUB_WORKSPACE" . |
+            "${SSH[@]}" takeshi@10.0.0.50 \
+            'tar -xzf - -C "$HOME/ci/liner-notes"'
+
+      - name: Build and run regression tests
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          ssh \
+            -i /home/ci/.ssh/id_ed25519_freebsd_ci \
+            -o BatchMode=yes \
+            -o StrictHostKeyChecking=yes \
+            -o ConnectTimeout=10 \
+            takeshi@10.0.0.50 \
+            'set -eu
+             cd "$HOME/ci/liner-notes"
+             export LINER_TEST_START_TIMEOUT=180
+             make -j2
+             make check'
+
+      - name: Test completed
+        run: |
+          echo "FreeBSD build and regression tests: PASS"
