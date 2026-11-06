@@ -25,4 +25,5 @@ jobs:
             'uname -a; cat /etc/release; id'
 
       - name: Test result
-        run: echo "Solaris SSH: OK"
+          run: |
+            echo "Solaris SSH: OK"
