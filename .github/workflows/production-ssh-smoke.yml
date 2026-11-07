@@ -1,0 +1,71 @@
+name: Production SSH Connectivity Test
+
+on:
+  workflow_dispatch:
+
+permissions: {}
+
+concurrency:
+  group: production-ssh-connectivity
+  cancel-in-progress: false
+
+jobs:
+  connectivity:
+    name: Read-only SSH checks (3 VPS)
+    runs-on: ubuntu-24.04
+    environment: production
+    timeout-minutes: 10
+
+    steps:
+      - name: Verify production SSH access
+        shell: bash
+        env:
+          DEPLOY_SSH_KEY: ${{ secrets.ID_ED25519_LN_DEPLOY }}
+          SSH_HOST_KEYS: ${{ secrets.LN_DEPLOY_KNOWN_HOSTS }}
+          FREEBSD_HOST: ${{ vars.LN_VPS_FREEBSD_HOST }}
+          ROCKY_HOST: ${{ vars.LN_VPS_ROCKY_HOST }}
+          DEBIAN_HOST: ${{ vars.LN_VPS_DEBIAN_HOST }}
+        run: |
+          set -euo pipefail
+          umask 077
+
+          key_file="$(mktemp "$RUNNER_TEMP/ln-deploy-key.XXXXXX")"
+          known_hosts_file="$(mktemp "$RUNNER_TEMP/ln-known-hosts.XXXXXX")"
+          trap 'rm -f "$key_file" "$known_hosts_file"' EXIT
+
+          printf '%s\n' "$DEPLOY_SSH_KEY" | tr -d '\r' > "$key_file"
+          printf '%s\n' "$SSH_HOST_KEYS" | tr -d '\r' > "$known_hosts_file"
+          unset DEPLOY_SSH_KEY SSH_HOST_KEYS
+
+          test -s "$key_file" || { echo "Missing ID_ED25519_LN_DEPLOY secret" >&2; exit 1; }
+          test -s "$known_hosts_file" || { echo "Missing LN_DEPLOY_KNOWN_HOSTS secret" >&2; exit 1; }
+          ssh-keygen -y -P '' -f "$key_file" >/dev/null || {
+            echo "Invalid or passphrase-protected SSH key" >&2
+            exit 1
+          }
+
+          check_host() {
+            local label="$1" host="$2"
+            if [[ -z "$host" ]]; then
+              echo "Missing production environment variable for $label" >&2
+              exit 1
+            fi
+            echo "::group::$label read-only SSH check"
+            ssh -n \
+              -i "$key_file" \
+              -o IdentitiesOnly=yes \
+              -o BatchMode=yes \
+              -o PasswordAuthentication=no \
+              -o KbdInteractiveAuthentication=no \
+              -o StrictHostKeyChecking=yes \
+              -o "UserKnownHostsFile=$known_hosts_file" \
+              -o ConnectTimeout=10 \
+              "ln-deploy@$host" \
+              'test "$(id -un)" = "ln-deploy" && printf "user=%s host=%s os=%s\n" "$(id -un)" "$(hostname)" "$(uname -s)"'
+            echo "::endgroup::"
+          }
+
+          check_host "FreeBSD" "$FREEBSD_HOST"
+          check_host "Rocky Linux" "$ROCKY_HOST"
+          check_host "Debian" "$DEBIAN_HOST"
+          echo "PASS: SSH access to all 3 production VPS"
