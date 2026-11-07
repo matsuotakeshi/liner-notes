@@ -44,6 +44,23 @@ jobs:
             exit 1
           }
 
+          # Diagnose the secret's *format and host labels* without printing key material.
+          # A fingerprint (SHA256:...) is not an OpenSSH known_hosts entry.
+          if ! awk '$2 == "ssh-ed25519" && $3 ~ /^AAAA/ { valid=1 } END { exit !valid }' "$known_hosts_file"; then
+            echo "::error::LN_DEPLOY_KNOWN_HOSTS has no valid ED25519 known_hosts line. Expected: hostname ssh-ed25519 AAAA... (not a SHA256 fingerprint)" >&2
+            exit 1
+          fi
+
+          for host in "$FREEBSD_HOST" "$ROCKY_HOST" "$DEBIAN_HOST"; do
+            [[ -n "$host" ]] || { echo "::error::A production host variable is empty" >&2; exit 1; }
+            if ! ssh-keygen -F "$host" -f "$known_hosts_file" >/dev/null 2>&1; then
+              echo "::error::No known_hosts entry matches the configured host: $host" >&2
+              echo "Host labels found in LN_DEPLOY_KNOWN_HOSTS (public labels only, no keys):"
+              awk '$2 == "ssh-ed25519" { print "  " $1 }' "$known_hosts_file" | head -20
+              exit 1
+            fi
+          done
+
           check_host() {
             local label="$1" host="$2"
             if [[ -z "$host" ]]; then
