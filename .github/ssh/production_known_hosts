@@ -1,0 +1,5 @@
+# Verified SSH host public keys for Liner Notes production VPS.
+# Public host keys only. Validate against each server's out-of-band fingerprint before changing.
+srv.ysni.org ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAICVomIeLOjFVUK6sS0kzCVVYwsUC0CDHXnq+78myrKLu
+rocky.ysni.org ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIE55M3BxEu+H4ZNzJ7Mzy1XXk+EXDmTeF3qWcRZsXuqW
+debian.ysni.org ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIGQP5Hz8loLa0u8Hi0RZxnkMYksM6+cDmxTOJLbHqxOw
