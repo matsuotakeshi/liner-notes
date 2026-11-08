@@ -1,0 +1,28 @@
+Source: liner-notes
+Section: net
+Priority: optional
+Maintainer: Liner Notes contributors <34602508+matsuotakeshi@users.noreply.github.com>
+Build-Depends: debhelper-compat (= 13), clang, make, python3 (>= 3.11), libssl-dev, libsqlite3-dev
+Standards-Version: 4.7.0
+Rules-Requires-Root: no
+Homepage: https://github.com/matsuotakeshi/liner-notes
+
+Package: liner-notes
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}, python3 (>= 3.11), adduser
+Description: Multi-user bulletin board system
+ Liner Notes provides message boards, mail, file storage, chat and Door games.
+ Installation or upgrade never starts or restarts services.
+
+Package: liner-notes-web
+Architecture: all
+Depends: ${misc:Depends}, liner-notes (= ${binary:Version}), python3-aiohttp (>= 3.11)
+Description: Optional browser interface for the Liner Notes BBS
+ An independent HTTP connector. Its default HTTP listener is loopback only.
+
+Package: liner-notes-link
+Architecture: all
+Depends: ${misc:Depends}, liner-notes (= ${binary:Version}), python3-cryptography (>= 43)
+Description: Optional signed shared-board connector for Liner Notes
+ Mutually authenticated BBS-to-BBS synchronization. Identity and trusted
+ peers must be configured explicitly before use.

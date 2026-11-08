@@ -1,0 +1,3 @@
+debian/liner-notes.install
+debian/liner-notes-web.install
+debian/liner-notes-link.install

@@ -1,0 +1,15 @@
+Debian 13 (trixie) experimental packages
+==========================================
+
+These packages target Debian 13 amd64, not Debian 12 or an unverified Ubuntu
+version. Web and link dependencies use Debian 13's official repositories.
+
+Core: liner-notes
+Optional browser connector: liner-notes-web
+Optional BBS shared-board connector: liner-notes-link
+
+Installation and upgrade NEVER start, stop, enable or restart systemd services.
+Configure the BBS, initialize an administrator and review existing databases
+before manually starting services. Removal leaves BBS data and service
+accounts intact. Save /etc/liner-notes, /var/lib/liner-notes*, signing keys
+and game data in consistent backups before upgrading. See DEB.md.

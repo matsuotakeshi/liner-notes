@@ -1,0 +1,9 @@
+Format: https://www.debian.org/doc/packaging-manuals/copyright-format/1.0/
+Upstream-Name: Liner Notes
+Source: https://github.com/matsuotakeshi/liner-notes
+
+Files: *
+Copyright: Liner Notes contributors
+License: GPL-3.0-only
+ See LICENSE and THIRD_PARTY.md in the source distribution.
+ The GPL 3.0 text is available at /usr/share/common-licenses/GPL-3.

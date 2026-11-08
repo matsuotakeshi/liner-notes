@@ -1,0 +1,21 @@
+#!/usr/bin/make -f
+export DEB_BUILD_MAINT_OPTIONS = hardening=+all
+
+%:
+	dh $@
+
+override_dh_auto_build:
+	$(MAKE) -j2 CC=clang SQLITE_CFLAGS= SQLITE_LIBS=-lsqlite3
+
+override_dh_auto_test:
+	$(MAKE) CC=clang SQLITE_CFLAGS= SQLITE_LIBS=-lsqlite3 test-chat
+	./test-chat
+
+override_dh_auto_install:
+	python3 scripts/install-linux.py --destdir=$(CURDIR)/debian/tmp --prefix=/usr --python=/usr/bin/python3 --unitdir=/usr/lib/systemd/system
+	python3 linux/rpm/optional.py $(CURDIR)/debian/tmp /usr/bin/python3
+	python3 linux/deb/manifest.py $(CURDIR)/debian/tmp
+
+# No package-triggered service activation or restart.
+override_dh_installsystemd:
+	dh_installsystemd --no-start --no-enable --no-stop-on-upgrade

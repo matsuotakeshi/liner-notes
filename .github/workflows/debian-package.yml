@@ -1,0 +1,79 @@
+name: Debian 13 Package CI
+
+# Builds an untrusted PR on GitHub-hosted infrastructure only; no SSH or deploy secrets.
+on:
+  pull_request:
+    paths:
+      - "debian/**"
+      - "linux/**"
+      - "scripts/install-linux.py"
+      - "webui/**"
+      - "src/**"
+      - "Makefile"
+      - ".github/workflows/debian-package.yml"
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build-deb:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 50
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Build and test in isolated Debian 13
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/deb-artifacts"
+          docker run --rm \
+            -e "SOURCE_SHA=$GITHUB_SHA" \
+            -v "$GITHUB_WORKSPACE:/source:ro" \
+            -v "$RUNNER_TEMP/deb-artifacts:/out" \
+            debian:trixie bash -euc '
+              export DEBIAN_FRONTEND=noninteractive
+              apt-get update -qq
+              apt-get install -y -qq build-essential debhelper devscripts clang \
+                libssl-dev libsqlite3-dev python3 ca-certificates
+              mkdir -p /build/liner-notes
+              cp -a /source/. /build/liner-notes/
+              cd /build/liner-notes
+              dpkg-buildpackage -b -us -uc
+              cp /build/*.deb /out/
+              test "$(find /out -maxdepth 1 -type f -name "*.deb" | wc -l)" -eq 3
+              for package in /out/*.deb; do
+                dpkg-deb --info "$package"
+                dpkg-deb --contents "$package" >/dev/null
+              done
+              apt-get install -y /out/liner-notes_*.deb \
+                /out/liner-notes-web_*.deb /out/liner-notes-link_*.deb
+              test -x /usr/sbin/liner-notes
+              test -x /usr/sbin/liner-notes-web
+              test -x /usr/bin/liner-notes-link
+              test -f /etc/liner-notes/liner-notes.env
+              test -f /etc/liner-notes/link.toml
+              test -f /etc/liner-notes/web/web.toml
+              mkdir -p /var/lib/liner-notes
+              echo keep > /var/lib/liner-notes/package-removal-test
+              apt-get remove -y liner-notes-link liner-notes-web liner-notes
+              test "$(cat /var/lib/liner-notes/package-removal-test)" = keep
+              cd /out
+              sha256sum ./*.deb > SHA256SUMS
+              sha256sum -c SHA256SUMS
+              printf "source_sha=%s\nbase=debian:trixie\n" "$SOURCE_SHA" > BUILD-INFO.txt
+            '
+      - name: Upload inspection artifacts (not a release)
+        uses: actions/upload-artifact@v4
+        with:
+          name: liner-notes-debian13-packages
+          path: |
+            ${{ runner.temp }}/deb-artifacts/*.deb
+            ${{ runner.temp }}/deb-artifacts/SHA256SUMS
+            ${{ runner.temp }}/deb-artifacts/BUILD-INFO.txt
+          if-no-files-found: error
+          retention-days: 14
