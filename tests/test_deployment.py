@@ -249,6 +249,22 @@ class Deployment(unittest.TestCase):
         with self.assertRaises(ValueError):
             policy.validate_release(changed)
 
+    @unittest.skipUnless(os.name == 'posix', 'POSIX O_NOFOLLOW package-copy guard is exercised on hosted Linux')
+    def test_real_adapter_rejects_package_hash_before_any_package_command(self):
+        host = object.__new__(Host)
+        host.root = self.base / 'state'
+        host.root.mkdir()
+        host.platform = 'rocky10'
+        incoming = self.base / 'incoming'
+        folder = incoming / policy.transaction_id(self.doc)
+        folder.mkdir(parents=True)
+        (folder / self.doc['platforms']['rocky10']['liner-notes']['filename']).write_bytes(b'x')
+        host.profile = {'incoming_directory': str(incoming)}
+        host.inventory = lambda: {'liner-notes': ['0.74.1-1', 'x86_64']}
+        with patch('deploy_host.command', side_effect=AssertionError('package command ran before hash verification')):
+            with self.assertRaisesRegex(ValueError, 'integrity mismatch'):
+                host.preflight(self.doc)
+
     def test_offhost_sink_rejects_corruption_and_accepts_exact_retry(self):
         root = self.base / 'sink'
         root.mkdir(mode=0o700)
