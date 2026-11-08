@@ -133,6 +133,14 @@ async def exercise(binary, root):
         await sync(star)
         assert stores[1].db.execute('SELECT count(*) FROM events WHERE origin=?', (ids[1],)).fetchone() == before
         await concealed(1, (1, 2, 3))
+        # Persist local-only moderation across an unclean runtime restart.
+        for client in clients[1].values(): await client.close()
+        await cores[1].close();servers[1].close(crash=True)
+        d=directories[1]
+        servers[1]=Server(binary,d/'notes',members=d/'members',catalog=d/'catalog',admins=d/'admins',telnet=True,options=['--link-accounts',str(d/'accounts')])
+        cores[1]=await Core(dict(port=servers[1].port,login='link',password_file=str(d/'secret'))).open()
+        clients[1]={name:await connect(servers[1],name) for name in ('admin','sigop','alice','other')}
+        await concealed(1, (1, 2, 3))
         for i in (0, 2):
             assert response_data(await command(clients[i]['alice'], 'READ 3'))['article']['parent'] == 2
         # A reply arriving below a locally hidden parent must still be stored.
@@ -220,7 +228,7 @@ async def exercise(binary, root):
             probe = await Core(dict(port=new_server.port, login='link', password_file=str(d/'secret'))).open()
             for _ in range(8):
                 await apply_pending(fresh, probe, {board: 2})
-            assert not fresh.pending(), fresh.pending()
+            assert fresh.db.execute('SELECT count(*) FROM events WHERE applied=0').fetchone()==(0,), list(fresh.db.execute('SELECT * FROM retry'))
             for envelope in old_events:
                 assert fresh.accept(envelope, ids[0]) is False
             await probe.select(2)

@@ -1,6 +1,6 @@
 {
   "LICENSE": "fb981668c18a279e285fc4d83fba1e836cc84dd4daa73c9697d3cfd2d8aca6e0",
-  "Makefile": "d544c2c59630f8cd9075d3a267e73b647bf6256bd267f586b00bd96dbc7375cd",
+  "Makefile": "dae450be5237977db48c1c4d331e879639d86128a33b972441f3749dcb4129d4",
   "boards.example.conf": "4bd1a17ecf3966d3829510e8495a1362fb8b922cd754badccc739f5e5ab0bde8",
   "doors.example.conf": "53b147bfddab948b3cbe628f6e3b4380ea97d47c9612a8f52c04a6875fd3703c",
   "help/en/content.txt": "9c264408a543ea4dd0ac471b36de0a1a9e32fa8b28b3e1c1ca333fa0019a511f",
@@ -83,5 +83,6 @@
   "debian/changelog": "8f3574a094f5a3677a9a7188e530ecdbdc006138b082b57243ca8441c644114d",
   "src/board_link.inc": "29373e73de2f120879b4bfc6254e5b165382a046fcf94246a34f9a931ff335e3",
   "src/ui.c": "c1e54ca7309614d5c8bd35236ada6f18067f8938060d9eae57b5a4c5cdafb093",
-  "help/en/adminboards.txt": "921f0f5d9b492dd07477fe803c16f9f8432811f819a75990abcd49ab1ef01667"
+  "help/en/adminboards.txt": "921f0f5d9b492dd07477fe803c16f9f8432811f819a75990abcd49ab1ef01667",
+  "webui/static/app.js": "ff79c5ac310c835df7e13595f2027d4c4ee8e699fc77c5192b102cca33ddba8c"
 }

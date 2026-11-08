@@ -1,7 +1,7 @@
 name: Shared board visibility
 on:
   push:
-    branches: [main, 'feature/shared-withdraw-visibility']
+    branches: [main]
   pull_request:
   workflow_dispatch:
 permissions:
@@ -30,8 +30,28 @@ jobs:
             python tests/test_stage74_link_bbs.py ./runtime
             python tests/test_shared_visibility.py ./runtime
           } 2>&1 | tee build/shared-visibility.log
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Browser moderation regression
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm install --no-save --prefix "$RUNNER_TEMP/browser" playwright@1.56.1
+          export NODE_PATH="$RUNNER_TEMP/browser/node_modules"
+          "$RUNNER_TEMP/browser/node_modules/.bin/playwright" install --with-deps chromium
+          python tests/web_browser_fixture.py ./runtime ./vaultctl 18889 > build/browser-fixture.log 2>&1 &
+          fixture=$!
+          trap 'kill "$fixture"; wait "$fixture" || true' EXIT
+          for attempt in $(seq 1 60); do
+            if grep -q 'BROWSER FIXTURE' build/browser-fixture.log; then break; fi
+            kill -0 "$fixture"
+            sleep 1
+          done
+          grep -q 'BROWSER FIXTURE' build/browser-fixture.log
+          node tests/test_visibility_browser.cjs http://127.0.0.1:18889/notes/ | tee build/visibility-browser.log
       - uses: actions/upload-artifact@v4
         if: always()
         with:
           name: shared-visibility-evidence
-          path: build/shared-visibility.log
+          path: build/*.log

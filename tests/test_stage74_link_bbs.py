@@ -37,7 +37,8 @@ async def run(binary,p):
   a.accept(a.sign(dict(reply,kind='title',revision=3,title='edited after bootstrap',body='')))
   await sync();a.make_checkpoints();await sync()
   assert 'HIDDEN 2 PARENT 1' in (await b.command('READ 2'))['text']
-  await core.select(1);assert len(await core.page(1))==2
+  await core.select(1);assert await core.lookup(ids[0],reply['article'])==(2,4)
+  assert len(await core.page(1))==2
   assert not await core.page(3)
   before=(p/'notes').stat().st_size
   with d.db:d.db.execute('UPDATE events SET applied=0')
