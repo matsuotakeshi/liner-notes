@@ -1,5 +1,5 @@
 """Ancestor visibility on ordinary boards, including counts and deep threads."""
-import sys,tempfile
+import sys,tempfile,hashlib
 from pathlib import Path
 from test_board import Server,post,read
 from test_runtime import Client
@@ -44,4 +44,29 @@ def run(binary):
    assert read(b,parent)[2]=='deep-body\r\n'
    print('PASS ordinary-board withdrawal/hide cascade, visible counts/navigation, audit and deep topology')
   finally:a.close();b.close();s.close()
+  # Reclaim only the withdrawn parent's body in a separate restored copy.
+  # Descendant data and audit survive; restoring a child cannot republish it.
+  sys.path.insert(0,str(Path(__file__).resolve().parents[1]/'scripts'))
+  import maintenance
+  original=hashlib.sha256((p/'notes').read_bytes()).digest()
+  with tempfile.TemporaryDirectory() as maintenance_tmp:
+   dest=Path(maintenance_tmp);archive=dest/'backup.tar.gz';copy=dest/'copy'
+   maintenance.backup(p,'notes','members',archive)
+   maintenance.restore(archive,copy,compact=True,reclaim_withdrawn=True)
+   assert hashlib.sha256((p/'notes').read_bytes()).digest()==original
+   assert b'root-body-secret' not in (copy/'notes').read_bytes()
+   assert b'grand-body-secret' in (copy/'notes').read_bytes()
+   s=Server(binary,copy/'notes',members=copy/'members',admins=copy/'admins')
+   a=Client(s.port)
+   try:
+    auth(a,'admin')
+    expect(a,'READ 1','WITHDRAWN 1 PARENT 0')
+    expect(a,'RESTORE 3','RESTORED 3')
+    expect(a,'READ 3','HIDDEN 3 PARENT 2')
+    assert inspect(a,3)[2]==b'grand-body-secret\r\n'
+    assert post(a,'after reclaim','retained ids')==parent+1
+    _,history,_=page(a,'AUDIT ARTICLE 1')
+    assert any(b'WITHDRAW' in line for line in history),history
+   finally:a.close();s.close()
+  print('PASS withdrawn-body reclamation preserves descendants, audit and monotonic IDs')
 if __name__=='__main__':run(str(Path(sys.argv[1]).resolve()))
