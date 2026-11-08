@@ -86,6 +86,9 @@ def test():
                     "webui": "not-tested", "link": "not-tested", "zmodem": "not-tested"}
     try:
         run(flags + ["-j2", "all"])
+        run([sys.executable, "tests/test_solaris_service.py"])
+        run([sys.executable, "scripts/install-solaris.py", "--destdir", "build/solaris-stage", "--python", sys.executable])
+        run(["/usr/sbin/svccfg", "validate", "build/solaris-stage/opt/liner-notes/share/smf/liner-notes.xml"])
         run(flags + ["check"])
         run([sys.executable, "tests/test_stage73_database.py", "./runtime"])
         capabilities["core"] = "passed"

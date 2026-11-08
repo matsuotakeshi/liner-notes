@@ -71,7 +71,10 @@
         "ci/solaris_ci.py",
         "ci/native_ci.py",
         "src/doors.c",
-        "Makefile"
+        "Makefile",
+        "scripts/install-solaris.py",
+        "scripts/solaris_service.py",
+        "solaris/liner-notes.xml"
       ]
     },
     {

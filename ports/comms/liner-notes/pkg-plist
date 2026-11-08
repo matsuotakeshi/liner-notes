@@ -104,6 +104,8 @@ bin/liner-notes-check-resume
 %%DATADIR%%/scripts/upgrade_check.py
 %%DATADIR%%/LICENSE
 %%DATADIR%%/scripts/install-linux.py
+%%DATADIR%%/scripts/install-solaris.py
+%%DATADIR%%/scripts/solaris_service.py
 %%DATADIR%%/THIRD_PARTY.md
 %%WEBUI%%sbin/liner-notes-web
 %%WEBUI%%etc/rc.d/liner_notes_web
