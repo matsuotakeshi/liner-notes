@@ -54,20 +54,32 @@ cryptography >= 43, and lrzsz >= 0.13.1 before staging, and passes
 `STRICT_DEPENDS=yes` to the Ports framework. This prevents any missing
 dependency from triggering a recursive Ports installation.
 
-The first observed FreeBSD CI failure (2026-11-08) was caused by missing
-`py311-sqlite3` on the **verification VM only**, after C compilation had
-already succeeded. The VM operator must check the installed Python flavor
-and preview any package transaction before installing prerequisites, for
-example:
+The first FreeBSD CI run (2026-11-08) selected Python 3.11 and failed on
+`py311-sqlite3` after native C compilation succeeded. Available pkg
+repositories on the verification VM instead offer `py312-aiohttp` and
+`py312-cryptography`. This candidate workflow now pins
+`PYTHON_VERSION=python3.12` **for the CI build only**, without changing
+system-wide FreeBSD Python defaults or the general 3.11+ port requirement.
 
-    pkg info -e py311-sqlite3
-    pkg install -n py311-sqlite3 py311-aiohttp py311-cryptography lrzsz
+VM operator checks (FreeBSD 10.0.0.50 only):
 
-Only on disposable FreeBSD VM 10.0.0.50, and only after reviewing the
-transaction, a privileged VM administrator may install necessary packages.
-Do not run this on any production host, and never have CI auto-install them.
-The source archive, native binary and existing BBS data are not modified
-by the preflight.
+    pkg info python312 py312-sqlite3
+    pkg install -n py312-aiohttp py312-cryptography
+    make -C /usr/ports/comms/lrzsz -V PORTVERSION
+
+The 2026-11-08 FreeBSD package catalogue offered `lrzsz-0.12.20_7`,
+which is **below the port's 0.13.1 minimum** for ZMODEM. This must NOT be
+installed as if it satisfied the dependency. FreeBSD Ports upstream updated
+`comms/lrzsz` to 0.13.1 on 2026-11-01 (PR 300299). If the local
+Ports Collection also has 0.13.1, its installation on the disposable VM
+can be planned separately; otherwise update the Ports checkout or wait
+for an official compatible binary pkg. Do not downgrade the requirement
+or silently turn off ZMODEM.
+
+Only after reviewing the preview and confirming no unrelated package
+upgrades should the VM administrator install missing Python 3.12
+dependencies. CI itself never runs pkg install, make install, or restart
+a service. Never run these commands on the production FreeBSD server.
 
 The resulting pkg is an Actions artifact, not a production release.
 Production FreeBSD srv.ysni.org is not contacted by this workflow, and
