@@ -43,7 +43,7 @@ def check_build_info(root, source_sha):
     values = {}
     for line in path.read_text(encoding="utf-8").splitlines():
         key, sep, value = line.partition("=")
-        if not sep or not re.fullmatch(r"[a-z_]+", key) or key in values:
+        if not sep or not re.fullmatch(r"[a-z][a-z0-9_]*", key) or key in values:
             raise ValueError("Invalid or duplicate BUILD-INFO key")
         values[key] = value
     if values.get("source_sha") != source_sha:

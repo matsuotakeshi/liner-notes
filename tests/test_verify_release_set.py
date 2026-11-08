@@ -40,7 +40,11 @@ def fixture(root, platform, source_sha=SHA):
                            version=version, directory=str(folder),
                            package=[name + "=" + filename for name, filename in SPECS[platform].items()]))
     (folder / "SHA256SUMS").write_text("\n".join(sums) + "\n", encoding="ascii")
-    (folder / "BUILD-INFO.txt").write_text("source_sha=" + source_sha + "\n", encoding="utf-8")
+    info = "source_sha=" + source_sha + "\n"
+    if platform == "freebsd15":
+        # Match the real FreeBSD CI BUILD-INFO.txt key with digits.
+        info += "platform=freebsd15\nsource_archive_sha256=" + "f" * 64 + "\n"
+    (folder / "BUILD-INFO.txt").write_text(info, encoding="utf-8")
     return folder
 
 
@@ -76,6 +80,26 @@ class ReleaseSetTests(unittest.TestCase):
                 fixture(root, platform)
             with self.assertRaises(ValueError):
                 verify_set(root, SHA)
+
+    def test_reject_malformed_or_duplicate_build_info_keys(self):
+        with tempfile.TemporaryDirectory() as path:
+            root = Path(path)
+            for platform in SPECS:
+                fixture(root, platform)
+            info = root / "freebsd15" / "BUILD-INFO.txt"
+            valid = info.read_text(encoding="utf-8")
+            for bad in (
+                "source_sha=" + SHA + "\nsource_sha=" + SHA + "\n",
+                "Source_sha=" + SHA + "\n",
+                "1source_sha=" + SHA + "\n",
+                "source_sha=" + SHA + "\ninvalid-key=value\n",
+            ):
+                with self.subTest(bad=bad):
+                    info.write_text(bad, encoding="utf-8")
+                    with self.assertRaisesRegex(ValueError, "Invalid or duplicate BUILD-INFO key"):
+                        verify_set(root, SHA)
+            info.write_text(valid, encoding="utf-8")
+            self.assertEqual(verify_set(root, SHA)["version"], "0.74")
 
     def test_reject_mismatched_base_versions(self):
         with tempfile.TemporaryDirectory() as path:
