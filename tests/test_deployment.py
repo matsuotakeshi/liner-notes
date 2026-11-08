@@ -276,6 +276,15 @@ class Deployment(unittest.TestCase):
             with self.assertRaises(ValueError):
                 policy.package_commands(platform, {'apache24': {'filename': 'apache.pkg'}}, self.base)
 
+    def test_installed_inventory_preserves_multiple_kernel_versions(self):
+        host = object.__new__(Host)
+        host.platform = 'rocky10'
+        output = 'kernel-core\t6.12.1\tx86_64\nkernel-core\t6.12.2\tx86_64\nliner-notes\t0.75-1\tx86_64'
+        with patch('deploy_host.command', return_value=output):
+            inventory = host.inventory()
+        self.assertEqual(len(inventory), 3)
+        self.assertEqual(inventory['liner-notes'], ['0.75-1', 'x86_64'])
+
     def test_package_policy_requires_complete_set_and_provenance_version(self):
         policy.validate_release(self.doc)
         changed = copy.deepcopy(self.doc)

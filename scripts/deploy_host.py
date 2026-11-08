@@ -92,8 +92,12 @@ class Host:
         result = {}
         for line in lines:
             fields = line.split('\t')
-            require(len(fields) == 3 and fields[0] not in result, 'Ambiguous installed package inventory')
-            result[fields[0]] = fields[1:]
+            require(len(fields) == 3, 'Malformed installed package inventory')
+            # RPM legitimately keeps several kernel versions. Preserve the
+            # complete unrelated inventory without rejecting a normal host.
+            key = fields[0] if fields[0] in PACKAGES else '@'.join(fields)
+            require(key not in result, 'Ambiguous installed BBS package inventory')
+            result[key] = fields[1:]
         return result
 
     def preflight(self, release):
