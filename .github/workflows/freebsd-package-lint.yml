@@ -10,6 +10,9 @@ on:
       - ".github/workflows/freebsd-package.yml"
       - ".github/workflows/freebsd-package-lint.yml"
       - "ports/comms/liner-notes/**"
+      - "*.md"
+      - "scripts/*.py"
+      - "tests/test_freebsd_plist.py"
   workflow_dispatch:
 
 permissions:
@@ -29,6 +32,7 @@ jobs:
           set -euo pipefail
           sh -n ci/build-freebsd-package.sh
           python3 tests/test_release_manifest.py
+          python3 tests/test_freebsd_plist.py
           git archive --format=tar HEAD | tar -tf - |
             grep -Fx ports/comms/liner-notes/Makefile > /dev/null
           echo "PASS: PR-safe FreeBSD packaging checks."

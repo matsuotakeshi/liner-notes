@@ -237,7 +237,11 @@ bin/liner-notes-serial
 %%PORTDOCS%%%%DOCSDIR%%/STAGE73.md
 %%PORTDOCS%%%%DOCSDIR%%/WEBUI_COVERAGE.md
 %%DATADIR%%/scripts/build-rpm.py
+%%DATADIR%%/scripts/release_manifest.py
 %%DATADIR%%/scripts/link_maintenance.py
 %%PORTDOCS%%%%DOCSDIR%%/BBS_LINK_OPERATIONS.md
 %%PORTDOCS%%%%DOCSDIR%%/RPM.md
+%%PORTDOCS%%%%DOCSDIR%%/CI_CD.md
+%%PORTDOCS%%%%DOCSDIR%%/DEB.md
+%%PORTDOCS%%%%DOCSDIR%%/RELEASE_CANDIDATE.md
 %%PORTDOCS%%%%DOCSDIR%%/STAGE74.md
