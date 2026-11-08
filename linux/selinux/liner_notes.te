@@ -131,6 +131,9 @@ manage_dirs_pattern(liner_notes_web_t, liner_notes_web_data_t, liner_notes_web_d
 manage_files_pattern(liner_notes_web_t, liner_notes_web_data_t, liner_notes_web_data_t)
 manage_dirs_pattern(liner_notes_link_t, liner_notes_link_data_t, liner_notes_link_data_t)
 manage_files_pattern(liner_notes_link_t, liner_notes_link_data_t, liner_notes_link_data_t)
+# SQLite WAL shared-memory files require map independently of manage_file_perms.
+allow liner_notes_t liner_notes_data_t:file map;
+allow liner_notes_link_t liner_notes_link_data_t:file map;
 manage_dirs_pattern(liner_notes_link_t, liner_notes_link_secret_t, liner_notes_link_secret_t)
 manage_files_pattern(liner_notes_link_t, liner_notes_link_secret_t, liner_notes_link_secret_t)
 manage_dirs_pattern(liner_notes_t, liner_notes_run_t, liner_notes_run_t)
@@ -244,6 +247,7 @@ manage_dirs_pattern(liner_notes_admin_t, liner_notes_data_t, liner_notes_data_t)
 manage_files_pattern(liner_notes_admin_t, liner_notes_data_t, liner_notes_data_t)
 manage_dirs_pattern(liner_notes_admin_t, liner_notes_link_data_t, liner_notes_link_data_t)
 manage_files_pattern(liner_notes_admin_t, liner_notes_link_data_t, liner_notes_link_data_t)
+allow liner_notes_admin_t { liner_notes_data_t liner_notes_link_data_t }:file map;
 manage_dirs_pattern(liner_notes_admin_t, liner_notes_link_secret_t, liner_notes_link_secret_t)
 manage_files_pattern(liner_notes_admin_t, liner_notes_link_secret_t, liner_notes_link_secret_t)
 read_files_pattern(liner_notes_admin_t, liner_notes_etc_t, liner_notes_etc_t)

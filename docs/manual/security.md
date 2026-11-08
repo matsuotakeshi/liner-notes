@@ -63,6 +63,8 @@ Doorの外向き通信は既定で無効です。必要な場合だけ `liner_no
 # 10.0.0.51 の管理者が、レビュー済みmainのソースディレクトリで実行
 dnf install selinux-policy-devel policycoreutils-python-utils gcc make \
     openssl-devel sqlite-devel python3-aiohttp python3-cryptography lrzsz
+# 未作成の場合だけ追加。CI SSHアカウントとUID・グループを分離する。
+useradd --system --no-create-home --home-dir /nonexistent --shell /sbin/nologin liner_notes_ci
 install -d -o root -g root -m 755 /usr/local/libexec
 install -o root -g root -m 755 ci/selinux_root.py /usr/local/libexec/liner-notes-ci-selinux
 visudo -f /etc/sudoers.d/liner-notes-selinux-ci
@@ -71,6 +73,8 @@ visudo -f /etc/sudoers.d/liner-notes-selinux-ci
 sudoersには固定ヘルパーのみを許可します。受け付ける引数は40文字のコミットSHAだけで、
 ヘルパー自身もGitHub上の最新mainと二度照合します。ファイルパス、URL、任意コマンドは
 受け付けません。環境変数も固定し、SSHユーザーが書けるチェックアウトは実行しません。
+試験用サービスは専用の `liner_notes_ci` で動かし、SSHの `ci-test` には試験データの
+書き込み権を与えません。rootが準備中のパスを呼出元ユーザーに置き換えられることを防ぎます。
 
 ```text
 ci-test ALL=(root) NOPASSWD: /usr/local/libexec/liner-notes-ci-selinux
@@ -83,6 +87,12 @@ ci-test ALL=(root) NOPASSWD: /usr/local/libexec/liner-notes-ci-selinux
 終了後は当該ユニットと追加したポート定義を除去してポリシーを外します。プロセスが残った
 場合はポリシーを残して失敗とし、root専用の記録と作業領域を保全します。準備不足や試験失敗を
 スキップ成功にはしません。
+
+タイムアウトやrunner切断時にも一時サービスは最長300秒で停止しますが、ポリシーが
+残った状態で次の試験を始めることはできません。検証機の管理者はroot専用作業領域の
+`fixture-state.json` と `acceptance.log` を確認し、記録された一時ユニットの停止・
+当該ポート定義の除去・専用ドメインの残留がないことを確認してから、試験用の優先度200の
+ポリシーを除去します。既存ポリシーを無条件に削除する回復コマンドは用意しません。
 
 配布元のlrzszがない場合や必要な転送試験に失敗する場合は、[Linux導入](install-linux.md)の
 隔離ビルド手順で用意した実エンジンを使います。版名だけで転送成功を判断しません。

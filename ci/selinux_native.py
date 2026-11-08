@@ -37,13 +37,29 @@ class Fixture:
             raise ValueError('Only the designated Rocky test VM is accepted')
         if 'ID="rocky"' not in Path('/etc/os-release').read_text():
             raise ValueError('Expected the Rocky test VM')
-        self.account = pwd.getpwnam('ci-test')
-        if self.account.pw_uid == 0:
-            raise ValueError('Dedicated non-root CI user required')
+        self.account = pwd.getpwnam('liner_notes_ci')
+        caller = pwd.getpwnam('ci-test')
+        if (self.account.pw_uid in (0, caller.pw_uid) or self.account.pw_gid == 0 or
+                Path(self.account.pw_shell).name != 'nologin'):
+            raise ValueError('A separate non-login fixture account is required')
         self.path = Path(tempfile.mkdtemp(prefix='liner-notes-selinux-ci-', dir='/var/lib'))
         self.path.chmod(0o755)
         run('chcon', '-t', 'liner_notes_ro_t', self.path)
         self.units, self.ports, self.results = [], [], []
+        self.record = ROOT.parent / 'fixture-state.json'
+        if self.record.exists():
+            raise ValueError('Refuse to overwrite an existing fixture recovery record')
+        self.save_record()
+
+    def save_record(self):
+        # ROOT.parent is the helper's root-only work directory, never ci-test data.
+        temporary = self.record.with_suffix('.new')
+        with temporary.open('x', encoding='utf8') as stream:
+            json.dump({'fixture': str(self.path), 'units': self.units, 'ports': self.ports}, stream)
+            stream.flush()
+            os.fsync(stream.fileno())
+        temporary.chmod(0o600)
+        os.replace(temporary, self.record)
 
     def label(self, path, kind, recursive=False):
         if not Path(path).resolve().is_relative_to(self.path):
@@ -71,6 +87,7 @@ class Fixture:
         # -a only: a preexisting mapping must never be overwritten by a test.
         run('semanage', 'port', '-a', '-t', kind, '-p', 'tcp', port)
         self.ports.append(port)
+        self.save_record()
         return port
 
     def start(self, name, executable, arguments, directory, domain):
@@ -78,10 +95,12 @@ class Fixture:
         if run('systemctl', 'show', unit, '-p', 'LoadState', '--value').stdout.strip() != 'not-found':
             raise ValueError('Refuse existing service identity')
         self.units.append(unit)
+        self.save_record()
         run('systemd-run', '--quiet', '--unit=' + unit,
-            '--property=User=ci-test', '--property=Group=' + str(self.account.pw_gid),
+            '--property=User=' + self.account.pw_name, '--property=Group=' + str(self.account.pw_gid),
             '--property=NoNewPrivileges=yes', '--property=PrivateTmp=yes',
-            '--property=ProtectHome=yes', '--property=RuntimeMaxSec=300',
+            '--property=ProtectHome=yes', '--property=ProtectSystem=strict',
+            '--property=ReadWritePaths=' + str(self.path), '--property=RuntimeMaxSec=300',
             '--property=WorkingDirectory=' + str(directory), '--', executable, *arguments)
         for _ in range(50):
             value = run('systemctl', 'show', unit, '-p', 'MainPID', '--value').stdout.strip()
@@ -208,7 +227,7 @@ host = "127.0.0.1"
 port = {core_port}
 telnet = true
 ''', 'liner_notes_web_etc_t')
-    entry = fixture.text('web-entry', '#!/usr/bin/python3\n'
+    entry = fixture.text('web-entry', '#!/usr/bin/python3 -B\n'
         'import sys,runpy\nfrom pathlib import Path\n'
         'try:\n'
         f'    Path({str(secret)!r}).read_text()\n'
@@ -290,7 +309,7 @@ port = {peer_port}
         scripts = fixture.path / 'source/scripts'
         shutil.copytree(ROOT/'scripts', scripts, ignore=shutil.ignore_patterns('__pycache__'))
         fixture.label(scripts, 'liner_notes_ro_t', True)
-        entry = fixture.text('link-entry', '#!/usr/bin/python3\nimport sys,runpy\n'
+        entry = fixture.text('link-entry', '#!/usr/bin/python3 -B\nimport sys,runpy\n'
             f'sys.path.insert(0,{str(scripts)!r})\n'
             f'runpy.run_path({str(scripts/"link_service.py")!r},run_name="__main__")\n',
             'liner_notes_link_exec_t', True)
@@ -331,7 +350,7 @@ def transfer_fixture(fixture, core, secret):
     shutil.copytree(ROOT/'scripts', scripts, ignore=shutil.ignore_patterns('__pycache__'))
     fixture.label(scripts, 'liner_notes_ro_t', True)
     arguments = ['--receiver',str(copies[0]),'--sender',str(copies[1]),'--spool-root',str(spool),'--timeout','15','--']
-    entry = fixture.text('transfer-entry', '#!/usr/bin/python3\n'
+    entry = fixture.text('transfer-entry', '#!/usr/bin/python3 -B\n'
         'import os,sys,runpy\nfrom pathlib import Path\n'
         'try:\n'
         f'    Path({str(secret)!r}).read_text()\n'
@@ -396,7 +415,7 @@ def admin_probe(fixture, vault):
     shutil.copyfile(ROOT/'vaultctl',binary)
     binary.chmod(0o755)
     fixture.label(binary,'liner_notes_admin_exec_t')
-    entry = fixture.text('admin-entry', '#!/usr/bin/python3\n'
+    entry = fixture.text('admin-entry', '#!/usr/bin/python3 -B\n'
         'import os,time\n'
         'print(os.getpid(),flush=True)\n'
         'time.sleep(1)\n'
@@ -404,7 +423,7 @@ def admin_probe(fixture, vault):
         'liner_notes_admin_exec_t',True)
     # Uses the owning uid, with no capability/DAC override granted to a daemon.
     process = subprocess.Popen([str(entry)], user=fixture.account.pw_uid,
-                               group=fixture.account.pw_gid, cwd=fixture.path,
+                               group=fixture.account.pw_gid, extra_groups=[], cwd=fixture.path,
                                stdout=subprocess.PIPE,stderr=subprocess.PIPE,text=True)
     try:
         pid = process.stdout.readline().strip()
@@ -437,7 +456,7 @@ def main():
         secret.chmod(0o644)
         fixture.label(secret, 'liner_notes_data_t')
         helper, vault, marker, binaries = transfer_fixture(fixture, core, secret)
-        game = fixture.text('door', '#!/usr/bin/python3\n'
+        game = fixture.text('door', '#!/usr/bin/python3 -B\n'
             'import os,sys,tty\n'
             'from pathlib import Path\n'
             'tty.setraw(0)\n'

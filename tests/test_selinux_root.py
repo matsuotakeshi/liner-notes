@@ -4,6 +4,7 @@ import io
 from pathlib import Path
 import tarfile
 import tempfile
+from types import SimpleNamespace
 import unittest
 from unittest.mock import patch
 
@@ -31,6 +32,21 @@ def archive(entries):
 
 
 class RootBoundaryTests(unittest.TestCase):
+    def test_fixture_uid_is_not_the_ssh_callers_writable_identity(self):
+        caller = SimpleNamespace(pw_uid=1002)
+        valid = dict(pw_uid=990, pw_gid=990, pw_shell='/sbin/nologin')
+        helper.validate_account(SimpleNamespace(**valid), caller, [990], [1002])
+        for change, own_groups, caller_groups in (
+            ({'pw_uid': 0}, [990], [1002]),
+            ({'pw_uid': 1002}, [990], [1002]),
+            ({'pw_gid': 0}, [990], [1002]),
+            ({'pw_shell': '/bin/bash'}, [990], [1002]),
+            ({}, [990, 0], [1002]),
+            ({}, [990], [1002, 990]),
+        ):
+            with self.subTest(change=change), self.assertRaises(ValueError):
+                helper.validate_account(SimpleNamespace(**(valid | change)), caller, own_groups, caller_groups)
+
     def test_argument_is_only_exact_sha(self):
         self.assertEqual(helper.validate_sha(SHA), SHA)
         for value in ('main', SHA+';id', '../source', SHA.upper(), SHA+'\n', ''):

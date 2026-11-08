@@ -46,6 +46,13 @@ def validate_sha(sha):
     return sha
 
 
+def validate_account(account, caller, fixture_groups, ssh_groups):
+    if (account.pw_uid in (0, caller.pw_uid) or account.pw_gid == 0 or
+            Path(account.pw_shell).name != 'nologin' or
+            0 in fixture_groups or account.pw_gid in ssh_groups):
+        raise ValueError('Fixture account must be non-login, non-root and separate from the SSH user')
+
+
 def current_main():
     return validate_sha(json.loads(get('https://api.github.com/repos/' + REPOSITORY +
                                      '/git/ref/heads/main', 65536))['object']['sha'])
@@ -110,6 +117,11 @@ def main():
         raise ValueError('Enforcing required; this helper never changes SELinux mode')
     if sha != current_main():
         raise ValueError('Only the current reviewed main commit is accepted')
+    import pwd
+    account = pwd.getpwnam('liner_notes_ci')
+    caller = pwd.getpwnam('ci-test')
+    validate_account(account, caller, os.getgrouplist(account.pw_name, account.pw_gid),
+                     os.getgrouplist(caller.pw_name, caller.pw_gid))
     safe_base()
     import fcntl
     with (BASE / 'lock').open('a') as lock:
@@ -142,12 +154,16 @@ def main():
         try:
             command('/usr/sbin/semodule', '-X', '200', '-i', policy / 'liner_notes.pp')
             installed = True
-            result = subprocess.run(['/usr/bin/python3', '-I', str(source / 'ci/selinux_native.py'),
-                                     '--designated-ci-vm'], cwd=source, env=ENV,
-                                    timeout=1200, capture_output=True, text=True)
-            (work / 'acceptance.log').write_text(result.stdout + result.stderr, encoding='utf8')
-            print(result.stdout, flush=True)
-            print(result.stderr, flush=True)
+            log = work / 'acceptance.log'
+            try:
+                with log.open('x', encoding='utf8') as stream:
+                    result = subprocess.run(['/usr/bin/python3', '-I', str(source / 'ci/selinux_native.py'),
+                                             '--designated-ci-vm'], cwd=source, env=ENV,
+                                            timeout=1200, stdout=stream, stderr=subprocess.STDOUT, text=True)
+            finally:
+                # Preserve partial output even if the acceptance process times out.
+                if log.is_file():
+                    print(log.read_text(encoding='utf8', errors='replace'), flush=True)
             result.check_returncode()
             print(json.dumps({'source_sha': sha, 'archive_sha256': hashlib.sha256(content).hexdigest(),
                               'policy_sha256': hashlib.sha256((policy/'liner_notes.pp').read_bytes()).hexdigest(),
