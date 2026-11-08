@@ -66,13 +66,13 @@ jobs:
           done
 
           check_host() {
-            local label="$1" host="$2"
+            local label="$1" host="$2" target="$3"
             if [[ -z "$host" ]]; then
               echo "Missing production environment variable for $label" >&2
               exit 1
             fi
             echo "::group::$label read-only SSH check"
-            ssh -n \
+            ssh -T \
               -i "$key_file" \
               -o IdentitiesOnly=yes \
               -o BatchMode=yes \
@@ -82,11 +82,11 @@ jobs:
               -o "UserKnownHostsFile=$known_hosts_file" \
               -o ConnectTimeout=10 \
               "ln-deploy@$host" \
-              'test "$(id -un)" = "ln-deploy" && printf "access=ok os=%s\n" "$(uname -s)"'
+              "sh -s -- $target" < "$GITHUB_WORKSPACE/ci/production-os-check.sh"
             echo "::endgroup::"
           }
 
-          check_host "FreeBSD" "$FREEBSD_HOST"
-          check_host "Rocky Linux" "$ROCKY_HOST"
-          check_host "Debian" "$DEBIAN_HOST"
+          check_host "FreeBSD" "$FREEBSD_HOST" freebsd15
+          check_host "Rocky Linux" "$ROCKY_HOST" rocky10
+          check_host "Debian" "$DEBIAN_HOST" debian13
           echo "PASS: SSH access to all 3 production VPS"
