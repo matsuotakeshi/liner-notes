@@ -76,6 +76,20 @@ jobs:
             -o StrictHostKeyChecking=yes -o ConnectTimeout=10 ci-test@10.0.0.51 \
             "sudo -n /usr/local/libexec/liner-notes-ci-selinux $SOURCE_SHA" \
             > "$RUNNER_TEMP/selinux-inventory/rocky.txt" 2>&1
+      - name: Write exact-SHA Enforcing acceptance receipt
+        env:
+          SOURCE_SHA: ${{ github.sha }}
+        run: |
+          python3 - <<'PY'
+          import json, os, pathlib, re
+          directory = pathlib.Path(os.environ['RUNNER_TEMP']) / 'selinux-inventory'
+          result = json.loads((directory / 'rocky.txt').read_text().splitlines()[-1])
+          assert result['source_sha'] == os.environ['SOURCE_SHA']
+          assert result['enforcing'] is True and result['acceptance'] == 'success'
+          for key in ('archive_sha256', 'policy_sha256', 'runtime_sha256'):
+              assert re.fullmatch(r'[0-9a-f]{64}', result[key])
+          (directory / 'SELINUX-ACCEPTANCE.json').write_text(json.dumps(result, indent=2) + '\n')
+          PY
       - uses: actions/upload-artifact@v4
         if: always()
         with:

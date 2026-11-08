@@ -143,7 +143,7 @@ def main():
                       128 * 1024 * 1024)
         extract(content, source, sha)
         # Fixed commands against reviewed, root-protected source, not CI-user input.
-        print(command('/usr/bin/make', '-j2', 'runtime', 'vaultctl', cwd=source,
+        print(command('/usr/bin/make', '-j2', 'all', cwd=source,
                       timeout=600).stdout, flush=True)
         policy = source / 'linux/selinux'
         print(command('/usr/bin/make', '-f', '/usr/share/selinux/devel/Makefile',

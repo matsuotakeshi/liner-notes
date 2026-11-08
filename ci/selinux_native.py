@@ -118,6 +118,15 @@ class Fixture:
     def stop(self, unit):
         run('systemctl', 'stop', unit)
 
+    def ready(self, port):
+        for _ in range(60):
+            try:
+                with socket.create_connection(('127.0.0.1', port), timeout=1):
+                    return
+            except OSError:
+                time.sleep(.1)
+        raise RuntimeError('Fixture listener did not become ready')
+
     def close(self):
         for unit in reversed(self.units):
             # All names are fresh fixture-generated units, never installed ones.
@@ -438,6 +447,45 @@ def admin_probe(fixture, vault):
             process.wait()
 
 
+def maintenance_probe(fixture, core):
+    backup = fixture.directory('backups', 'liner_notes_backup_t')
+    converter = fixture.path / 'dbconvert'
+    shutil.copyfile(ROOT / 'dbconvert', converter)
+    converter.chmod(0o755)
+    fixture.label(converter, 'liner_notes_admin_exec_t')
+    scripts = fixture.path / 'transfer-scripts'
+    entry = fixture.text('maintenance-entry', '#!/usr/bin/python3 -B\n'
+        'import os,sys,time,runpy\n'
+        'print(os.getpid(),flush=True)\ntime.sleep(1)\n'
+        f'sys.path.insert(0,{str(scripts)!r})\n'
+        f'runpy.run_path({str(scripts / "maintenance.py")!r},run_name="__main__")\n',
+        'liner_notes_admin_exec_t', True)
+    archive, restored = backup / 'instance.tar.gz', backup / 'restored'
+    for arguments in (
+        ['db-backup', '--root', core, '--database', core/'notes.sqlite',
+         '--board', 'notes', '--members', 'members', archive],
+        ['verify', archive],
+        ['db-restore', archive, restored, '--database', 'notes.sqlite', '--tools-dir', fixture.path],
+    ):
+        process = subprocess.Popen([str(entry), *map(str, arguments)],
+            user=fixture.account.pw_uid, group=fixture.account.pw_gid, extra_groups=[],
+            cwd=fixture.path, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+        try:
+            pid = process.stdout.readline().strip()
+            assert pid.isdigit()
+            assert Path('/proc/'+pid+'/attr/current').read_text().split(':')[2] == 'liner_notes_admin_t'
+            output, error = process.communicate(timeout=60)
+            assert process.returncode == 0, (arguments[0], output, error)
+        finally:
+            if process.poll() is None:
+                process.kill()
+                process.wait()
+    # A restored copy is explicitly relabelled for its future BBS role.
+    fixture.label(restored, 'liner_notes_data_t', True)
+    fixture.results.append({'admin': 'confined logical backup, verification and structured restore'})
+    return restored
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--designated-ci-vm', action='store_true', required=True)
@@ -478,12 +526,7 @@ def main():
         for iteration in range(2):
             unit = fixture.start('core'+str(iteration), executable, args, core, 'liner_notes_t')
             # Readiness retries are safe: only connection attempts precede writes.
-            for _ in range(60):
-                try:
-                    with socket.create_connection(('127.0.0.1', port), timeout=1):
-                        break
-                except OSError:
-                    time.sleep(.1)
+            fixture.ready(port)
             asyncio.run(bbs_probe(port, iteration == 0))
             if iteration == 0:
                 door_probe(port)
@@ -492,6 +535,19 @@ def main():
                 transfer_probe(fixture, port, marker, binaries)
             fixture.stop(unit)
         admin_probe(fixture,vault)
+        restored = maintenance_probe(fixture, core)
+        restored_args = [str(restored) + value[len(str(core)):] if value.startswith(str(core)+'/') else value
+                         for value in args]
+        # Its parent is an administrator-only backup directory. Move the verified
+        # copy to the fixture root before admitting the BBS service to it.
+        recovered = fixture.path / 'recovered'
+        restored.rename(recovered)
+        restored_args = [str(recovered) + value[len(str(restored)):] if value.startswith(str(restored)+'/') else value
+                         for value in restored_args]
+        unit = fixture.start('recovered', executable, restored_args, recovered, 'liner_notes_t')
+        fixture.ready(port)
+        asyncio.run(bbs_probe(port, False))
+        fixture.stop(unit)
         fixture.results.append({'bbs': 'Telnet/articles/mail/SQLite restart', 'door': 'PTY/normal/abnormal/disconnect/MAC denial'})
         assert run('getenforce').stdout.strip() == 'Enforcing'
     finally:

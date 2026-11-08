@@ -67,6 +67,8 @@ type liner_notes_door_drop_t;
 files_type(liner_notes_door_drop_t)
 type liner_notes_spool_t;
 files_type(liner_notes_spool_t)
+type liner_notes_backup_t;
+files_type(liner_notes_backup_t)
 type liner_notes_tmp_t;
 files_tmp_file(liner_notes_tmp_t)
 type liner_notes_web_tmp_t;
@@ -256,3 +258,10 @@ read_files_pattern(liner_notes_admin_t, liner_notes_web_etc_t, liner_notes_web_e
 manage_dirs_pattern(liner_notes_admin_t, liner_notes_tmp_t, liner_notes_tmp_t)
 manage_files_pattern(liner_notes_admin_t, liner_notes_tmp_t, liner_notes_tmp_t)
 files_tmp_filetrans(liner_notes_admin_t, liner_notes_tmp_t, { dir file })
+# Offline copy-only maintenance can read related service stores. Only the
+# designated backup destination is writable through this additional grant.
+allow liner_notes_admin_t { liner_notes_web_data_t liner_notes_door_data_t liner_notes_door_drop_t liner_notes_spool_t liner_notes_log_t liner_notes_web_log_t liner_notes_link_log_t }:dir list_dir_perms;
+allow liner_notes_admin_t { liner_notes_web_data_t liner_notes_door_data_t liner_notes_door_drop_t liner_notes_spool_t liner_notes_log_t liner_notes_web_log_t liner_notes_link_log_t liner_notes_transfer_receipt_t }:file read_file_perms;
+manage_dirs_pattern(liner_notes_admin_t, liner_notes_backup_t, liner_notes_backup_t)
+manage_files_pattern(liner_notes_admin_t, liner_notes_backup_t, liner_notes_backup_t)
+allow liner_notes_admin_t liner_notes_backup_t:file map;
