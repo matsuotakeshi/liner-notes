@@ -30,8 +30,10 @@ def find_tool(names):
 def inventory():
     print(json.dumps({"platform": platform.platform(), "machine": platform.machine(),
                       "python": sys.version, "executable": sys.executable}, indent=2), flush=True)
-    for command in (["uname", "-a"], ["/usr/bin/isainfo", "-kv"]):
+    for command in (["uname", "-a"], ["/usr/bin/isainfo", "-kv"], ["id"]):
         run(command)
+    if Path("/usr/bin/auths").is_file():
+        run(["/usr/bin/auths"])
     print(Path("/etc/release").read_text(), flush=True)
     for name in ("gmake", "clang", "gcc", "pkg-config", "openssl", "lrz", "lsz"):
         print(name + ": " + str(shutil.which(name)), flush=True)
