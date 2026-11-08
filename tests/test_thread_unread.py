@@ -41,7 +41,7 @@ def run(binary):
             for i in [root,child,deep]:mark(b,i)
             assert counts(b)[root]==0 and counts(b)[other[0]]==1
             expect(a,f'HIDE {root}',f'HIDDEN SAVED {root}');assert root not in counts(a)
-            _,rows,_=page(a,'NOTES');assert rows[0].startswith(b'HIDDEN ') and b'unread=' not in rows[0]
+            _,rows,_=page(a,'NOTES');assert rows and all(not row.startswith((b'HIDDEN ',f'#{root} '.encode())) for row in rows)
             expect(a,f'RESTORE {root}',f'RESTORED {root}');assert counts(b)[root]==0
         finally:a.close();b.close();g.close();s.close()
         snapshot=(data.read_bytes(),users.read_bytes(),pathlib.Path(str(data)+'.moderation').read_bytes())

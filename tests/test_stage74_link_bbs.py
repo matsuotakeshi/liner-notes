@@ -30,13 +30,15 @@ async def run(binary,p):
    for _ in range(3):await apply_pending(d,core,{board:1})
   await sync()
   assert 'WITHDRAWN 1' in (await b.command('READ 1'))['text']
-  result=response_data((await b.command('READ 2'))['text'])['article']
-  assert result['parent']==1 and result['body']=='surviving reply',result
+  assert 'HIDDEN 2 PARENT 1' in (await b.command('READ 2'))['text']
+  await core.select(1);item=await core.snapshot(2,True)
+  assert item['parent']==1 and item['state']=='HIDDEN' and not item['body'] and not item['title'],item
   assert b'old secret' not in (p/'notes').read_bytes()
   a.accept(a.sign(dict(reply,kind='title',revision=3,title='edited after bootstrap',body='')))
   await sync();a.make_checkpoints();await sync()
-  assert response_data((await b.command('READ 2'))['text'])['article']['title']=='edited after bootstrap'
-  await core.select(1);assert len(await core.page(1))==2
+  assert 'HIDDEN 2 PARENT 1' in (await b.command('READ 2'))['text']
+  await core.select(1);assert await core.lookup(ids[0],reply['article'])==(2,4)
+  assert len(await core.page(1))==2
   assert not await core.page(3)
   before=(p/'notes').stat().st_size
   with d.db:d.db.execute('UPDATE events SET applied=0')

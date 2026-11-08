@@ -83,6 +83,7 @@ test: test-userlog test-chat runtime vaultctl test-adapters test-vault-core test
 	$(PYTHON) tests/test_telnet.py ./runtime
 	$(PYTHON) tests/test_telnet_client.py ./runtime
 	$(PYTHON) tests/test_moderation.py ./runtime
+	$(PYTHON) tests/test_visibility.py ./runtime
 	$(PYTHON) tests/test_suspension.py ./runtime
 	$(PYTHON) tests/test_audit.py ./runtime
 	$(PYTHON) tests/test_content_audit.py ./runtime

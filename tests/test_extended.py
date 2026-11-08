@@ -71,8 +71,9 @@ def run(binary):
             expect(m,f'RESTORE {root}','ERR article withdrawn')
             expect(a,f'RETITLE {root} blocked','ERR article hidden')
             expect(a,f'REPLY {root} blocked','ERR article hidden')
-            rows=tree(b,root);assert rows[0].startswith(b'WITHDRAWN') and str(child).encode() in rows[1]
-            assert root not in unread(b) and child in unread(b)
+            assert tree(b,root)==[]
+            expect(b,f'READ {child}',f'HIDDEN {child} PARENT {root}')
+            assert root not in unread(b) and child not in unread(b)
             assert not findall(b,'ALL * admin-title') and not findall(b,'ALL * body-original')
             switch(a,2);secret=post(a,'private-word','secret-body')
             switch(a,3);other=post(a,'other-title','needle');last=post(b,'main-title','needle')
@@ -136,7 +137,7 @@ def run(binary):
             assert 'Handle: アリス' in a.cmd('PROFILE alice')
             a.cmd('PROFILES');assert 'user7' in a.cmd('+')
             a.cmd('PROFILES 掲示板');assert 'Handle: アリス' in a.cmd('1')
-            assert 'withdrawn by the author' in a.cmd('READGLOBAL 1')
+            assert 'withdrawn at its origin' in a.cmd('READGLOBAL 1')
             a.cmd('PAGER SIZE 80 7');a.cmd('PAGER ON')
             out,n=screens(a,'FIND ALL * needle');assert n>1
             out,n=screens(a,'+');assert b'many-9' in out

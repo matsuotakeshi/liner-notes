@@ -35,11 +35,12 @@ async def exercise(binary,p):
    (d/'accounts').write_text('1 1\n');(d/'secret').write_text('link-test-password\n');(d/'secret').chmod(0o600)
    server=Server(binary,d/'notes',members=d/'members',telnet=True,options=['--link-accounts',str(d/'accounts')]);servers.append(server)
    b=await Bridge('127.0.0.1',server.port).open();await b.command('REGISTER alice');await b.command('user-test-password');users.append(b)
-  # A withdrawn parent predating link activation keeps live replies connected,
-  # without exporting the original withdrawn body.
+  # A withdrawal predating activation exports no original body. A separate
+  # live tree first converges over TLS, then its withdrawal hides the reply.
   await post(users[0],'old parent','private withdrawn original')
-  await post(users[0],'old reply','retained reply',1)
   await users[0].command('WITHDRAW 1 CONFIRM')
+  await post(users[0],'live parent','parent to withdraw')
+  await post(users[0],'old reply','retained reply',2)
   for i,d in enumerate(dirs):
    cfg=d/'link.toml';configs.append(cfg);other=dirs[1-i];q=lambda x:json.dumps(str(x))
    cfg.write_text(f'''[node]
@@ -68,11 +69,17 @@ port = {ports[1-i]}
    subprocess.run([sys.executable,str(ROOT/'scripts/link_service.py'),'check','--config',str(cfg)],check=True,capture_output=True)
    start(i)
   async def has_reply():
-   r=response_data((await users[1].command('READ 2'))['text']).get('article',{})
-   return r.get('title')=='old reply' and r.get('parent')==1
+   r=response_data((await users[1].command('READ 3'))['text']).get('article',{})
+   return r.get('title')=='old reply' and r.get('parent')==2
   await wait_for(has_reply)
   async def withdrawn():return 'WITHDRAWN 1' in (await users[1].command('READ 1'))['text']
   await wait_for(withdrawn)
+  await users[0].command('WITHDRAW 2 CONFIRM')
+  async def hidden_reply():
+   text=(await users[1].command('READ 3'))['text']
+   return 'HIDDEN 3 PARENT 2' in text and 'retained reply' not in text
+  await wait_for(hidden_reply)
+  assert b'retained reply' in (dirs[1]/'notes').read_bytes()
   async def control(i,action,peer=None):
    reader,writer=await asyncio.open_unix_connection(str(dirs[i]/'control.sock'))
    try:
@@ -90,9 +97,9 @@ port = {ports[1-i]}
   # Peer unavailable: local accepted work persists, then converges on restart.
   stop(1)
   await post(users[0],'offline post','queued body')
-  await users[0].command('RETITLE 3 new title')
+  await users[0].command('RETITLE 4 new title')
   await asyncio.sleep(2);start(1)
-  async def renamed():return response_data((await users[1].command('READ 3'))['text']).get('article',{}).get('title')=='new title'
+  async def renamed():return response_data((await users[1].command('READ 4'))['text']).get('article',{}).get('title')=='new title'
   await wait_for(renamed)
   before=(dirs[1]/'notes').stat().st_size
   stop(1)

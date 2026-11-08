@@ -1,3 +1,13 @@
+/* Provenance, not the displayed author or current board, decides who may
+ * originate a withdrawal. Include unfinished intents and fail closed. */
+static int link_imported(uint32_t id) {
+    sqlite3_stmt *s=feature_stmt("SELECT 1 FROM link_articles WHERE local_id=?");
+    if(!s) { features_broken=1;return -1; }
+    sqlite3_bind_int64(s,1,id);int rc=sqlite3_step(s);sqlite3_finalize(s);
+    if(rc==SQLITE_ROW)return 1;
+    if(rc==SQLITE_DONE)return 0;
+    features_broken=1;return -1;
+}
 /* Local connector account + explicit board allowlist. Peer signatures are
  * checked by the separate link service; public Telnet never trusts an origin
  * string as authentication. This path always runs in the board owner thread. */
@@ -69,13 +79,13 @@ static void link_execute(const BoardRequest *q,BoardResult *r) {
         for(unsigned item=0;item<(q->action=='B'?32U:1U);item++) {
         while(id<=article_count && !on_board(id,q->board))id++;
         if(id>article_count) { snprintf(r->text+used,sizeof(r->text)-used,"LINK END\r\n");return; }
-        Article *a=article_at(id-1);const char *state=extras_removed(id)?"WITHDRAWN":moderation_hidden(id)?"HIDDEN":"LIVE";
+        const char *state=extras_removed(id)?"WITHDRAWN":unavailable(id)?"HIDDEN":"LIVE";Article *a=article_at(id-1);
         sqlite3_stmt *s=feature_stmt("SELECT origin,article,revision FROM link_articles WHERE local_id=? AND done=1");if(!s)goto storage;
         sqlite3_bind_int64(s,1,id);int rc=sqlite3_step(s);char origin[65]="-",key[65]="-";uint32_t revision=0;
         if(rc==SQLITE_ROW) { snprintf(origin,sizeof(origin),"%s",sqlite3_column_text(s,0));snprintf(key,sizeof(key),"%s",sqlite3_column_text(s,1));revision=(uint32_t)sqlite3_column_int64(s,2); }
         sqlite3_finalize(s);if(rc!=SQLITE_ROW && rc!=SQLITE_DONE)goto storage;
         const char *body=q->action=='S' && !strcmp(state,"LIVE")?article_body(a):"";if(body_read_failed)goto storage;
-        int size=snprintf(r->text+used,sizeof(r->text)-used,"LINK ITEM %u %u %llu %s %s %s %u\r\nAUTHOR %s\r\nTITLE %s\r\nBODY %zu\r\n%s",id,a->parent,(unsigned long long)a->created,state,origin,key,revision,a->author,a->title,strlen(body),body);
+        int size=snprintf(r->text+used,sizeof(r->text)-used,"LINK ITEM %u %u %llu %s %s %s %u\r\nAUTHOR %s\r\nTITLE %s\r\nBODY %zu\r\n%s",id,a->parent,(unsigned long long)a->created,state,origin,key,revision,a->author,!strcmp(state,"LIVE")?a->title:"",strlen(body),body);
         if(size<0 || (size_t)size>=sizeof(r->text)-used)goto storage;used+=(size_t)size;id++;
         }return;
     }
@@ -110,7 +120,7 @@ static void link_execute(const BoardRequest *q,BoardResult *r) {
         if(existing->parent!=q->number || existing->created!=q->since || strcmp(existing->author,alias) || !link_hash(existing_body,existing_hash) || strcmp(existing_hash,hash)) { strcpy(r->text,"ERR link checkpoint conflicts with immutable article\r\n");return; }
     }
     if(create) {
-        if(q->number && (!on_board(q->number,q->board) || moderation_hidden(q->number))) { strcpy(r->text,"ERR link parent unavailable\r\n");return; }
+        if(q->number && !on_board(q->number,q->board)) { strcpy(r->text,"ERR link parent unavailable\r\n");return; }
         post_article(q,r,alias,q->since,1);if(!r->selected)return;id=r->selected;r->selected=0;
     }
     s=feature_stmt("INSERT INTO link_articles VALUES(?,?,?,?,?,?,?,?,?,?,?,?,0,?) ON CONFLICT(board,origin,article) DO UPDATE SET revision=excluded.revision,kind=excluded.kind,title=excluded.title,done=0,actor=excluded.actor");if(!s)goto storage;
