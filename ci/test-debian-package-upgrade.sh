@@ -28,7 +28,7 @@ for file in /etc/liner-notes/liner-notes.env /etc/liner-notes/web/web.toml /etc/
   sha256sum "$file" >> "$config_digests"
 done
 mkdir -p /var/lib/liner-notes /var/lib/liner-notes-link
-printf 'retain-me\n' > /var/lib/liner-notes/package-removal-test
+printf 'keep\n' > /var/lib/liner-notes/package-removal-test
 printf 'CI-ONLY-SYNTHETIC-LINK-KEY\n' > /var/lib/liner-notes-link/ci-link-key
 chmod 0600 /var/lib/liner-notes-link/ci-link-key
 sha256sum /var/lib/liner-notes-link/ci-link-key >> "$config_digests"
@@ -63,7 +63,7 @@ for package in "${packages[@]}"; do
   test "$(dpkg-query -W -f='${Version}' "$package")" = 0.74-2
 done
 sha256sum -c "$config_digests"
-test "$(cat /var/lib/liner-notes/package-removal-test)" = retain-me
+test "$(cat /var/lib/liner-notes/package-removal-test)" = keep
 python3 - <<'PY'
 import sqlite3
 with sqlite3.connect('/var/lib/liner-notes/ci-package-upgrade.sqlite') as db:
