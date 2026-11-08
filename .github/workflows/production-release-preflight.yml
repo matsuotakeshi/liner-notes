@@ -1,0 +1,74 @@
+name: Production Release Preflight (read only)
+
+# Release admission check only. This workflow never installs a package or
+# restarts a service. Deployment requires a separate implementation and review.
+on:
+  workflow_dispatch:
+    inputs:
+      commit_sha:
+        description: 'Full 40-character SHA to release (must equal main HEAD)'
+        required: true
+        type: string
+
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: liner-notes-production-release
+  cancel-in-progress: false
+
+jobs:
+  preflight:
+    name: Confirm test results and production SSH readiness
+    runs-on: ubuntu-24.04
+    environment: production-release
+    timeout-minutes: 10
+    steps:
+      - name: Checkout release revision
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Verify exact commit and required GitHub checks
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_SHA: ${{ inputs.commit_sha }}
+        run: |
+          set -euo pipefail
+          if [[ "$GITHUB_REF" != "refs/heads/main" ]]; then
+            echo "::error::Production release preflight runs on main only"
+            exit 1
+          fi
+          if [[ ! "$RELEASE_SHA" =~ ^[0-9a-f]{40}$ ]]; then
+            echo "::error::commit_sha must be a lowercase 40-character SHA"
+            exit 1
+          fi
+          if [[ "$RELEASE_SHA" != "$(git rev-parse HEAD)" ]]; then
+            echo "::error::Only the exact current main HEAD can be promoted"
+            exit 1
+          fi
+
+          ci_json="$(gh api "repos/$GITHUB_REPOSITORY/actions/workflows/multi-os-ci.yml/runs?head_sha=$RELEASE_SHA&per_page=100")"
+          if ! jq -e --arg sha "$RELEASE_SHA" '
+            any(.workflow_runs[];
+              .head_sha == $sha and .head_branch == "main"
+              and .event == "push" and .conclusion == "success")
+          ' <<< "$ci_json" >/dev/null; then
+            echo "::error::No successful main push Multi-OS Native CI for this SHA"
+            exit 1
+          fi
+
+          connectivity_json="$(gh api "repos/$GITHUB_REPOSITORY/actions/workflows/production-ssh-smoke.yml/runs?head_sha=$RELEASE_SHA&per_page=100")"
+          if ! jq -e --arg sha "$RELEASE_SHA" '
+            any(.workflow_runs[];
+              .head_sha == $sha and .head_branch == "main"
+              and .event == "workflow_dispatch" and .conclusion == "success")
+          ' <<< "$connectivity_json" >/dev/null; then
+            echo "::error::Run Production SSH Connectivity Test successfully on this SHA before release"
+            exit 1
+          fi
+
+          echo "PASS: exact main revision has 3-OS native CI success and production SSH connectivity success."
+          echo "READ ONLY: This preflight did not install software, change a server, or restart a service."
