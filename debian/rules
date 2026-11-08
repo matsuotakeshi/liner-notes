@@ -1,0 +1,31 @@
+#!/usr/bin/make -f
+export DEB_BUILD_MAINT_OPTIONS = hardening=+all
+# The existing rebuildable SQLite cache signature intentionally uses __DATE__
+# and __TIME__ to invalidate caches between native builds. Debian adds
+# -Wdate-time, which conflicts with the upstream strict -Werror policy.
+# Strip this ONE warning until the source-level cache ABI is refactored.
+export CPPFLAGS := $(filter-out -Wdate-time,$(CPPFLAGS))
+
+%:
+	dh $@
+
+override_dh_auto_build:
+	$(MAKE) -j2 CC=clang SQLITE_CFLAGS= SQLITE_LIBS=-lsqlite3
+
+override_dh_auto_test:
+	$(MAKE) CC=clang SQLITE_CFLAGS= SQLITE_LIBS=-lsqlite3 test-chat
+	./test-chat
+
+override_dh_auto_install:
+	python3 scripts/install-linux.py --destdir=$(CURDIR)/debian/tmp --prefix=/usr --python=/usr/bin/python3 --unitdir=/usr/lib/systemd/system
+	python3 linux/rpm/optional.py $(CURDIR)/debian/tmp /usr/bin/python3
+	python3 linux/deb/manifest.py $(CURDIR)/debian/tmp
+
+# No package-triggered service activation or restart.
+override_dh_installsystemd:
+	dh_installsystemd --no-start --no-enable --no-stop-on-upgrade
+
+# Debian 13's dwz cannot read Clang's DWARF5 .debug_addr sections.
+# dh_strip still handles binaries; this optional size optimization is skipped.
+override_dh_dwz:
+	@echo "Skipping optional dwz compression for Clang DWARF5"

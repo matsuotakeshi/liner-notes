@@ -1,0 +1,106 @@
+name: Rocky 10 Package CI
+
+# GitHub-hosted and isolated. No CI LAN SSH keys or production credentials.
+on:
+  pull_request:
+    paths:
+      - "linux/rpm/**"
+      - "ci/test-rocky-package-upgrade.sh"
+      - "scripts/build-rpm.py"
+      - "scripts/release_manifest.py"
+      - "tests/test_release_manifest.py"
+      - "src/**"
+      - "Makefile"
+      - ".github/workflows/rocky-package.yml"
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build-rpm:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 50
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Test candidate artifact integrity checks
+        run: python3 tests/test_release_manifest.py
+      - name: Generate the canonical offline manual
+        shell: bash
+        run: |
+          python3 -m venv "$RUNNER_TEMP/manual-venv"
+          "$RUNNER_TEMP/manual-venv/bin/pip" install -r scripts/manual/requirements.txt
+          "$RUNNER_TEMP/manual-venv/bin/python" scripts/manual/build.py docs/book
+          "$RUNNER_TEMP/manual-venv/bin/python" scripts/manual/check.py docs/book
+      - name: Fix source inputs to the exact checkout
+        shell: bash
+        run: |
+          set -euo pipefail
+          { git ls-files; find docs/book -type f; } | LC_ALL=C sort -u > SOURCE-MANIFEST
+      - name: Build 3 RPMs inside disposable Rocky Linux 10
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/rpm-artifacts"
+          docker run --rm \
+            -e "SOURCE_SHA=$GITHUB_SHA" \
+            -v "$GITHUB_WORKSPACE:/source:ro" \
+            -v "$RUNNER_TEMP/rpm-artifacts:/out" \
+            rockylinux/rockylinux:10 bash -euc '
+              dnf install -y --setopt=install_weak_deps=False \
+                python3 clang make openssl-devel sqlite-devel \
+                rpm-build systemd-rpm-macros tar gzip
+              mkdir -p /build/liner-notes
+              cp -a /source/. /build/liner-notes/
+              cd /build/liner-notes
+              python3 scripts/build-rpm.py /build/rpm-work
+              declare -A packages=()
+              while IFS= read -r -d "" rpmfile; do
+                name="$(rpm -qp --qf "%{NAME}" "$rpmfile")"
+                case "$name" in
+                  liner-notes|liner-notes-web|liner-notes-link)
+                    if [[ -n "${packages[$name]:-}" ]]; then
+                      echo "Duplicate package: $name" >&2; exit 1
+                    fi
+                    cp "$rpmfile" "/out/$(basename "$rpmfile")"
+                    packages[$name]="$(basename "$rpmfile")"
+                    ;;
+                esac
+              done < <(find /build/rpm-work/RPMS -type f -name "*.rpm" -print0)
+              test "${#packages[@]}" -eq 3
+              for name in liner-notes liner-notes-web liner-notes-link; do
+                test -s "/out/${packages[$name]}"
+                rpm -qp --scripts "/out/${packages[$name]}" >/dev/null
+              done
+              python3 scripts/release_manifest.py create \
+                --platform rocky10 --version 0.74.1-1 --source-sha "$SOURCE_SHA" \
+                --directory /out \
+                --package "liner-notes=${packages[liner-notes]}" \
+                --package "liner-notes-web=${packages[liner-notes-web]}" \
+                --package "liner-notes-link=${packages[liner-notes-link]}"
+              python3 scripts/release_manifest.py verify \
+                --platform rocky10 --source-sha "$SOURCE_SHA" \
+                --manifest /out/RELEASE-MANIFEST.json
+              # The second revision is built and tested only in this container;
+              # never upload its artifacts as release candidates.
+              CI_DISPOSABLE_ROCKY=1 bash /build/liner-notes/ci/test-rocky-package-upgrade.sh
+              cd /out
+              sha256sum -- *.rpm > SHA256SUMS
+              sha256sum -c SHA256SUMS
+              printf "source_sha=%s\nbase=rockylinux:10\n" "$SOURCE_SHA" > BUILD-INFO.txt
+            '
+      - name: Upload inspected RPM candidates (not a release)
+        uses: actions/upload-artifact@v4
+        with:
+          name: liner-notes-rocky10-packages
+          path: |
+            ${{ runner.temp }}/rpm-artifacts/*.rpm
+            ${{ runner.temp }}/rpm-artifacts/SHA256SUMS
+            ${{ runner.temp }}/rpm-artifacts/RELEASE-MANIFEST.json
+            ${{ runner.temp }}/rpm-artifacts/BUILD-INFO.txt
+          if-no-files-found: error
+          retention-days: 14

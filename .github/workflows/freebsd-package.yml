@@ -1,0 +1,87 @@
+name: FreeBSD 15 Package CI
+
+# Never execute untrusted pull_request code on the home CI LAN.
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: liner-notes-freebsd-package
+  cancel-in-progress: false
+
+jobs:
+  package:
+    if: "${{ github.ref == 'refs/heads/main' }}"
+    runs-on: [self-hosted, Linux, X64]
+    timeout-minutes: 60
+    steps:
+      - name: Checkout exact trusted main commit
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Generate the canonical offline manual
+        shell: bash
+        run: |
+          python3 -m venv "$RUNNER_TEMP/manual-venv"
+          "$RUNNER_TEMP/manual-venv/bin/pip" install -r scripts/manual/requirements.txt
+          "$RUNNER_TEMP/manual-venv/bin/python" scripts/manual/build.py docs/book
+          "$RUNNER_TEMP/manual-venv/bin/python" scripts/manual/check.py docs/book
+      - name: Archive only tracked files from the committed revision
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          git archive --format=tar HEAD > "$RUNNER_TEMP/freebsd-source.tar"
+          tar -rf "$RUNNER_TEMP/freebsd-source.tar" docs/book
+          gzip -n < "$RUNNER_TEMP/freebsd-source.tar" > "$RUNNER_TEMP/freebsd-source.tar.gz"
+          test -s "$RUNNER_TEMP/freebsd-source.tar.gz"
+          tar -tzf "$RUNNER_TEMP/freebsd-source.tar.gz" | grep -Fx "ports/comms/liner-notes/Makefile" > /dev/null
+          sha256sum "$RUNNER_TEMP/freebsd-source.tar.gz"
+      - name: Build and inspect pkg on FreeBSD CI host
+        shell: bash
+        run: |
+          set -euo pipefail
+          src="$RUNNER_TEMP/freebsd-source.tar.gz"
+          source_hash="$(sha256sum "$src" | cut -d' ' -f1)"
+          SSH=(
+            ssh -i /home/ci/.ssh/id_ed25519_freebsd_ci
+            -o IdentitiesOnly=yes -o BatchMode=yes
+            -o PasswordAuthentication=no -o StrictHostKeyChecking=yes
+            -o ConnectTimeout=10
+          )
+          remote_dir="$("${SSH[@]}" takeshi@10.0.0.50 \
+            'set -eu; mkdir -p "$HOME/ci"; umask 077; mktemp -d "$HOME/ci/freebsd-pkg-XXXXXXXX"')"
+          case "$remote_dir" in
+            /*/ci/freebsd-pkg-*) ;;
+            *) echo "::error::Unexpected FreeBSD build directory"; exit 1 ;;
+          esac
+          scp -i /home/ci/.ssh/id_ed25519_freebsd_ci \
+            -o IdentitiesOnly=yes -o BatchMode=yes \
+            -o PasswordAuthentication=no -o StrictHostKeyChecking=yes \
+            "$src" "takeshi@10.0.0.50:$remote_dir/source.tar.gz"
+          "${SSH[@]}" takeshi@10.0.0.50 \
+            "sh -s -- '$remote_dir' '$GITHUB_SHA' '$source_hash'" < ci/build-freebsd-package.sh
+          mkdir -p "$RUNNER_TEMP/freebsd-pkg-artifacts"
+          "${SSH[@]}" takeshi@10.0.0.50 \
+            "tar -czf - -C '$remote_dir/artifacts' ." > "$RUNNER_TEMP/freebsd-artifacts.tar.gz"
+          tar -xzf "$RUNNER_TEMP/freebsd-artifacts.tar.gz" -C "$RUNNER_TEMP/freebsd-pkg-artifacts"
+          python3 scripts/release_manifest.py verify \
+            --platform freebsd15 --source-sha "$GITHUB_SHA" \
+            --manifest "$RUNNER_TEMP/freebsd-pkg-artifacts/RELEASE-MANIFEST.json"
+          test -f "$RUNNER_TEMP/freebsd-pkg-artifacts/SHA256SUMS"
+          echo "FreeBSD candidate created; no installation or production updates."
+      - name: Upload FreeBSD candidate pkg and checksums
+        uses: actions/upload-artifact@v4
+        with:
+          name: liner-notes-freebsd15-packages
+          path: |
+            ${{ runner.temp }}/freebsd-pkg-artifacts/*.pkg
+            ${{ runner.temp }}/freebsd-pkg-artifacts/RELEASE-MANIFEST.json
+            ${{ runner.temp }}/freebsd-pkg-artifacts/SHA256SUMS
+            ${{ runner.temp }}/freebsd-pkg-artifacts/BUILD-INFO.txt
+          if-no-files-found: error
+          retention-days: 14

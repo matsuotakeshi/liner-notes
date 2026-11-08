@@ -421,3 +421,5 @@ bin/liner-notes-serial
 %%PORTDOCS%%%%DOCSDIR%%/manual/ZRESUME_FIX.md
 %%PORTDOCS%%%%DOCSDIR%%/manual/ZUPLOAD_FIX.html
 %%PORTDOCS%%%%DOCSDIR%%/manual/ZUPLOAD_FIX.md
+%%DATADIR%%/scripts/release_manifest.py
+%%DATADIR%%/scripts/verify_release_set.py

@@ -12,6 +12,8 @@ HELPとマニュアルを訂正した修正版です。既存DBの変換、ボ�
 
 Linuxのソース導入でも、旧 `.sample` と同じ内容のHELPは更新します。編集済み、または比較用の旧sampleがない既存HELPは保持します。新しいマニュアルの入口はFreeBSDで `/usr/local/share/doc/liner-notes/index.html`、RPMで `/usr/share/doc/liner-notes/index.html` です。Gitから直接ソース導入する場合はHTML未生成なら `index.md` を使用します。
 
+FreeBSDで `pkg add -f` のみを実行すると、古い既定HELPが残る場合があります。下記の削除・導入手順を使用します。パッケージのoriginが `comms/liner-notes` で一致すること、依存・ABIが合うことを先に確認し、誤ったoriginの候補を強制導入しないでください。
+
 以下の停止・バックアップ・更新手順に従ってください。サービスや利用者データを自動的に初期化する処理はありません。
 
 更新前に利用者へ停止を案内してください。ゲームの初期化や既存DBの形式変更は不要です。

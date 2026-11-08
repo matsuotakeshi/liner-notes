@@ -1,0 +1,81 @@
+
+name: Ubuntu Build and Test
+
+on:
+  workflow_dispatch:
+  workflow_call:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ubuntu-build-test
+  cancel-in-progress: false
+
+jobs:
+  test:
+    name: Ubuntu Native Tests
+    runs-on: [self-hosted, Linux, X64]
+    timeout-minutes: 60
+
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v7
+
+      - name: Transfer clean source
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          SSH=(
+            ssh
+            -i /home/ci/.ssh/id_ed25519_ubuntu_ci
+            -o BatchMode=yes
+            -o StrictHostKeyChecking=yes
+            -o ConnectTimeout=10
+          )
+
+          "${SSH[@]}" ci-test@10.0.0.53 \
+            'mkdir -p "$HOME/ci";
+             rm -rf "$HOME/ci/liner-notes";
+             mkdir -p "$HOME/ci/liner-notes"'
+
+          tar --exclude=.git -czf - \
+            -C "$GITHUB_WORKSPACE" . |
+            "${SSH[@]}" ci-test@10.0.0.53 \
+            'tar -xzf - -C "$HOME/ci/liner-notes"'
+
+      - name: Verify Ubuntu environment
+        shell: bash
+        run: |
+          ssh \
+            -i /home/ci/.ssh/id_ed25519_ubuntu_ci \
+            -o BatchMode=yes \
+            -o StrictHostKeyChecking=yes \
+            ci-test@10.0.0.53 \
+            'cat /etc/os-release;
+             python3 --version;
+             clang --version;
+             free -h'
+
+      - name: Build and run regression tests
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          ssh \
+            -i /home/ci/.ssh/id_ed25519_ubuntu_ci \
+            -o BatchMode=yes \
+            -o StrictHostKeyChecking=yes \
+            ci-test@10.0.0.53 \
+            'set -eu
+             cd "$HOME/ci/liner-notes"
+             export LINER_TEST_START_TIMEOUT=180
+             make -j2 CC=clang PYTHON=python3 \
+               SQLITE_CFLAGS= SQLITE_LIBS=-lsqlite3
+             make CC=clang PYTHON=python3 \
+               SQLITE_CFLAGS= SQLITE_LIBS=-lsqlite3 check'
+
+      - name: Test completed
+        run: |
+          echo "Ubuntu build and regression tests: PASS"

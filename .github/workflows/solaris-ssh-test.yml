@@ -1,0 +1,30 @@
+
+name: Solaris SSH Test
+
+on:
+  workflow_dispatch:
+  workflow_call:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: Solaris Remote Test
+    runs-on: [self-hosted, Linux, X64]
+    timeout-minutes: 5
+
+    steps:
+      - name: Check Solaris
+        run: |
+          ssh \
+            -i /home/ci/.ssh/id_ed25519_solaris_ci \
+            -o BatchMode=yes \
+            -o StrictHostKeyChecking=yes \
+            -o ConnectTimeout=10 \
+            ci-test@10.0.0.52 \
+            'uname -a; cat /etc/release; id'
+
+      - name: Test result
+        run: |
+          echo "Solaris SSH: OK"

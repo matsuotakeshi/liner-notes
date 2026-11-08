@@ -1,0 +1,93 @@
+name: Production Release Preflight (read only)
+
+# Release admission check only. This workflow never installs a package or
+# restarts a service. Deployment requires a separate implementation and review.
+on:
+  workflow_dispatch:
+    inputs:
+      commit_sha:
+        description: 'Full 40-character SHA to release (must equal main HEAD)'
+        required: true
+        type: string
+
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: liner-notes-production-release
+  cancel-in-progress: false
+
+jobs:
+  preflight:
+    name: Confirm test results and production SSH readiness
+    runs-on: ubuntu-24.04
+    environment: production-release
+    timeout-minutes: 10
+    steps:
+      - name: Checkout release revision
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Verify exact commit and required GitHub checks
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_SHA: ${{ inputs.commit_sha }}
+        run: |
+          set -euo pipefail
+          if [[ "$GITHUB_REF" != "refs/heads/main" ]]; then
+            echo "::error::Production release preflight runs on main only"
+            exit 1
+          fi
+          if [[ ! "$RELEASE_SHA" =~ ^[0-9a-f]{40}$ ]]; then
+            echo "::error::commit_sha must be a lowercase 40-character SHA"
+            exit 1
+          fi
+          if [[ "$RELEASE_SHA" != "$(git rev-parse HEAD)" ]]; then
+            echo "::error::Only the exact current main HEAD can be promoted"
+            exit 1
+          fi
+
+          # Refuse a dispatch that was queued before main moved.
+          assert_current_main() {
+            local current
+            current="$(gh api "repos/$GITHUB_REPOSITORY/git/ref/heads/main" --jq '.object.sha')"
+            if [[ "$current" != "$RELEASE_SHA" ]]; then
+              echo "::error::Main moved; only its current HEAD is eligible"
+              exit 1
+            fi
+          }
+          assert_current_main
+
+          evidence="$(mktemp -d "$RUNNER_TEMP/ln-release-admission.XXXXXXXX")"
+          trap 'rm -rf "$evidence"' EXIT
+          fetch_runs() {
+            local label="$1" workflow="$2"
+            gh api "repos/$GITHUB_REPOSITORY/actions/workflows/$workflow/runs?head_sha=$RELEASE_SHA&per_page=100" > "$evidence/$label.json"
+          }
+          fetch_runs native multi-os-ci.yml
+          fetch_runs freebsd freebsd-package.yml
+          fetch_runs rocky rocky-package.yml
+          fetch_runs debian debian-package.yml
+          fetch_runs release_set release-set.yml
+          fetch_runs connectivity production-ssh-smoke.yml
+
+          release_set_run_id="$(python3 ci/release_admission.py gates \
+            --source-sha "$RELEASE_SHA" \
+            --native-json "$evidence/native.json" \
+            --freebsd-json "$evidence/freebsd.json" \
+            --rocky-json "$evidence/rocky.json" \
+            --debian-json "$evidence/debian.json" \
+            --release-set-json "$evidence/release_set.json" \
+            --connectivity-json "$evidence/connectivity.json")"
+          gh api "repos/$GITHUB_REPOSITORY/actions/runs/$release_set_run_id/artifacts?per_page=100" > "$evidence/artifacts.json"
+          python3 ci/release_admission.py receipt \
+            --source-sha "$RELEASE_SHA" \
+            --run-id "$release_set_run_id" \
+            --artifacts-json "$evidence/artifacts.json"
+          assert_current_main
+
+          echo "PASS: exact main revision has native CI, pkg/RPM/DEB, verified release receipt and SSH connectivity evidence."
+          echo "READ ONLY: not a deployment, backup or restore authorization; no server changes or restarts."

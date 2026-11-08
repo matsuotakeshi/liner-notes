@@ -169,3 +169,20 @@ sudo /opt/liner-notes-link-python/bin/pip install -r link-requirements.txt
 に置き換えます。設定は `/etc/liner-notes/link.toml`、保存先は
 `/var/lib/liner-notes-link` 等を使います。鍵・接続先を設定する前に自動起動しません。
 システム標準Pythonへ追加パッケージを入れる必要はありません。
+
+
+## Debian 13向けパッケージ（検証用）
+
+Debian 13（trixie）amd64用に、本体・Web・リンクの3パッケージを生成できます。配置はRPMと同じ `/usr`、`/etc/liner-notes`、`/var/lib/liner-notes` です。Webには `python3-aiohttp >= 3.11`、リンクには `python3-cryptography >= 43` が必要です。Debian 12やUbuntuへの同一DEBの流用は検証していません。
+
+使い捨てのDebian 13環境で次を実行します。
+
+```sh
+apt-get update
+apt-get install -y build-essential debhelper clang libssl-dev libsqlite3-dev python3
+dpkg-buildpackage -b -us -uc
+```
+
+設定はconffileとして保持し、会員データや鍵をパッケージへ含めません。パッケージ処理でサービスを自動起動・停止・再起動しません。既存データの初期化も行いません。Gitのソースだけから生成する場合はMarkdown版マニュアルが入り、HTML生成済みの配布ソース・CI候補ではHTMLも同梱します。
+
+CIの同一ソースによるパッケージリビジョン更新試験は、設定・合成SQLiteデータ・ダミー鍵の保持確認です。旧版からの実データ移行、動作中サービスの無停止更新、バックアップからの復旧を保証するものではありません。DEBは検証候補として扱い、本番更新は別途判断してください。

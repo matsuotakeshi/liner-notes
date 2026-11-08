@@ -6373,6 +6373,78 @@
           "section_sha256": "e7ffa53580ff3ac689f71e9b45bc6c003554bf42ac2401c7c2341f55e1fdfc10"
         }
       ]
+    },
+    {
+      "source": "CI_CD.md",
+      "archive": "docs/development/release-ci/CI_CD.md",
+      "sha256": "25df61c1304445b7642bf5c06d005199d5b08a16bbbfcfa28c5772c9281aa2e8",
+      "destinations": [
+        "upgrade"
+      ],
+      "sections": [
+        {
+          "heading": "全体",
+          "destinations": [
+            "upgrade"
+          ],
+          "disposition": "導入上の制約を統合。CI実行手順と候補検証は開発資料として保管",
+          "section_sha256": "25df61c1304445b7642bf5c06d005199d5b08a16bbbfcfa28c5772c9281aa2e8"
+        }
+      ]
+    },
+    {
+      "source": "DEB.md",
+      "archive": "docs/development/release-ci/DEB.md",
+      "sha256": "4f0f41779129e406485d2712789c7d626c9fccb8adbddac977ccc76d0cd7bc74",
+      "destinations": [
+        "install-linux"
+      ],
+      "sections": [
+        {
+          "heading": "全体",
+          "destinations": [
+            "install-linux"
+          ],
+          "disposition": "導入上の制約を統合。CI実行手順と候補検証は開発資料として保管",
+          "section_sha256": "4f0f41779129e406485d2712789c7d626c9fccb8adbddac977ccc76d0cd7bc74"
+        }
+      ]
+    },
+    {
+      "source": "RELEASE_CANDIDATE.md",
+      "archive": "docs/development/release-ci/RELEASE_CANDIDATE.md",
+      "sha256": "ae829ca7a9c17989525cc4fdadb9d045dae4c73889ae59701f463f3dafdfc6a3",
+      "destinations": [
+        "upgrade"
+      ],
+      "sections": [
+        {
+          "heading": "全体",
+          "destinations": [
+            "upgrade"
+          ],
+          "disposition": "導入上の制約を統合。CI実行手順と候補検証は開発資料として保管",
+          "section_sha256": "ae829ca7a9c17989525cc4fdadb9d045dae4c73889ae59701f463f3dafdfc6a3"
+        }
+      ]
+    },
+    {
+      "source": "RELEASE_SET.md",
+      "archive": "docs/development/release-ci/RELEASE_SET.md",
+      "sha256": "747e2b7941eb41a8167e6a69c75d778865398ec336a3e470e74ddcce01676b27",
+      "destinations": [
+        "upgrade"
+      ],
+      "sections": [
+        {
+          "heading": "全体",
+          "destinations": [
+            "upgrade"
+          ],
+          "disposition": "導入上の制約を統合。CI実行手順と候補検証は開発資料として保管",
+          "section_sha256": "747e2b7941eb41a8167e6a69c75d778865398ec336a3e470e74ddcce01676b27"
+        }
+      ]
     }
   ],
   "help_topics": {

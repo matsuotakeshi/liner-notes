@@ -15,6 +15,8 @@ HyperNotes型のツリー掲示板、会員間メール、チャット、ファ�
 
 ## 開発
 
+[CI/CDとリリース検証](CI_CD.md)も参照してください。
+
 Cのビルドは `make`、回帰試験は `make check`。OS別の依存と配置は統合マニュアルを参照してください。マニュアルの生成・検証・今後の更新規則は [docs/CONTRIBUTING.md](docs/CONTRIBUTING.md) にあります。
 
 [変更履歴](CHANGELOG.md)、[開発アーカイブ・統合対応表](docs/development/manual-consolidation/MAPPING.md)、既存の `evidence/` は開発資料です。

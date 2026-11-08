@@ -90,3 +90,7 @@
 | `ZMODEM_MENU.md` | [transfers](../../manual/transfers.md), [files](../../manual/files.md) | 現行情報を統合、原文は開発アーカイブ |
 | `ZRESUME_FIX.md` | [transfers](../../manual/transfers.md), [troubleshooting](../../manual/troubleshooting.md), [install-freebsd](../../manual/install-freebsd.md), [upgrade](../../manual/upgrade.md), [transfer-admin](../../manual/transfer-admin.md) | 現行情報を統合、原文は開発アーカイブ |
 | `ZUPLOAD_FIX.md` | [transfers](../../manual/transfers.md), [transfer-admin](../../manual/transfer-admin.md), [install-freebsd](../../manual/install-freebsd.md), [upgrade](../../manual/upgrade.md) | 現行情報を統合、原文は開発アーカイブ |
+
+## 2026-11-09 統合追加
+
+CI_CD.md / RELEASE_CANDIDATE.md / RELEASE_SET.md は開発用CI資料として `docs/development/release-ci/` に保管。誤ったoriginのpkgを導入しない制約は更新章へ統合。DEB.md のパッケージ構成・依存・非自動起動・検証範囲はLinux導入章へ統合。RPM.md の新しいCIリビジョン試験記録も開発資料へ保管しました。

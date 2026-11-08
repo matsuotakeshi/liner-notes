@@ -1,0 +1,92 @@
+name: Production SSH Connectivity Test
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: production-ssh-connectivity
+  cancel-in-progress: false
+
+jobs:
+  connectivity:
+    name: Read-only SSH checks (3 VPS)
+    if: "${{ github.ref == 'refs/heads/main' }}"
+    runs-on: ubuntu-24.04
+    environment: production
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout host key pins
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - name: Verify production SSH access
+        shell: bash
+        env:
+          DEPLOY_SSH_KEY: ${{ secrets.ID_ED25519_LN_DEPLOY }}
+          FREEBSD_HOST: ${{ vars.LN_VPS_FREEBSD_HOST }}
+          ROCKY_HOST: ${{ vars.LN_VPS_ROCKY_HOST }}
+          DEBIAN_HOST: ${{ vars.LN_VPS_DEBIAN_HOST }}
+        run: |
+          set -euo pipefail
+          umask 077
+
+          key_file="$(mktemp "$RUNNER_TEMP/ln-deploy-key.XXXXXX")"
+          known_hosts_file="$GITHUB_WORKSPACE/.github/ssh/production_known_hosts"
+          trap 'rm -f "$key_file"' EXIT
+
+          printf '%s\n' "$DEPLOY_SSH_KEY" | tr -d '\r' > "$key_file"
+          unset DEPLOY_SSH_KEY
+
+          test -s "$key_file" || { echo "Missing ID_ED25519_LN_DEPLOY secret" >&2; exit 1; }
+          test -s "$known_hosts_file" || { echo "Missing checked-in host key file" >&2; exit 1; }
+          ssh-keygen -y -P '' -f "$key_file" >/dev/null || {
+            echo "Invalid or passphrase-protected SSH key" >&2
+            exit 1
+          }
+
+          # Validate checked-in public host keys; do not fetch untrusted keys at runtime.
+          if ! awk '$2 == "ssh-ed25519" && $3 ~ /^AAAA/ { valid=1 } END { exit !valid }' "$known_hosts_file"; then
+            echo "::error::Checked-in known_hosts file has no valid ED25519 host key" >&2
+            exit 1
+          fi
+
+          for host in "$FREEBSD_HOST" "$ROCKY_HOST" "$DEBIAN_HOST"; do
+            [[ -n "$host" ]] || { echo "::error::A production host variable is empty" >&2; exit 1; }
+            if ! ssh-keygen -F "$host" -f "$known_hosts_file" >/dev/null 2>&1; then
+              echo "::error::No known_hosts entry matches the configured host: $host" >&2
+              echo "Host labels in checked-in known_hosts (no keys shown):"
+              awk '$2 == "ssh-ed25519" { print "  " $1 }' "$known_hosts_file" | head -20
+              exit 1
+            fi
+          done
+
+          check_host() {
+            local label="$1" host="$2" target="$3"
+            if [[ -z "$host" ]]; then
+              echo "Missing production environment variable for $label" >&2
+              exit 1
+            fi
+            echo "::group::$label read-only SSH check"
+            ssh -T \
+              -i "$key_file" \
+              -o IdentitiesOnly=yes \
+              -o BatchMode=yes \
+              -o PasswordAuthentication=no \
+              -o KbdInteractiveAuthentication=no \
+              -o StrictHostKeyChecking=yes \
+              -o "UserKnownHostsFile=$known_hosts_file" \
+              -o ConnectTimeout=10 \
+              "ln-deploy@$host" \
+              "sh -s -- $target" < "$GITHUB_WORKSPACE/ci/production-os-check.sh"
+            echo "::endgroup::"
+          }
+
+          check_host "FreeBSD" "$FREEBSD_HOST" freebsd15
+          check_host "Rocky Linux" "$ROCKY_HOST" rocky10
+          check_host "Debian" "$DEBIAN_HOST" debian13
+          echo "PASS: SSH access to all 3 production VPS"

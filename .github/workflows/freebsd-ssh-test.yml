@@ -1,0 +1,30 @@
+
+name: FreeBSD SSH Test
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: FreeBSD Remote Test
+    runs-on: [self-hosted, Linux, X64]
+    timeout-minutes: 5
+
+    steps:
+      - name: Verify CI user
+        run: |
+          whoami
+          hostname
+
+      - name: Check FreeBSD
+        run: |
+          ssh \
+            -i /home/ci/.ssh/id_ed25519_freebsd_ci \
+            -o BatchMode=yes \
+            -o StrictHostKeyChecking=yes \
+            -o ConnectTimeout=10 \
+            takeshi@10.0.0.50 \
+            'uname -a; freebsd-version; id'
