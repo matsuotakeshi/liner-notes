@@ -73,5 +73,22 @@ class ManifestTests(unittest.TestCase):
                                          platform="rocky10", version="0.74-1", source_sha=SOURCE))
 
 
+    def test_freebsd_candidate_round_trip(self):
+        with tempfile.TemporaryDirectory() as folder:
+            directory = Path(folder)
+            package = "liner-notes-0.74.pkg"
+            (directory / package).write_bytes(b"mock-freebsd-pkg")
+            rm.create(argparse.Namespace(platform="freebsd15", version="0.74",
+                                         source_sha=SOURCE, directory=str(directory),
+                                         package=["liner-notes=" + package]))
+            checked = argparse.Namespace(
+                manifest=str(directory / "RELEASE-MANIFEST.json"),
+                platform="freebsd15", version="0.74", source_sha=SOURCE)
+            rm.verify(checked)
+            (directory / package).write_bytes(b"changed-pkg")
+            with self.assertRaises(ValueError):
+                rm.verify(checked)
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)
