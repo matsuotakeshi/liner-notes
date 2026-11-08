@@ -1,6 +1,6 @@
 #!/bin/sh
 # Build a FreeBSD 15/amd64 release-candidate pkg in a unique, unprivileged CI
-# directory from the exact GitHub checkout archive. No installation or reboot.
+# directory from the exact GitHub checkout archive. No host installation or reboot.
 set -eu
 
 if [ "$#" -ne 3 ]; then

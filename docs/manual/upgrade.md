@@ -47,6 +47,8 @@ probeはlocalhostへの送受信で、任意のroot shellコマンドではあ�
 さらに使い捨てコピー上のBBSを非root・loopbackで起動してlogin/article/mailを確認します。外部のゲームdaemon等が
 まだデータを書いている場合は停止し、ゲーム側の整合バックアップ手順を先に設計します。別ホストの専用backup
 receiverへ転送し、保管後hashが一致するまでpackage更新を開始しません。
+backup識別子は局名・release ID・SHAで区別します。転送先SSH host keyに加え、OS machine IDの
+SHA-256も固定して照合し、同じ局への「ホスト外バックアップ」を拒否します。
 backup receiverはprivate directory `/var/lib/liner-notes-release-backups` を使い、
 専用SSHアカウントには `deploy_backup_store.py` のみを実行可能にします。
 ゲーム外部データ、秘密鍵、証明書を含むバックアップをActions Artifactに保管しないでください。

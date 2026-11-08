@@ -42,7 +42,11 @@ def apply_host(release, authorization, target, adapter):
             require(old['manifest_sha256'] == fingerprint, 'Release identity already used with different content')
             require(old['result'] == 'healthy', 'Interrupted or failed deployment: planned restore/recovery required')
             adapter.health(release)
-            return dict(old, repeated=True)
+            now = datetime.datetime.now(datetime.timezone.utc).isoformat()
+            return dict(old, repeated=True, original_approval=old['approval'],
+                        approval=dict(run_id=authorization['run_id'], run_attempt=authorization['run_attempt'],
+                                      actor_id=authorization['actor_id']),
+                        original_finished_at=old.get('finished_at'), started_at=now, finished_at=now)
         state = dict(schema=1, release=release['tag'], source_sha=release['source_sha'],
                      target=target, manifest_sha256=fingerprint,
                      approval=dict(run_id=authorization['run_id'], run_attempt=authorization['run_attempt'],

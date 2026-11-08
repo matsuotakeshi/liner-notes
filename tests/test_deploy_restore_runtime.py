@@ -23,6 +23,7 @@ with tempfile.TemporaryDirectory(prefix='liner-cd-restore-ci-', dir='/var/tmp') 
     base = Path(temporary)
     data = base / 'original'
     data.mkdir()
+    (data / 'catalog').write_text('1|0|all|member|Restore test\n')
     options = ['--database-structured', str(data / 'liner.sqlite')]
     server = Server(str(binary), data / 'notes', members=data / 'members', catalog=data / 'catalog', options=options)
     clients = [Client(server.port) for _ in range(3)]

@@ -63,6 +63,20 @@ def successful_execution(jobs, step, minimum=1):
     require(len(executed) >= minimum and all(j.get('conclusion') == 'success' for j in executed), 'Required tests were not actually executed')
 
 
+def latest_full_run(document, sha, event, label):
+    """Allow an explicit full manual run after a documentation-only push.
+
+    Run/job/artifact provenance checks still apply; manual is not a substitute
+    for executing the required build/test steps on this exact main revision.
+    """
+    events = {event, 'workflow_dispatch'}
+    candidates = [r for r in document.get('workflow_runs', []) if r.get('head_sha') == sha
+                  and r.get('head_branch') == 'main' and r.get('event') in events]
+    require(candidates, 'No exact-main automatic/manual CI run')
+    latest = max(candidates, key=lambda r: (r.get('run_number', 0), r.get('run_attempt', 0), r.get('id', 0)))
+    return latest_successful_run(document, sha, latest['event'], label)
+
+
 def fresh_evidence(release):
     sha = release['source_sha']
     require(api(f'repos/{REPO}/git/ref/heads/main')['object']['sha'] == sha, 'Main moved; create a new exact-SHA release')
@@ -74,7 +88,7 @@ def fresh_evidence(release):
     evidence, artifacts = {}, {}
     for label, (workflow, event, step, artifact_name) in GATES.items():
         runs = api(f'repos/{REPO}/actions/workflows/{workflow}/runs?head_sha={sha}&per_page=100')
-        run_id = latest_successful_run(runs, sha, event, label)
+        run_id = latest_full_run(runs, sha, event, label)
         jobs = api(f'repos/{REPO}/actions/runs/{run_id}/jobs?filter=latest&per_page=100')
         successful_execution(jobs, step, 2 if label == 'linux' else 1)
         if label == 'deployment':
@@ -138,12 +152,43 @@ def transport(target, release_envelope, authorization_envelope, folder, key):
     return report
 
 
+def record_target(target, release, invoke, results, save):
+    try:
+        result = invoke()
+    except Exception:
+        result = {'target': target, 'source_sha': release['source_sha'], 'result': 'transport-or-admission-failed',
+                  'reason': 'inspect-private-host-state-before-resume',
+                  'finished_at': datetime.datetime.now(datetime.timezone.utc).isoformat()}
+    results.append(result)
+    save()
+    return result
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--release-id', type=int, required=True)
     parser.add_argument('--mode', choices=('plan', 'apply'), default='plan')
     parser.add_argument('--output', type=Path, required=True)
     args = parser.parse_args()
+    args.output.write_text(json.dumps({'mode': args.mode, 'release_id': args.release_id,
+                                      'source_sha': os.environ.get('GITHUB_SHA'), 'targets': list(TARGETS),
+                                      'run_id': os.environ.get('GITHUB_RUN_ID'),
+                                      'run_attempt': os.environ.get('GITHUB_RUN_ATTEMPT'),
+                                      'started_at': datetime.datetime.now(datetime.timezone.utc).isoformat(),
+                                      'result': 'checking-admission'}, indent=2) + '\n')
+    try:
+        execute(args)
+    except Exception:
+        report = json.loads(args.output.read_text())
+        report.update(result='rejected-or-stopped', reason='admission-integrity-or-host-operation-failed',
+                      finished_at=datetime.datetime.now(datetime.timezone.utc).isoformat())
+        completed = {r.get('target') for r in report.get('results', [])}
+        report['not_attempted_targets'] = [target for target in TARGETS if target not in completed]
+        args.output.write_text(json.dumps(report, indent=2) + '\n')
+        raise
+
+
+def execute(args):
     require(os.environ.get('GITHUB_REPOSITORY') == REPO and os.environ.get('GITHUB_REF') == 'refs/heads/main' and
             os.environ.get('GITHUB_EVENT_NAME') == 'workflow_dispatch', 'Trusted main dispatch required')
     run_id, attempt = int(os.environ['GITHUB_RUN_ID']), int(os.environ['GITHUB_RUN_ATTEMPT'])
@@ -183,22 +228,15 @@ def main():
         fresh_evidence(release)
         results = []
         def save_audit():
-            args.output.write_text(json.dumps({'release': release['tag'], 'source_sha': release['source_sha'],
+            args.output.write_text(json.dumps({'release': release['tag'], 'source_sha': release['source_sha'], 'targets': list(TARGETS),
                                               'package_hashes': {p: {n: i['sha256'] for n, i in packages.items()} for p, packages in release['platforms'].items()},
                                               'approval': {'run_id': run_id, 'run_attempt': attempt, 'actor_id': actor},
                                               'ci_runs': evidence, 'results': results}, indent=2) + '\n')
         save_audit()
         try:
             def apply(target, doc, approval):
-                try:
-                    result = transport(target, envelope, signed_auth, folder, key)
-                except Exception:
-                    result = {'target': target, 'source_sha': release['source_sha'], 'result': 'transport-or-admission-failed',
-                              'reason': 'inspect-private-host-state-before-resume',
-                              'finished_at': datetime.datetime.now(datetime.timezone.utc).isoformat()}
-                results.append(result)
-                save_audit()
-                return result
+                return record_target(target, release,
+                                     lambda: transport(target, envelope, signed_auth, folder, key), results, save_audit)
             rollout(release, auth, apply, dry_run=False)
         finally:
             key.unlink(missing_ok=True)

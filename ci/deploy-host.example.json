@@ -38,6 +38,7 @@
   "probes": {},
   "backup_sink": {
     "host": "backup.example.invalid",
+    "machine_id": "REPLACE_WITH_VERIFIED_BACKUP_HOST_MACHINE_ID_SHA256",
     "user": "ln-backup",
     "key": "/etc/liner-notes-deploy/backup-key",
     "known_hosts": "/etc/liner-notes-deploy/backup-known-hosts"

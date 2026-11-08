@@ -76,7 +76,7 @@ jobs:
             --platform freebsd15 --source-sha "$GITHUB_SHA" \
             --manifest "$RUNNER_TEMP/freebsd-pkg-artifacts/RELEASE-MANIFEST.json"
           test -f "$RUNNER_TEMP/freebsd-pkg-artifacts/SHA256SUMS"
-          echo "FreeBSD candidate created; no installation or production updates."
+          echo "FreeBSD candidate and private-root update checks; no host installation or production updates."
       - name: Upload FreeBSD candidate pkg and checksums
         uses: actions/upload-artifact@v4
         with:

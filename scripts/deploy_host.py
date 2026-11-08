@@ -18,7 +18,7 @@ import subprocess
 import sys
 import tarfile
 
-from deploy_policy import (PACKAGES, PLATFORMS, SERVICES, canonical, digest_file,
+from deploy_policy import (PACKAGES, PLATFORMS, SERVICES, HEX64, canonical, digest_file, machine_identity,
                            package_commands, require, service_command,
                            transaction_id, validate_authorization, validate_release, verify)
 from deploy_transaction import apply_host, atomic_json
@@ -221,9 +221,12 @@ class Host:
         sink = self.profile['backup_sink']
         require(re.fullmatch(r'[a-zA-Z0-9.-]+', sink['host']) and sink['host'] not in PLATFORMS,
                 'Backup destination must be a separate non-production host')
+        require(HEX64.fullmatch(sink['machine_id']) and sink['machine_id'] != machine_identity(),
+                'Backup destination must have a different pinned OS machine identity')
         require(re.fullmatch(r'[a-z_][a-z0-9_-]*', sink['user']), 'Invalid backup user')
         key, hosts = trusted(sink['key']), trusted(sink['known_hosts'])
-        request = json.dumps({'id': identity, 'sha256': checksum, 'size': archive.stat().st_size}, separators=(',', ':'))
+        backup_id = self.target + '-' + identity
+        request = json.dumps({'id': backup_id, 'sha256': checksum, 'size': archive.stat().st_size}, separators=(',', ':'))
         argv = ['/usr/bin/ssh', '-T', '-i', str(key), '-o', 'BatchMode=yes', '-o', 'IdentitiesOnly=yes',
                 '-o', 'StrictHostKeyChecking=yes', '-o', 'UserKnownHostsFile=' + str(hosts),
                 sink['user'] + '@' + sink['host'], '/usr/local/libexec/liner-notes-backup-store ' + shlex.quote(request)]
@@ -233,8 +236,9 @@ class Host:
             result = subprocess.run(argv, stdin=source, stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=3600)
         require(result.returncode == 0, 'Off-host backup transfer failed')
         received = json.loads(result.stdout)
-        require(received == {'id': identity, 'sha256': checksum, 'size': archive.stat().st_size}, 'Off-host backup verification failed')
-        return {'id': identity, 'sha256': checksum, 'restored': True, 'off_host_verified': True}
+        require(received == {'id': backup_id, 'sha256': checksum, 'size': archive.stat().st_size,
+                             'machine_id': sink['machine_id']}, 'Off-host backup verification failed')
+        return {'id': backup_id, 'sha256': checksum, 'restored': True, 'off_host_verified': True}
 
     def install(self, release):
         for argv in package_commands(self.platform, self.packages, self.stage):
@@ -278,8 +282,11 @@ def main():
         profile = json.loads(trusted(CONFIG).read_text())
         request = json.loads(sys.stdin.buffer.read(1024 * 1024))
         require(set(request) == {'release', 'authorization'}, 'Invalid deployment request')
-        release = validate_release(verify(request['release'], trusted(profile['release_public_key']).read_bytes()))
-        auth = verify(request['authorization'], trusted(profile['approval_public_key']).read_bytes())
+        release_key = trusted(profile['release_public_key']).read_bytes()
+        approval_key = trusted(profile['approval_public_key']).read_bytes()
+        require(release_key != approval_key, 'Release signing and deployment approval keys must be separate')
+        release = validate_release(verify(request['release'], release_key))
+        auth = verify(request['authorization'], approval_key)
         validate_authorization(auth, release, profile['target'])
         host = Host(profile)
         result = apply_host(release, auth, profile['target'], host)

@@ -94,6 +94,17 @@ def verify_application(restored, profile, trusted):
     try:
         data = temporary / 'data'
         shutil.copytree(source, data, symlinks=True)
+        catalog = None
+        if profile.get('catalog'):
+            original = Path(profile['catalog'])
+            require(original.is_absolute(), 'Restore catalog must have an absolute source path')
+            if original.is_relative_to(source_root):
+                catalog = data / original.relative_to(source_root)
+            else:
+                copied_config = restored / str(original).lstrip('/')
+                require(copied_config.is_file() and not copied_config.is_symlink(), 'Catalog was not included in the verified backup')
+                catalog = temporary / 'catalog.conf'
+                shutil.copyfile(copied_config, catalog)
         for path in [temporary, *temporary.rglob('*')]:
             require(not path.is_symlink() or path.resolve().is_relative_to(temporary), 'Restored application has an escaping symlink')
             os.chown(path, user.pw_uid, user.pw_gid, follow_symlinks=False)
@@ -106,7 +117,9 @@ def verify_application(restored, profile, trusted):
             port = reservation.getsockname()[1]
         argv = [str(executable), '--bind', '127.0.0.1',
                 '--database-structured' if profile['structured'] else '--database', mapped(profile['database']),
-                str(port), mapped(profile['board']), mapped(profile['members']), mapped(profile['catalog'])]
+                str(port), mapped(profile['board']), mapped(profile['members'])]
+        if catalog is not None:
+            argv.append(str(catalog))
         process = subprocess.Popen(argv, cwd=data, stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,
                                    stderr=subprocess.DEVNULL, start_new_session=True,
                                    user=user.pw_uid, group=user.pw_gid, extra_groups=[],

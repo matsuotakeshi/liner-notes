@@ -23,7 +23,7 @@ import deploy_policy as policy
 from deploy_transaction import apply_host, atomic_json, rollout
 from deploy_backup_store import receive
 from deploy_restore import health_probes
-from deploy_release import successful_execution
+from deploy_release import successful_execution, latest_full_run, main as controller_main, record_target
 from deploy_host import Host
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 from cryptography.hazmat.primitives.serialization import Encoding, PrivateFormat, PublicFormat, NoEncryption
@@ -93,7 +93,7 @@ class Fixture:
         data = (self.path / 'restored.sqlite').read_bytes()
         sink = self.path / 'offhost'
         sink.mkdir(mode=0o700)
-        meta = {'id': identity, 'sha256': hashlib.sha256(data).hexdigest(), 'size': len(data)}
+        meta = {'id': self.target + '-' + identity, 'sha256': hashlib.sha256(data).hexdigest(), 'size': len(data)}
         receive(meta, io.BytesIO(data), sink)
         return dict(meta, restored=True, off_host_verified=True)
 
@@ -128,8 +128,35 @@ class Deployment(unittest.TestCase):
         result = rollout(self.doc, self.auth, apply, dry_run=False)
         self.assertEqual(order, list(policy.TARGETS))
         self.assertTrue(all(r['result'] == 'healthy' for r in result))
-        rollout(self.doc, policy.authorization(self.doc, 101, 1, 34602508), apply, dry_run=False)
+        repeated = rollout(self.doc, policy.authorization(self.doc, 101, 1, 34602508), apply, dry_run=False)
         self.assertTrue(all(h.calls.count('install') == 1 for h in hosts.values()))
+        self.assertTrue(all(r['approval']['run_id'] == 101 and r['original_approval']['run_id'] == 100 for r in repeated))
+
+    def test_first_transport_failure_is_persisted_without_contacting_later_hosts(self):
+        results, contacted = [], []
+        output = self.base / 'audit.json'
+        def invoke():
+            raise RuntimeError('SECRET transport credential text')
+        def apply(target, doc, approval):
+            contacted.append(target)
+            return record_target(target, doc, invoke, results, lambda: output.write_text(json.dumps(results)))
+        with self.assertRaises(ValueError):
+            rollout(self.doc, self.auth, apply, dry_run=False)
+        self.assertEqual(contacted, [policy.TARGETS[0]])
+        self.assertEqual(json.loads(output.read_text())[0]['result'], 'transport-or-admission-failed')
+        self.assertNotIn('SECRET', output.read_text())
+
+    def test_admission_failure_still_emits_redacted_identity_audit(self):
+        output = self.base / 'audit.json'
+        with patch.dict(os.environ, {'GITHUB_REPOSITORY': 'untrusted/repo', 'GITHUB_SHA': self.doc['source_sha'],
+                                     'GITHUB_RUN_ID': '100', 'GITHUB_RUN_ATTEMPT': '2'}), \
+             patch.object(sys, 'argv', ['deploy_release.py', '--release-id', '123', '--output', str(output)]), \
+             self.assertRaises(ValueError):
+            controller_main()
+        result = json.loads(output.read_text())
+        self.assertEqual(result['source_sha'], self.doc['source_sha'])
+        self.assertEqual(result['result'], 'rejected-or-stopped')
+        self.assertEqual(result['run_attempt'], '2')
 
     def test_default_plan_never_calls_transport(self):
         result = rollout(self.doc, self.auth, lambda *args: self.fail('SSH in dry run'))
@@ -224,6 +251,17 @@ class Deployment(unittest.TestCase):
         with self.assertRaises(ValueError):
             successful_execution(jobs, 'actual test', 2)
 
+    def test_manual_full_run_allowed_but_new_failed_attempt_cannot_be_hidden(self):
+        base = {'id': 1, 'run_number': 1, 'run_attempt': 1, 'head_branch': 'main',
+                'head_sha': self.doc['source_sha'], 'status': 'completed', 'conclusion': 'success', 'event': 'push'}
+        manual = dict(base, id=2, run_number=2, event='workflow_dispatch')
+        self.assertEqual(latest_full_run({'workflow_runs': [base, manual]}, self.doc['source_sha'], 'push', 'test'), 2)
+        failed = dict(manual, run_attempt=2, conclusion='failure')
+        with self.assertRaises(ValueError):
+            latest_full_run({'workflow_runs': [base, failed]}, self.doc['source_sha'], 'push', 'test')
+        with self.assertRaises(ValueError):
+            latest_full_run({'workflow_runs': [dict(manual, head_branch='feature')]}, self.doc['source_sha'], 'push', 'test')
+
     def test_package_and_service_commands_are_closed(self):
         for platform, packages in self.doc['platforms'].items():
             command = policy.package_commands(platform, packages, self.base)[0]
@@ -244,6 +282,10 @@ class Deployment(unittest.TestCase):
         del changed['platforms']['debian13']['liner-notes-web']
         with self.assertRaises(ValueError):
             policy.validate_release(changed)
+        optional = copy.deepcopy(self.doc)
+        optional['platforms']['rocky10']['liner-notes-selinux'] = dict(
+            optional['platforms']['rocky10']['liner-notes'], filename='liner-notes-selinux-0.1.0-1.el10.noarch.rpm', version='0.1.0-1.el10')
+        policy.validate_release(optional)
         changed = copy.deepcopy(self.doc)
         changed['platforms']['freebsd15']['liner-notes']['version'] = '0.74.1'
         with self.assertRaises(ValueError):
@@ -269,7 +311,7 @@ class Deployment(unittest.TestCase):
         root = self.base / 'sink'
         root.mkdir(mode=0o700)
         payload = b'isolated backup data'
-        meta = {'id': policy.transaction_id(self.doc), 'sha256': hashlib.sha256(payload).hexdigest(), 'size': len(payload)}
+        meta = {'id': policy.TARGETS[0] + '-' + policy.transaction_id(self.doc), 'sha256': hashlib.sha256(payload).hexdigest(), 'size': len(payload)}
         receive(meta, io.BytesIO(payload), root)
         receive(meta, io.BytesIO(payload), root)
         with self.assertRaises(ValueError):

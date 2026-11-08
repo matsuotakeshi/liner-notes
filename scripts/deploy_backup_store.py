@@ -11,14 +11,15 @@ from pathlib import Path
 import re
 import shlex
 import sys
-from deploy_policy import HEX64, digest_file, require
+from deploy_policy import HEX64, TARGETS, digest_file, machine_identity, require
 
 STORE = Path('/var/lib/liner-notes-release-backups')
 
 
 def receive(meta, stream, root=STORE):
     require(set(meta) == {'id', 'sha256', 'size'}, 'Invalid backup metadata')
-    require(re.fullmatch(r'[1-9][0-9]*-[0-9a-f]{40}', meta['id']) and HEX64.fullmatch(meta['sha256']), 'Invalid backup identity')
+    require(any(re.fullmatch(re.escape(target) + r'-[1-9][0-9]*-[0-9a-f]{40}', meta['id']) for target in TARGETS)
+            and HEX64.fullmatch(meta['sha256']), 'Invalid backup identity')
     require(type(meta['size']) is int and 0 < meta['size'] <= 16 * 1024**4, 'Invalid backup size')
     require(root.is_dir() and not root.is_symlink() and not root.stat().st_mode & 0o077, 'Backup directory must be private')
     target = root / (meta['id'] + '.tar')
@@ -65,7 +66,9 @@ if __name__ == '__main__':
             args = original[1:]
         require(len(args) == 1, 'One metadata argument required')
         os.umask(0o077)
-        print(json.dumps(receive(json.loads(args[0]), sys.stdin.buffer), sort_keys=True))
+        identity = machine_identity()
+        result = receive(json.loads(args[0]), sys.stdin.buffer)
+        print(json.dumps(dict(result, machine_id=identity), sort_keys=True))
     except Exception:
         print('{"result":"backup-rejected"}')
         raise SystemExit(1)

@@ -66,6 +66,7 @@ with tempfile.TemporaryDirectory(prefix='actual-upgrade-', dir=work) as temporar
     assert binary.is_file() and rc.is_file()
     data = root / 'var/db/liner-notes'
     data.mkdir(parents=True, exist_ok=True)
+    (data / 'catalog.dat').write_text('1|0|all|member|Package update test\n')
     source = Server(str(binary), data / 'notes.dat', members=data / 'members.dat', catalog=data / 'catalog.dat',
                     options=['--database-structured', str(data / 'liner.sqlite')])
     client = RawClient(source.port)

@@ -8,6 +8,8 @@ import base64
 import hashlib
 import json
 import re
+import subprocess
+import sys
 import time
 from pathlib import Path
 
@@ -39,6 +41,18 @@ def digest_file(path):
         for data in iter(lambda: stream.read(1024 * 1024), b''):
             digest.update(data)
     return digest.hexdigest()
+
+
+def machine_identity():
+    """Opaque OS machine identity, used to reject a backup on the same host."""
+    if sys.platform.startswith('freebsd'):
+        result = subprocess.run(['/sbin/sysctl', '-n', 'kern.hostuuid'], capture_output=True, timeout=10)
+        require(result.returncode == 0, 'Cannot identify the backup host')
+        value = result.stdout.decode('ascii').strip().lower().replace('-', '')
+    else:
+        value = Path('/etc/machine-id').read_text(encoding='ascii').strip().lower()
+    require(re.fullmatch('[0-9a-f]{32}', value) and value != '0' * 32, 'Invalid OS machine identity')
+    return hashlib.sha256(value.encode('ascii')).hexdigest()
 
 
 def sign(document, private_pem):
@@ -81,7 +95,7 @@ def validate_release(doc):
             require(SAFE_NAME.fullmatch(item['filename']) and HEX64.fullmatch(item['sha256']), 'Unsafe package filename/hash')
             require(type(item['size']) is int and 0 < item['size'] <= 4 * 1024**3, 'Invalid package size')
             require(isinstance(item['version'], str) and SAFE_NAME.fullmatch(item['version']), 'Invalid package version')
-            require(item['version'] == doc['version'] or item['version'].startswith(doc['version'] + '-'), 'Package version differs from release')
+            require(name == 'liner-notes-selinux' or item['version'] == doc['version'] or item['version'].startswith(doc['version'] + '-'), 'Package version differs from release')
     return doc
 
 
