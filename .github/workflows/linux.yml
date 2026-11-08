@@ -7,7 +7,11 @@ on:
 permissions:
   contents: read
 jobs:
+  changes:
+    uses: ./.github/workflows/change-scope.yml
   linux:
+    needs: changes
+    if: ${{ always() }}
     runs-on: ubuntu-24.04
     timeout-minutes: 60
     strategy:
@@ -15,8 +19,20 @@ jobs:
       matrix:
         image: [rockylinux/rockylinux:9, almalinux:9]
     steps:
+      - name: Require a successful scope decision
+        env:
+          SCOPE_RESULT: ${{ needs.changes.result }}
+          BUILD: ${{ needs.changes.outputs.build }}
+        run: |
+          test "$SCOPE_RESULT" = success
+          case "$BUILD" in true|false) ;; *) exit 1 ;; esac
+          if [ "$BUILD" = false ]; then
+            echo "Documentation-only: build and runtime tests are not applicable." >> "$GITHUB_STEP_SUMMARY"
+          fi
       - uses: actions/checkout@v4
+        if: ${{ needs.changes.outputs.build == 'true' }}
       - name: Build and test in the target distribution
+        if: ${{ needs.changes.outputs.build == 'true' }}
         env:
           IMAGE: ${{ matrix.image }}
         run: docker run --rm -v "$PWD:/source:ro" "$IMAGE" bash /source/ci/linux.sh

@@ -22,8 +22,48 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  verify:
+  changes:
     if: "${{ github.ref == 'refs/heads/main' && (github.event_name == 'workflow_dispatch' || (github.event_name == 'workflow_run' && github.event.workflow_run.event == 'push' && github.event.workflow_run.head_branch == 'main' && github.event.workflow_run.conclusion == 'success')) }}"
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    outputs:
+      build: ${{ steps.scope.outputs.build }}
+    steps:
+      - name: Read the triggering package workflow's scope receipt
+        if: ${{ github.event_name == 'workflow_run' }}
+        uses: actions/download-artifact@v4
+        with:
+          name: ci-change-scope
+          path: scope
+          run-id: ${{ github.event.workflow_run.id }}
+          github-token: ${{ github.token }}
+      - name: Require explicit build or documented non-applicability
+        id: scope
+        env:
+          EVENT: ${{ github.event_name }}
+          SOURCE_SHA: ${{ github.event.workflow_run.head_sha }}
+        run: |
+          python3 - <<'PY'
+          import json, os
+          from pathlib import Path
+          build = True
+          if os.environ['EVENT'] == 'workflow_run':
+              receipt = json.loads(Path('scope/ci-change-scope.json').read_text())
+              assert receipt['schema'] == 1 and receipt['event'] == 'push'
+              assert receipt['source_sha'] == os.environ['SOURCE_SHA']
+              assert type(receipt['build']) is bool
+              build = receipt['build']
+              if not build:
+                  assert receipt['reason'] == 'documentation-only' and receipt['files']
+          with open(os.environ['GITHUB_OUTPUT'], 'a') as output:
+              output.write('build=' + str(build).lower() + '\n')
+          if not build:
+              with open(os.environ['GITHUB_STEP_SUMMARY'], 'a') as summary:
+                  summary.write('Documentation-only: no package artifacts produced; release-set verification is not applicable.\n')
+          PY
+  verify:
+    needs: changes
+    if: ${{ needs.changes.outputs.build == 'true' }}
     runs-on: ubuntu-24.04
     timeout-minutes: 20
     steps:
@@ -62,7 +102,7 @@ jobs:
                 jq -r --arg sha "$SOURCE_SHA" '
                   [.workflow_runs[] | select(
                     .head_sha == $sha and .head_branch == "main" and
-                    .event == "push"
+                    (.event == "push" or .event == "workflow_dispatch")
                   )] | sort_by(.run_number, .run_attempt) | last |
                   if . == null then "none pending"
                   else "\(.id) \(.conclusion // .status)" end
@@ -81,7 +121,7 @@ jobs:
               sleep 10
             done
             if [[ ! "$run_id" =~ ^[0-9]+$ || "$result" != success ]]; then
-              echo "::error::No successful main-push CI for $platform at $SOURCE_SHA"
+              echo "::error::No successful main CI for $platform at $SOURCE_SHA"
               return 1
             fi
             mkdir -p "candidates/$platform"

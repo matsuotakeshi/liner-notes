@@ -3,17 +3,6 @@ name: Debian 13 Package CI
 # Builds an untrusted PR on GitHub-hosted infrastructure only; no SSH or deploy secrets.
 on:
   pull_request:
-    paths:
-      - "debian/**"
-      - "ci/test-debian-package-upgrade.sh"
-      - "linux/**"
-      - "scripts/install-linux.py"
-      - "scripts/release_manifest.py"
-      - "tests/test_release_manifest.py"
-      - "webui/**"
-      - "src/**"
-      - "Makefile"
-      - ".github/workflows/debian-package.yml"
   push:
     branches: [main]
   workflow_dispatch:
@@ -22,7 +11,11 @@ permissions:
   contents: read
 
 jobs:
+  changes:
+    uses: ./.github/workflows/change-scope.yml
   build-deb:
+    needs: changes
+    if: ${{ needs.changes.outputs.build == 'true' }}
     runs-on: ubuntu-24.04
     timeout-minutes: 50
     steps:

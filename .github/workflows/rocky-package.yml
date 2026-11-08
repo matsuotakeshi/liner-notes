@@ -3,15 +3,6 @@ name: Rocky 10 Package CI
 # GitHub-hosted and isolated. No CI LAN SSH keys or production credentials.
 on:
   pull_request:
-    paths:
-      - "linux/rpm/**"
-      - "ci/test-rocky-package-upgrade.sh"
-      - "scripts/build-rpm.py"
-      - "scripts/release_manifest.py"
-      - "tests/test_release_manifest.py"
-      - "src/**"
-      - "Makefile"
-      - ".github/workflows/rocky-package.yml"
   push:
     branches: [main]
   workflow_dispatch:
@@ -20,7 +11,11 @@ permissions:
   contents: read
 
 jobs:
+  changes:
+    uses: ./.github/workflows/change-scope.yml
   build-rpm:
+    needs: changes
+    if: ${{ needs.changes.outputs.build == 'true' }}
     runs-on: ubuntu-24.04
     timeout-minutes: 50
     steps:

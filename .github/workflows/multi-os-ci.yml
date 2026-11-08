@@ -12,9 +12,12 @@ concurrency:
   group: liner-notes-native-hosts
   cancel-in-progress: false
 jobs:
+  changes:
+    uses: ./.github/workflows/change-scope.yml
   native:
+    needs: changes
     name: Parallel FreeBSD / Rocky / Ubuntu regression
-    if: ${{ github.repository == 'matsuotakeshi/liner-notes' && github.ref == 'refs/heads/main' }}
+    if: ${{ github.repository == 'matsuotakeshi/liner-notes' && github.ref == 'refs/heads/main' && needs.changes.outputs.build == 'true' }}
     runs-on: [self-hosted, Linux, X64]
     timeout-minutes: 60
     steps:
@@ -37,14 +40,23 @@ jobs:
   release-gate:
     name: All required native suites passed
     if: ${{ always() }}
-    needs: [native]
+    needs: [changes, native]
     runs-on: ubuntu-24.04
     steps:
       - name: Reject failed, skipped or cancelled native suites
         shell: bash
         env:
+          SCOPE_RESULT: ${{ needs.changes.result }}
+          BUILD: ${{ needs.changes.outputs.build }}
           NATIVE_RESULT: ${{ needs.native.result }}
         run: |
           set -euo pipefail
+          test "$SCOPE_RESULT" = success
+          if [ "$BUILD" = false ]; then
+            test "$NATIVE_RESULT" = skipped
+            echo "Documentation-only: native tests are not applicable." >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          test "$BUILD" = true
           test "$NATIVE_RESULT" = success
           echo "PASS: All 3 native OS suites passed on this exact commit."
