@@ -27,6 +27,7 @@ jobs:
             python tests/test_moderation.py ./runtime
             python tests/test_visibility.py ./runtime
             python tests/test_link_bbs.py ./runtime
+            python tests/test_link_service.py ./runtime
             python tests/test_stage74_link_bbs.py ./runtime
             python tests/test_shared_visibility.py ./runtime
           } 2>&1 | tee build/shared-visibility.log
