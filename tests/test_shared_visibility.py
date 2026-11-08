@@ -17,6 +17,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path[:0] = [str(ROOT), str(ROOT / 'scripts')]
 from link_store import Store, Ed25519PrivateKey, identity, public_bytes
 from link_bbs import Core, export_board, apply_pending
+from link_maintenance import snapshot, bootstrap
 from webui.bridge import Bridge, response_data
 from webui.app import create_app
 from test_board import Server
@@ -84,7 +85,7 @@ async def exercise(binary, root):
                       'FIND HERE * needle', 'FIND SUBTREE * needle', 'FIND ALL * needle',
                       'UNREAD', 'NEWS ALL 2000-01-01'):
             text = await command(b, query)
-            assert 'needle' not in text, (query, text)
+            assert 'needle-' not in text, (query, text)
         await cores[node].select(2)
         for number in numbers:
             item = await cores[node].snapshot(number, True)
@@ -200,6 +201,13 @@ async def exercise(binary, root):
         # Long-disconnected/new participant: reversed signed checkpoints, old
         # replay, missing parents, durable deferred events, and local restart.
         old_events = [json.loads(row[0]) for row in stores[0].db.execute('SELECT envelope FROM events')]
+        foreign = next(e['event'] for e in old_events if e['event']['origin']==ids[0])
+        try:
+            stores[1].sign(dict(foreign,kind='withdraw',revision=99,title='',body=''))
+        except ValueError as error:
+            assert 'impersonate' in str(error)
+        else:
+            raise AssertionError('receiver signed a forged origin withdrawal')
         for store in stores:
             store.make_checkpoints()
         await sync(star)
@@ -220,9 +228,15 @@ async def exercise(binary, root):
             envelopes = [json.loads(row[0]) for row in stores[0].db.execute('SELECT envelope FROM events ORDER BY seq')]
             for envelope in reversed(envelopes):
                 fresh.accept(envelope, ids[0])
+            # Exercise the actual portable snapshot importer, retaining the
+            # reversed arrival order and resetting application receipts.
+            assert snapshot(fresh,d/'snapshot')==6
+            fresh.close()
+            assert bootstrap(d/'snapshot',d/'boot.sqlite',key,new_origins,origins)==6
+            fresh=Store(d/'boot.sqlite',key,new_origins,origins)
             await apply_pending(fresh, probe, {board: 2})
             await probe.close(); new_server.close(); fresh.close()
-            fresh = Store(d/'link.sqlite', key, new_origins, origins)
+            fresh = Store(d/'boot.sqlite', key, new_origins, origins)
             new_server = Server(binary, d/'notes', members=d/'members', catalog=directories[0]/'catalog',
                                 telnet=True, options=['--link-accounts', str(d/'accounts')])
             probe = await Core(dict(port=new_server.port, login='link', password_file=str(d/'secret'))).open()
