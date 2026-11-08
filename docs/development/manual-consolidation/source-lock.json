@@ -39,7 +39,7 @@
   "ports/comms/liner-notes/files/PORTS.md": "c5e0496ca5e2367cd142de2f505aefefd22a2127ace3ebf45a5596890fd843d7",
   "ports/comms/liner-notes/files/liner_notes.conf.in": "a02965ea8d2505101ef90efec584946b95200c2430bf6ab0207d4836f68341c2",
   "ports/comms/liner-notes/files/liner_notes.in": "e42460c324202635956856b6bc605f38dd004de3c3c67fe14396a08fdec500e2",
-  "ports/comms/liner-notes/pkg-plist": "c176596a11efc9aa7db068d073976c9e3127b599bd74f974b19a170d27abe875",
+  "ports/comms/liner-notes/pkg-plist": "986abedc650ad7d297c9e5772f63e54badcf131c2cbbeefa6888f272145fbe93",
   "scripts/configure-zmodem.py": "2abc3c427aa5f93a8920cfce7a390bc8624b5958d72ddd3f8b4df4244c7dc838",
   "scripts/door_clans.sh": "42d098ab56618024c6fa89a86c7f575a41a18082cf0ef1e71797b83675026fc5",
   "scripts/install-linux.py": "af955a635e058ac54e875b0de95282e091e6489e18665606ecf27a21dfcda032",
@@ -79,10 +79,17 @@
   "src/locales/ja.def": "f1bfc81da3a79ec04547b4acfdfc7499417f2d5c6fb3d7c4a65bf077632a787e",
   "src/locales/en.def": "1eebc4e2040b1fc3057582bf486eac584f5c31298202cb52253d0458c3b6c59b",
   "tests/test_freebsd_plist.py": "b0d63881c93d6adbfcfa2a77fc80c2cb839ec4ac83604ad0244b03e1b3786ff0",
-  "ci/build-freebsd-package.sh": "7f4b5bcec05e66acbf353aa08d622285964ca4c4292563989e63d13077f78f2c",
+  "ci/build-freebsd-package.sh": "2eb506106694b2de6c6c30c14a448749c0f244b63b3666f0abb59988755eba34",
   "debian/changelog": "8f3574a094f5a3677a9a7188e530ecdbdc006138b082b57243ca8441c644114d",
   "src/board_link.inc": "29373e73de2f120879b4bfc6254e5b165382a046fcf94246a34f9a931ff335e3",
   "src/ui.c": "c1e54ca7309614d5c8bd35236ada6f18067f8938060d9eae57b5a4c5cdafb093",
   "help/en/adminboards.txt": "921f0f5d9b492dd07477fe803c16f9f8432811f819a75990abcd49ab1ef01667",
-  "webui/static/app.js": "ff79c5ac310c835df7e13595f2027d4c4ee8e699fc77c5192b102cca33ddba8c"
+  "webui/static/app.js": "ff79c5ac310c835df7e13595f2027d4c4ee8e699fc77c5192b102cca33ddba8c",
+  "ci/deploy_release.py": "72f0f2d3b6ea3d9f96cdf8891a568e0da650e9f1dbb3de64e3aa8bbdbf2fda7c",
+  "scripts/deploy_policy.py": "651299442273b0208da694e6832b3eafe2ca9410ee78f21c9fc797798b19c804",
+  "scripts/deploy_host.py": "c53bb50e5b52d8ece5ddce3913f14ca574e75ade220279225031c27cbdb93c20",
+  "scripts/deploy_restore.py": "9c23bbd1d8a7ac7a016a08c852dd811309c860dc7d7362a595c308caaf47d9a5",
+  "scripts/deploy_transaction.py": "821b03f9415b40f05b0a5a5e42d5bd04ee1b695d8d617fc1a060c934c6aae53d",
+  "scripts/deploy_backup_store.py": "21382fc8bd3884c0ad9958983f91707a8e981c98c2732261191a29c62eff8ce5",
+  "scripts/deploy_manifest.py": "f49aaa2d98c6e09e3a2a0e00608dcc4d84bf61d283431d8c30dd70aaf51c204c"
 }
