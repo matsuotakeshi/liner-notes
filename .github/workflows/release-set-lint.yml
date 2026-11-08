@@ -9,6 +9,7 @@ on:
       - "tests/test_release_admission.py"
       - ".github/workflows/production-release-preflight.yml"
       - ".github/workflows/production-ssh-smoke.yml"
+      - "ci/production-os-check.sh"
       - "CI_CD.md"
       - "scripts/release_manifest.py"
       - "tests/test_verify_release_set.py"
@@ -33,3 +34,4 @@ jobs:
           python3 tests/test_release_manifest.py
           python3 tests/test_verify_release_set.py
           python3 tests/test_release_admission.py
+          sh -n ci/production-os-check.sh
