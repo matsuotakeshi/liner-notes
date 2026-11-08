@@ -95,7 +95,7 @@ pkg info liner-notes
 
 Web不要なら `OPTIONS_SET="DOCS ZMODEM" OPTIONS_UNSET=WEBUI` を指定します。ZMODEM不要なら `OPTIONS_SET="DOCS WEBUI" OPTIONS_UNSET=ZMODEM` とし、後のlrzsz検査とhelper設定を省略します。保管庫のWeb転送にlrzszは不要です。共有ボードリンクも使う場合は `OPTIONS_SET` に `LINK` を追加し、[BBS間リンクとスター・リング型共有](links.md)の専用会員・鍵・共有設定を行ってください。
 
-**pkgで導入する場合は、上のmake installとどちらか一方を選びます。** 同梱pkgはFreeBSD 15/amd64・Python 3.12用、DOCS/WEBUI/LINK有効です。ZMODEMの依存指定は無効なので、使う場合は本家lrzszを別途導入します。配布物のルートから実行します。
+**pkgで導入する場合は、上のmake installとどちらか一方を選びます。** 同梱pkgはFreeBSD 15/amd64・Python 3.12用、DOCS/WEBUI/LINK/ZMODEM有効です。本家lrzsz 0.13.1以上の依存が必要です。配布物のルートから実行します。
 
 ```sh
 pkg install python312 py312-sqlite3 py312-aiohttp py312-cryptography sqlite3
