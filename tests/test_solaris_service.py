@@ -53,9 +53,27 @@ class ServiceTests(unittest.TestCase):
                         service.settings(path)
 
     def test_live_root_install_is_rejected(self):
-        for dest in ("", Path.cwd().anchor):
-            with self.assertRaises(ValueError):
-                installer.install(dest)
+        anchor = Path(Path.cwd().anchor)
+        for dest in ("", str(anchor), str(anchor / ".."), str(anchor / "missing-stage" / "..")):
+            with self.subTest(destination=dest), \
+                 patch.object(Path, "read_bytes", side_effect=AssertionError("must reject before reading payload")):
+                with self.assertRaises(ValueError):
+                    installer.install(dest)
+
+    @unittest.skipUnless(os.name == "posix", "real Unix symlink boundary")
+    def test_symlink_stage_and_ancestor_rejected(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            target = root / "target"
+            target.mkdir()
+            link = root / "redirect"
+            link.symlink_to(target, target_is_directory=True)
+            for dest in (link, link / "stage", link / ".." / "stage"):
+                with self.subTest(destination=str(dest)), \
+                     patch.object(Path, "read_bytes", side_effect=AssertionError("must reject before reading payload")):
+                    with self.assertRaisesRegex(ValueError, "symlink"):
+                        installer.install(str(dest))
+            self.assertEqual(list(target.iterdir()), [])
 
     def test_stage_preserves_custom_config_and_has_no_service_side_effects(self):
         with tempfile.TemporaryDirectory() as tmp:

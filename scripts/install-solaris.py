@@ -13,8 +13,13 @@ ROOT = Path(__file__).resolve().parents[1]
 
 def install(destdir, prefix="/opt/liner-notes", python="/usr/bin/python3.11"):
     # A mandatory non-root staging area prevents implicit live deployment.
-    stage = Path(destdir).absolute()
-    if not destdir or stage == Path(stage.anchor) or stage.is_symlink():
+    requested = Path(destdir).absolute()
+    # Inspect the original spelling before resolve() removes symlink ancestors.
+    # In particular, /.. must not bypass the live-filesystem-root boundary.
+    if not destdir or any(part.is_symlink() for part in (requested, *requested.parents)):
+        raise ValueError("Use an explicit, non-root staging directory without symlink ancestors")
+    stage = requested.resolve()
+    if stage == Path(stage.anchor):
         raise ValueError("Use an explicit, non-root staging directory")
     for value in (prefix, python):
         if not re.fullmatch(r"/[A-Za-z0-9_./-]+", value) or ".." in Path(value).parts:
