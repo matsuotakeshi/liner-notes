@@ -1,0 +1,37 @@
+name: Shared board visibility
+on:
+  push:
+    branches: [main, 'feature/shared-withdraw-visibility']
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  integration:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: sudo apt-get update && sudo apt-get install -y clang libssl-dev libsqlite3-dev
+      - run: python -m pip install -r webui/requirements.txt -r link-requirements.txt
+      - run: make -j2 CC=clang SQLITE_CFLAGS= SQLITE_LIBS=-lsqlite3
+      - name: Core visibility and signed multi-node integration
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p build
+          {
+            python tests/test_moderation.py ./runtime
+            python tests/test_visibility.py ./runtime
+            python tests/test_link_bbs.py ./runtime
+            python tests/test_stage74_link_bbs.py ./runtime
+            python tests/test_shared_visibility.py ./runtime
+          } 2>&1 | tee build/shared-visibility.log
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: shared-visibility-evidence
+          path: build/shared-visibility.log

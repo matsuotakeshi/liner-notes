@@ -82,12 +82,13 @@ def run(binary):
                 for command in ['LIST','NOTES','TREE 1','TREE 2']:
                     h,rows,_=page(c,command); output=b'\n'.join([h]+rows)
                     assert b'secret-root' not in output and b'secret-child' not in output
-                    assert any(row.startswith(b'HIDDEN ') for row in rows)
-                expect(c,'READ 1','HIDDEN 1 PARENT 0'); expect(c,'CHILD','HIDDEN 2 PARENT 1')
-                navigate(c,'CHILD',4); expect(c,'PARENT','HIDDEN 2 PARENT 1'); navigate(c,'NEXT',3)
-            assert unread(b)==[3,4,5]
-            assert unread(b,1)==[3,4]
-            navigate(b,'NEW',3)
+                    assert not any(row.startswith((b'HIDDEN ',b'WITHDRAWN ')) for row in rows)
+                    assert b'sibling' not in output and b'grandchild' not in output
+                expect(c,'READ 1','HIDDEN 1 PARENT 0'); expect(c,'CHILD','ERR no neighbour')
+                expect(c,'READ 4','HIDDEN 4 PARENT 2'); expect(c,'PARENT','ERR no neighbour')
+            assert unread(b)==[5]
+            assert unread(b,1)==[]
+            navigate(b,'NEW',5)
             expect(b,'SEEN 1','ERR article hidden'); expect(b,'UNSEEN 2','ERR article hidden')
             expect(a,'INSPECT 999','ERR no article')
             print('PASS: explicit admin bootstrap, worker-side authority, board ACLs and read-only-board moderation')
@@ -97,8 +98,11 @@ def run(binary):
         assert data.read_bytes()==before
         s=Server(binary,data,members=users,catalog=catalog,admins=admins); a,b=Client(s.port),Client(s.port)
         try:
-            auth(a,'alice'); auth(b,'bob'); expect(b,'READ 1','HIDDEN 1 PARENT 0'); assert unread(b)==[3,4,5]
-            expect(a,'RESTORE 1','RESTORED 1'); expect(a,'RESTORE 2','RESTORED 2')
+            auth(a,'alice'); auth(b,'bob'); expect(b,'READ 1','HIDDEN 1 PARENT 0'); assert unread(b)==[5]
+            expect(a,'RESTORE 1','RESTORED 1')
+            assert unread(b)==[1,3,5]
+            expect(b,'READ 4','HIDDEN 4 PARENT 2')
+            expect(a,'RESTORE 2','RESTORED 2')
             assert read(b,1)[1:] == ('secret-root','secret-root-body\r\n')
             assert read(b,2)[0]==1 and read(b,4)[0]==2
             assert unread(b)==[1,2,3,4,5]  # Hide did not silently mark anything read.

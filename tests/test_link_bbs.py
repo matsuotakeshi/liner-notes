@@ -48,6 +48,7 @@ async def exercise(binary,p):
   for user in users:assert response_data((await user.command('READ 1'))['text'])['article']['title']=='renamed'
   await users[0].command('WITHDRAW 1 CONFIRM');await sync(star)
   for user in users:assert 'WITHDRAWN 1' in (await user.command('READ 1'))['text']
+  for user in users:assert 'HIDDEN 2 PARENT 1' in (await user.command('READ 2'))['text']
   await post(users[0],'maximum','\n'.join(['x'*4094]*64));await sync(ring)
   for user in users:assert len(response_data((await user.command('READ 3'))['text'])['article']['body'].encode())==262144
   # Replaying every signed event never appends another local article.

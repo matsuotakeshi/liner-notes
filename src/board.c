@@ -110,7 +110,8 @@ static UiSave *ui_head,*ui_tail;
 static struct { int state; uint64_t ticket; BoardRequest request; BoardResult result; } jobs[QUEUE];
 static uint64_t next_ticket;
 static int on_board(uint32_t id,uint32_t board) { return id && id<=article_count && (*article_at(id-1)).board==board; }
-static int unavailable(uint32_t id) { return moderation_hidden(id) || extras_removed(id); }
+static int unavailable(uint32_t id);
+static int link_imported(uint32_t id);
 static uint32_t get32(const unsigned char *p) {
     return (uint32_t)p[0]|((uint32_t)p[1]<<8)|((uint32_t)p[2]<<16)|((uint32_t)p[3]<<24);
 }
@@ -120,6 +121,39 @@ static void put32(unsigned char *p,uint32_t n) {
 static const char *article_body(const Article *);
 static int require_v5(void);
 #include "board_features.inc"
+/* Derived visibility only: never alter descendants or their signed provenance.
+ * The board owner thread invalidates this cache on every relevant mutation.
+ * Iterative memoization keeps deep threads linear, without recursion. */
+static unsigned char *visibility;
+static size_t visibility_capacity,visibility_moves;
+static uint32_t visibility_articles,visibility_moderation,visibility_extras;
+static int unavailable(uint32_t id) {
+    uint32_t moderation=moderation_count(),extras=extras_audit_count();
+    if(!id || id>article_count)return 1;
+    if(!store_reserve((void **)&visibility,&visibility_capacity,(size_t)article_count+1,1)) {
+        body_read_failed=1;return 1;
+    }
+    if(visibility_articles!=article_count || visibility_moderation!=moderation ||
+       visibility_extras!=extras || visibility_moves!=move_count) {
+        memset(visibility,0,(size_t)article_count+1);
+        visibility_articles=article_count;visibility_moderation=moderation;
+        visibility_extras=extras;visibility_moves=move_count;
+    }
+    uint32_t at=id;unsigned char state=1;
+    while(at) {
+        if(at>article_count) { state=2;break; }
+        if(visibility[at]) { state=visibility[at]==1?1:2;break; }
+        visibility[at]=3;
+        if(moderation_hidden(at) || extras_removed(at)) { state=2;break; }
+        at=article_at(at-1)->parent;
+    }
+    at=id;
+    while(at && at<=article_count && visibility[at]==3) {
+        visibility[at]=state;at=article_at(at-1)->parent;
+    }
+    return state!=1;
+}
+
 static void index_article(uint32_t id) {
     Article *a=&(*article_at(id-1)); a->root=id; a->latest=id;
     if(a->parent) {
@@ -271,6 +305,9 @@ static void extra_execute(const BoardRequest *q,BoardResult *r) {
         int owner=a->author[0] && strcmp(a->author,"guest") && members_name(q->user) && !strcmp(a->author,members_name(q->user));
         if(!owner && !catalog_manage((*article_at(q->number-1)).board,q->user)) { strcpy(r->text,"ERR article owner\r\n"); return; }
         if(q->action==1) {
+            int imported=link_imported(q->number);
+            if(imported<0) { strcpy(r->text,"ERR link storage; restart inspection required\r\n");return; }
+            if(imported) { strcpy(r->text,"ERR imported article; use HIDE for local moderation\r\n");return; }
             if(q->cursor!=1) { snprintf(r->text,sizeof(r->text),"WITHDRAW CONFIRM %u\r\n",q->number); return; }
             if(!extras_set('D',q->number,q->user,"")) { strcpy(r->text,"ERR extras storage\r\n"); return; }
             snprintf(r->text,sizeof(r->text),"WITHDRAW SAVED %u\r\n",q->number); return;
@@ -927,6 +964,10 @@ static void execute(const BoardRequest *q,BoardResult *r) {
         if(!q->number || q->number>article_count) { strcpy(r->text,"ERR no current article\r\n"); return; }
         Article *a=&(*article_at(q->number-1));
         uint32_t target=q->op=='U'?a->parent:q->op=='C'?a->child:q->op=='N'?a->next:a->prev;
+        while(target && unavailable(target)) {
+            Article *next=article_at(target-1);
+            target=q->op=='U'?next->parent:q->op=='B'?next->prev:next->next;
+        }
         if(!target) { strcpy(r->text,"ERR no neighbour\r\n"); return; }
         display_article(target,r,0);
     } else if(q->op=='T') {
@@ -934,10 +975,11 @@ static void execute(const BoardRequest *q,BoardResult *r) {
         uint32_t root=(*article_at(q->number-1)).root, id=q->cursor?q->cursor:root;
         if(id>article_count || (*article_at(id-1)).root!=root) { strcpy(r->text,"ERR tree cursor\r\n"); return; }
         size_t pos=(size_t)snprintf(r->text,sizeof(r->text),"TREE %u\r\n",root);
-        for(int shown=0;id && shown<8;shown++) {
+        for(int shown=0;id;) {
+            if(unavailable(id)) { id=tree_next(id);continue; }
+            if(shown++==8)break;
             Article *a=&(*article_at(id-1)); unsigned indent=a->depth>12?24:a->depth*2;
-            if(unavailable(id)) pos+=(size_t)snprintf(r->text+pos,sizeof(r->text)-pos,extras_removed(id)?"WITHDRAWN %u PARENT %u DEPTH %u\r\n":"HIDDEN %u PARENT %u DEPTH %u\r\n",id,a->parent,a->depth);
-            else pos+=(size_t)snprintf(r->text+pos,sizeof(r->text)-pos,"%*s#%u parent=%u depth=%u %.80s\r\n",
+            pos+=(size_t)snprintf(r->text+pos,sizeof(r->text)-pos,"%*s#%u parent=%u depth=%u %.80s\r\n",
                                  (int)indent,"",id,a->parent,a->depth,a->title);
             id=tree_next(id);
         }
@@ -951,39 +993,38 @@ static void execute(const BoardRequest *q,BoardResult *r) {
             if(on_board(i,q->board) && !unavailable(i) && !members_seen(q->user,i))
                 unread_counts[(*article_at(i-1)).root]++;
         for(uint32_t i=0;i<article_count;i++)
-            if((*article_at(i)).board==q->board && !(*article_at(i)).parent &&
-               (!q->notes_unread || (!unavailable(i+1) && unread_counts[i+1]))) count++;
+            if((*article_at(i)).board==q->board && !(*article_at(i)).parent && !unavailable(i+1) &&
+               (!q->notes_unread || unread_counts[i+1])) count++;
         size_t pos=(size_t)snprintf(r->text,sizeof(r->text),q->notes_unread?"NOTES UNREAD %u\r\n":"NOTES %u\r\n",count);
         int shown=0;
         for(;id<=article_count;id++) {
-            Article *a=&(*article_at(id-1)); if(a->board!=q->board || a->parent) continue;
-            if(q->notes_unread && (unavailable(id) || !unread_counts[id])) continue;
+            Article *a=&(*article_at(id-1)); if(a->board!=q->board || a->parent || unavailable(id)) continue;
+            if(q->notes_unread && !unread_counts[id]) continue;
             if(shown++==5) break;
-            if(unavailable(id)) {
-                pos+=(size_t)snprintf(r->text+pos,sizeof(r->text)-pos,extras_removed(id)?"WITHDRAWN %u PARENT %u DEPTH %u\r\n":"HIDDEN %u PARENT %u DEPTH %u\r\n",id,a->parent,a->depth); continue;
-            }
+            uint32_t replies=0,latest=id;
+            for(uint32_t child=tree_next(id);child;child=tree_next(child))
+                if(!unavailable(child)) { replies++;if(child>latest)latest=child; }
             char date[32]="unknown";
-            uint64_t stamp=(*article_at(a->latest-1)).created;
+            uint64_t stamp=(*article_at(latest-1)).created;
             time_t t=(time_t)stamp; struct tm *tm=stamp?localtime(&t):NULL;
             if(tm) strftime(date,sizeof(date),date_pattern(),tm);
             char unread_text[16];
             if(q->user) snprintf(unread_text,sizeof(unread_text),"%u",unread_counts[id]);
             else strcpy(unread_text,"-");
             pos+=(size_t)snprintf(r->text+pos,sizeof(r->text)-pos,"#%u replies=%u latest=%u updated=%s unread=%s %.80s\r\n",
-                                 id,a->replies,a->latest,date,unread_text,a->title);
+                                 id,replies,latest,date,unread_text,a->title);
         }
         snprintf(r->text+pos,sizeof(r->text)-pos,"END NEXT %u\r\n",id<=article_count?id:0);
         free(unread_counts);
     } else {
         uint32_t id=q->number?q->number:1, count=0; int shown=0;
-        for(uint32_t i=1;i<=article_count;i++) if(on_board(i,q->board)) count++;
+        for(uint32_t i=1;i<=article_count;i++) if(on_board(i,q->board) && !unavailable(i)) count++;
         size_t pos=(size_t)snprintf(r->text,sizeof(r->text),"LIST %u\r\n",count);
         for(;id<=article_count;id++) {
-            if(!on_board(id,q->board)) continue;
+            if(!on_board(id,q->board) || unavailable(id)) continue;
             if(shown++==5) break;
             Article *a=&(*article_at(id-1));
-            if(unavailable(id)) pos+=(size_t)snprintf(r->text+pos,sizeof(r->text)-pos,extras_removed(id)?"WITHDRAWN %u PARENT %u DEPTH %u\r\n":"HIDDEN %u PARENT %u DEPTH %u\r\n",id,a->parent,a->depth);
-            else pos+=(size_t)snprintf(r->text+pos,sizeof(r->text)-pos,"%u %u %s\r\n",id,a->parent,a->title);
+            pos+=(size_t)snprintf(r->text+pos,sizeof(r->text)-pos,"%u %u %s\r\n",id,a->parent,a->title);
         }
         snprintf(r->text+pos,sizeof(r->text)-pos,"END NEXT %u\r\n",id<=article_count?id:0);
     }
@@ -1124,6 +1165,8 @@ void board_stop(void) {
     pthread_join(worker,NULL);
 #endif
     vault_worker_stop();
+    free(visibility);visibility=NULL;visibility_capacity=0;
+    visibility_articles=visibility_moderation=visibility_extras=0;visibility_moves=0;
     completion_close();
     if(!failed && !move_journal.broken) { uint32_t meta[]={article_count,(uint32_t)version,(uint32_t)format5};int sources[]={store,move_journal.fd,extras_descriptor()};db_cache_store(&article_db,sources,3,meta,sizeof(meta)); }
     policy_close();dj_close(&move_journal);dj_close(&access_journal);db_close(&moves_db);db_close(&accesses_db);move_count=move_replayed=0;access_count=0;
