@@ -70,6 +70,9 @@ class Host:
         import fcntl
         with (self.root / 'transaction.lock').open('a') as stream:
             fcntl.flock(stream, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            for path in self.root.glob('*.json'):
+                record = json.loads(path.read_text())
+                require(record.get('result') == 'healthy', 'An earlier host transaction requires explicit recovery before any release')
             yield
 
     def load_state(self, identity):
@@ -245,6 +248,20 @@ class Host:
         from deploy_restore import health_probes
         for service in self.profile['services']:
             command(service_command(self.platform, service, 'status'))
+        if self.platform == 'freebsd15':
+            expected_binary = '/usr/local/sbin/liner-notes'
+            pid = int(Path(self.profile['runtime_pidfile']).read_text().strip())
+            require(pid > 1, 'Invalid runtime PID')
+            rows = command(['/usr/bin/procstat', '-b', str(pid)]).splitlines()
+            require(len(rows) == 2 and rows[1].split()[-1] == expected_binary,
+                    'Runtime does not execute the packaged binary; inspect rc.conf program override')
+        else:
+            expected_binary = '/usr/sbin/liner-notes'
+            pid = int(command(['/usr/bin/systemctl', 'show', '-p', 'MainPID', '--value', 'liner-notes.service']))
+            require(pid > 1 and str(Path('/proc/' + str(pid) + '/exe').readlink()) == expected_binary,
+                    'Runtime does not execute the packaged binary; inspect systemd override')
+        require(self.profile['restore_application']['executable'] == expected_binary,
+                'Restore probe must use the same packaged executable')
         health_probes(self.profile['probes'])
         inventory = self.inventory()
         if release:
@@ -254,6 +271,7 @@ class Host:
 
 
 def main():
+    host = release = None
     try:
         require(len(sys.argv) == 1 and os.geteuid() == 0, 'Dedicated root helper takes no arguments')
         os.umask(0o077)
@@ -263,10 +281,19 @@ def main():
         release = validate_release(verify(request['release'], trusted(profile['release_public_key']).read_bytes()))
         auth = verify(request['authorization'], trusted(profile['approval_public_key']).read_bytes())
         validate_authorization(auth, release, profile['target'])
-        result = apply_host(release, auth, profile['target'], Host(profile))
+        host = Host(profile)
+        result = apply_host(release, auth, profile['target'], host)
         print(json.dumps(result, sort_keys=True))
         return 0
     except Exception:
+        if host is not None and release is not None:
+            try:
+                state = host.load_state(transaction_id(release))
+            except Exception:
+                state = None
+            if state:
+                print(json.dumps(state, sort_keys=True))
+                return 1
         print('{"result":"rejected","reason":"host-deployment-validation-or-operation-failed"}')
         return 1
 

@@ -24,6 +24,7 @@ from deploy_transaction import apply_host, atomic_json, rollout
 from deploy_backup_store import receive
 from deploy_restore import health_probes
 from deploy_release import successful_execution
+from deploy_host import Host
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 from cryptography.hazmat.primitives.serialization import Encoding, PrivateFormat, PublicFormat, NoEncryption
 
@@ -173,6 +174,15 @@ class Deployment(unittest.TestCase):
         with self.assertRaises(ValueError):
             apply_host(self.doc, self.auth, policy.TARGETS[0], host)
         self.assertEqual(host.calls, [])
+
+    @unittest.skipUnless(os.name == 'posix', 'POSIX host flock is exercised on hosted Linux')
+    def test_failed_host_transaction_blocks_a_different_release(self):
+        host = object.__new__(Host)
+        host.root = self.base
+        atomic_json(self.base / 'previous-release.json', {'result': 'planned-restore-required'})
+        with self.assertRaises(ValueError):
+            with host.lock():
+                self.fail('A different release bypassed unresolved recovery')
 
     def test_approval_binding_rejects_tampering_expiry_and_new_sha(self):
         for field, value in [('source_sha', 'c' * 40), ('release_id', 124), ('targets', list(reversed(policy.TARGETS))), ('manifest_sha256', 'd' * 64)]:

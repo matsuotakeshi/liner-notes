@@ -35,15 +35,17 @@ sudoは `ln-deploy` に対し引数なしの `/usr/local/libexec/liner-notes-dep
 
 root管理profileにはtarget、private state directory、incoming directory、公開鍵、
 導入済みサービス、旧package manifest、停止確認用PID一覧、バックアップ対象、
-復元照合用SELECT、ローカルのlogin/article/mailヘルスチェックを設定します。
+復元照合用SELECT、別コピーのBBS起動設定 `restore_application`、ローカルのlogin/article/mailヘルスチェックを設定します。
 有効なWeb/link/登録Doorには追加のprobeが必須です。profileのprobeには検証会員の
 秘密情報が入り得るためrootのみが読み書きできるようにし、GitHubへアップロードしません。
 probeはlocalhostへの送受信で、任意のroot shellコマンドではありません。
 
 バックアップ対象はdata/config/attachments/vault/spool/link/web/doors/binaries/old-packages
 の10区分すべてを明記します。未使用区分は空配列、使用中の外部保存先は実パスを列挙します。
-停止後にACL・拡張属性を含むarchiveを作成し、別コピーへ復元して全file hash、SQLite
-integrity、指定の会員・記事・メール等のSELECT結果を照合します。別ホストの専用backup
+停止後に専用サービスアカウントのworkerが残っていないことを確認し、ACL・拡張属性を含むarchiveを作成します。
+別コピーへ復元して全file hash、SQLite integrity、指定の会員・記事・メール等のSELECT結果を照合し、
+さらに使い捨てコピー上のBBSを非root・loopbackで起動してlogin/article/mailを確認します。外部のゲームdaemon等が
+まだデータを書いている場合は停止し、ゲーム側の整合バックアップ手順を先に設計します。別ホストの専用backup
 receiverへ転送し、保管後hashが一致するまでpackage更新を開始しません。
 backup receiverはprivate directory `/var/lib/liner-notes-release-backups` を使い、
 専用SSHアカウントには `deploy_backup_store.py` のみを実行可能にします。
@@ -60,10 +62,14 @@ helperのサービス許可一覧に追加しないでください。更新前�
 DB互換性の推測による自動バイナリ切り戻しは行いません。private host state、
 off-host backupと旧packageを確認して[計画的な復元](backup-recovery.md)を実施し、
 整合性を確認した後に新しいrun/承認で再開します。状態fileを消すだけの再実行は禁止です。
+失敗状態が一つでも残る局は別releaseへの更新も拒否します。計画復元の完了を管理者が確認してから、
+失敗stateを復元証跡と一緒にroot専用の履歴directoryへ移して保持し、新しい承認で再検査します。
 監査出力はSHA、版、対象、承認run/attempt、更新前後、backup識別子・hash、結果・停止理由です。
 
 **検証上の区別:** hostedの3局試験はfile/SQLite/subprocessの隔離fixtureです。
 RPM/DEBの既存disposable更新CIでは実package操作も検証します。
+FreeBSDのrootdir合成package試験は実pkg resolverを使用しますが、service/maintainer script試験ではありません。
+適用controllerは `FREEBSD-SERVICE-UPGRADE.json` に同一SHAの完全なpackage/service更新・復元証跡がない限りapplyを拒否します。
 FreeBSDの実Liner Notes package・サービスを含む完全な隔離更新、全保存領域のsite profile、
 本番用root helper/鍵/backup先の設置が確認できるまでは、本番更新可能と扱いません。
 

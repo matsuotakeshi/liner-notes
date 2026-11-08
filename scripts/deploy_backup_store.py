@@ -9,6 +9,7 @@ import json
 import os
 from pathlib import Path
 import re
+import shlex
 import sys
 from deploy_policy import HEX64, digest_file, require
 
@@ -56,9 +57,15 @@ def receive(meta, stream, root=STORE):
 
 if __name__ == '__main__':
     try:
-        require(len(sys.argv) == 2, 'One metadata argument required')
+        args = sys.argv[1:]
+        if os.environ.get('SSH_ORIGINAL_COMMAND'):
+            original = shlex.split(os.environ['SSH_ORIGINAL_COMMAND'])
+            require(len(original) == 2 and original[0] == '/usr/local/libexec/liner-notes-backup-store', 'Only the backup receiver is allowed')
+            require(not args, 'Forced-command receiver takes no process arguments')
+            args = original[1:]
+        require(len(args) == 1, 'One metadata argument required')
         os.umask(0o077)
-        print(json.dumps(receive(json.loads(sys.argv[1]), sys.stdin.buffer), sort_keys=True))
+        print(json.dumps(receive(json.loads(args[0]), sys.stdin.buffer), sort_keys=True))
     except Exception:
         print('{"result":"backup-rejected"}')
         raise SystemExit(1)

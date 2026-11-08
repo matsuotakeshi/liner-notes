@@ -5,6 +5,7 @@ This workflow controller is not a root helper. It cannot authorize a deployment
 using user-supplied JSON evidence; it fetches GitHub evidence itself each time.
 """
 import argparse
+import datetime
 import io
 import json
 import os
@@ -131,8 +132,10 @@ def transport(target, release_envelope, authorization_envelope, folder, key):
     result = subprocess.run(['ssh', '-T', *options, host, 'sudo -n /usr/local/libexec/liner-notes-deploy-host'],
                             input=canonical({'release': release_envelope, 'authorization': authorization_envelope}),
                             stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=7200)
-    require(result.returncode == 0, 'Host update failed; later hosts were not contacted')
-    return json.loads(result.stdout)
+    report = json.loads(result.stdout)
+    require(report.get('target') == target and report.get('source_sha') == release['source_sha'], 'Host returned no matching deployment audit')
+    require(result.returncode == 0 or report.get('result') != 'healthy', 'Host reported inconsistent success')
+    return report
 
 
 def main():
@@ -179,11 +182,22 @@ def main():
         # Revalidate current-main and CI after approval and package download.
         fresh_evidence(release)
         results = []
+        def save_audit():
+            args.output.write_text(json.dumps({'release': release['tag'], 'source_sha': release['source_sha'],
+                                              'package_hashes': {p: {n: i['sha256'] for n, i in packages.items()} for p, packages in release['platforms'].items()},
+                                              'approval': {'run_id': run_id, 'run_attempt': attempt, 'actor_id': actor},
+                                              'ci_runs': evidence, 'results': results}, indent=2) + '\n')
+        save_audit()
         try:
             def apply(target, doc, approval):
-                result = transport(target, envelope, signed_auth, folder, key)
+                try:
+                    result = transport(target, envelope, signed_auth, folder, key)
+                except Exception:
+                    result = {'target': target, 'source_sha': release['source_sha'], 'result': 'transport-or-admission-failed',
+                              'reason': 'inspect-private-host-state-before-resume',
+                              'finished_at': datetime.datetime.now(datetime.timezone.utc).isoformat()}
                 results.append(result)
-                args.output.write_text(json.dumps({'ci_runs': evidence, 'results': results}, indent=2) + '\n')
+                save_audit()
                 return result
             rollout(release, auth, apply, dry_run=False)
         finally:

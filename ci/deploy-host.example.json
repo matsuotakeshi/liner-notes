@@ -8,6 +8,7 @@
   "services": ["liner_notes", "liner_notes_web", "liner_notes_link"],
   "quiescence_users": ["liner_notes", "liner_notes_web", "liner_notes_link"],
   "quiescence_pidfiles": ["/var/run/liner-notes.pid"],
+  "runtime_pidfile": "/var/run/liner-notes.child.pid",
   "backup_roots": {
     "data": ["/var/db/liner-notes"],
     "config": ["/usr/local/etc/liner-notes"],
