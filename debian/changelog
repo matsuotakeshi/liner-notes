@@ -1,0 +1,6 @@
+liner-notes (0.74-1) unstable; urgency=medium
+
+  * Provide experimental Debian 13 core, Web and link packages.
+  * Preserve BBS data and local settings; never auto-start or auto-restart.
+
+ -- Liner Notes contributors <34602508+matsuotakeshi@users.noreply.github.com>  Sun, 08 Nov 2026 10:00:00 +0900

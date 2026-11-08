@@ -1,0 +1,19 @@
+#!/bin/sh
+set -e
+case "$1" in
+  configure)
+    getent group liner_notes >/dev/null || addgroup --quiet --system liner_notes
+    getent group liner_notes_linkctl >/dev/null || addgroup --quiet --system liner_notes_linkctl
+    getent passwd liner_notes >/dev/null ||
+      adduser --quiet --system --disabled-login --no-create-home \
+        --home /var/lib/liner-notes --ingroup liner_notes liner_notes
+    install -d -m 0700 -o liner_notes -g liner_notes \
+      /var/lib/liner-notes /var/log/liner-notes
+    for f in /etc/liner-notes/limits.conf /etc/liner-notes/vault-limits.conf \
+             /etc/liner-notes/doors.conf /etc/liner-notes/link-accounts.conf; do
+      if [ -f "$f" ]; then chgrp liner_notes "$f"; chmod 0640 "$f"; fi
+    done
+    ;;
+esac
+#DEBHELPER#
+exit 0

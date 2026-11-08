@@ -1,0 +1,17 @@
+#!/bin/sh
+set -e
+case "$1" in
+  configure)
+    getent group liner_notes_web >/dev/null || addgroup --quiet --system liner_notes_web
+    getent passwd liner_notes_web >/dev/null ||
+      adduser --quiet --system --disabled-login --no-create-home \
+        --home /var/lib/liner-notes-web --ingroup liner_notes_web liner_notes_web
+    install -d -m 0700 -o liner_notes_web -g liner_notes_web /var/lib/liner-notes-web
+    if [ -f /etc/liner-notes/web/web.toml ]; then
+      chgrp liner_notes_web /etc/liner-notes/web/web.toml
+      chmod 0640 /etc/liner-notes/web/web.toml
+    fi
+    ;;
+esac
+#DEBHELPER#
+exit 0
