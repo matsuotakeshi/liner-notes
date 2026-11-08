@@ -1,48 +1,50 @@
 name: Multi-OS Native CI
 
-# Native SSH tests use trusted LAN hosts and must not execute untrusted PR code.
+# One existing runner coordinates three remote suites concurrently.
+# Never dispatch private-LAN code from a PR or a non-main ref.
 on:
   push:
     branches: [main]
   workflow_dispatch:
-
 permissions:
   contents: read
-
 concurrency:
-  group: liner-notes-native-ci-${{ github.ref }}
+  group: liner-notes-native-hosts
   cancel-in-progress: false
-
 jobs:
-  freebsd:
-    name: FreeBSD native regression
-    uses: ./.github/workflows/freebsd-build-test.yml
-
-  rocky:
-    name: Rocky Linux native regression
-    uses: ./.github/workflows/rocky-build-test.yml
-
-  ubuntu:
-    name: Ubuntu native regression
-    uses: ./.github/workflows/ubuntu-build-test.yml
+  native:
+    name: Parallel FreeBSD / Rocky / Ubuntu regression
+    if: ${{ github.repository == 'matsuotakeshi/liner-notes' && github.ref == 'refs/heads/main' }}
+    runs-on: [self-hosted, Linux, X64]
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Run native suites through existing CI SSH accounts
+        run: python3 ci/native_ci.py --target all --output "$RUNNER_TEMP/native-results"
+      - name: Retain OS logs and exact-commit results
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: native-ci-results
+          path: |
+            ${{ runner.temp }}/native-results/*.log
+            ${{ runner.temp }}/native-results/results.json
+          if-no-files-found: warn
+          retention-days: 30
 
   release-gate:
     name: All required native suites passed
     if: ${{ always() }}
-    needs: [freebsd, rocky, ubuntu]
+    needs: [native]
     runs-on: ubuntu-24.04
     steps:
-      - name: Fail closed if a required suite failed, was skipped, or was cancelled
+      - name: Reject failed, skipped or cancelled native suites
         shell: bash
         env:
-          FREEBSD_RESULT: ${{ needs.freebsd.result }}
-          ROCKY_RESULT: ${{ needs.rocky.result }}
-          UBUNTU_RESULT: ${{ needs.ubuntu.result }}
+          NATIVE_RESULT: ${{ needs.native.result }}
         run: |
           set -euo pipefail
-          printf 'FreeBSD=%s Rocky=%s Ubuntu=%s\n' "$FREEBSD_RESULT" "$ROCKY_RESULT" "$UBUNTU_RESULT"
-          if [[ "$FREEBSD_RESULT" != success || "$ROCKY_RESULT" != success || "$UBUNTU_RESULT" != success ]]; then
-            echo "::error::Required native CI suite failed, skipped, or was cancelled"
-            exit 1
-          fi
+          test "$NATIVE_RESULT" = success
           echo "PASS: All 3 native OS suites passed on this exact commit."

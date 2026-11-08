@@ -1,65 +1,33 @@
-
 name: FreeBSD Build and Test
 
+# Manual/reusable entry point shares the same worker and host exclusion.
 on:
   workflow_dispatch:
   workflow_call:
-
 permissions:
   contents: read
-
 concurrency:
-  group: freebsd-build-test
+  group: liner-notes-native-hosts
   cancel-in-progress: false
-
 jobs:
   test:
     name: FreeBSD Native Tests
+    if: ${{ github.repository == 'matsuotakeshi/liner-notes' && github.ref == 'refs/heads/main' }}
     runs-on: [self-hosted, Linux, X64]
     timeout-minutes: 60
-
     steps:
-      - name: Checkout source
-        uses: actions/checkout@v7
-
-      - name: Transfer clean source
-        shell: bash
-        run: |
-          set -euo pipefail
-
-          SSH=(
-            ssh
-            -i /home/ci/.ssh/id_ed25519_freebsd_ci
-            -o BatchMode=yes
-            -o StrictHostKeyChecking=yes
-            -o ConnectTimeout=10
-          )
-
-          "${SSH[@]}" takeshi@10.0.0.50 \
-            'mkdir -p "$HOME/ci"; rm -rf "$HOME/ci/liner-notes"; mkdir -p "$HOME/ci/liner-notes"'
-
-          tar --exclude=.git -czf - \
-            -C "$GITHUB_WORKSPACE" . |
-            "${SSH[@]}" takeshi@10.0.0.50 \
-            'tar -xzf - -C "$HOME/ci/liner-notes"'
-
-      - name: Build and run regression tests
-        shell: bash
-        run: |
-          set -euo pipefail
-
-          ssh \
-            -i /home/ci/.ssh/id_ed25519_freebsd_ci \
-            -o BatchMode=yes \
-            -o StrictHostKeyChecking=yes \
-            -o ConnectTimeout=10 \
-            takeshi@10.0.0.50 \
-            'set -eu
-             cd "$HOME/ci/liner-notes"
-             export LINER_TEST_START_TIMEOUT=180
-             make -j2
-             make check'
-
-      - name: Test completed
-        run: |
-          echo "FreeBSD build and regression tests: PASS"
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Run native suites through existing CI SSH accounts
+        run: python3 ci/native_ci.py --target freebsd --output "$RUNNER_TEMP/native-results"
+      - name: Retain OS logs and exact-commit results
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: native-ci-freebsd-results
+          path: |
+            ${{ runner.temp }}/native-results/*.log
+            ${{ runner.temp }}/native-results/results.json
+          if-no-files-found: warn
+          retention-days: 30
