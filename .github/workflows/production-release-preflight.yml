@@ -50,25 +50,44 @@ jobs:
             exit 1
           fi
 
-          ci_json="$(gh api "repos/$GITHUB_REPOSITORY/actions/workflows/multi-os-ci.yml/runs?head_sha=$RELEASE_SHA&per_page=100")"
-          if ! jq -e --arg sha "$RELEASE_SHA" '
-            any(.workflow_runs[];
-              .head_sha == $sha and .head_branch == "main"
-              and .event == "push" and .conclusion == "success")
-          ' <<< "$ci_json" >/dev/null; then
-            echo "::error::No successful main push Multi-OS Native CI for this SHA"
-            exit 1
-          fi
+          # Refuse a dispatch that was queued before main moved.
+          assert_current_main() {
+            local current
+            current="$(gh api "repos/$GITHUB_REPOSITORY/git/ref/heads/main" --jq '.object.sha')"
+            if [[ "$current" != "$RELEASE_SHA" ]]; then
+              echo "::error::Main moved; only its current HEAD is eligible"
+              exit 1
+            fi
+          }
+          assert_current_main
 
-          connectivity_json="$(gh api "repos/$GITHUB_REPOSITORY/actions/workflows/production-ssh-smoke.yml/runs?head_sha=$RELEASE_SHA&per_page=100")"
-          if ! jq -e --arg sha "$RELEASE_SHA" '
-            any(.workflow_runs[];
-              .head_sha == $sha and .head_branch == "main"
-              and .event == "workflow_dispatch" and .conclusion == "success")
-          ' <<< "$connectivity_json" >/dev/null; then
-            echo "::error::Run Production SSH Connectivity Test successfully on this SHA before release"
-            exit 1
-          fi
+          evidence="$(mktemp -d "$RUNNER_TEMP/ln-release-admission.XXXXXXXX")"
+          trap 'rm -rf "$evidence"' EXIT
+          fetch_runs() {
+            local label="$1" workflow="$2"
+            gh api "repos/$GITHUB_REPOSITORY/actions/workflows/$workflow/runs?head_sha=$RELEASE_SHA&per_page=100" > "$evidence/$label.json"
+          }
+          fetch_runs native multi-os-ci.yml
+          fetch_runs freebsd freebsd-package.yml
+          fetch_runs rocky rocky-package.yml
+          fetch_runs debian debian-package.yml
+          fetch_runs release_set release-set.yml
+          fetch_runs connectivity production-ssh-smoke.yml
 
-          echo "PASS: exact main revision has 3-OS native CI success and production SSH connectivity success."
-          echo "READ ONLY: This preflight did not install software, change a server, or restart a service."
+          release_set_run_id="$(python3 ci/release_admission.py gates \
+            --source-sha "$RELEASE_SHA" \
+            --native-json "$evidence/native.json" \
+            --freebsd-json "$evidence/freebsd.json" \
+            --rocky-json "$evidence/rocky.json" \
+            --debian-json "$evidence/debian.json" \
+            --release-set-json "$evidence/release_set.json" \
+            --connectivity-json "$evidence/connectivity.json")"
+          gh api "repos/$GITHUB_REPOSITORY/actions/runs/$release_set_run_id/artifacts?per_page=100" > "$evidence/artifacts.json"
+          python3 ci/release_admission.py receipt \
+            --source-sha "$RELEASE_SHA" \
+            --run-id "$release_set_run_id" \
+            --artifacts-json "$evidence/artifacts.json"
+          assert_current_main
+
+          echo "PASS: exact main revision has native CI, pkg/RPM/DEB, verified release receipt and SSH connectivity evidence."
+          echo "READ ONLY: not a deployment, backup or restore authorization; no server changes or restarts."

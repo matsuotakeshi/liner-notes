@@ -1,6 +1,6 @@
 # Liner Notes CI/CD・本番リリース運用設計
 
-> 状態（2026-11-08）: **CI統合と本番リリース前の読み取り専用検査**。本番更新・自動ロールバックの実装はまだありません。専用権限、検証済みpkg/RPM/DEB、バックアップと復元方法が整うまでデプロイを有効にしないこと。
+> 状態（2026-11-08）: **3OSのCI候補生成・同一main SHAの照合・Debianの隔離パッケージリビジョン更新試験は成功**。本番リリース前の読み取り専用ゲートを強化中です。本番更新・自動ロールバックは未実装であり、OS別実更新・バックアップ/復元・リンク互換性確認までデプロイを有効にしないこと。
 
 ## 検証環境と本番環境
 
@@ -34,9 +34,13 @@
 
 手動起動のみ。mainの現在のコミットSHA（40桁）を入力し、次の一致を検査する。
 
-1. 選択ブランチは`main`、入力SHAは現在のmainのHEADと一致する。
-2. 同じSHAでpush起動した`Multi-OS Native CI`が成功している。
-3. 同じSHAで手動起動した`Production SSH Connectivity Test`が成功している。
+1. 選択ブランチは`main`、入力SHAは現在のmainのHEADと一致し、判定の前後にもmainが動いていない。
+2. 同じSHAでpush起動した`Multi-OS Native CI`と、FreeBSD 15 pkg / Rocky 10 RPM / Debian 13 DEBの3ワークフローがすべて成功している。
+3. 同じSHAに対応するFreeBSD CI完了起動の`Release Set Verification`が成功し、その実行に紐付いた未失効の`liner-notes-release-set-receipt`がある。
+4. 同じSHAで手動起動した`Production SSH Connectivity Test`が成功し、3局のSSHユーザー`ln-deploy`が非rootであることと、配布候補の対象OS/CPU（FreeBSD 15 amd64 / Rocky 10 x86_64 / Debian 13 amd64）が一致している。
+5. 同じコミットでの古い成功履歴を流用して新しい失敗や未完了実行を隠さない。
+
+この判定は`ci/release_admission.py`で行い、GitHub-hosted PRテストで失敗条件を検査します。証跡のSHA-256チェックは暗号署名ではありません。署名済みReleaseや本番ホストのバックアップ状態を示すものでもありません。
 
 現在の前検査は**サーバーへの変更、パッケージ更新、サービス停止・再起動を一切行わない**。GitHub Environment `production-release`を参照する。Environmentを使うだけでは手動承認の実効性はないため、GitHubの管理画面でRequired Reviewers等を設定し、有効性を確認すること。
 
@@ -44,9 +48,9 @@
 
 このPRでは上記前検査までを実装する。本番デプロイを有効化するには次が必要。
 
-1. 自宅検証環境でFreeBSD pkg・Rocky RPM・Debian基準DEBを構築し、OS別導入／更新／復元テストを実施。**DEB作成とDebianビルド環境はまだ開発待ち**。Ubuntu検証機を再構築せずDebian用ビルド環境はCI管理VM内の隔離環境を利用する。
+1. pkg/RPM/DEBの候補ビルド・同一SHA照合は成功済み。Debian 13は隔離コンテナで同一ソースの0.74-1→0.74-2リビジョン更新を検証済み。ただし**異なるアプリ版の更新・実DB互換・復元を検証したことにはならない**。FreeBSDとRockyの実更新/復元も残件。
 2. ビルド元コミット・パッケージのバージョン・SHA-256を一致させて成果物を固定し、署名・検証済み配布物をGitHub Releasesで公開。**本番でビルドしない**。
-3. リリース直前の設定差分、依存関係、実行アカウント、DB互換性、共有ボードリンクのプロトコル互換性を検査する。必要なBBS間の一時停止と再開手順も整える。
+3. リリース直前の設定差分、依存関係、実行アカウント、DB互換性、共有ボードリンクのプロトコル互換性を検査する。**0.74の共有ボードprotocol 2は0.73との混在運用非対応**。3局のリンクをすべて安全に停止し、整合バックアップを取ってから段階更新し、全局の正常稼働・版一致を確認して初めてリンクを再開する手順と試験が必要。
 4. 配布前に各本番BBSの設定・DB・会員・保管庫・リンク鍵・リンクDB・Doorデータを整合した方法でバックアップし、復元可能性も確認する。
 5. **Rocky → Debian → FreeBSD**の順に単一のバイナリ成果物を展開し、各局のLiner Notesだけを更新して稼働・BBS間リンクを検証。前局の更新・確認が失敗したら後続は止める。
 6. 以前のDBへ戻れないスキーマ更新やリンクプロトコル非互換がある場合、バイナリだけの自動ロールバックを禁止し、手動判断に移行する。
@@ -60,9 +64,9 @@
 
 ## リリース手順（現時点）
 
-1. mainへのpushによるネイティブ3OS CIの成功を確認。
-2. 同一SHAの`Production SSH Connectivity Test`を手動実行。
-3. 同一SHAで`Production Release Preflight (read only)`を手動実行。
+1. mainへのpushによるネイティブCI、pkg/RPM/DEB各CI、Release Set Verification、証跡Artifactの成功を確認。
+2. 同一SHAの`Production SSH Connectivity Test`を手動実行（読み取り専用）。
+3. 同一SHAで`Production Release Preflight (read only)`を手動実行し、すべての検証証跡が同じmainに紐付くか確認。
 4. 前検査が成功しても自動で本番更新は起きない。パッケージとOS別デプロイ・復旧手順の整備が完了してから、本番更新ジョブを別PRで追加する。
 
 本番に対して勝手な更新を始めず、段階的に承認された配布体制へ進める。

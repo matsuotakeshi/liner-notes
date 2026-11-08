@@ -5,6 +5,12 @@ on:
   pull_request:
     paths:
       - "scripts/verify_release_set.py"
+      - "ci/release_admission.py"
+      - "tests/test_release_admission.py"
+      - ".github/workflows/production-release-preflight.yml"
+      - ".github/workflows/production-ssh-smoke.yml"
+      - "ci/production-os-check.sh"
+      - "CI_CD.md"
       - "scripts/release_manifest.py"
       - "tests/test_verify_release_set.py"
       - "tests/test_release_manifest.py"
@@ -27,3 +33,5 @@ jobs:
         run: |
           python3 tests/test_release_manifest.py
           python3 tests/test_verify_release_set.py
+          python3 tests/test_release_admission.py
+          sh -n ci/production-os-check.sh
