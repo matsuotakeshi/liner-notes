@@ -94,3 +94,7 @@
 ## 2026-11-09 統合追加
 
 CI_CD.md / RELEASE_CANDIDATE.md / RELEASE_SET.md は開発用CI資料として `docs/development/release-ci/` に保管。誤ったoriginのpkgを導入しない制約は更新章へ統合。DEB.md のパッケージ構成・依存・非自動起動・検証範囲はLinux導入章へ統合。RPM.md の新しいCIリビジョン試験記録も開発資料へ保管しました。
+
+## CI/CD運用規則の恒久化（2026-11-09）
+
+ルートの `CI_CD.md` は現行の恒久運用方針へ更新し、AGENTS.mdとdocs/CONTRIBUTING.mdから参照します。`docs/development/release-ci/CI_CD.md` は2026-11-08時点の原本・検証記録としてハッシュ付きで保存しています。同記録の旧状態説明や本番再起動の許可は現行の権限ではありません。現在の作業にはルートCI_CD.mdの信頼済みmain限定・本番保護・個別承認規則を適用します。公開利用マニュアルへのCI開発記録の追加は行いません。
