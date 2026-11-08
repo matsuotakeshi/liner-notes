@@ -1,0 +1,28 @@
+name: Classify CI changes
+on:
+  workflow_call:
+    outputs:
+      build:
+        description: Whether full build/test/package verification is required
+        value: ${{ jobs.scope.outputs.build }}
+permissions:
+  contents: read
+jobs:
+  scope:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    outputs:
+      build: ${{ steps.classify.outputs.build }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - id: classify
+        run: python3 ci/change_scope.py
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ci-change-scope
+          path: ci-change-scope.json
+          if-no-files-found: error
+          retention-days: 30

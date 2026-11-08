@@ -113,7 +113,7 @@ class PolicyTests(unittest.TestCase):
             self.assertIn("results.json", artifact["with"]["path"])
         doc = yaml.load((folder / names[0]).read_text(), Loader=yaml.BaseLoader)
         gate = doc["jobs"]["release-gate"]
-        self.assertEqual(gate["needs"], ["native"])
+        self.assertEqual(gate["needs"], ["changes", "native"])
         self.assertEqual(gate["if"], "${{ always() }}")
         self.assertIn('test "$NATIVE_RESULT" = success', gate["steps"][0]["run"])
         lint = yaml.load((folder / "native-ci-lint.yml").read_text(), Loader=yaml.BaseLoader)

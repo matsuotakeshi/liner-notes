@@ -20,6 +20,11 @@ Work on a branch and open a PR. Require successful applicable GitHub-hosted
 checks before merging reviewed code to main, then verify the exact main commit
 with the existing FreeBSD, Rocky Linux and Ubuntu native CI. Investigate failures;
 do not disable tests or weaken conditions to obtain a passing result.
+Documentation-only changes use the shared CI scope classifier: keep Canonical
+manual and lightweight checks, but do not build binaries/packages or contact
+native VMs. Record those checks as not applicable, never as tests executed.
+Mixed/unknown changes and manual dispatch still require full verification.
+See the documentation-only exception in `CI_CD.md`.
 
 Self-hosted runners and home test hosts must execute trusted main code only.
 Never run unreviewed PR code against the home network or production. Manual
