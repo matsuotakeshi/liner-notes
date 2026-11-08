@@ -10,7 +10,7 @@
 
 必要な構築環境はGNU make、64ビットC11コンパイラ（ClangまたはGCC）、SQLiteとOpenSSLの開発用ヘッダー・ライブラリ、Python 3.9以上です。WebUIとBBS間リンクはPython 3.11以上に加え、それぞれaiohttp、cryptographyを必要とします。ZMODEM相互運用試験はlrz/lszが必要です。
 
-CIログにはOS、コンパイラ候補、ライブラリ配置、Python、正確なソースSHAを記録します。不足依存はOSへ自動導入せずに報告します。基本BBS、Door、WebUI、リンク、ZMODEMの検証状態は`SOLARIS_CAPABILITIES`行で区別します。追加依存がなく実行できなかった機能を成功扱いしません。
+CIログにはOS、コンパイラ候補、ライブラリ配置、Python、正確なソースSHAを記録します。OSパッケージは自動導入しません。WebUI・リンクのPython依存は作業コピー内の専用venvにrequirementsから導入し、既存のsystem Pythonを変更しません。インストール失敗もCI失敗として記録します。基本BBS、Door、WebUI、リンク、ZMODEMの検証状態は`SOLARIS_CAPABILITIES`行で区別します。追加依存がなく実行できなかった機能を成功扱いしません。
 
 ## ビルド上のOS差
 
@@ -58,7 +58,7 @@ SMFのcontractモデルで子プロセスを追跡し、停止は`:kill`で当�
 ## 現在の制約
 
 - 最初の実機CIではGCC15の厳密な警告とBSD flockの未提供を確認しました。警告の抑制はせず、該当箇所の改行と排他方式を修正中です。ビルド・機能試験の成功はまだ確認できていません。
-- 検証機にはPython3.11/3.13、cryptography、OpenSSL3、SQLite3.51がありますが、aiohttpはありません。WebUIの実機試験にはCI専用venv等で依存を準備する必要があります。
+- 検証機にはPython3.11/3.13、cryptography、OpenSSL3、SQLite3.51がありますが、aiohttpはありません。CIでは作業コピー内の専用venvへrequirementsからaiohttpを導入してからWebUIを検証します。依存導入・機能試験の成否は次の実機CIで確認します。
 - CIアカウントにはSMF管理権限がありません。既存OS設定や権限を自動変更せず、実サービス登録・稼働は未検証とします。
 - SMFマニフェストと設定保持を行うstaging installerを用意しています。実SMFでの登録・起動・停止・自動起動、および本番用の導入・更新手順は未検証です。FreeBSDのrc.dやLinuxのsystemdの手順をそのまま使用しないでください。
 - COM・モデムコネクタはFreeBSD/Linux向けです。Solaris対応はありません。
