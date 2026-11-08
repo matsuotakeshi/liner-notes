@@ -14,7 +14,7 @@ CIログにはOS、コンパイラ候補、ライブラリ配置、Python、正�
 
 ## ビルド上のOS差
 
-Solaris 11.4の`openpty`と`login_tty`はlibcにあり、`termios.h`で宣言されます。FreeBSD/Linux向けの`libutil`をSolarisへリンクしません。ソケットは`-lsocket -lnsl`を明示します。既存のPTY、端末サイズ伝達、Doorの排他・切断処理は維持し、端末の制御取得だけSolarisの`login_tty`へ委ねます。
+Solaris 11.4の`openpty`と`login_tty`はlibcにあり、`termios.h`で宣言されます。FreeBSD/Linux向けの`libutil`をSolarisへリンクしません。ソケットは`-lsocket -lnsl`を明示します。既存のPTYと端末サイズ伝達を維持し、端末の制御取得はSolarisの`login_tty`へ委ねます。SolarisにはBSDの`flock`がないため、専用の小さな子プロセスがPOSIXファイルロックを保持します。BBSとDoorへ継承したpipeがすべて閉じるまで保持し、BBSの異常終了後も生存中のDoorが同じ枠を占有します。FreeBSD/Linuxは従来の`flock`を使用します。
 
 独立した作業コピーでの検証入口は次のとおりです。CIでは上記のmain検証を通った後に同じコマンドを使用します。
 
@@ -57,7 +57,9 @@ SMFのcontractモデルで子プロセスを追跡し、停止は`:kill`で当�
 
 ## 現在の制約
 
-- Solarisの実機ビルドと機能試験は確認待ちです。CI結果に応じて必要な移植差分を追加します。
+- 最初の実機CIではGCC15の厳密な警告とBSD flockの未提供を確認しました。警告の抑制はせず、該当箇所の改行と排他方式を修正中です。ビルド・機能試験の成功はまだ確認できていません。
+- 検証機にはPython3.11/3.13、cryptography、OpenSSL3、SQLite3.51がありますが、aiohttpはありません。WebUIの実機試験にはCI専用venv等で依存を準備する必要があります。
+- CIアカウントにはSMF管理権限がありません。既存OS設定や権限を自動変更せず、実サービス登録・稼働は未検証とします。
 - SMFマニフェストと設定保持を行うstaging installerを用意しています。実SMFでの登録・起動・停止・自動起動、および本番用の導入・更新手順は未検証です。FreeBSDのrc.dやLinuxのsystemdの手順をそのまま使用しないでください。
 - COM・モデムコネクタはFreeBSD/Linux向けです。Solaris対応はありません。
 - FreeBSD pkg、RPM、DEBをSolarisへ導入できるという意味ではありません。

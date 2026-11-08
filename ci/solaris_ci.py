@@ -3,6 +3,7 @@
 import argparse
 import importlib.util
 import json
+import os
 from pathlib import Path
 import platform
 import shlex
@@ -73,6 +74,10 @@ def build_arguments():
                     cppflags.append("-I" + str(prefix / "include"))
                     ldflags.append("-L" + str(lib))
                     break
+    # Solaris pkg-config can return the 32-bit lib directory even for -m64.
+    ldflags = ["-L" + str(Path(flag[2:]) / "amd64")
+               if flag.startswith("-L") and (Path(flag[2:]) / "amd64").is_dir()
+               else flag for flag in ldflags]
     # Libraries found through pkg-config must also be discoverable by the runtime.
     ldflags.extend("-Wl,-R," + flag[2:] for flag in list(ldflags) if flag.startswith("-L"))
     return [make, "CC=" + compiler, "PYTHON=" + sys.executable,
@@ -84,10 +89,14 @@ def build_arguments():
 
 def test():
     flags = build_arguments()
+    for assignment in flags[1:]:
+        key, value = assignment.split("=", 1)
+        os.environ[key] = value
     capabilities = {"core": "not-tested", "door": "not-tested",
                     "webui": "not-tested", "link": "not-tested", "zmodem": "not-tested"}
     try:
         run(flags + ["-j2", "all"])
+        run([sys.executable, "tests/test_door_lock.py"])
         run([sys.executable, "tests/test_solaris_service.py"])
         run([sys.executable, "scripts/install-solaris.py", "--destdir", "build/solaris-stage", "--python", sys.executable])
         run(["/usr/sbin/svccfg", "validate", "build/solaris-stage/opt/liner-notes/share/smf/liner-notes.xml"])

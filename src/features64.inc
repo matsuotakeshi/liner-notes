@@ -59,7 +59,8 @@ static int features_import(const char *base) {
         if(present) { char command[256];snprintf(command,sizeof(command),"INSERT OR IGNORE INTO %s SELECT * FROM legacy.%s",tables[i],tables[i]);ok=feature_exec(command); }
     }
     if(ok)ok=feature_exec("INSERT INTO storage_imports VALUES('features');COMMIT");else feature_exec("ROLLBACK");
-    if(legacy && !feature_exec("DETACH DATABASE legacy"))ok=0;return ok;
+    if(legacy && !feature_exec("DETACH DATABASE legacy"))ok=0;
+    return ok;
 }
 static int features_open(const char *base) {
     char path[4096];if(snprintf(path,sizeof(path),"%s.features.sqlite",base)>=(int)sizeof(path))return 0;

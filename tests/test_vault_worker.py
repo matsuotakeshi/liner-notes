@@ -1,3 +1,4 @@
+import shlex, os
 """Deterministic blocked hash: BBS stays responsive; revocation prevents publication."""
 import hashlib
 import os
@@ -21,7 +22,7 @@ def run(binary,ctl):
     with tempfile.TemporaryDirectory(prefix='worker-isolation-') as d:
         p=pathlib.Path(d);vault=p/'vault';users=p/'users';data=p/'bbs';admins=p/'admins';gate=p/'gate';marker=p/'marker'
         shim=p/'slow.so'
-        subprocess.run(['cc','-shared','-fPIC','-pthread',str(pathlib.Path(__file__).with_name('slow_vault_io.c')),'-o',str(shim)],check=True)
+        subprocess.run([*shlex.split(os.environ.get('CC','cc')),*shlex.split(os.environ.get('CFLAGS','')), '-shared','-fPIC','-pthread',str(pathlib.Path(__file__).with_name('slow_vault_io.c')),'-o',str(shim)],check=True)
         subprocess.run([ctl,'init',str(vault)],check=True,capture_output=True)
         s=Server(binary,data,members=users,vault=vault)
         try:
