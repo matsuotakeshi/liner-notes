@@ -101,7 +101,11 @@ def test():
         else:
             capabilities["webui"] = "unverified: requires Python >=3.11 and aiohttp"
         if sys.version_info >= (3, 11) and importlib.util.find_spec("cryptography"):
+            run([sys.executable, "tests/test_link_store.py"])
+            run([sys.executable, "tests/test_link_tls.py"])
             run([sys.executable, "tests/test_link_bbs.py", "./runtime"])
+            run([sys.executable, "tests/test_link_service.py", "./runtime"])
+            run([sys.executable, "tests/test_stage74_links.py"])
             run([sys.executable, "tests/test_stage74_link_bbs.py", "./runtime"])
             capabilities["link"] = "passed"
         else:
