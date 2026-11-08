@@ -76,7 +76,7 @@
   "webui/deployment/apache.conf": "725cd6feb187808111277812b946eb208b4e94ff685bd5e340eda49c96e60f7f",
   "webui/example.toml": "a97e62182dc86eddaa67c7efe5df5d41426346d1ccc5d7a469d04591451fd27c",
   "webui/static/reports-ui.js": "44f7d9cdbec2eb1a0bfb7f01942b767593697e3f29385805a2e792ad31752065",
-  "src/locales/ja.def": "a08345693596494e81c70b436fe3cfce112f070c59a9031d2904c081928fa8fe",
+  "src/locales/ja.def": "d4b84e1df437222f6427178f33c8ca5213f830405c8dba123e94ac6b56218c67",
   "src/locales/en.def": "f5770d0c2c7507e12eadd929ac8b296f730c7db75b892b20c42d70260bc5e9b1",
   "tests/test_freebsd_plist.py": "b0d63881c93d6adbfcfa2a77fc80c2cb839ec4ac83604ad0244b03e1b3786ff0",
   "ci/build-freebsd-package.sh": "7f4b5bcec05e66acbf353aa08d622285964ca4c4292563989e63d13077f78f2c",

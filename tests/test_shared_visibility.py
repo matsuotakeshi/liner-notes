@@ -7,6 +7,7 @@ import asyncio
 import hashlib
 import json
 import sys
+import socket
 import tempfile
 from pathlib import Path
 
@@ -152,14 +153,15 @@ async def exercise(binary, root):
         assert response_data(await command(clients[1]['alice'], 'READ 4'))['article']['parent'] == 3
 
         # HTTP uses the same core decision, including the administrator view.
-        app = create_app({'web': {'origin': 'http://visibility.invalid', 'secure_cookies': False,
+        listener=socket.socket();listener.bind(('127.0.0.1',0))
+        port=listener.getsockname()[1];origin=f'http://127.0.0.1:{port}'
+        app = create_app({'web': {'origin': origin, 'secure_cookies': False,
                                  'spool': str(root/'spool'), 'messages': str(ROOT/'webui/messages')},
                           'bbs': {'host': '127.0.0.1', 'port': servers[1].port, 'telnet': True}})
         runner = web.AppRunner(app); await runner.setup()
-        site = web.TCPSite(runner, '127.0.0.1', 0); await site.start()
-        port = site._server.sockets[0].getsockname()[1]
+        site = web.SockSite(runner, listener); await site.start()
         try:
-            async with aiohttp.ClientSession(cookie_jar=aiohttp.CookieJar(unsafe=True), headers={'Origin': 'http://visibility.invalid'}) as http:
+            async with aiohttp.ClientSession(cookie_jar=aiohttp.CookieJar(unsafe=True), headers={'Origin': origin}) as http:
                 base = f'http://127.0.0.1:{port}/notes/api/'
                 async def request(route, payload):
                     async with http.post(base+route, json=payload) as r:

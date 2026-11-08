@@ -175,7 +175,7 @@ MESSAGE(ERR_PROFILE_TEXT, "ハンドル80バイト、自己紹介320バイト、
 MESSAGE(WITHDRAW_CONFIRM, "記事 #%u を取り消すには WITHDRAW %u CONFIRM を入力してください。本文は公開されなくなり、返信関係は残ります。\r\n")
 MESSAGE(WITHDRAW_SAVED, "記事 #%u を取り消しました。\r\n")
 MESSAGE(RETITLED, "記事 #%u の題名を変更しました。\r\n")
-MESSAGE(WITHDRAWN, "#%u （親 #%u）: 投稿者が取り消しました。\r\n")
+MESSAGE(WITHDRAWN, "#%u （親 #%u）: 投稿元で取り消されました。\r\n")
 MESSAGE(FIND, "横断・投稿者検索: %s\r\n")
 MESSAGE(FIND_ROW, "%u  [ボード %u / 親 %u] %s\r\n")
 MESSAGE(SCAN_HINT, "連続読み出し: Enterで次の記事、STOPまたはQで中止。既読にはしません。\r\n")
