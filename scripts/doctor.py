@@ -722,8 +722,9 @@ class Doctor:
             self.item('links',secret,user='liner_notes_link',private=True)
             self.read(secret,8192,secret=True)
             self.check_link_certificates(cfg, boards)
-            self.item('links',node['identity'],user='liner_notes_link',directory=True,private=True)
+            self.item('links',node['identity'],user='liner_notes_link',directory=True,private=True,writable=node.get('rotate_tls',False))
             self.item('links',str(PurePosixPath(node['database']).parent),user='liner_notes_link',directory=True,writable=True,private=True)
+            self.item('links',node['database'],user='liner_notes_link',writable=True,private=True)
             account_file = self.core.get('link-accounts')
             if account_file:
                 pairs = {}

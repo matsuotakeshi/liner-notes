@@ -327,6 +327,7 @@ class DoctorTests(unittest.TestCase):
         (self.root/'link').chmod(0o700)
         with closing(sqlite3.connect(self.root/'link/link.sqlite')) as db:
             db.executescript('CREATE TABLE events(seq INTEGER); CREATE TABLE cursors(peer TEXT,sequence INTEGER);');db.commit()
+        (self.root/'link/link.sqlite').chmod(0o600)
         self.write('/etc/liner-notes/link.toml',f'''[node]
 identity="/identity"
 database="/link/link.sqlite"
@@ -351,6 +352,17 @@ boards=["{board}"]
         self.assertFalse(any(r['status']=='error' for r in obj.results),obj.results)
         self.assertNotIn('SYNTHETIC-SECRET',json.dumps(obj.results))
         self.assertEqual(before,self.state())
+        if os.getuid()!=0:
+            database=self.root/'link/link.sqlite';database.chmod(0o400)
+            obj.results=[];obj.check_links()
+            self.assertTrue(any(r['code']=='permission' and r['location']=='/link/link.sqlite' for r in obj.results))
+            database.chmod(0o600)
+            config=self.root/'etc/liner-notes/link.toml'
+            config.write_text(config.read_text().replace('[node]\n','[node]\nrotate_tls=true\n'),encoding='utf-8')
+            (self.root/'identity').chmod(0o500)
+            obj.results=[];obj.check_links()
+            self.assertTrue(any(r['code']=='permission' and r['location']=='/identity' for r in obj.results))
+            (self.root/'identity').chmod(0o700)
         generate('/identity');generate('/peer',expired=True)
         obj.results=[];obj.check_link_certificates(cfg,{board:1})
         self.assertTrue(any(r['code']=='certificate' for r in obj.results))
