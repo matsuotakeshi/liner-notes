@@ -1,10 +1,11 @@
 name: Release Set Verification
 
-# Manually attest that all 3 package sets came from the exact same main commit.
+# Audit candidates after the trusted FreeBSD main-push package job succeeds.
 # Never connect to production hosts or enable deployment credentials.
 on:
-  push:
-    branches: [main]
+  workflow_run:
+    workflows: ["FreeBSD 15 Package CI"]
+    types: [completed]
   workflow_dispatch:
     inputs:
       source_sha:
@@ -22,9 +23,9 @@ concurrency:
 
 jobs:
   verify:
-    if: ${{ github.ref == 'refs/heads/main' }}
+    if: "${{ github.ref == 'refs/heads/main' && (github.event_name == 'workflow_dispatch' || (github.event_name == 'workflow_run' && github.event.workflow_run.event == 'push' && github.event.workflow_run.head_branch == 'main' && github.event.workflow_run.conclusion == 'success')) }}"
     runs-on: ubuntu-24.04
-    timeout-minutes: 25
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
         with:
@@ -33,7 +34,7 @@ jobs:
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
-          SOURCE_SHA: ${{ github.event_name == 'workflow_dispatch' && inputs.source_sha || github.sha }}
+          SOURCE_SHA: ${{ github.event_name == 'workflow_dispatch' && inputs.source_sha || github.event.workflow_run.head_sha }}
         run: |
           set -euo pipefail
           if [[ ! "$SOURCE_SHA" =~ ^[0-9a-f]{40}$ ]]; then
@@ -53,8 +54,9 @@ jobs:
           fetch_platform() {
             local platform="$1" workflow="$2" artifact="$3"
             local record run_id result attempt
-            # The independent main-push package workflows may not have
-            # completed yet. Poll with a bounded timeout; fail closed.
+            # A successful FreeBSD main-push package job triggers this check.
+            # The other independent package jobs may still be finishing.
+            # Poll with a bounded timeout; fail closed.
             for attempt in {1..60}; do
               record="$(gh api "repos/$GITHUB_REPOSITORY/actions/workflows/$workflow/runs?head_sha=$SOURCE_SHA&per_page=100" |
                 jq -r --arg sha "$SOURCE_SHA" '

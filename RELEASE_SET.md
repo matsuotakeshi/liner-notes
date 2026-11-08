@@ -26,10 +26,15 @@ Directory layout:
     candidates/rocky10/{liner-notes*.rpm, RELEASE-MANIFEST.json, SHA256SUMS, BUILD-INFO.txt}
     candidates/debian13/{liner-notes*.deb, RELEASE-MANIFEST.json, SHA256SUMS, BUILD-INFO.txt}
 
-The GitHub workflow "Release Set Verification" triggers automatically on
-every main push and can also be run manually against current main HEAD.
-It waits for the independent platform CI jobs (with a strict timeout),
-rejects missing/failed runs and verifies the exact same SHA. It downloads
+The GitHub workflow "Release Set Verification" triggers only when the
+trusted main-push **FreeBSD 15 Package CI** succeeds (or through manual
+workflow dispatch for current main HEAD). Its trigger is deliberately after
+FreeBSD packaging because the single local self-hosted runner may first
+execute a lengthy Multi-OS Native CI suite. This avoids beginning a
+short-lived release verification while FreeBSD packaging is still queued.
+The verifier waits for any unfinished Rocky/Debian package jobs with a
+strict timeout, rejects missing/failed runs and checks the same SHA.
+It downloads
 candidates from separate successful *main push* runs for the exact
 main HEAD, validates them, and publishes RELEASE-SET.json plus authenticated-source-run references
 (RELEASE-SOURCES.txt) as Actions artifacts. No deployment credentials are loaded.
