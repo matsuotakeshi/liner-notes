@@ -44,7 +44,7 @@
   "ports/comms/liner-notes/files/liner_notes.in": "e42460c324202635956856b6bc605f38dd004de3c3c67fe14396a08fdec500e2",
   "ports/comms/liner-notes/pkg-plist": "a5e59403fcec9d2841014a74368e287f9e93baf67b4b73c3b5294d3e09196539",
   "scripts/configure-zmodem.py": "2abc3c427aa5f93a8920cfce7a390bc8624b5958d72ddd3f8b4df4244c7dc838",
-  "scripts/doctor.py": "a0b61f870c638947f5452f49066502db9d364707acc555fbfa65ee9c4614d396",
+  "scripts/doctor.py": "bc17cd9b29361c1f596edf43b227737c704b1ba41f400f4c98eeb017f76749a6",
   "scripts/door_clans.sh": "42d098ab56618024c6fa89a86c7f575a41a18082cf0ef1e71797b83675026fc5",
   "scripts/install-linux.py": "e41194a57563a0581f65efd59bdd7f37420cc4366cba11757bbdb77675a0e2c8",
   "scripts/liner-notes-ssh": "f73b5ebd8e24bff366c93fdf3f518a87feefb226e0b809df67eed04f190a8969",

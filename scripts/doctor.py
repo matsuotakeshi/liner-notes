@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 """Read-only local installation diagnostics. Never sources configuration or runs games."""
 from __future__ import annotations
+import sys
+sys.dont_write_bytecode = True
 import argparse
 import datetime
 import hashlib
@@ -18,14 +20,12 @@ import sqlite3
 import ssl
 import stat
 import subprocess
-import sys
 import tempfile
 import time
 import tomllib
 from urllib.parse import urlsplit
 
 # No BBS/Web/link modules are imported: several initialise stores on construction.
-sys.dont_write_bytecode = True
 CHECKS = ('config', 'database', 'links', 'doors', 'transfers', 'permissions', 'selinux')
 TEXT = {
  'ok': ('確認できました。', 'Check passed.'),
