@@ -2,6 +2,10 @@
 # Read-only architecture/OS target probe; streamed to ln-deploy via SSH.
 # Does not inspect private files, stop processes, install or change anything.
 set -eu
+if [ "$(id -un)" != "ln-deploy" ] || [ "$(id -u)" -eq 0 ]; then
+  echo 'Expected unprivileged ln-deploy account' >&2
+  exit 1
+fi
 if [ "$#" -ne 1 ]; then
   echo 'Expected exactly one release target' >&2
   exit 2
