@@ -32,7 +32,7 @@ jobs:
             rockylinux/rockylinux:10 bash -euc '
               dnf install -y --setopt=install_weak_deps=False selinux-policy-devel rpm-build make python3
               mkdir -p /build/{SOURCES,SPECS,BUILD,BUILDROOT,RPMS,SRPMS}
-              cp /source/linux/selinux/* /build/SOURCES/
+              cp /source/linux/selinux/liner_notes.te /source/linux/selinux/liner_notes.fc /source/linux/selinux/selinux_labels.py /build/SOURCES/
               cp /source/LICENSE /build/SOURCES/
               rpmbuild -ba --define "_topdir /build" /source/linux/selinux/liner-notes-selinux.spec
               cp /build/RPMS/noarch/*.rpm /out/
