@@ -29,11 +29,18 @@ jobs:
           persist-credentials: false
       - name: Test candidate artifact integrity checks
         run: python3 tests/test_release_manifest.py
+      - name: Generate the canonical offline manual
+        shell: bash
+        run: |
+          python3 -m venv "$RUNNER_TEMP/manual-venv"
+          "$RUNNER_TEMP/manual-venv/bin/pip" install -r scripts/manual/requirements.txt
+          "$RUNNER_TEMP/manual-venv/bin/python" scripts/manual/build.py docs/book
+          "$RUNNER_TEMP/manual-venv/bin/python" scripts/manual/check.py docs/book
       - name: Fix source inputs to the exact checkout
         shell: bash
         run: |
           set -euo pipefail
-          git ls-files | LC_ALL=C sort > SOURCE-MANIFEST
+          { git ls-files; find docs/book -type f; } | LC_ALL=C sort -u > SOURCE-MANIFEST
       - name: Build 3 RPMs inside disposable Rocky Linux 10
         shell: bash
         run: |
@@ -70,7 +77,7 @@ jobs:
                 rpm -qp --scripts "/out/${packages[$name]}" >/dev/null
               done
               python3 scripts/release_manifest.py create \
-                --platform rocky10 --version 0.74-1 --source-sha "$SOURCE_SHA" \
+                --platform rocky10 --version 0.74.1-1 --source-sha "$SOURCE_SHA" \
                 --directory /out \
                 --package "liner-notes=${packages[liner-notes]}" \
                 --package "liner-notes-web=${packages[liner-notes-web]}" \

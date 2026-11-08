@@ -1,3 +1,9 @@
+liner-notes (0.74.1-1) unstable; urgency=medium
+
+  * Align bilingual HELP and install the integrated current manual.
+
+ -- Liner Notes contributors <34602508+matsuotakeshi@users.noreply.github.com>  Mon, 09 Nov 2026 10:00:00 +0900
+
 liner-notes (0.74-1) unstable; urgency=medium
 
   * Provide experimental Debian 13 core, Web and link packages.

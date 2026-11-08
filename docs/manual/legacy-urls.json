@@ -1,0 +1,904 @@
+{
+  "documents": {
+    "README.md": "overview",
+    "PLATFORMS.md": "overview",
+    "STAGE2.md": "overview",
+    "STAGE3.md": "overview",
+    "STAGE4.md": "overview",
+    "STAGE5.md": "overview",
+    "STAGE6.md": "overview",
+    "STAGE28.md": "overview",
+    "STAGE30.md": "overview",
+    "STAGE31.md": "overview",
+    "STAGE72.md": "overview",
+    "STAGE74.md": "overview",
+    "INSTALL.md": "install-freebsd",
+    "PORTS.md": "install-freebsd",
+    "UPGRADING.md": "upgrade",
+    "LINUX.md": "install-linux",
+    "RPM.md": "install-linux",
+    "PASSWORD.md": "accounts",
+    "COMMANDS.md": "navigation",
+    "HELP.md": "navigation",
+    "PAGER.md": "navigation",
+    "LIST_PAGER.md": "navigation",
+    "CONTENT_AUDIT.md": "boards",
+    "BOARD_UNREAD.md": "article-search",
+    "LOGIN_UNREAD.md": "article-search",
+    "NEXT_BOARD.md": "article-search",
+    "SEARCH.md": "article-search",
+    "THREAD_UNREAD.md": "article-search",
+    "UNREAD_THREADS.md": "article-search",
+    "DRAFT_EDIT.md": "editor",
+    "DRAFT_NOTICE.md": "editor",
+    "DRAFT_UNDO.md": "editor",
+    "PREVIEW.md": "editor",
+    "SAVED_DRAFT.md": "editor",
+    "MEMBER_MAIL.md": "mail",
+    "MAIL_ATTACHMENTS.md": "mail",
+    "CHAT.md": "conversation",
+    "CHAT_ADMIN.md": "conversation",
+    "TALK.md": "conversation",
+    "PREFERENCES.md": "personal-settings",
+    "I18N.md": "personal-settings",
+    "ADMIN.md": "permissions",
+    "STAGE58.md": "permissions",
+    "STAGE59.md": "permissions",
+    "MEMBERS_ADMIN.md": "member-admin",
+    "STAGE62.md": "member-admin",
+    "STAGE60.md": "board-admin",
+    "STAGE64.md": "board-admin",
+    "FILE_BOARDS.md": "file-admin",
+    "STAGE61.md": "file-admin",
+    "VAULT.md": "files",
+    "STAGE56.md": "files",
+    "STAGE57.md": "files",
+    "STAGE69.md": "files",
+    "AUDIT.md": "logs",
+    "HISTORY.md": "logs",
+    "DAEMON.md": "operations",
+    "MAINTENANCE.md": "backup-recovery",
+    "STAGE63.md": "backup-recovery",
+    "DATABASE_STRUCTURED.md": "storage",
+    "STAGE67.md": "storage",
+    "STAGE70.md": "storage",
+    "STAGE71.md": "storage",
+    "WEBUI.md": "web-server",
+    "WEBUI_REVIEW_VERIFICATION.md": "web-server",
+    "STAGE73.md": "web-server",
+    "WEBUI_COVERAGE.md": "web-users",
+    "TRANSPORTS.md": "connections",
+    "ZMODEM.md": "transfers",
+    "ZMODEM_MENU.md": "transfers",
+    "ZUPLOAD_FIX.md": "transfers",
+    "ZRESUME_FIX.md": "transfers",
+    "TRANSFER.md": "protocol",
+    "BINARY_TRANSFER.md": "protocol",
+    "UPLOAD.md": "protocol",
+    "DOORS.md": "external-games",
+    "DOOR_OPERATIONS.md": "external-games",
+    "DOOR_GENERIC_VERIFICATION.md": "external-games",
+    "DOOR_RESIZE_VERIFICATION.md": "external-games",
+    "STAGE65.md": "external-games",
+    "STAGE66.md": "external-games",
+    "STARROUTE.md": "starroute-integration",
+    "SERIAL.md": "serial-connector",
+    "BBS_LINKS.md": "links",
+    "BBS_LINK_OPERATIONS.md": "link-operations",
+    "THIRD_PARTY.md": "licenses"
+  },
+  "install_anchors": {
+    "preflight": "install-freebsd",
+    "install-package": "install-freebsd",
+    "layout": "layout",
+    "initial-config": "initial-setup",
+    "transfer-setup": "initial-setup",
+    "first-admin": "initial-setup",
+    "smoke-test": "initial-setup",
+    "backup-restore": "backup-recovery",
+    "public-telnet": "connections",
+    "troubleshooting": "troubleshooting",
+    "webui-setup": "web-server",
+    "web-troubleshooting": "web-server",
+    "doors-setup": "external-games",
+    "upgrade-entry": "upgrade",
+    "config-reference": "configuration",
+    "acceptance": "initial-setup"
+  },
+  "anchors": {
+    "ADMIN.md": {
+      "第9段階-管理者と記事の非表示復元": "backup-recovery.html",
+      "初期管理者の指定": "permissions.html",
+      "管理操作": "permissions.html",
+      "非表示記事の扱い": "permissions.html",
+      "保存とバックアップ": "backup-recovery.html",
+      "検証": "permissions.html",
+      "content": "permissions.html"
+    },
+    "AUDIT.md": {
+      "管理操作履歴-第11段階": "logs.html",
+      "操作": "logs.html",
+      "保存と通信への依存": "logs.html",
+      "検証項目": "logs.html",
+      "content": "logs.html"
+    },
+    "BBS_LINKS.md": {
+      "公開鍵で識別する共有ボードリンクstage73": "links.html",
+      "共有単位と権限": "permissions.html",
+      "freebsdでの準備": "links.html",
+      "スター型リング型": "links.html",
+      "状態復旧バックアップ": "backup-recovery.html",
+      "現在の境界": "links.html"
+    },
+    "BBS_LINK_OPERATIONS.md": {
+      "共有ボードの管理保守protocol-2": "links.html",
+      "状態表示停止再試行": "operations.html",
+      "大規模ボード": "link-operations.html",
+      "履歴の整理": "backup-recovery.html",
+      "新規bbsの参加": "link-operations.html",
+      "通信鍵の更新": "upgrade.html"
+    },
+    "BINARY_TRANSFER.md": {
+      "バイナリ転送専用モードと保管庫ワーカーstage37": "files.html",
+      "使い方": "protocol.html",
+      "専用モード": "protocol.html",
+      "ワーカーと認可": "protocol.html",
+      "検証": "protocol.html",
+      "content": "protocol.html"
+    },
+    "BOARD_UNREAD.md": {
+      "ボード一覧の未読件数-第22段階": "article-search.html",
+      "raw応答": "article-search.html",
+      "検証": "article-search.html",
+      "content": "article-search.html"
+    },
+    "CHAT.md": {
+      "rtbbs風の共通チャット室stage39": "conversation.html",
+      "使い方": "conversation.html",
+      "会話と履歴": "logs.html",
+      "構成": "conversation.html",
+      "今回の範囲": "conversation.html",
+      "検証": "conversation.html",
+      "content": "conversation.html"
+    },
+    "CHAT_ADMIN.md": {
+      "管理者によるチャット退出措置stage43": "conversation.html",
+      "退出後の扱い": "conversation.html",
+      "操作履歴": "logs.html",
+      "更新と試作配置": "upgrade.html",
+      "content": "conversation.html"
+    },
+    "COMMANDS.md": {
+      "rtbbs風コマンド整理-liner-notes-stage67": "backup-recovery.html",
+      "操作の原則": "navigation.html",
+      "主メニュー旧rtbbsへ合わせたキー": "navigation.html",
+      "掲示板読書": "navigation.html",
+      "メール保管庫": "mail.html",
+      "エディタ設定プロフィール": "editor.html",
+      "揃えていない操作残る差分": "navigation.html",
+      "liner-notes独自機能として名前付きで残すもの": "navigation.html",
+      "stage66以前からの更新": "upgrade.html",
+      "content": "navigation.html"
+    },
+    "CONTENT_AUDIT.md": {
+      "取り消し題名変更の操作履歴統合第29段階": "logs.html",
+      "操作と閲覧権限": "permissions.html",
+      "保存と過去の記録": "boards.html",
+      "検証": "boards.html",
+      "メニュー表示の追加": "boards.html",
+      "content": "boards.html"
+    },
+    "DAEMON.md": {
+      "第32段階-freebsd-daemon-rcd-サービス": "operations.html",
+      "できること": "operations.html",
+      "今の検証機へ設定する例": "operations.html",
+      "設定項目": "operations.html",
+      "外部telnetssh": "operations.html",
+      "隔離検証": "operations.html",
+      "content": "operations.html"
+    },
+    "DATABASE_STRUCTURED.md": {
+      "項目別テーブルへの別コピー移行": "storage.html"
+    },
+    "DOORS.md": {
+      "freebsd外部ゲーム": "external-games.html",
+      "汎用ドロップファイルと同時起動枠": "files.html",
+      "the-clansネイティブ版の導入": "external-games.html",
+      "既存の-usrlocalclans-を使う場合": "external-games.html",
+      "content": "external-games.html"
+    },
+    "DOOR_GENERIC_VERIFICATION.md": {
+      "汎用door連携ゲームメニューの実装記録": "external-games.html",
+      "実装の境界codex-workへの引き継ぎ": "external-games.html",
+      "検証環境と分離": "external-games.html",
+      "試験": "external-games.html",
+      "同時収録のwebui修正": "web-server.html",
+      "実行結果": "external-games.html",
+      "content": "external-games.html"
+    },
+    "DOOR_OPERATIONS.md": {
+      "doorの追加更新復旧手順": "external-games.html",
+      "追加前の確認": "external-games.html",
+      "独立環境で確認する順序": "external-games.html",
+      "本番へ反映するとき": "external-games.html"
+    },
+    "DOOR_RESIZE_VERIFICATION.md": {
+      "door実行中のtelnet端末サイズ変更": "external-games.html",
+      "取り込み元と比較": "external-games.html",
+      "採用した挙動": "external-games.html",
+      "検証方法": "external-games.html",
+      "最終候補の確認結果": "external-games.html",
+      "既存試験で判明した問題": "external-games.html",
+      "content": "external-games.html"
+    },
+    "DRAFT_EDIT.md": {
+      "下書きの題名行編集-第18段階": "editor.html",
+      "コマンドを本文に書く場合": "editor.html",
+      "表示と保存": "editor.html",
+      "検証": "editor.html",
+      "content": "editor.html"
+    },
+    "DRAFT_NOTICE.md": {
+      "ログイン時の保存下書き案内-第21段階": "editor.html",
+      "検証": "editor.html",
+      "content": "editor.html"
+    },
+    "DRAFT_UNDO.md": {
+      "下書きの行挿入とundo-第19段階": "editor.html",
+      "履歴の寿命": "logs.html",
+      "検証": "editor.html",
+      "content": "editor.html"
+    },
+    "FILE_BOARDS.md": {
+      "ファイルボードの設定と操作stage54": "files.html",
+      "管理者の設定": "file-admin.html",
+      "既存保管庫への導入": "files.html",
+      "利用者の操作": "file-admin.html",
+      "コネクタと保存形式": "storage.html",
+      "今回の対象外": "file-admin.html",
+      "content": "file-admin.html"
+    },
+    "HELP.md": {
+      "操作別ヘルプ-第27段階": "navigation.html",
+      "ページ送りと状態維持": "navigation.html",
+      "本文入力中": "navigation.html",
+      "raw通信と構成": "navigation.html",
+      "検証": "navigation.html",
+      "stage39の追加": "navigation.html",
+      "stage40-個別トーク": "conversation.html",
+      "stage41-受信設定": "transfers.html",
+      "stage42-受信設定の保存": "transfers.html",
+      "stage43-管理者のチャット退出措置": "conversation.html",
+      "stage44-メール室外トーク": "mail.html",
+      "content": "navigation.html"
+    },
+    "HISTORY.md": {
+      "liner-notes-第64段階の試作": "logs.html",
+      "stage56-上限helpバナー一括転送旧式エディタ": "editor.html",
+      "stage55-非公開のメール添付": "mail.html",
+      "stage54-ファイルボードの権限と階層": "permissions.html",
+      "stage53-本文16kibと停止中のデータ整理": "backup-recovery.html",
+      "整理ツール": "backup-recovery.html",
+      "stage52-日付検索メール本文検索接続者メモsysop呼び出し": "mail.html",
+      "stage51-保管庫の一括送信登録後の管理新着一覧": "files.html",
+      "stage50-会員レベルグループ登録方式機能停止": "member-admin.html",
+      "会員レベルとグループ": "member-admin.html",
+      "登録方式": "logs.html",
+      "機能単位の停止": "operations.html",
+      "データの互換性": "upgrade.html",
+      "検証配置": "logs.html",
+      "stage55時点の残作業履歴現状はstage63mdを参照": "logs.html",
+      "将来の実装キュー着手待ち": "logs.html",
+      "方針": "logs.html",
+      "freebsdでの実行": "logs.html",
+      "受入試験": "logs.html",
+      "次の段階": "logs.html",
+      "content": "logs.html"
+    },
+    "I18N.md": {
+      "表示メッセージの多言語対応": "personal-settings.html",
+      "操作": "personal-settings.html",
+      "開発時の追加方法": "personal-settings.html",
+      "content": "personal-settings.html"
+    },
+    "INSTALL.md": {
+      "liner-notes-074-導入運用開始マニュアル": "install-freebsd.html",
+      "preflight": "install-freebsd.html#preflight",
+      "1-導入前の確認": "install-freebsd.html",
+      "install-package": "install-freebsd.html#install-package",
+      "2-配布物とportsのインストール": "install-freebsd.html",
+      "layout": "layout.html#layout",
+      "3-インストール先": "install-freebsd.html",
+      "initial-config": "initial-setup.html#initial-config",
+      "4-初回起動の設定": "operations.html",
+      "transfer-setup": "initial-setup.html#transfer-setup",
+      "5-保管庫とzmodemの準備": "files.html",
+      "first-admin": "initial-setup.html#first-admin",
+      "6-起動と管理者の登録": "operations.html",
+      "61-最初のボードと案内": "board-admin.html",
+      "smoke-test": "initial-setup.html#smoke-test",
+      "7-公開前の動作確認": "install-freebsd.html",
+      "backup-restore": "backup-recovery.html#backup-restore",
+      "8-初期バックアップと復元確認": "backup-recovery.html",
+      "public-telnet": "connections.html#public-telnet",
+      "9-外部公開": "install-freebsd.html",
+      "91-標準のtelnetポート23で待ち受ける": "install-freebsd.html",
+      "10-運用設定と案内文": "board-admin.html",
+      "troubleshooting": "troubleshooting.html#troubleshooting",
+      "11-起動と接続のトラブル": "operations.html",
+      "webui-setup": "web-server.html#webui-setup",
+      "12-webuiとapache-https": "web-server.html",
+      "121-接続経路と準備": "operations.html",
+      "122-webtomlを編集する": "editor.html",
+      "123-apacheより手前で動作を確認する": "web-server.html",
+      "124-apacheのvirtualhost": "web-server.html",
+      "125-ブラウザーでの確認と差し替え": "install-freebsd.html",
+      "126-転送上限再開の確認": "transfers.html",
+      "web-troubleshooting": "web-server.html#web-troubleshooting",
+      "127-webのトラブルを層ごとに切り分ける": "web-server.html",
+      "doors-setup": "external-games.html#doors-setup",
+      "13-starroute-tradersthe-clansとゲームメニュー": "external-games.html",
+      "131-共通の設定": "install-freebsd.html",
+      "132-既存starroute-traders": "starroute-integration.html",
+      "133-既存の-usrlocalclans-を登録する": "external-games.html",
+      "134-反映と動作確認": "install-freebsd.html",
+      "upgrade-entry": "upgrade.html#upgrade-entry",
+      "14-既存環境の更新元に戻す手順": "upgrade.html",
+      "config-reference": "configuration.html#config-reference",
+      "15-よく変更する設定と上限": "limits.html",
+      "acceptance": "initial-setup.html#acceptance",
+      "16-公開前の最終確認と検証範囲": "install-freebsd.html",
+      "content": "install-freebsd.html",
+      "liner-notes-072-導入運用開始マニュアル": "install-freebsd.html"
+    },
+    "LINUX.md": {
+      "rocky-linux-almalinux": "install-linux.html",
+      "ビルド": "install-freebsd.html",
+      "インストール": "install-freebsd.html",
+      "保管庫zmodem": "files.html",
+      "ドアゲーム": "external-games.html",
+      "comと共有ボードリンク": "serial-connector.html",
+      "更新と検証範囲": "upgrade.html",
+      "content": "install-linux.html"
+    },
+    "LIST_PAGER.md": {
+      "一覧の画面ページ送り-第16段階": "navigation.html",
+      "2種類の続き": "navigation.html",
+      "権限と状態": "permissions.html",
+      "検証": "navigation.html",
+      "content": "navigation.html"
+    },
+    "LOGIN_UNREAD.md": {
+      "ログイン時の未読状況案内-第26段階": "board-admin.html",
+      "集計対象": "article-search.html",
+      "通信と保存": "article-search.html",
+      "検証": "article-search.html",
+      "content": "article-search.html"
+    },
+    "MAIL_ATTACHMENTS.md": {
+      "メール添付ファイルstage65": "mail.html",
+      "端末での操作": "mail.html",
+      "専用転送クライアント": "transfers.html",
+      "保存権限削除": "permissions.html",
+      "更新バックアップ整理": "backup-recovery.html",
+      "実装の境界": "mail.html",
+      "content": "mail.html"
+    },
+    "MAINTENANCE.md": {
+      "外部メンテナンスツールstage63": "backup-recovery.html",
+      "最初に確認すること": "backup-recovery.html",
+      "バックアップ": "backup-recovery.html",
+      "検証": "backup-recovery.html",
+      "復元": "backup-recovery.html",
+      "データ整理": "backup-recovery.html",
+      "検証コマンド": "backup-recovery.html",
+      "会員保管庫設定の整理stage63": "member-admin.html",
+      "stage64-取り消し記事の本文回収": "backup-recovery.html",
+      "content": "backup-recovery.html"
+    },
+    "MEMBERS_ADMIN.md": {
+      "第10段階-会員の利用停止解除": "member-admin.html",
+      "操作": "member-admin.html",
+      "停止と解除の意味": "operations.html",
+      "保存と異常時": "member-admin.html",
+      "comwebアダプターへの契約": "web-server.html",
+      "検証": "member-admin.html",
+      "content": "member-admin.html"
+    },
+    "MEMBER_MAIL.md": {
+      "会員間メールstage48": "mail.html",
+      "操作": "mail.html",
+      "保存と構成": "mail.html",
+      "rtbbsとの操作上の差": "mail.html",
+      "検証": "mail.html",
+      "stage45-メール下書きの保存再開": "editor.html",
+      "stage46-ログイン時のメール下書き案内": "editor.html",
+      "stage47-ログイン中のメール新着通知": "mail.html",
+      "stage48-会員ごとの新着通知onoff": "member-admin.html",
+      "stage52-題名本文検索": "article-search.html",
+      "content": "mail.html"
+    },
+    "NEXT_BOARD.md": {
+      "未読のある次のボードへ-第23段階": "article-search.html",
+      "raw応答と構成": "article-search.html",
+      "検証": "article-search.html",
+      "content": "article-search.html"
+    },
+    "PAGER.md": {
+      "記事のページ送り-第14段階": "navigation.html",
+      "画面サイズ": "navigation.html",
+      "実装とcomweb": "web-server.html",
+      "検証": "navigation.html",
+      "content": "navigation.html"
+    },
+    "PASSWORD.md": {
+      "パスワード変更-第12段階": "board-admin.html",
+      "変更後の接続": "operations.html",
+      "保存と復旧": "accounts.html",
+      "comwebへの拡張": "web-server.html",
+      "検証": "accounts.html",
+      "content": "accounts.html"
+    },
+    "PLATFORMS.md": {
+      "対応osと移植の見通し": "overview.html",
+      "content": "overview.html"
+    },
+    "PORTS.md": {
+      "liner-notes-freebsd-port-074": "install-freebsd.html",
+      "インストール": "install-freebsd.html",
+      "配置": "install-freebsd.html",
+      "rcconfからの設定と起動": "operations.html",
+      "メニューとhelpの更新": "upgrade.html",
+      "旧portからの更新": "upgrade.html",
+      "管理とバックアップ": "backup-recovery.html",
+      "com共有ボードzmodem外部ゲーム": "transfers.html",
+      "検証公開準備": "install-freebsd.html",
+      "content": "install-freebsd.html",
+      "liner-notes-freebsd-port-072": "install-freebsd.html",
+      "zmodem外部ゲーム": "transfers.html"
+    },
+    "PREFERENCES.md": {
+      "表示設定stage65": "personal-settings.html",
+      "content": "personal-settings.html"
+    },
+    "PREVIEW.md": {
+      "投稿返信のプレビュー-第17段階": "editor.html",
+      "ページ送りと中止": "editor.html",
+      "保存権限接続": "permissions.html",
+      "検証": "editor.html",
+      "content": "editor.html"
+    },
+    "README.md": {
+      "liner-notes-074": "overview.html",
+      "最初に読む文書": "overview.html",
+      "ビルドと試運転": "install-freebsd.html",
+      "検証": "overview.html",
+      "ライセンス": "overview.html",
+      "content": "overview.html",
+      "liner-notes-072": "overview.html"
+    },
+    "RPM.md": {
+      "linux-rpm074": "install-linux.html",
+      "配置とサービス": "install-linux.html",
+      "新規導入": "install-freebsd.html",
+      "更新": "upgrade.html",
+      "ビルドと検査": "install-freebsd.html"
+    },
+    "SAVED_DRAFT.md": {
+      "下書きの一時保存再開-第20段階": "editor.html",
+      "入力中の下書きと保存コピー": "editor.html",
+      "権限": "permissions.html",
+      "保存形式と復旧": "storage.html",
+      "通信と検証": "editor.html",
+      "content": "editor.html"
+    },
+    "SEARCH.md": {
+      "記事検索-第13段階": "article-search.html",
+      "権限とページ送り": "permissions.html",
+      "raw応答と拡張": "article-search.html",
+      "検証": "article-search.html",
+      "content": "article-search.html"
+    },
+    "SERIAL.md": {
+      "comモデムコネクタ": "serial-connector.html",
+      "まず疑似端末で確認": "serial-connector.html",
+      "直接接続": "operations.html",
+      "hayes互換モデム": "serial-connector.html",
+      "linuxで選択する例": "serial-connector.html"
+    },
+    "STAGE2.md": {
+      "第2段階-1ボードの投稿返信永続保存": "overview.html",
+      "実機で試す": "overview.html",
+      "実装と原版との関係": "overview.html",
+      "保存形式と失敗時の扱い": "storage.html",
+      "検証": "overview.html",
+      "content": "overview.html"
+    },
+    "STAGE28.md": {
+      "記事管理横断検索プロフィール-第28段階": "personal-settings.html",
+      "記事取り消しと題名変更": "overview.html",
+      "検索と投稿者指定": "article-search.html",
+      "連続読み出し": "overview.html",
+      "ボード説明": "overview.html",
+      "公開プロフィール": "personal-settings.html",
+      "永続記録バックアップ互換性": "backup-recovery.html",
+      "raw応答": "overview.html",
+      "検証": "overview.html",
+      "content": "overview.html"
+    },
+    "STAGE3.md": {
+      "hypernotes型bbs-ベースノートと返信ツリー": "overview.html",
+      "試す": "overview.html",
+      "ノート関係と保存": "overview.html",
+      "検証結果": "overview.html",
+      "content": "overview.html"
+    },
+    "STAGE30.md": {
+      "第30段階-外部メニューと操作履歴の絞り込み": "logs.html",
+      "起動と外部メニュー": "operations.html",
+      "操作履歴の絞り込み": "logs.html",
+      "検証": "overview.html",
+      "content": "overview.html"
+    },
+    "STAGE31.md": {
+      "第31段階-外部telnetとssh経由の接続": "operations.html",
+      "外部telnet": "overview.html",
+      "sshで直接bbsを開く": "overview.html",
+      "bbs専用sshアカウントを用意する場合": "overview.html",
+      "既存データで新版を起動する": "operations.html",
+      "検証": "overview.html",
+      "content": "overview.html"
+    },
+    "STAGE4.md": {
+      "会員投稿者記事ごとの未読管理": "member-admin.html",
+      "起動と操作": "operations.html",
+      "保存と認証": "overview.html",
+      "試験と限界": "overview.html",
+      "content": "overview.html"
+    },
+    "STAGE5.md": {
+      "複数ボード階層閲覧投稿権限": "permissions.html",
+      "試す": "overview.html",
+      "設定ファイル": "files.html",
+      "データ分離と保存": "overview.html",
+      "検証": "overview.html",
+      "content": "overview.html"
+    },
+    "STAGE56.md": {
+      "stage56-上限表示一括転送エディタ": "editor.html",
+      "起動と設定": "operations.html",
+      "メニューhelpバナー": "files.html",
+      "一括アップロードと途中再開": "transfer-admin.html",
+      "エディタ": "editor.html",
+      "固定上限の棚卸し今回は変更しない項目": "limits.html",
+      "検証": "files.html",
+      "content": "files.html"
+    },
+    "STAGE57.md": {
+      "liner-notes-stage57-上限拡張管理機能gatherlrzsz-ports": "conversation.html",
+      "変更した上限": "limits.html",
+      "公開保管庫の物理削除容量回収": "files.html",
+      "メールの日付指定検索ゲストからのsysopメール": "mail.html",
+      "gather伝言板": "conversation.html",
+      "チャットログとプロフィール": "conversation.html",
+      "管理者の告知切断停止": "operations.html",
+      "lrzsz-0131-ports": "install-freebsd.html",
+      "データと移行": "files.html",
+      "検証": "files.html",
+      "content": "files.html"
+    },
+    "STAGE58.md": {
+      "liner-notes-stage58-取得履歴オンライン設定userlog": "logs.html",
+      "公開保管庫のダウンロード履歴取得回数": "files.html",
+      "コネクタの完了通知": "permissions.html",
+      "掲示板設定のオンライン変更": "permissions.html",
+      "ファイルボード設定のオンライン変更": "board-admin.html",
+      "userlog相当の接続履歴利用時間": "logs.html",
+      "保存と運用": "permissions.html",
+      "content": "permissions.html"
+    },
+    "STAGE59.md": {
+      "liner-notes-stage59-ファイルの本人管理sigop運用管理": "permissions.html",
+      "登録者本人の保管庫ファイル管理": "files.html",
+      "掲示板ごとのsigop": "permissions.html",
+      "管理者によるパスワード再設定": "board-admin.html",
+      "無入力切断": "permissions.html",
+      "ログの保存期間管理": "logs.html",
+      "導入": "install-freebsd.html",
+      "content": "permissions.html"
+    },
+    "STAGE6.md": {
+      "第6段階-日本語の対話メニュー": "overview.html",
+      "freebsdで起動": "operations.html",
+      "操作": "overview.html",
+      "実装と検証": "overview.html",
+      "content": "overview.html"
+    },
+    "STAGE60.md": {
+      "liner-notes-stage60-掲示板管理と入力操作": "board-admin.html",
+      "入力と表示": "board-admin.html",
+      "ボード管理のコマンド": "board-admin.html",
+      "共通パスワード": "board-admin.html",
+      "案内と編集バッファ": "editor.html",
+      "メニュー専用ノードと順序": "board-admin.html",
+      "容量とログ保持": "logs.html",
+      "削除記事移動": "board-admin.html",
+      "保存ファイルと更新": "files.html",
+      "content": "board-admin.html"
+    },
+    "STAGE61.md": {
+      "liner-notes-stage61-保管庫会員共通エディタ外部help": "editor.html",
+      "ビルドと起動": "install-freebsd.html",
+      "外部helpバナー管理者メニュー": "file-admin.html",
+      "ファイル保管庫": "files.html",
+      "転送方式": "transfers.html",
+      "プロフィールと100グループ": "personal-settings.html",
+      "userlogと接続時間": "logs.html",
+      "共通エディタとチャット": "editor.html",
+      "更新とバックアップ": "backup-recovery.html",
+      "content": "file-admin.html"
+    },
+    "STAGE62.md": {
+      "stage62-外部バックアップ復元データ整理": "backup-recovery.html",
+      "content": "member-admin.html"
+    },
+    "STAGE63.md": {
+      "liner-notes-stage63": "backup-recovery.html",
+      "今回の変更": "backup-recovery.html",
+      "接続者回線状況": "operations.html",
+      "メールの複数添付": "mail.html",
+      "申請会員の終了処理": "member-admin.html",
+      "保管庫添付の上限設定": "mail.html",
+      "全領域整理": "backup-recovery.html",
+      "省メモリ化": "storage.html",
+      "更新時の注意": "upgrade.html",
+      "content": "backup-recovery.html"
+    },
+    "STAGE64.md": {
+      "liner-notes-stage64": "board-admin.html",
+      "導入とビルド": "install-freebsd.html",
+      "sigopとグループ": "permissions.html",
+      "読書と新着巡回": "article-search.html",
+      "ファイルボードと登録後の操作": "files.html",
+      "入会とプロフィール": "personal-settings.html",
+      "エディタ": "editor.html",
+      "新しい上限": "limits.html",
+      "dbと保存領域": "storage.html",
+      "管理ツールによる本文回収": "backup-recovery.html",
+      "添付一括ダウンロード": "mail.html",
+      "content": "board-admin.html"
+    },
+    "STAGE65.md": {
+      "stage65-操作性管理操作添付一括登録db索引外部ゲーム": "mail.html",
+      "利用者向け": "external-games.html",
+      "管理sigop": "permissions.html",
+      "db索引と保存": "storage.html",
+      "更新と互換性": "upgrade.html",
+      "content": "external-games.html"
+    },
+    "STAGE66.md": {
+      "stage66-rtbbs風コマンド整理": "backup-recovery.html",
+      "更新時": "upgrade.html",
+      "検証": "external-games.html",
+      "content": "external-games.html"
+    },
+    "STAGE67.md": {
+      "liner-notes-stage67": "storage.html",
+      "操作と権限": "permissions.html",
+      "日時と巡回": "article-search.html",
+      "保管庫と添付": "mail.html",
+      "設定できる運用上限": "limits.html",
+      "正式なsqlite保存と移行": "storage.html",
+      "portsとrcconf": "install-freebsd.html",
+      "content": "storage.html"
+    },
+    "STAGE69.md": {
+      "liner-notes-069-stage69": "files.html",
+      "対応内容": "files.html",
+      "任意設定": "files.html",
+      "保持する差異と運用上の注意": "files.html",
+      "検証記録": "files.html",
+      "content": "files.html"
+    },
+    "STAGE70.md": {
+      "liner-notes-070-の変更と残件": "storage.html",
+      "利用者向けの変更": "storage.html",
+      "中断データの管理": "transfer-admin.html",
+      "新規構築向けのsql保存": "storage.html",
+      "大規模運用": "storage.html",
+      "残件": "storage.html",
+      "将来対応として保留": "storage.html",
+      "今回の初期対応から残る改善": "storage.html",
+      "rtbbsとの操作差で今回変更を指定されていないもの": "storage.html",
+      "今回変更しない仕様": "storage.html",
+      "content": "storage.html"
+    },
+    "STAGE71.md": {
+      "liner-notes-071": "storage.html",
+      "更新": "upgrade.html",
+      "中断データの照合": "transfer-admin.html",
+      "sql保存": "storage.html",
+      "読書中のs": "storage.html",
+      "検証と保留範囲": "storage.html",
+      "content": "storage.html"
+    },
+    "STAGE72.md": {
+      "liner-notes-072": "overview.html",
+      "更新": "upgrade.html",
+      "検証と制限": "limits.html",
+      "content": "overview.html"
+    },
+    "STAGE73.md": {
+      "liner-notes-073stage73": "web-server.html",
+      "実装": "web-server.html",
+      "確認済みの範囲": "web-server.html",
+      "配布と導入": "install-freebsd.html",
+      "転送の測定": "transfers.html",
+      "残る検証将来対応": "web-server.html"
+    },
+    "STAGE74.md": {
+      "liner-notes-074-変更検証記録": "overview.html",
+      "追加内容": "overview.html",
+      "検証環境と確認済み結果": "overview.html",
+      "検証の意味と境界": "overview.html",
+      "導入保守": "install-freebsd.html"
+    },
+    "STARROUTE.md": {
+      "starroute-traders-liner-notes-本番導入手順": "starroute-integration.html",
+      "1-前提確認": "starroute-integration.html",
+      "2-キットを展開して配置": "starroute-integration.html",
+      "3-新しい宇宙を一度だけ作る": "starroute-integration.html",
+      "4-liner-notesへゲームを登録": "external-games.html",
+      "5-本番の受け入れ確認": "starroute-integration.html",
+      "6-エラー時の切り分け戻し方": "starroute-integration.html",
+      "検証範囲": "starroute-integration.html",
+      "content": "starroute-integration.html"
+    },
+    "TALK.md": {
+      "個別トークstage44": "conversation.html",
+      "チャット室内からの使い方": "conversation.html",
+      "範囲と構成": "conversation.html",
+      "検証と試作配置": "conversation.html",
+      "受信設定ミュートstage42の動作": "transfers.html",
+      "stage42-保存復元と複数接続": "backup-recovery.html",
+      "stage44-チャット室外のトーク": "conversation.html",
+      "content": "conversation.html"
+    },
+    "THIRD_PARTY.md": {
+      "licensing-and-third-party-components": "serial-connector.html",
+      "content": "licenses.html"
+    },
+    "THREAD_UNREAD.md": {
+      "親記事一覧のスレッド未読件数-第24段階": "article-search.html",
+      "通信と保存": "article-search.html",
+      "検証": "article-search.html",
+      "content": "article-search.html"
+    },
+    "TRANSFER.md": {
+      "送受信コネクタと会員向け送信stage3637": "member-admin.html",
+      "利用方法": "protocol.html",
+      "再開用ファイル": "files.html",
+      "コネクタの境界": "protocol.html",
+      "zmodemなどを追加するとき": "transfers.html",
+      "line-v1の通信仕様": "protocol.html",
+      "現時点の制限": "limits.html",
+      "検証結果": "protocol.html",
+      "content": "protocol.html"
+    },
+    "TRANSPORTS.md": {
+      "入出力と端末処理": "connections.html",
+      "第8段階-telnetと入出力の分離": "connections.html",
+      "freebsdで試す": "connections.html",
+      "責務と将来の拡張": "connections.html",
+      "アダプターの契約": "connections.html",
+      "telnetで対応した範囲": "connections.html",
+      "試験": "connections.html",
+      "stage36の送受信コネクタ": "transfers.html",
+      "stage38のzmodem試作": "transfers.html",
+      "stage39のチャット": "conversation.html",
+      "content": "connections.html"
+    },
+    "UNREAD_THREADS.md": {
+      "未読のあるスレッドだけ表示-第25段階": "article-search.html",
+      "raw通信": "article-search.html",
+      "検証": "article-search.html",
+      "content": "article-search.html"
+    },
+    "UPGRADING.md": {
+      "074への更新": "upgrade.html",
+      "1-現在の設定とバックアップ": "backup-recovery.html",
+      "2-portsで構築配置": "install-freebsd.html",
+      "3-再開検査と起動": "transfer-admin.html",
+      "4-戻す場合": "upgrade.html",
+      "content": "upgrade.html",
+      "072への更新": "upgrade.html"
+    },
+    "UPLOAD.md": {
+      "アップロードの土台stage35": "protocol.html",
+      "freebsdで小さく試す": "protocol.html",
+      "分割送信再開再送": "transfers.html",
+      "認証と疎結合": "protocol.html",
+      "容量と保存": "limits.html",
+      "操作履歴と旧版": "logs.html",
+      "stage36の追加": "protocol.html",
+      "検証結果": "protocol.html",
+      "content": "protocol.html"
+    },
+    "VAULT.md": {
+      "ファイル保管庫の試作stage37": "files.html",
+      "今回できること": "files.html",
+      "freebsdで試す": "files.html",
+      "stage34-カテゴリ検索操作履歴": "article-search.html",
+      "疎結合の境界": "files.html",
+      "保存と制限": "limits.html",
+      "stage33の検証結果": "files.html",
+      "stage34の検証結果": "files.html",
+      "stage54-ファイルボード": "files.html",
+      "content": "files.html"
+    },
+    "WEBUI.md": {
+      "liner-notes-webui-074": "web-server.html",
+      "freebsd-portsでの導入": "install-freebsd.html",
+      "構成": "web-server.html",
+      "画面": "web-server.html",
+      "htmlテンプレート": "web-server.html",
+      "外部メッセージ": "web-server.html",
+      "検証用起動": "operations.html",
+      "portsを使用しない手動配置とrcconf": "install-freebsd.html",
+      "転送と現時点の制限": "transfers.html",
+      "開発時の検証": "web-server.html",
+      "継続する改善検証": "web-server.html",
+      "content": "web-server.html",
+      "liner-notes-webui-072": "web-server.html"
+    },
+    "WEBUI_COVERAGE.md": {
+      "webuiの機能操作対応stage73": "web-server.html",
+      "機能画面化と端末互換の区別": "upgrade.html",
+      "メッセージテンプレートの変更": "web-server.html"
+    },
+    "WEBUI_REVIEW_VERIFICATION.md": {
+      "webui改善と転送検証2026-11-02": "transfers.html",
+      "対応内容": "web-server.html",
+      "検証環境と実ファイル": "files.html",
+      "回帰確認": "web-server.html",
+      "更新時の注意": "upgrade.html",
+      "content": "web-server.html"
+    },
+    "ZMODEM.md": {
+      "zmodemコネクタの試作stage38": "transfers.html",
+      "導入": "install-freebsd.html",
+      "使用方法": "transfers.html",
+      "保存と失敗時の扱い": "transfers.html",
+      "分離と制限": "limits.html",
+      "検証方法": "transfers.html",
+      "content": "transfers.html"
+    },
+    "ZMODEM_MENU.md": {
+      "保管庫メニューとzmodem組み込みstage49": "files.html",
+      "利用者の操作": "transfers.html",
+      "freebsdでの準備": "transfers.html",
+      "分離と保護": "transfers.html",
+      "失敗回復": "transfers.html",
+      "今回の範囲": "transfers.html",
+      "stage49の検証結果2026-10-28": "transfers.html",
+      "stage54-ファイルボード": "files.html",
+      "content": "transfers.html"
+    },
+    "ZRESUME_FIX.md": {
+      "zresumeと長時間アップロードの修正ports-069_3": "install-freebsd.html",
+      "変更内容": "transfers.html",
+      "既存portsからの更新": "install-freebsd.html",
+      "再開検証のエラーが表示された場合": "transfer-admin.html",
+      "検証記録": "transfers.html",
+      "content": "transfers.html"
+    },
+    "ZUPLOAD_FIX.md": {
+      "zupload中断後の再試行修正ports-069_2": "transfer-admin.html",
+      "原因と修正": "transfers.html",
+      "069-069_1への最小修正": "transfers.html",
+      "portsによる更新": "install-freebsd.html",
+      "検証範囲": "transfers.html",
+      "content": "transfers.html"
+    }
+  }
+}

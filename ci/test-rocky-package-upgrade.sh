@@ -18,11 +18,11 @@ fi
 packages=(liner-notes liner-notes-web liner-notes-link)
 dnf install -y --setopt=install_weak_deps=False epel-release
 dnf install -y --setopt=install_weak_deps=False \
-  /out/liner-notes-0.74-1*.x86_64.rpm \
-  /out/liner-notes-web-0.74-1*.x86_64.rpm \
-  /out/liner-notes-link-0.74-1*.x86_64.rpm
+  /out/liner-notes-0.74.1-1*.x86_64.rpm \
+  /out/liner-notes-web-0.74.1-1*.x86_64.rpm \
+  /out/liner-notes-link-0.74.1-1*.x86_64.rpm
 for package in "${packages[@]}"; do
-  rpm -q --qf '%{VERSION}-%{RELEASE}\n' "$package" | grep -Eq '^0\.74-1(\.|$)'
+  rpm -q --qf '%{VERSION}-%{RELEASE}\n' "$package" | grep -Eq '^0\.74\.1-1(\.|$)'
 done
 
 # The RPM %config(noreplace) entries must preserve local modifications.
@@ -77,7 +77,7 @@ test "${#upgrade_packages[@]}" -eq 3
 dnf upgrade -y --setopt=install_weak_deps=False "${upgrade_packages[@]}"
 
 for package in "${packages[@]}"; do
-  rpm -q --qf '%{VERSION}-%{RELEASE}\n' "$package" | grep -Eq '^0\.74-2(\.|$)'
+  rpm -q --qf '%{VERSION}-%{RELEASE}\n' "$package" | grep -Eq '^0\.74\.1-2(\.|$)'
 done
 sha256sum -c "$config_hashes"
 test "$(cat /var/lib/liner-notes/package-removal-test)" = keep
@@ -92,4 +92,4 @@ dnf remove -y --setopt=install_weak_deps=False "${packages[@]}"
 test "$(cat /var/lib/liner-notes/package-removal-test)" = keep
 test -s /var/lib/liner-notes-link/ci-link-key
 test -s /var/lib/liner-notes/ci-package-upgrade.sqlite
-echo 'PASS: disposable Rocky 10 RPM 0.74-1 -> 0.74-2, modified configs, SQLite and synthetic link-key preserved'
+echo 'PASS: disposable Rocky 10 RPM 0.74.1-1 -> 0.74.1-2, modified configs, SQLite and synthetic link-key preserved'

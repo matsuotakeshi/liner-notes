@@ -1,0 +1,5 @@
+{
+  "ok": true,
+  "case": "Unmanifested historical document rejected before generation",
+  "message": "Unmanifested/missing canonical Markdown"
+}

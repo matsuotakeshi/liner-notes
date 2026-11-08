@@ -1,0 +1,1 @@
+Historical source documents from stable 0.74. Not the current manual. Original bytes are preserved for audit and development history. Use docs/manual for supported behavior. Relative paths in these snapshots refer to their original repository-root location.

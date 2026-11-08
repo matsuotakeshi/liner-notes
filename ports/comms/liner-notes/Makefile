@@ -1,8 +1,8 @@
 PORTNAME=	liner-notes
-DISTVERSION=	0.74
+DISTVERSION=	0.74.1
 CATEGORIES=	comms
 MASTER_SITES=	https://github.com/matsuotakeshi/liner-notes/releases/download/v${DISTVERSION}/
-DISTNAME=	liner-notes-stage74
+DISTNAME=	liner-notes-${DISTVERSION}
 
 MAINTAINER=	ports@FreeBSD.org
 COMMENT=	HyperNotes-style BBS with Telnet, mail, chat, and file vaults
@@ -43,13 +43,14 @@ WEBUI_RUN_DEPENDS=	${PYTHON_PKGNAMEPREFIX}aiohttp>=3.11:www/py-aiohttp@${PY_FLAV
 LINK_DESC=	Install the optional public-key shared-board connector
 LINK_RUN_DEPENDS=	${PYTHON_PKGNAMEPREFIX}cryptography>=43:security/py-cryptography@${PY_FLAVOR}
 
+ZMODEM_DESC=	Depend on lrzsz 0.13.1 or newer for external file transfers
+ZMODEM_RUN_DEPENDS=	lrzsz>=0.13.1:comms/lrzsz
+
 .include <bsd.port.options.mk>
 .if ${PORT_OPTIONS:MWEBUI}
 USERS+=		liner_notes_web
 GROUPS+=	liner_notes_web
 .endif
-ZMODEM_DESC=	Depend on lrzsz 0.13.1 or newer for external file transfers
-ZMODEM_RUN_DEPENDS=	lrzsz>=0.13.1:comms/lrzsz
 
 # Public executables in sbin/bin; support files in DATADIR.
 do-install:
@@ -104,7 +105,6 @@ do-install-LINK-on:
 
 do-install-DOCS-on:
 	${MKDIR} ${STAGEDIR}${DOCSDIR}
-	${INSTALL_DATA} ${WRKSRC}/*.md ${STAGEDIR}${DOCSDIR}/
-	${INSTALL_DATA} ${FILESDIR}/PORTS.md ${STAGEDIR}${DOCSDIR}/
+	cd ${WRKSRC}/docs/book && ${COPYTREE_SHARE} . ${STAGEDIR}${DOCSDIR}
 
 .include <bsd.port.mk>

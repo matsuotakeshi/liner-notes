@@ -1,13 +1,5 @@
-# 表示設定（stage65）
+# 文書の移転
 
-言語、ページ送りON/OFF、エディタ種別、画面サイズを会員ごとに保存し、ログイン時に復元します。現在の記事・ボード・RAW/MENUの選択は保存しません。
+この文書の現行仕様・操作手順は [Liner Notes 0.74 統合マニュアル](https://linernotes.site/manual/personal-settings.html) に統合しました。
 
-- `PREFS`: 保存設定の確認。`PREFS SAVE`: 即時保存。`PREFS LOAD`: 読み戻し。
-- `LOGOUT` / `QUIT`（O/Q、チャットの/QUITを含む）は、表示設定を保存してから終了します。保存に失敗した場合は終了せず通知します。
-- 通信断でも変更分の保存を試みます。権限剥奪やプロセス異常終了では保存できない場合があります。確実に残すにはPREFS SAVEを使います。
-- `MENUMODE BEGINNER|STANDARD|EXPERT` は別の会員設定として即時保存します。通常の主画面で、全メニューを毎回・初回のみ・手動のみ表示する切替です。省略してもMENUや?から全メニューを表示できます。
-- 管理者はEXPERTでもログイン時に管理メニューが表示されます。一般ユーザーには管理者用メニュー・HELPを表示しません。
-
-ページ待ちでは表示を進めるかQで閉じてから設定します。ゲストの設定・ハンドルは接続中だけ有効です。複数の接続から設定を保存した場合は、最後の保存内容が次回ログインへ反映されます。
-
-行番号表示（M / /M）と転送方式（PROTOCOL）も会員設定に含まれます。編集中の本文、検索文字列、行カーソルは保存対象に含みません。
+[統合Markdown原本](https://github.com/matsuotakeshi/liner-notes/tree/main/docs/manual)が正本です。過去の実装・検証記録は[開発アーカイブ](https://github.com/matsuotakeshi/liner-notes/blob/main/docs/development/archive/0.74/PREFERENCES.md)に保存しています。

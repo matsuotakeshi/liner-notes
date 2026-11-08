@@ -23,12 +23,21 @@ jobs:
         uses: actions/checkout@v4
         with:
           persist-credentials: false
+      - name: Generate the canonical offline manual
+        shell: bash
+        run: |
+          python3 -m venv "$RUNNER_TEMP/manual-venv"
+          "$RUNNER_TEMP/manual-venv/bin/pip" install -r scripts/manual/requirements.txt
+          "$RUNNER_TEMP/manual-venv/bin/python" scripts/manual/build.py docs/book
+          "$RUNNER_TEMP/manual-venv/bin/python" scripts/manual/check.py docs/book
       - name: Archive only tracked files from the committed revision
         shell: bash
         run: |
           set -euo pipefail
           test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
-          git archive --format=tar HEAD | gzip -n > "$RUNNER_TEMP/freebsd-source.tar.gz"
+          git archive --format=tar HEAD > "$RUNNER_TEMP/freebsd-source.tar"
+          tar -rf "$RUNNER_TEMP/freebsd-source.tar" docs/book
+          gzip -n < "$RUNNER_TEMP/freebsd-source.tar" > "$RUNNER_TEMP/freebsd-source.tar.gz"
           test -s "$RUNNER_TEMP/freebsd-source.tar.gz"
           tar -tzf "$RUNNER_TEMP/freebsd-source.tar.gz" | grep -Fx "ports/comms/liner-notes/Makefile" > /dev/null
           sha256sum "$RUNNER_TEMP/freebsd-source.tar.gz"

@@ -1,0 +1,16 @@
+{
+  "ok": true,
+  "version": "0.74",
+  "revision": "2026-11-05",
+  "canonical_pages": 41,
+  "chapters": 7,
+  "html_pages": 130,
+  "local_links_checked": 2671,
+  "legacy_urls": 172,
+  "legacy_anchor_entries": 622,
+  "legacy_target_fragments_checked": 16,
+  "search_sections": 210,
+  "markdown_html_parity": true,
+  "errors": [],
+  "bundle_hashes_sha256": "08d232b1022cc79d030968212a8480d40e040c5fbdd5f295a347d44b0d34ccdf"
+}

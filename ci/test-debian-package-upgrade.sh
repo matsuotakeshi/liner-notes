@@ -16,7 +16,7 @@ fi
 
 packages=(liner-notes liner-notes-web liner-notes-link)
 for package in "${packages[@]}"; do
-  test "$(dpkg-query -W -f='${Version}' "$package")" = 0.74-1
+  test "$(dpkg-query -W -f='${Version}' "$package")" = 0.74.1-1
 done
 
 # Local changes must survive a dpkg revision upgrade without conffile prompts.
@@ -42,10 +42,10 @@ with sqlite3.connect('/var/lib/liner-notes/ci-package-upgrade.sqlite') as db:
 PY
 
 # Build a second Debian revision of the same source, inside this container.
-# Original 0.74-1 artifacts in /out remain unchanged and are the only
+# Original 0.74.1-1 artifacts in /out remain unchanged and are the only
 # versioned candidates uploaded by the release manifest workflow.
 cat > /tmp/liner-notes-ci-changelog <<'EOF'
-liner-notes (0.74-2) unstable; urgency=medium
+liner-notes (0.74.1-2) unstable; urgency=medium
 
   * CI-only disposable packaging-revision upgrade rehearsal.
 
@@ -55,12 +55,12 @@ cat debian/changelog >> /tmp/liner-notes-ci-changelog
 mv /tmp/liner-notes-ci-changelog debian/changelog
 dpkg-buildpackage -b -us -uc
 DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
-  /build/liner-notes_0.74-2_amd64.deb \
-  /build/liner-notes-web_0.74-2_all.deb \
-  /build/liner-notes-link_0.74-2_all.deb
+  /build/liner-notes_0.74.1-2_amd64.deb \
+  /build/liner-notes-web_0.74.1-2_all.deb \
+  /build/liner-notes-link_0.74.1-2_all.deb
 
 for package in "${packages[@]}"; do
-  test "$(dpkg-query -W -f='${Version}' "$package")" = 0.74-2
+  test "$(dpkg-query -W -f='${Version}' "$package")" = 0.74.1-2
 done
 sha256sum -c "$config_digests"
 test "$(cat /var/lib/liner-notes/package-removal-test)" = keep
@@ -70,4 +70,4 @@ with sqlite3.connect('/var/lib/liner-notes/ci-package-upgrade.sqlite') as db:
     assert db.execute('PRAGMA integrity_check').fetchone() == ('ok',)
     assert db.execute('SELECT value FROM ci_marker').fetchone() == ('kept-across-upgrade',)
 PY
-echo 'PASS: isolated Debian 13 same-source revision 0.74-1 -> 0.74-2, conffiles, SQLite fixture and link-key retained'
+echo 'PASS: isolated Debian 13 same-source revision 0.74.1-1 -> 0.74.1-2, conffiles, SQLite fixture and link-key retained'

@@ -13,6 +13,16 @@ with tempfile.TemporaryDirectory(prefix='install-linux-') as tmp:
     for p in assets:
         assert p.read_text()=='local customization\n'
         assert p.with_name(p.name+'.sample').read_text()!='local customization\n'
+    unchanged=stage/'usr/local/share/liner-notes/help/ja/content.txt'
+    unchanged.write_bytes(b'previous default\n')
+    unchanged.with_name(unchanged.name+'.sample').write_bytes(b'previous default\n')
+    installer.install(str(stage),'/usr/local',sys.executable)
+    assert unchanged.read_bytes()==(ROOT/'help/ja/content.txt').read_bytes()
+    assert assets[2].read_text()=='local customization\n'
+    docs=stage/'usr/local/share/doc/liner-notes'
+    assert (docs/'manual/boards.md').read_bytes()==(ROOT/'docs/manual/boards.md').read_bytes()
+    assert (docs/'index.html').is_file() or (docs/'index.md').is_file()
+    assert not list(docs.glob('STAGE*.md')) and not (docs/'development').exists()
     assert not (stage/'var').exists(),'Installer must not create or alter instance data'
     assert (stage/'usr/local/sbin/liner-notes').read_bytes()==(ROOT/'runtime').read_bytes()
     assert os.access(stage/'usr/local/share/liner-notes/scripts/door_guess.py',os.X_OK)

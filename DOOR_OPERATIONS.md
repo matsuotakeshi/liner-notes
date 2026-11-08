@@ -1,46 +1,5 @@
-# Doorの追加・更新・復旧手順
+# 文書の移転
 
-Liner notesはゲームをPTYで起動し、画面・キー入力・端末サイズを転送します。
-ゲームの保存形式、日次処理、共有マスターはゲーム側の責任です。
-既存のStarRoute TradersとThe Clansのデータを初期化しません。
+この文書の現行仕様・操作手順は [Liner Notes 0.74 統合マニュアル](https://linernotes.site/manual/external-games.html) に統合しました。
 
-## 追加前の確認
-
-1. 稼働中の `doors.conf` をバックアップし、既存行を保持します。
-2. BBSの実行ユーザーでゲーム起動ファイルを実行できること、親ディレクトリを
-   通過できることを確認します。書き込みはゲームが保存する領域だけに与えます。
-   インストール先全体を一律にchown/chmodしません。
-3. [DOORS.md](DOORS.md) の書式で未使用の番号を追加します。
-   引数が必要なら専用ラッパーを使用し、会員入力をシェル命令へ展開しません。
-   ゲームごとに同時実行上限と時間制限を設定します。
-4. DORINFO1.DEFが必要なら汎用dropfile設定を使います。接続ごとの専用ディレクトリを
-   使用し、ゲームの共用データディレクトリへ同じ名前で上書きしません。
-   Clansは同梱 `door_clans.sh` と [DOORS.md](DOORS.md)、StarRouteは
-   [STARROUTE.md](STARROUTE.md) の設定を参照します。
-
-## 独立環境で確認する順序
-
-- 別のBBSデータ・別ポート・ゲームの検証用保存先を使用する。
-- `GAMES` →番号→起動→ゲーム内終了→ゲーム一覧へ復帰。
-- 認証済みの別会員で起動し、表示名・会員番号・dropfileが混線しない。
-- PTYのサイズ変更（80×24から100×30）に追従し、同じサイズの再通知で不要な
-  再描画が起きない。ゲーム自身も現在の端末サイズを取得する必要がある。
-- ゲームが異常終了してもBBSへ戻る。時間切れ・回線切断で子プロセスが残らない。
-- 排他設定では2人目が拒否され、1人目終了後に利用できる。
-- 同時許可時は別PTY・別dropfileになり、別ゲームの起動を妨げない。
-- TelnetとWeb端末で日本語、矢印キー、終了操作、リサイズを確認する。
-
-自動確認は `make test-doors`。検証用の小さなPTYプログラムで設定拒否、
-NAWS、SIGWINCH、dropfile、終了・切断とBBS復帰を検査します。
-ゲーム本体の全機能や、実運用のStarRoute/Clansのデータはこの試験で触りません。
-
-## 本番へ反映するとき
-
-新runtimeと設定を別コピーで検証し、実行パスを確認してから告知・バックアップ・
-停止・切替を行います。`liner_notes_program` が旧preview実行パスを指していないか
-確認します。起動後は `service liner_notes status`、待受ポート、ログ、
-既存StarRouteとClansの再入場を確認します。[UPGRADING.md](UPGRADING.md)を参照。
-
-不調時は先に新ゲームの行を外し、既存ゲームの行・保存領域を保持して原因を
-切り分けます。ゲームのリセットコマンドを復旧目的で実行しません。
-DOS実行環境やWindows ConPTYの追加は別案件です。
+[統合Markdown原本](https://github.com/matsuotakeshi/liner-notes/tree/main/docs/manual)が正本です。過去の実装・検証記録は[開発アーカイブ](https://github.com/matsuotakeshi/liner-notes/blob/main/docs/development/archive/0.74/DOOR_OPERATIONS.md)に保存しています。

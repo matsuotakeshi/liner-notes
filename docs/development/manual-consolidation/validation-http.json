@@ -1,0 +1,662 @@
+{
+  "ok": true,
+  "pages": 131,
+  "kind": "Local HTTP serving only; not browser rendering",
+  "results": [
+    {
+      "path": "index.html",
+      "status": 200,
+      "matches": true
+    },
+    {
+      "path": "ja/index.html",
+      "status": 200,
+      "matches": true
+    },
+    {
+      "path": "manual/accounts.html",
+      "status": 200,
+      "matches": true
+    },
+    {
+      "path": "manual/ADMIN.html",
+      "status": 200,
+      "matches": true
+    },
+    {
+      "path": "manual/article-search.html",
+      "status": 200,
+      "matches": true
+    },
+    {
+      "path": "manual/AUDIT.html",
+      "status": 200,
+      "matches": true
+    },
+    {
+      "path": "manual/backup-recovery.html",
+      "status": 200,
+      "matches": true
+    },
+    {
+      "path": "manual/BBS_LINKS.html",
+      "status": 200,
+      "matches": true
+    },
+    {
+      "path": "manual/BBS_LINK_OPERATIONS.html",
+      "status": 200,
+      "matches": true
+    },
+    {
+      "path": "manual/BINARY_TRANSFER.html",
+      "status": 200,
+      "matches": true
+    },
+    {
+      "path": "manual/board-admin.html",
+      "status": 200,
+      "matches": true
+    },
+    {
+      "path": "manual/boards.html",
+      "status": 200,
+      "matches": true
+    },
+    {
+      "path": "manual/BOARD_UNREAD.html",
+      "status": 200,
+      "matches": true
+    },
+    {
+      "path": "manual/CHAT.html",
+      "status": 200,
+      "matches": true
+    },
+    {
+      "path": "manual/CHAT_ADMIN.html",
+      "status": 200,
+      "matches": true
+    },
+    {
+      "path": "manual/command-reference.html",
+      "status": 200,
+      "matches": true
+    },
+    {
+      "path": "manual/COMMANDS.html",
+      "status": 200,
+      "matches": true
+    },
+    {
+      "path": "manual/configuration.html",
+      "status": 200,
+      "matches": true
+    },
+    {
+      "path": "manual/connections.html",
+      "status": 200,
+      "matches": true
+    },
+    {
+      "path": "manual/CONTENT_AUDIT.html",
+      "status": 200,
+      "matches": true
+    },
+    {
+      "path": "manual/conversation.html",
+      "status": 200,
+      "matches": true
+    },
+    {
+      "path": "manual/DAEMON.html",
+      "status": 200,
+      "matches": true
+    },
+    {
+      "path": "manual/DATABASE_STRUCTURED.html",
+      "status": 200,
+      "matches": true
+    },
+    {
+      "path": "manual/DOORS.html",
+      "status": 200,
+      "matches": true
+    },
+    {
+      "path": "manual/DOOR_GENERIC_VERIFICATION.html",
+      "status": 200,
+      "matches": true
+    },
+    {
+      "path": "manual/DOOR_OPERATIONS.html",
+      "status": 200,
+      "matches": true
+    },
+    {
+      "path": "manual/DOOR_RESIZE_VERIFICATION.html",
+      "status": 200,
+      "matches": true
+    },
+    {
+      "path": "manual/DRAFT_EDIT.html",
+      "status": 200,
+      "matches": true
+    },
+    {
+      "path": "manual/DRAFT_NOTICE.html",
+      "status": 200,
+      "matches": true
+    },
+    {
+      "path": "manual/DRAFT_UNDO.html",
+      "status": 200,
+      "matches": true
+    },
+    {
+      "path": "manual/editor.html",
+      "status": 200,
+      "matches": true
+    },
+    {
+      "path": "manual/external-games.html",
+      "status": 200,
+      "matches": true
+    },
+    {
+      "path": "manual/file-admin.html",
+      "status": 200,
+      "matches": true
+    },
+    {
+      "path": "manual/files.html",
+      "status": 200,
+      "matches": true
+    },
+    {
+      "path": "manual/FILE_BOARDS.html",
+      "status": 200,
+      "matches": true
+    },
+    {
+      "path": "manual/HELP.html",
+      "status": 200,
+      "matches": true
+    },
+    {
+      "path": "manual/HISTORY.html",
+      "status": 200,
+      "matches": true
+    },
+    {
+      "path": "manual/I18N.html",
+      "status": 200,
+      "matches": true
+    },
+    {
+      "path": "manual/index.html",
+      "status": 200,
+      "matches": true
+    },
+    {
+      "path": "manual/initial-setup.html",
+      "status": 200,
+      "matches": true
+    },
+    {
+      "path": "manual/install-freebsd.html",
+      "status": 200,
+      "matches": true
+    },
+    {
+      "path": "manual/install-linux.html",
+      "status": 200,
+      "matches": true
+    },
+    {
+      "path": "manual/INSTALL.html",
+      "status": 200,
+      "matches": true
+    },
+    {
+      "path": "manual/layout.html",
+      "status": 200,
+      "matches": true
+    },
+    {
+      "path": "manual/licenses.html",
+      "status": 200,
+      "matches": true
+    },
+    {
+      "path": "manual/limits.html",
+      "status": 200,
+      "matches": true
+    },
+    {
+      "path": "manual/link-operations.html",
+      "status": 200,
+      "matches": true
+    },
+    {
+      "path": "manual/links.html",
+      "status": 200,
+      "matches": true
+    },
+    {
+      "path": "manual/LINUX.html",
+      "status": 200,
+      "matches": true
+    },
+    {
+      "path": "manual/LIST_PAGER.html",
+      "status": 200,
+      "matches": true
+    },
+    {
+      "path": "manual/LOGIN_UNREAD.html",
+      "status": 200,
+      "matches": true
+    },
+    {
+      "path": "manual/logs.html",
+      "status": 200,
+      "matches": true
+    },
+    {
+      "path": "manual/mail.html",
+      "status": 200,
+      "matches": true
+    },
+    {
+      "path": "manual/MAIL_ATTACHMENTS.html",
+      "status": 200,
+      "matches": true
+    },
+    {
+      "path": "manual/MAINTENANCE.html",
+      "status": 200,
+      "matches": true
+    },
+    {
+      "path": "manual/member-admin.html",
+      "status": 200,
+      "matches": true
+    },
+    {
+      "path": "manual/MEMBERS_ADMIN.html",
+      "status": 200,
+      "matches": true
+    },
+    {
+      "path": "manual/MEMBER_MAIL.html",
+      "status": 200,
+      "matches": true
+    },
+    {
+      "path": "manual/navigation.html",
+      "status": 200,
+      "matches": true
+    },
+    {
+      "path": "manual/NEXT_BOARD.html",
+      "status": 200,
+      "matches": true
+    },
+    {
+      "path": "manual/operations.html",
+      "status": 200,
+      "matches": true
+    },
+    {
+      "path": "manual/overview.html",
+      "status": 200,
+      "matches": true
+    },
+    {
+      "path": "manual/PAGER.html",
+      "status": 200,
+      "matches": true
+    },
+    {
+      "path": "manual/PASSWORD.html",
+      "status": 200,
+      "matches": true
+    },
+    {
+      "path": "manual/permissions.html",
+      "status": 200,
+      "matches": true
+    },
+    {
+      "path": "manual/personal-settings.html",
+      "status": 200,
+      "matches": true
+    },
+    {
+      "path": "manual/PLATFORMS.html",
+      "status": 200,
+      "matches": true
+    },
+    {
+      "path": "manual/PORTS.html",
+      "status": 200,
+      "matches": true
+    },
+    {
+      "path": "manual/PREFERENCES.html",
+      "status": 200,
+      "matches": true
+    },
+    {
+      "path": "manual/PREVIEW.html",
+      "status": 200,
+      "matches": true
+    },
+    {
+      "path": "manual/protocol.html",
+      "status": 200,
+      "matches": true
+    },
+    {
+      "path": "manual/README.html",
+      "status": 200,
+      "matches": true
+    },
+    {
+      "path": "manual/RPM.html",
+      "status": 200,
+      "matches": true
+    },
+    {
+      "path": "manual/SAVED_DRAFT.html",
+      "status": 200,
+      "matches": true
+    },
+    {
+      "path": "manual/SEARCH.html",
+      "status": 200,
+      "matches": true
+    },
+    {
+      "path": "manual/security.html",
+      "status": 200,
+      "matches": true
+    },
+    {
+      "path": "manual/serial-connector.html",
+      "status": 200,
+      "matches": true
+    },
+    {
+      "path": "manual/SERIAL.html",
+      "status": 200,
+      "matches": true
+    },
+    {
+      "path": "manual/STAGE2.html",
+      "status": 200,
+      "matches": true
+    },
+    {
+      "path": "manual/STAGE28.html",
+      "status": 200,
+      "matches": true
+    },
+    {
+      "path": "manual/STAGE3.html",
+      "status": 200,
+      "matches": true
+    },
+    {
+      "path": "manual/STAGE30.html",
+      "status": 200,
+      "matches": true
+    },
+    {
+      "path": "manual/STAGE31.html",
+      "status": 200,
+      "matches": true
+    },
+    {
+      "path": "manual/STAGE4.html",
+      "status": 200,
+      "matches": true
+    },
+    {
+      "path": "manual/STAGE5.html",
+      "status": 200,
+      "matches": true
+    },
+    {
+      "path": "manual/STAGE56.html",
+      "status": 200,
+      "matches": true
+    },
+    {
+      "path": "manual/STAGE57.html",
+      "status": 200,
+      "matches": true
+    },
+    {
+      "path": "manual/STAGE58.html",
+      "status": 200,
+      "matches": true
+    },
+    {
+      "path": "manual/STAGE59.html",
+      "status": 200,
+      "matches": true
+    },
+    {
+      "path": "manual/STAGE6.html",
+      "status": 200,
+      "matches": true
+    },
+    {
+      "path": "manual/STAGE60.html",
+      "status": 200,
+      "matches": true
+    },
+    {
+      "path": "manual/STAGE61.html",
+      "status": 200,
+      "matches": true
+    },
+    {
+      "path": "manual/STAGE62.html",
+      "status": 200,
+      "matches": true
+    },
+    {
+      "path": "manual/STAGE63.html",
+      "status": 200,
+      "matches": true
+    },
+    {
+      "path": "manual/STAGE64.html",
+      "status": 200,
+      "matches": true
+    },
+    {
+      "path": "manual/STAGE65.html",
+      "status": 200,
+      "matches": true
+    },
+    {
+      "path": "manual/STAGE66.html",
+      "status": 200,
+      "matches": true
+    },
+    {
+      "path": "manual/STAGE67.html",
+      "status": 200,
+      "matches": true
+    },
+    {
+      "path": "manual/STAGE69.html",
+      "status": 200,
+      "matches": true
+    },
+    {
+      "path": "manual/STAGE70.html",
+      "status": 200,
+      "matches": true
+    },
+    {
+      "path": "manual/STAGE71.html",
+      "status": 200,
+      "matches": true
+    },
+    {
+      "path": "manual/STAGE72.html",
+      "status": 200,
+      "matches": true
+    },
+    {
+      "path": "manual/STAGE73.html",
+      "status": 200,
+      "matches": true
+    },
+    {
+      "path": "manual/STAGE74.html",
+      "status": 200,
+      "matches": true
+    },
+    {
+      "path": "manual/starroute-integration.html",
+      "status": 200,
+      "matches": true
+    },
+    {
+      "path": "manual/STARROUTE.html",
+      "status": 200,
+      "matches": true
+    },
+    {
+      "path": "manual/storage.html",
+      "status": 200,
+      "matches": true
+    },
+    {
+      "path": "manual/TALK.html",
+      "status": 200,
+      "matches": true
+    },
+    {
+      "path": "manual/THIRD_PARTY.html",
+      "status": 200,
+      "matches": true
+    },
+    {
+      "path": "manual/THREAD_UNREAD.html",
+      "status": 200,
+      "matches": true
+    },
+    {
+      "path": "manual/transfer-admin.html",
+      "status": 200,
+      "matches": true
+    },
+    {
+      "path": "manual/TRANSFER.html",
+      "status": 200,
+      "matches": true
+    },
+    {
+      "path": "manual/transfers.html",
+      "status": 200,
+      "matches": true
+    },
+    {
+      "path": "manual/TRANSPORTS.html",
+      "status": 200,
+      "matches": true
+    },
+    {
+      "path": "manual/troubleshooting.html",
+      "status": 200,
+      "matches": true
+    },
+    {
+      "path": "manual/uninstall.html",
+      "status": 200,
+      "matches": true
+    },
+    {
+      "path": "manual/UNREAD_THREADS.html",
+      "status": 200,
+      "matches": true
+    },
+    {
+      "path": "manual/upgrade.html",
+      "status": 200,
+      "matches": true
+    },
+    {
+      "path": "manual/UPGRADING.html",
+      "status": 200,
+      "matches": true
+    },
+    {
+      "path": "manual/UPLOAD.html",
+      "status": 200,
+      "matches": true
+    },
+    {
+      "path": "manual/VAULT.html",
+      "status": 200,
+      "matches": true
+    },
+    {
+      "path": "manual/web-server.html",
+      "status": 200,
+      "matches": true
+    },
+    {
+      "path": "manual/web-users.html",
+      "status": 200,
+      "matches": true
+    },
+    {
+      "path": "manual/WEBUI.html",
+      "status": 200,
+      "matches": true
+    },
+    {
+      "path": "manual/WEBUI_COVERAGE.html",
+      "status": 200,
+      "matches": true
+    },
+    {
+      "path": "manual/WEBUI_REVIEW_VERIFICATION.html",
+      "status": 200,
+      "matches": true
+    },
+    {
+      "path": "manual/ZMODEM.html",
+      "status": 200,
+      "matches": true
+    },
+    {
+      "path": "manual/ZMODEM_MENU.html",
+      "status": 200,
+      "matches": true
+    },
+    {
+      "path": "manual/ZRESUME_FIX.html",
+      "status": 200,
+      "matches": true
+    },
+    {
+      "path": "manual/ZUPLOAD_FIX.html",
+      "status": 200,
+      "matches": true
+    },
+    {
+      "path": "manual/en/index.html",
+      "status": 200,
+      "matches": true
+    }
+  ]
+}

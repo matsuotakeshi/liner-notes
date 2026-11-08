@@ -104,6 +104,7 @@ test: test-userlog test-chat runtime vaultctl test-adapters test-vault-core test
 	$(PYTHON) tests/test_unread_threads.py ./runtime
 	$(PYTHON) tests/test_login_unread.py ./runtime
 	$(PYTHON) tests/test_help.py ./runtime
+	$(PYTHON) tests/test_help_release.py ./runtime
 	$(PYTHON) tests/test_extended.py ./runtime
 
 vaultctl: src/vaultctl.c src/vault.c src/vault.h src/principal.h

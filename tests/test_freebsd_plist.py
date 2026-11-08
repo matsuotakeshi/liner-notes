@@ -1,12 +1,7 @@
 #!/usr/bin/env python3
-"""Ensure the FreeBSD port plist enumerates all installed Markdown/Python files.
-
-The port's do-install stages every top-level *.md and scripts/*.py. Before
-running private FreeBSD CI, catch any newly added file missing from pkg-plist
-using a GitHub-hosted PR check. No VM access or package installs.
-"""
+"""Match the generated canonical book and installed scripts against pkg-plist."""
 from pathlib import Path
-import sys
+import sys,tempfile
 
 ROOT = Path(__file__).resolve().parents[1]
 PLIST = ROOT / "ports/comms/liner-notes/pkg-plist"
@@ -14,16 +9,20 @@ PLIST = ROOT / "ports/comms/liner-notes/pkg-plist"
 
 def main():
     content = PLIST.read_text(encoding="utf-8").splitlines()
-    expected = {
-        f"%%PORTDOCS%%%%DOCSDIR%%/{p.name}"
-        for p in ROOT.glob("*.md") if p.is_file()
-    }
+    sys.path.insert(0,str(ROOT/'scripts/manual'))
+    from build import build
+    with tempfile.TemporaryDirectory(prefix='manual-plist-') as tmp:
+        book=Path(tmp)/'book';build(book)
+        expected = {f"%%PORTDOCS%%%%DOCSDIR%%/{p.relative_to(book).as_posix()}"
+                    for p in book.rglob('*') if p.is_file()}
     expected.update({
         f"%%DATADIR%%/scripts/{p.name}"
         for p in (ROOT / "scripts").glob("*.py") if p.is_file()
     })
     actual = set(content)
     missing = sorted(expected - actual)
+    extra=sorted(x for x in actual-expected if x.startswith('%%PORTDOCS%%'))
+    if extra:raise AssertionError(('Unexpected published documentation',extra))
     if missing:
         for entry in missing:
             print(f"UNLISTED FreeBSD stage file: {entry}", file=sys.stderr)

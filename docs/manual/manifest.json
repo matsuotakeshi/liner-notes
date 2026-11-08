@@ -1,0 +1,489 @@
+{
+  "version": "0.74.1",
+  "revision": "2026-11-09",
+  "source_commit": "v0.74.1",
+  "chapters": [
+    "Liner Notesの概要",
+    "インストールと更新",
+    "利用者マニュアル",
+    "管理者・SIGOPマニュアル",
+    "接続・外部連携",
+    "設定・技術仕様",
+    "トラブルシューティング"
+  ],
+  "pages": [
+    {
+      "id": "overview",
+      "title": "Liner Notesの概要",
+      "chapter": 1,
+      "sources": [
+        "README.md",
+        "PLATFORMS.md",
+        "STAGE74.md",
+        "src/runtime.c",
+        "linux/rpm/liner-notes.spec"
+      ]
+    },
+    {
+      "id": "licenses",
+      "title": "ライセンスと同梱物",
+      "chapter": 1,
+      "sources": [
+        "LICENSE",
+        "THIRD_PARTY.md"
+      ]
+    },
+    {
+      "id": "install-freebsd",
+      "title": "FreeBSDへの導入",
+      "chapter": 2,
+      "sources": [
+        "INSTALL.md",
+        "ports/comms/liner-notes/Makefile"
+      ]
+    },
+    {
+      "id": "initial-setup",
+      "title": "初期設定と公開前の確認",
+      "chapter": 2,
+      "sources": [
+        "INSTALL.md",
+        "ports/comms/liner-notes/files/liner_notes.conf.in",
+        "src/runtime.c"
+      ]
+    },
+    {
+      "id": "install-linux",
+      "title": "Linuxへの導入",
+      "chapter": 2,
+      "sources": [
+        "RPM.md",
+        "LINUX.md",
+        "linux/rpm/liner-notes.spec",
+        "scripts/install-linux.py"
+      ]
+    },
+    {
+      "id": "upgrade",
+      "title": "バージョンアップと切り戻し",
+      "chapter": 2,
+      "sources": [
+        "UPGRADING.md",
+        "RPM.md",
+        "DATABASE_STRUCTURED.md"
+      ]
+    },
+    {
+      "id": "uninstall",
+      "title": "アンインストール",
+      "chapter": 2,
+      "sources": [
+        "RPM.md",
+        "ports/comms/liner-notes/pkg-plist",
+        "scripts/install-linux.py"
+      ]
+    },
+    {
+      "id": "accounts",
+      "title": "接続・ログイン・会員登録",
+      "chapter": 3,
+      "sources": [
+        "help/ja/account.txt",
+        "PASSWORD.md",
+        "src/session.c",
+        "src/runtime.c"
+      ]
+    },
+    {
+      "id": "navigation",
+      "title": "メニューとコマンドの使い方",
+      "chapter": 3,
+      "sources": [
+        "COMMANDS.md",
+        "HELP.md",
+        "PAGER.md",
+        "LIST_PAGER.md",
+        "help/ja/settings.txt",
+        "menus/ja.txt"
+      ]
+    },
+    {
+      "id": "boards",
+      "title": "ボード・記事・返信を読む",
+      "chapter": 3,
+      "sources": [
+        "help/ja/read.txt",
+        "help/ja/adminboards.txt",
+        "STAGE67.md",
+        "STAGE71.md",
+        "src/session.c"
+      ]
+    },
+    {
+      "id": "article-search",
+      "title": "検索・新着巡回・未読管理",
+      "chapter": 3,
+      "sources": [
+        "SEARCH.md",
+        "BOARD_UNREAD.md",
+        "NEXT_BOARD.md",
+        "THREAD_UNREAD.md",
+        "UNREAD_THREADS.md",
+        "LOGIN_UNREAD.md",
+        "help/ja/unread.txt",
+        "src/session.c"
+      ]
+    },
+    {
+      "id": "editor",
+      "title": "投稿・編集・下書き・共通バッファ",
+      "chapter": 3,
+      "sources": [
+        "DRAFT_EDIT.md",
+        "DRAFT_UNDO.md",
+        "PREVIEW.md",
+        "SAVED_DRAFT.md",
+        "DRAFT_NOTICE.md",
+        "help/ja/editor.txt",
+        "src/session.c"
+      ]
+    },
+    {
+      "id": "mail",
+      "title": "会員間メールと添付",
+      "chapter": 3,
+      "sources": [
+        "MEMBER_MAIL.md",
+        "MAIL_ATTACHMENTS.md",
+        "help/ja/mail.txt",
+        "src/session.c",
+        "webui/app.py"
+      ]
+    },
+    {
+      "id": "conversation",
+      "title": "チャット・個別トーク・Gather",
+      "chapter": 3,
+      "sources": [
+        "CHAT.md",
+        "CHAT_ADMIN.md",
+        "TALK.md",
+        "help/ja/chat.txt",
+        "help/ja/gather.txt",
+        "STAGE70.md"
+      ]
+    },
+    {
+      "id": "files",
+      "title": "ファイル保管庫と一括選択",
+      "chapter": 3,
+      "sources": [
+        "VAULT.md",
+        "FILE_BOARDS.md",
+        "help/ja/files.txt",
+        "STAGE69.md",
+        "src/session.c"
+      ]
+    },
+    {
+      "id": "personal-settings",
+      "title": "プロフィールと個人設定",
+      "chapter": 3,
+      "sources": [
+        "PREFERENCES.md",
+        "I18N.md",
+        "help/ja/profile.txt",
+        "help/ja/settings.txt",
+        "src/profile_store.c"
+      ]
+    },
+    {
+      "id": "web-users",
+      "title": "WebUIを使う",
+      "chapter": 3,
+      "sources": [
+        "WEBUI_COVERAGE.md",
+        "WEBUI.md",
+        "webui/commands.py",
+        "webui/static/reports-ui.js"
+      ]
+    },
+    {
+      "id": "permissions",
+      "title": "管理者・SIGOPと権限",
+      "chapter": 4,
+      "sources": [
+        "help/ja/sigop.txt",
+        "help/ja/adminboards.txt",
+        "help/ja/adminmembers.txt",
+        "src/board.c",
+        "src/session.c"
+      ]
+    },
+    {
+      "id": "member-admin",
+      "title": "会員・申請の管理",
+      "chapter": 4,
+      "sources": [
+        "MEMBERS_ADMIN.md",
+        "help/ja/adminmembers.txt",
+        "STAGE69.md",
+        "src/members.c"
+      ]
+    },
+    {
+      "id": "board-admin",
+      "title": "ボード・グループ・記事の管理",
+      "chapter": 4,
+      "sources": [
+        "help/ja/adminboards.txt",
+        "boards.example.conf",
+        "src/board.c",
+        "src/board_policy.c"
+      ]
+    },
+    {
+      "id": "file-admin",
+      "title": "ファイルボードと登録済みファイルの管理",
+      "chapter": 4,
+      "sources": [
+        "FILE_BOARDS.md",
+        "help/ja/adminfiles.txt",
+        "help/ja/files.txt",
+        "src/vault.c"
+      ]
+    },
+    {
+      "id": "logs",
+      "title": "監査ログ・接続履歴・取得回数",
+      "chapter": 4,
+      "sources": [
+        "AUDIT.md",
+        "CONTENT_AUDIT.md",
+        "HISTORY.md",
+        "MAINTENANCE.md",
+        "help/ja/adminstorage.txt"
+      ]
+    },
+    {
+      "id": "operations",
+      "title": "運用・監視・告知・停止",
+      "chapter": 4,
+      "sources": [
+        "DAEMON.md",
+        "help/ja/adminconnections.txt",
+        "src/runtime.c",
+        "STAGE74.md"
+      ]
+    },
+    {
+      "id": "backup-recovery",
+      "title": "バックアップ・復元・データ整理",
+      "chapter": 4,
+      "sources": [
+        "INSTALL.md",
+        "MAINTENANCE.md",
+        "DATABASE_STRUCTURED.md",
+        "scripts/maintenance.py"
+      ]
+    },
+    {
+      "id": "transfer-admin",
+      "title": "中断した転送データの管理",
+      "chapter": 4,
+      "sources": [
+        "STAGE70.md",
+        "STAGE71.md",
+        "scripts/transfer_spool.py"
+      ]
+    },
+    {
+      "id": "connections",
+      "title": "Telnet公開・ポート23・SSH",
+      "chapter": 5,
+      "sources": [
+        "INSTALL.md",
+        "TRANSPORTS.md",
+        "scripts/liner-notes-ssh",
+        "src/telnet.c"
+      ]
+    },
+    {
+      "id": "web-server",
+      "title": "WebUIとApacheの構成・差し替え",
+      "chapter": 5,
+      "sources": [
+        "INSTALL.md",
+        "WEBUI.md",
+        "webui/example.toml",
+        "webui/deployment/apache.conf"
+      ]
+    },
+    {
+      "id": "transfers",
+      "title": "転送方式・途中再開・タイムアウト",
+      "chapter": 5,
+      "sources": [
+        "ZMODEM.md",
+        "ZMODEM_MENU.md",
+        "ZUPLOAD_FIX.md",
+        "ZRESUME_FIX.md",
+        "STAGE70.md",
+        "scripts/vault_zmodem.py",
+        "webui/bridge.py"
+      ]
+    },
+    {
+      "id": "external-games",
+      "title": "Door・The Clans・外部ゲーム",
+      "chapter": 5,
+      "sources": [
+        "DOORS.md",
+        "DOOR_OPERATIONS.md",
+        "src/doors.c",
+        "src/runtime.c",
+        "scripts/door_clans.sh"
+      ]
+    },
+    {
+      "id": "starroute-integration",
+      "title": "StarRoute Tradersとの連携",
+      "chapter": 5,
+      "sources": [
+        "STARROUTE.md",
+        "INSTALL.md",
+        "DOORS.md",
+        "src/doors.c"
+      ]
+    },
+    {
+      "id": "serial-connector",
+      "title": "COM・Hayesモデム接続",
+      "chapter": 5,
+      "sources": [
+        "SERIAL.md",
+        "scripts/serial_connector.py",
+        "tests/test_serial_connector.py"
+      ]
+    },
+    {
+      "id": "links",
+      "title": "BBS間リンクとスター・リング型共有",
+      "chapter": 5,
+      "sources": [
+        "BBS_LINKS.md",
+        "scripts/link_service.py",
+        "link.example.toml"
+      ]
+    },
+    {
+      "id": "link-operations",
+      "title": "共有ボードの管理・保守",
+      "chapter": 5,
+      "sources": [
+        "BBS_LINK_OPERATIONS.md",
+        "scripts/link_service.py",
+        "webui/app.py"
+      ]
+    },
+    {
+      "id": "layout",
+      "title": "ディレクトリと配置",
+      "chapter": 6,
+      "sources": [
+        "INSTALL.md",
+        "RPM.md",
+        "scripts/install-linux.py"
+      ]
+    },
+    {
+      "id": "limits",
+      "title": "システム上限と無制限指定",
+      "chapter": 6,
+      "sources": [
+        "limits.example.conf",
+        "vault-limits.example.conf",
+        "src/runtime_limits.h",
+        "src/vault.h",
+        "help/ja/profile.txt"
+      ]
+    },
+    {
+      "id": "storage",
+      "title": "DB構造と保存方式",
+      "chapter": 6,
+      "sources": [
+        "DATABASE_STRUCTURED.md",
+        "src/storage_sqlite.c",
+        "STAGE71.md",
+        "STAGE73.md",
+        "scripts/maintenance.py"
+      ]
+    },
+    {
+      "id": "security",
+      "title": "セキュリティと権限モデル",
+      "chapter": 6,
+      "sources": [
+        "DOORS.md",
+        "WEBUI.md",
+        "BBS_LINKS.md",
+        "RPM.md",
+        "src/members.c"
+      ]
+    },
+    {
+      "id": "configuration",
+      "title": "設定ファイルと配布設定値",
+      "chapter": 6,
+      "sources": [
+        "ports/comms/liner-notes/files/liner_notes.conf.in",
+        "liner_notes.rc.conf.example",
+        "limits.example.conf",
+        "vault-limits.example.conf",
+        "boards.example.conf",
+        "doors.example.conf",
+        "webui/example.toml",
+        "link.example.toml",
+        "link-accounts.example.conf",
+        "linux/liner-notes.env",
+        "src/runtime.c",
+        "ports/comms/liner-notes/files/liner_notes.in"
+      ]
+    },
+    {
+      "id": "command-reference",
+      "title": "名前付きコマンド・Webフォーム索引",
+      "chapter": 6,
+      "sources": [
+        "webui/commands.py",
+        "help/ja/index.txt"
+      ]
+    },
+    {
+      "id": "protocol",
+      "title": "通信とコネクタの技術仕様",
+      "chapter": 6,
+      "sources": [
+        "TRANSPORTS.md",
+        "TRANSFER.md",
+        "BINARY_TRANSFER.md",
+        "UPLOAD.md",
+        "webui/bbs_transport.py",
+        "src/session.c"
+      ]
+    },
+    {
+      "id": "troubleshooting",
+      "title": "障害の切り分けと復旧",
+      "chapter": 7,
+      "sources": [
+        "INSTALL.md",
+        "ZRESUME_FIX.md",
+        "DATABASE_STRUCTURED.md",
+        "DOOR_OPERATIONS.md",
+        "BBS_LINK_OPERATIONS.md"
+      ]
+    }
+  ]
+}

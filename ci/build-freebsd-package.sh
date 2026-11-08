@@ -67,7 +67,9 @@ test -f "$work/source/scripts/release_manifest.py"
 # Keep the original category/port directory name: FreeBSD derives PKGORIGIN
 # from the port directory and categories, not just the package name.
 cp -R "$work/source/ports/comms/liner-notes" "$port_dir"
-cp "$archive" "$work/distfiles/liner-notes-stage74.tar.gz"
+distfile=$(make -C "$port_dir" -V DISTFILES)
+case "$distfile" in liner-notes-*.tar.gz) ;; *) echo "Unexpected distfile" >&2; exit 1;; esac
+cp "$archive" "$work/distfiles/$distfile"
 
 # Pin Python 3.12 only for this CI port build. The FreeBSD pkg repository
 # carries py312-aiohttp/cryptography; do not alter the VM-wide default.
@@ -138,7 +140,7 @@ esac
 make -C "$port_dir" BATCH=yes \
     PORTSDIR=/usr/ports DISTDIR="$work/distfiles" \
     PYTHON_VERSION=python3.12 STRICT_DEPENDS=yes makesum
-grep -Fqx "SHA256 (liner-notes-stage74.tar.gz) = $source_digest" "$port_dir/distinfo" || {
+grep -Fqx "SHA256 ($distfile) = $source_digest" "$port_dir/distinfo" || {
     echo "Ports distinfo and Git source archive are inconsistent" >&2; exit 1;
 }
 
