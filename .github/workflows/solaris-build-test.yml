@@ -1,0 +1,37 @@
+name: Solaris Native CI
+
+# Experimental port: separate from the established three-OS release gate.
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: liner-notes-native-solaris
+  cancel-in-progress: false
+jobs:
+  changes:
+    uses: ./.github/workflows/change-scope.yml
+  test:
+    needs: changes
+    name: Solaris 11.4 x86-64 native tests
+    if: ${{ github.repository == 'matsuotakeshi/liner-notes' && github.ref == 'refs/heads/main' && needs.changes.outputs.build == 'true' }}
+    runs-on: [self-hosted, Linux, X64]
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Build and test exact main using the existing Solaris CI account
+        run: python3 ci/native_ci.py --target solaris --output "$RUNNER_TEMP/solaris-results"
+      - name: Retain inventory, capabilities and exact-commit results
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: native-ci-solaris-results
+          path: |
+            ${{ runner.temp }}/solaris-results/*.log
+            ${{ runner.temp }}/solaris-results/results.json
+          if-no-files-found: warn
+          retention-days: 30

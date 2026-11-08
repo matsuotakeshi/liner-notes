@@ -3,6 +3,9 @@
 from __future__ import annotations
 import sys
 sys.dont_write_bytecode = True
+if sys.version_info < (3,11):
+    print('liner-notes-doctor: Python 3.11以降が必要です / Python 3.11 or newer is required.',file=sys.stderr)
+    raise SystemExit(2)
 import argparse
 import datetime
 import hashlib
