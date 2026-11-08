@@ -111,11 +111,25 @@ class DoctorTests(unittest.TestCase):
         self.assertEqual([r['code'] for r in report['results']],['disabled']*3)
 
     def test_invalid_core_options_are_rejected_without_echo(self):
-        for text in ('--unknown SECRET 23','--lang SECRET 23','--bind hostname 23','70000','--database --menu 23','--max-mail -1 23'):
+        for text in ('--unknown SECRET 23','--lang SECRET 23','--bind hostname 23','70000','--database --menu 23','--max-mail -1 23','--id-digits 12 23','--idle-seconds 86401 23'):
             self.write('/etc/liner-notes/liner-notes.env',f'LINER_NOTES_OPTIONS="{text}"\n')
             report=self.instance('--check-doors').run()
             self.assertEqual(report['exit_code'],2,text)
             self.assertNotIn('SECRET',json.dumps(report))
+
+    def test_database_flag_order_and_explicit_override(self):
+        parsed=doctor.options('--database-structured /old.sqlite --database /actual.sqlite 2222')
+        self.assertEqual(parsed['database'],'/actual.sqlite')
+        self.assertNotIn('database-structured',parsed)
+        self.write('/etc/liner-notes/liner-notes.env','LINER_NOTES_OPTIONS="--database-structured /old.sqlite 2222"\n')
+        obj=self.instance('--check-database','--database','/actual.sqlite');obj.load()
+        self.assertEqual(obj.core['database'],'/actual.sqlite')
+        self.assertNotIn('database-structured',obj.core)
+
+    def test_binary_version_is_read_without_execution(self):
+        self.write('/usr/sbin/liner-notes',b'\x7fELF\x00Liner notes 0.69 (stage69)\r\n\x00Liner notes 0.74.1\r\n\x00',0o755)
+        obj=self.instance('--check-config');obj.load();obj.check_config()
+        self.assertTrue(any(r['detail'].startswith('embedded version=0.74.1; sha256=') for r in obj.results),obj.results)
 
     def test_freebsd_rc_overrides_config(self):
         self.write('/usr/local/etc/liner-notes/liner_notes.conf','liner_notes_port="2222"\nliner_notes_database="/var/lib/liner-notes/liner.sqlite"\n')
@@ -157,6 +171,55 @@ class DoctorTests(unittest.TestCase):
     def test_staged_root_escape_rejected(self):
         obj=self.instance('--check-database')
         with self.assertRaises(ValueError):obj.path('/../../outside')
+
+    def test_staged_supplementary_groups(self):
+        self.write('/etc/passwd','liner_notes_web:x:1201:1201::/:/bin/false\n')
+        self.write('/etc/group','liner_notes_web:x:1201:\nliner_notes_linkctl:x:1301:someone,liner_notes_web\n')
+        self.assertEqual(self.instance('--check-permissions').account('liner_notes_web'),(1201,{1201,1301}))
+
+    def test_replaced_regular_file_not_read(self):
+        path=self.write('/target','original')
+        original=doctor.os.open
+        def replacing(filename,flags,*args,**kwargs):
+            if Path(filename)==path:
+                path.unlink();path.write_text('PRIVATE-REPLACEMENT',encoding='ascii')
+            return original(filename,flags,*args,**kwargs)
+        with patch.object(doctor.os,'open',replacing):
+            with self.assertRaises(doctor.InspectionChanged):
+                self.instance('--check-config').read('/target')
+
+    @unittest.skipIf(os.name=='nt','UNIX no-follow/nonblocking race test runs in hosted/native CI')
+    def test_fifo_and_symlink_swap_never_read_or_block(self):
+        original=doctor.os.open
+        for kind in ('fifo','symlink'):
+            path=self.write('/target-'+kind,'original')
+            secret=self.write('/secret-'+kind,'PRIVATE')
+            flags_seen=[]
+            def replacing(filename,flags,*args,**kwargs):
+                if Path(filename)==path:
+                    flags_seen.append(flags)
+                    path.unlink()
+                    if kind=='fifo':os.mkfifo(path)
+                    else:path.symlink_to(secret)
+                return original(filename,flags,*args,**kwargs)
+            with patch.object(doctor.os,'open',replacing):
+                with self.assertRaises((ValueError,OSError)):
+                    self.instance('--check-config').read('/target-'+kind)
+            self.assertTrue(flags_seen[0]&os.O_NONBLOCK)
+            self.assertTrue(flags_seen[0]&os.O_NOFOLLOW)
+            self.assertEqual(secret.read_text(),'PRIVATE')
+
+    @unittest.skipIf(os.name=='nt','UNIX nonblocking database race test runs in hosted/native CI')
+    def test_database_swap_to_fifo_is_inconclusive_not_a_read(self):
+        path=self.root/'var/lib/liner-notes/liner.sqlite'
+        original=doctor.os.open
+        def replacing(filename,flags,*args,**kwargs):
+            if Path(filename)==path:
+                path.unlink();os.mkfifo(path)
+            return original(filename,flags,*args,**kwargs)
+        with patch.object(doctor.os,'open',replacing):report=self.instance('--check-database').run()
+        self.assertEqual(report['exit_code'],1,report)
+        self.assertEqual(report['results'][-1]['code'],'busy')
 
     def test_quota_validation_matches_zero_and_duplicate_rules(self):
         for text,code in [('members=999999\nbody_bytes=262144\n',0),('members=0\n',2),('body_bytes=262145\n',2),('members=10\nmembers=20\n',2),('unknown=1\n',2)]:
@@ -241,6 +304,37 @@ class DoctorTests(unittest.TestCase):
         key=self.root/'identity/identity.key';key.write_bytes((self.root/'peer/identity.key').read_bytes())
         obj.results=[];obj.check_link_certificates(cfg,{board:1})
         self.assertTrue(any(r['code']=='certificate' for r in obj.results))
+        generate('/identity');generate('/peer')
+        (self.root/'identity').chmod(0o700)
+        self.write('/etc/liner-notes/link-accounts.conf','1 17\n')
+        self.write('/link/bbs-password','SYNTHETIC-SECRET\n')
+        (self.root/'link').chmod(0o700)
+        with closing(sqlite3.connect(self.root/'link/link.sqlite')) as db:
+            db.executescript('CREATE TABLE events(seq INTEGER); CREATE TABLE cursors(peer TEXT,sequence INTEGER);');db.commit()
+        self.write('/etc/liner-notes/link.toml',f'''[node]
+identity="/identity"
+database="/link/link.sqlite"
+port=9044
+[bbs]
+host="127.0.0.1"
+port=2222
+login="linkfixture"
+password_file="/link/bbs-password"
+[[boards]]
+id="{board}"
+local=1
+[[peers]]
+host="example.invalid"
+certificate="/peer/identity.crt"
+boards=["{board}"]
+''')
+        obj=self.instance('--check-links','--link-config','/etc/liner-notes/link.toml')
+        obj.load();obj.core['link-accounts']='/etc/liner-notes/link-accounts.conf'
+        before=self.state()
+        with patch('socket.socket.connect',side_effect=AssertionError('network')):obj.check_links()
+        self.assertFalse(any(r['status']=='error' for r in obj.results),obj.results)
+        self.assertNotIn('SYNTHETIC-SECRET',json.dumps(obj.results))
+        self.assertEqual(before,self.state())
         generate('/identity');generate('/peer',expired=True)
         obj.results=[];obj.check_link_certificates(cfg,{board:1})
         self.assertTrue(any(r['code']=='certificate' for r in obj.results))

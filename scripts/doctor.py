@@ -9,7 +9,7 @@ import ipaddress
 import json
 import os
 from pathlib import Path, PurePosixPath
-from contextlib import closing
+from contextlib import closing, contextmanager
 import platform
 import re
 import shlex
@@ -70,6 +70,37 @@ FLAGS = {'--menu', '--telnet', '--rtbbs-member-policy', '--userlog-public'}
 VALUES = set('database database-structured limits timezone sysinfo goodbye doors link-accounts zmodem-helper vault-dir menu-dir help-dir admins lang bind banner disable registration id-mode id-prefix id-digits id-first login-text-dir registration-form max-articles max-mail max-user-posts gather-count user-log chat-log userlog-keep idle-seconds level-seconds time-warning time-grace'.split())
 
 
+class InspectionChanged(ValueError):
+    """An inspected pathname changed before a safe descriptor was obtained."""
+
+
+def fingerprint(st):
+    # Windows lstat/fstat expose different ctime meanings on some Python builds.
+    # All supported UNIX targets retain the change-time check.
+    return (st.st_dev,st.st_ino,st.st_size,st.st_mtime_ns,st.st_ctime_ns if os.name!='nt' else 0)
+
+
+@contextmanager
+def open_regular(path,maximum=None,private=False,expected=None):
+    """No-follow, nonblocking read; verify the opened object before reading."""
+    before=path.lstat()
+    def validate(st):
+        if not stat.S_ISREG(st.st_mode) or (maximum is not None and st.st_size>maximum) or (private and (st.st_nlink!=1 or st.st_mode&0o077)):
+            raise ValueError('unsafe/large file')
+    validate(before)
+    if expected is not None and fingerprint(before)!=expected:
+        raise InspectionChanged('source changed')
+    flags=os.O_RDONLY|getattr(os,'O_NOFOLLOW',0)|getattr(os,'O_NONBLOCK',0)|getattr(os,'O_CLOEXEC',0)
+    fd=os.open(path,flags)
+    try:
+        after=os.fstat(fd);validate(after)
+        if fingerprint(before)!=fingerprint(after):
+            raise InspectionChanged('source changed')
+        with os.fdopen(fd,'rb',closefd=False) as stream:
+            yield stream
+    finally:os.close(fd)
+
+
 def assignments(text):
     """Read conservative rc.conf/EnvironmentFile assignments without evaluation."""
     values, dynamic = {}, False
@@ -103,6 +134,8 @@ def options(text):
             value = args.pop(0)
             if value.startswith('--'):
                 raise ValueError('missing option value')
+            if key in {'--database','--database-structured'}:
+                out.pop('database' if key=='--database-structured' else 'database-structured',None)
             out[key[2:]] = value
         else:
             raise ValueError('unknown option')
@@ -164,10 +197,7 @@ class Doctor:
 
     def read(self, value, maximum=1048576, relative=None, secret=False):
         path = self.path(value, relative)
-        st = path.lstat()
-        if not stat.S_ISREG(st.st_mode) or st.st_size > maximum or (secret and (st.st_nlink != 1 or st.st_mode & 0o077)):
-            raise ValueError('unsafe/large file')
-        with path.open('rb') as stream:
+        with open_regular(path,maximum,secret) as stream:
             data = stream.read(maximum + 1)
         if len(data) > maximum:
             raise ValueError('large file')
@@ -176,10 +206,20 @@ class Doctor:
     def account(self, name):
         if self.staged:
             try:
+                primary=None
                 for line in self.read('/etc/passwd').decode().splitlines():
                     parts = line.split(':')
                     if parts[0] == name and len(parts) >= 4:
-                        return int(parts[2]), {int(parts[3])}
+                        primary=(int(parts[2]),{int(parts[3])})
+                        break
+                if primary is not None:
+                    try:
+                        for line in self.read('/etc/group').decode().splitlines():
+                            parts=line.split(':')
+                            if len(parts)>=4 and name in parts[3].split(','):
+                                primary[1].add(int(parts[2]))
+                    except FileNotFoundError:pass
+                    return primary
             except (OSError, ValueError, UnicodeError):
                 pass
             return None
@@ -271,6 +311,8 @@ class Doctor:
                 arguments=settings['arguments']
                 if not isinstance(arguments,list) or not all(isinstance(x,str) for x in arguments):
                     raise ValueError('arguments')
+                if any(not isinstance(settings[k],str) or not PurePosixPath(settings[k]).is_absolute() for k in ('program','working_directory')):
+                    raise ValueError('absolute paths required')
                 self.core=options(shlex.join(arguments))
                 self.program=self.args.program or settings['program']
                 self.data_dir=self.args.data_dir or settings['working_directory']
@@ -305,6 +347,17 @@ class Doctor:
                 if not 1 <= self.core['port'] <= 65535:
                     raise ValueError('port')
                 ipaddress.IPv4Address(self.core.get('bind', '127.0.0.1'))
+                candidate=[]
+                for key in VALUES:
+                    if key in self.core and self.core[key]!='':
+                        candidate.extend(['--'+key,str(self.core[key])])
+                candidate.append(str(self.core['port']))
+                options(shlex.join(candidate))
+                if self.core.get('database-mode','blocks') not in {'blocks','structured'}:
+                    raise ValueError('database mode')
+                for key in ('chat','mail','vault','userlog-public','rtbbs-member-policy'):
+                    if self.core.get(key,'NO') not in {'YES','NO'}:
+                        raise ValueError('boolean')
             except ValueError:
                 self.add('config', 'syntax', 'error', config)
         elif 'LINER_NOTES_OPTIONS' in self.env:
@@ -315,6 +368,7 @@ class Doctor:
         elif self.system!='SunOS':
             self.add('config', 'syntax', 'error', config)
         if self.args.database:
+            self.core.pop('database-structured',None)
             self.core['database'] = self.args.database
         if self.args.doors_config:
             self.core['doors'] = self.args.doors_config
@@ -360,6 +414,15 @@ class Doctor:
         if self.system not in {'FreeBSD', 'Linux', 'SunOS'}:
             self.add('config', 'unsupported', 'warning')
         self.item('config', self.program, executable=True)
+        try:
+            binary_data=self.read(self.program,16777216)
+            versions=set(re.findall(rb'Liner notes ([0-9]+(?:\.[0-9]+){1,3}(?:[-+][A-Za-z0-9.-]+)?)\r\n\x00',binary_data))
+            if len(versions)==1:
+                self.add('config','ok',location=self.program,detail='embedded version='+versions.pop().decode('ascii')+'; sha256='+hashlib.sha256(binary_data).hexdigest())
+            else:
+                self.add('config','limited','warning',self.program,detail='binary version marker unavailable/ambiguous; program was not executed')
+        except (ValueError,OSError):
+            self.add('config','limited','warning',self.program,detail='binary version unavailable; program was not executed')
         if self.service_program.get('core') and self.service_program['core']!=self.program:
             self.add('config','mismatch','warning',self.program,detail='systemd ExecStart differs; use --program for an intentional override')
         for name in ('openssl', 'sqlite3'):
@@ -416,6 +479,12 @@ class Doctor:
                 self.item('config', value, directory=field.endswith('-dir'))
         if self.core.get('limits'):
             self.check_limits(self.core['limits'])
+        if self.core.get('admins'):
+            try:
+                self.admin_ids(self.core['admins'])
+                self.add('config','limited','warning',self.core['admins'],detail='administrator ID syntax checked; member existence/status requires runtime verification')
+            except (ValueError,UnicodeError,OSError):
+                self.add('config','syntax','error',self.core['admins'])
         if 'web' in self.enabled:
             self.check_web()
 
@@ -432,6 +501,15 @@ class Doctor:
             self.add('config','ok',location=value,detail='operational quota syntax and compiled maxima')
         except (ValueError,UnicodeError,OSError):
             self.add('config','syntax','error',value)
+
+    def admin_ids(self,value):
+        ids=set()
+        for line in self.read(value).decode('ascii').splitlines():
+            if not line or line.startswith('#'):continue
+            if len(line)>=127 or not line.isdigit() or not 1<=int(line)<=999999 or int(line) in ids:
+                raise ValueError('administrator IDs')
+            ids.add(int(line))
+        return ids
 
     def listener(self,group,feature,port):
         """Inspect kernel socket listings only. No connect(), DNS or health request."""
@@ -493,6 +571,7 @@ class Doctor:
         """Never give SQLite the source path: locks/SHM/WAL exist only in temp copy."""
         path = self.path(value)
         sources = [path, Path(str(path)+'-wal'), Path(str(path)+'-journal')]
+        before=None
         def metadata():
             result = {}
             for p in sources:
@@ -500,10 +579,14 @@ class Doctor:
                     s = p.lstat()
                     if not stat.S_ISREG(s.st_mode) or s.st_nlink != 1:
                         raise ValueError('unsafe database')
-                    result[p] = (s.st_dev,s.st_ino,s.st_size,s.st_mtime_ns,s.st_ctime_ns)
+                    result[p] = fingerprint(s)
                 except FileNotFoundError:
                     result[p] = None
             return result
+        def failed(code,status='error'):
+            try:changed=before is not None and metadata()!=before
+            except (OSError,ValueError):changed=before is not None
+            self.add(group,'busy' if changed else code,'warning' if changed else status,value)
         try:
             deadline = time.monotonic() + self.args.database_timeout
             before = metadata()
@@ -527,7 +610,7 @@ class Doctor:
                     if before[src] is None:
                         continue
                     dst = copy if src == path else Path(str(copy)+'-wal')
-                    with src.open('rb') as inp, dst.open('xb') as out:
+                    with open_regular(src,self.args.max_database_bytes,expected=before[src]) as inp, dst.open('xb') as out:
                         os.chmod(dst, 0o600)
                         remaining=before[src][2]
                         while remaining:
@@ -563,12 +646,14 @@ class Doctor:
                     self.add(group, 'busy', 'warning', value)
                 else:
                     self.add(group, 'ok', location=value, detail='quick_check/schema/foreign keys; private snapshot including WAL; source never opened by SQLite')
+        except InspectionChanged:
+            self.add(group,'busy','warning',value)
         except (FileNotFoundError, PermissionError, OSError):
-            self.add(group, 'unreadable', 'error', value)
+            failed('unreadable')
         except sqlite3.OperationalError as error:
-            self.add(group, 'limit' if str(error)=='interrupted' else 'database', 'warning' if str(error)=='interrupted' else 'error', value)
+            failed('limit' if str(error)=='interrupted' else 'database','warning' if str(error)=='interrupted' else 'error')
         except (sqlite3.DatabaseError, ValueError):
-            self.add(group, 'database', 'error', value)
+            failed('database')
 
     def check_database(self):
         value = self.core.get('database-structured') or self.core.get('database')
@@ -630,6 +715,10 @@ class Doctor:
                     pairs[int(parts[0])] = int(parts[1])
                 if not set(boards.values())<=set(pairs):
                     self.add('links','mismatch','error',account_file)
+                if self.core.get('admins'):
+                    administrator_ids=self.admin_ids(self.core['admins'])
+                    if administrator_ids.intersection(pairs.values()):
+                        self.add('links','permission','error',account_file,detail='connector account is also configured as a global administrator')
                 self.add('links','limited','warning',account_file, 'allowlist IDs checked; authentication/account suspension and board ACL require an authorised runtime check')
             else:
                 self.add('links','missing','error',detail='link account allowlist')
@@ -726,7 +815,7 @@ class Doctor:
                     self.add('doors','permission','error',file,detail='runtime refuses Door execution as root')
                 try:
                     if not executable_ok:continue
-                    with self.path(exe).open('rb') as stream:
+                    with open_regular(self.path(exe)) as stream:
                         first = stream.readline(4096)
                     if first.startswith(b'#!'):
                         interpreter = first[2:].decode().strip().split()[0]
@@ -827,7 +916,12 @@ class Doctor:
             except (OSError,ValueError,UnicodeError,IndexError):
                 self.add('selinux','unreadable','warning',detail=feature)
         labels=[(self.program,'liner_notes_exec_t'),(self.data_dir,'liner_notes_data_t')]
-        if 'transfers' in self.enabled:labels.append((self.env.get('LINER_NOTES_SPOOL_ROOT',self.data_dir+'/spool'),'liner_notes_spool_t'))
+        if 'transfers' in self.enabled:
+            labels.append((self.env.get('LINER_NOTES_SPOOL_ROOT',self.data_dir+'/spool'),'liner_notes_spool_t'))
+            if self.core.get('zmodem-helper'):
+                labels.append((self.core['zmodem-helper'],'liner_notes_transfer_exec_t'))
+            receipt=self.env.get('LINER_NOTES_RESUME_RECEIPT',self.data_dir+'/lrz-resume.json')
+            if self.path(receipt).exists():labels.append((receipt,'liner_notes_transfer_receipt_t'))
         if 'web' in self.enabled:
             labels += [(self.prefix+'/sbin/liner-notes-web','liner_notes_web_exec_t'),('/var/lib/liner-notes-web','liner_notes_web_data_t')]
         if 'links' in self.enabled:
