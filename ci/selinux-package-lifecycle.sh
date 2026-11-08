@@ -2,8 +2,9 @@
 # Only the disposable hosted Rocky container; no services/host network involved.
 set -euo pipefail
 test "${CI_SELINUX_DISPOSABLE:-}" = 1
-test "$#" = 1
+test "$#" = 2
 rpmfile="$1"
+updated="$2"
 rpm -U "$rpmfile"
 semodule -lfull | grep -E '^200[[:space:]]+liner_notes[[:space:]]'
 # Inspect the compiled allow graph rather than treating an unconfined run as MAC.
@@ -22,8 +23,10 @@ PY
 semanage fcontext -a -t var_lib_t '/var/lib/liner-notes-local-policy-fixture(/.*)?'
 semanage fcontext -l -C > /tmp/labels-before
 # Installing the same artifact is an idempotent package reinstall, not an
-# old-to-new compatibility claim. A real version update is tested below too.
+# old-to-new compatibility claim. A real RPM release update follows.
 rpm -U --replacepkgs "$rpmfile"
+rpm -U "$updated"
+test "$(rpm -q --qf '%{RELEASE}' liner-notes-selinux)" != "$(rpm -qp --qf '%{RELEASE}' "$rpmfile")"
 semanage fcontext -l -C > /tmp/labels-after
 cmp /tmp/labels-before /tmp/labels-after
 rpm -e liner-notes-selinux
@@ -31,4 +34,4 @@ if semodule -lfull | grep -Eq '^200[[:space:]]+liner_notes[[:space:]]'; then exi
 semanage fcontext -l -C > /tmp/labels-after
 cmp /tmp/labels-before /tmp/labels-after
 semanage fcontext -d '/var/lib/liner-notes-local-policy-fixture(/.*)?'
-echo 'PASS offline policy graph and RPM install/reinstall/remove; Enforcing runtime not tested here'
+echo 'PASS offline policy graph and RPM install/reinstall/update/remove; Enforcing runtime not tested here'

@@ -1,6 +1,7 @@
+%{!?policy_release:%global policy_release 1}
 Name:           liner-notes-selinux
 Version:        0.1.0
-Release:        1%{?dist}
+Release:        %{policy_release}%{?dist}
 Summary:        Confined SELinux domains for Liner Notes
 License:        GPL-3.0-only
 BuildArch:      noarch

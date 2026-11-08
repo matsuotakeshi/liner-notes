@@ -36,8 +36,9 @@ jobs:
               cp /source/LICENSE /build/SOURCES/
               rpmbuild -ba --define "_topdir /build" /source/linux/selinux/liner-notes-selinux.spec
               cp /build/RPMS/noarch/*.rpm /out/
-              CI_SELINUX_DISPOSABLE=1 bash /source/ci/selinux-package-lifecycle.sh /build/RPMS/noarch/*.rpm
               cp /build/BUILD/liner-notes-selinux-*/liner_notes.pp /out/ || find /build/BUILD -name liner_notes.pp -exec cp {} /out/ \;
+              rpmbuild -ba --define "_topdir /build" --define "policy_release 2" /source/linux/selinux/liner-notes-selinux.spec
+              CI_SELINUX_DISPOSABLE=1 bash /source/ci/selinux-package-lifecycle.sh /build/RPMS/noarch/*-1.*.rpm /build/RPMS/noarch/*-2.*.rpm
               cd /out
               sha256sum *.rpm *.pp > SHA256SUMS
             '
