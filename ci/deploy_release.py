@@ -43,10 +43,12 @@ def api(path, binary=False):
     return result.stdout if binary else json.loads(result.stdout)
 
 
-def artifact_json(artifact, basename):
+def artifact_json(artifact, basename, optional=False):
     data = api(f'repos/{REPO}/actions/artifacts/{artifact["id"]}/zip', binary=True)
     with zipfile.ZipFile(io.BytesIO(data)) as archive:
         entries = [i for i in archive.infolist() if Path(i.filename).name == basename]
+        if optional and not entries:
+            return None
         require(len(entries) == 1 and entries[0].file_size <= 8 * 1024 * 1024, 'Missing/ambiguous artifact evidence')
         return json.loads(archive.read(entries[0]))
 
@@ -74,6 +76,8 @@ def fresh_evidence(release):
         run_id = latest_successful_run(runs, sha, event, label)
         jobs = api(f'repos/{REPO}/actions/runs/{run_id}/jobs?filter=latest&per_page=100')
         successful_execution(jobs, step, 2 if label == 'linux' else 1)
+        if label == 'deployment':
+            successful_execution(jobs, 'Restore and boot the actual BBS using a disposable unprivileged account')
         evidence[label] = run_id
         if artifact_name:
             document = api(f'repos/{REPO}/actions/runs/{run_id}/artifacts?per_page=100')
@@ -101,6 +105,13 @@ def fresh_evidence(release):
             require(manifest['packages'].get(name) == expected, 'Signed package differs from CI-generated package')
             require(receipt['platforms'][platform]['packages'].get(name) ==
                     {'filename': package['filename'], 'sha256': package['sha256']}, 'Package is absent from verified release set')
+    # A resolver fixture is deliberately not a substitute for the actual
+    # package/scripts/services/restore acceptance required for srv.ysni.org.
+    full = artifact_json(artifacts['freebsd'], 'FREEBSD-SERVICE-UPGRADE.json', optional=True)
+    evidence['freebsd_service_upgrade_verified'] = bool(full and full.get('source_sha') == sha and all(
+        full.get(field) is True for field in ('full_service_update_verified', 'backup_restore_verified',
+                                              'config_data_retained', 'unrelated_services_untouched',
+                                              'old_package_restoration_verified')))
     return evidence, released
 
 
@@ -151,6 +162,7 @@ def main():
                                               'approval_comment': phrase, 'ci_runs': evidence}, indent=2) + '\n')
             print(phrase)
             return
+        require(evidence['freebsd_service_upgrade_verified'], 'Full isolated FreeBSD package/service upgrade acceptance is missing; apply remains disabled')
         actor = validate_environment(api(f'repos/{REPO}/environments/production-release'),
                                      api(f'repos/{REPO}/environments/production-release/deployment-branch-policies'),
                                      api(f'repos/{REPO}/actions/runs/{run_id}/approvals'), release, run_id, attempt)

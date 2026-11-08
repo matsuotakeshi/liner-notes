@@ -56,8 +56,10 @@ def apply_host(release, authorization, target, adapter):
             # dry-run package plan all precede the first service stop.
             state['before'] = adapter.preflight(release)
             adapter.health(None)
-            adapter.stop()
             stopped = True
+            state['result'] = 'stopping'
+            adapter.save_state(identity, state)
+            adapter.stop()
             state['result'] = 'stopped'
             adapter.save_state(identity, state)
             backup = adapter.backup(identity)

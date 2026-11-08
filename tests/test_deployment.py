@@ -154,6 +154,13 @@ class Deployment(unittest.TestCase):
             apply_host(self.doc, self.auth, policy.TARGETS[0], host)
         self.assertNotIn('install', host.calls)
 
+    def test_partly_stopped_service_is_never_reported_as_preflight_failure(self):
+        host = Fixture(self.base / 'host', policy.TARGETS[0], 'stop')
+        with self.assertRaises(ValueError):
+            apply_host(self.doc, self.auth, policy.TARGETS[0], host)
+        self.assertEqual(host.load_state('')['result'], 'planned-restore-required')
+        self.assertNotIn('install', host.calls)
+
     def test_preflight_failure_does_not_stop_service(self):
         host = Fixture(self.base / 'host', policy.TARGETS[0], 'preflight')
         with self.assertRaises(ValueError):
@@ -251,10 +258,10 @@ class Deployment(unittest.TestCase):
                 connection, _ = server.accept()
                 with connection:
                     self.assertEqual(connection.recv(1024), b'READ 1\n')
-                    connection.sendall(b'retained article\n')
+                    connection.sendall(b'retained article\nNEXT PROMPT\n')
             thread = threading.Thread(target=serve)
             thread.start()
-            health_probes({'article': {'host': '127.0.0.1', 'port': server.getsockname()[1], 'exchanges': [{'send': 'READ 1\n', 'expect': 'retained article'}]}})
+            health_probes({'article': {'host': '127.0.0.1', 'port': server.getsockname()[1], 'exchanges': [{'send': 'READ 1\n', 'expect': 'retained article'}, {'expect': 'NEXT PROMPT'}]}})
             thread.join(5)
             self.assertFalse(thread.is_alive())
 

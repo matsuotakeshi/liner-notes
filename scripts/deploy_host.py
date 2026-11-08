@@ -63,6 +63,7 @@ class Host:
         for feature, service in zip(('web', 'link'), SERVICES[self.platform][1:]):
             require(service not in profile['services'] or feature in profile['probes'], 'Enabled service has no health probe')
         require(not profile['backup_roots']['doors'] or 'door' in profile['probes'], 'Registered Doors require a health probe')
+        require(profile.get('quiescence_users'), 'Dedicated service accounts must be checked for remaining workers')
 
     @contextlib.contextmanager
     def lock(self):
@@ -171,6 +172,12 @@ class Host:
                 except ProcessLookupError:
                     continue
                 raise ValueError('A BBS/Door/transfer process is still alive')
+        import pwd
+        for name in self.profile['quiescence_users']:
+            user = pwd.getpwnam(name)
+            require(user.pw_uid != 0, 'Root cannot be a BBS worker account')
+            processes = command(['/usr/bin/pgrep', '-u', str(user.pw_uid)], accepted=(0, 1))
+            require(not processes, 'A process still runs under a dedicated BBS/Door/transfer account')
 
     def start(self):
         for service in self.profile['services']:
@@ -203,14 +210,11 @@ class Host:
                     require(db.execute('PRAGMA integrity_check').fetchall() == [('ok',)], 'Restored database integrity failed')
                 checked += 1
         require(checked > 0, 'No SQLite database was restored')
-        # A loopback verification instance uses the restored tree; its probes
-        # are a required operator-supplied, unprivileged service profile.
-        require(self.profile.get('restore_probe_receipt_required') is True,
-                'Restore verification contract is not configured')
         # The fixed verifier validates the complete restored set; no arbitrary
         # root commands or shell scripts are accepted through the request.
-        from deploy_restore import verify_restored
+        from deploy_restore import verify_restored, verify_application
         verify_restored(restored, roots, self.profile['database_checks'])
+        verify_application(restored, self.profile['restore_application'], trusted)
         sink = self.profile['backup_sink']
         require(re.fullmatch(r'[a-zA-Z0-9.-]+', sink['host']) and sink['host'] not in PLATFORMS,
                 'Backup destination must be a separate non-production host')

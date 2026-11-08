@@ -1,0 +1,44 @@
+{
+  "target": "srv.ysni.org",
+  "state_directory": "/var/lib/liner-notes-deploy",
+  "incoming_directory": "/var/tmp/liner-notes-deploy",
+  "release_public_key": "/etc/liner-notes-deploy/release-public.pem",
+  "approval_public_key": "/etc/liner-notes-deploy/approval-public.pem",
+  "old_package_manifest": "/etc/liner-notes-deploy/old-packages.json",
+  "services": ["liner_notes", "liner_notes_web", "liner_notes_link"],
+  "quiescence_users": ["liner_notes", "liner_notes_web", "liner_notes_link"],
+  "quiescence_pidfiles": ["/var/run/liner-notes.pid"],
+  "backup_roots": {
+    "data": ["/var/db/liner-notes"],
+    "config": ["/usr/local/etc/liner-notes"],
+    "attachments": [],
+    "vault": [],
+    "spool": [],
+    "link": [],
+    "web": [],
+    "doors": [],
+    "binaries": ["/usr/local/sbin/liner-notes"],
+    "old-packages": ["/var/backups/liner-notes-packages"]
+  },
+  "database_checks": [
+    {"path": "/var/db/liner-notes/liner.sqlite", "query": "SELECT * FROM storage_meta"}
+  ],
+  "restore_application": {
+    "run_user": "liner_notes",
+    "executable": "/usr/local/sbin/liner-notes",
+    "data_root": "/var/db/liner-notes",
+    "database": "/var/db/liner-notes/liner.sqlite",
+    "structured": true,
+    "board": "/var/db/liner-notes/notes.dat",
+    "members": "/var/db/liner-notes/members.dat",
+    "catalog": "/var/db/liner-notes/catalog.dat",
+    "probes": {}
+  },
+  "probes": {},
+  "backup_sink": {
+    "host": "backup.example.invalid",
+    "user": "ln-backup",
+    "key": "/etc/liner-notes-deploy/backup-key",
+    "known_hosts": "/etc/liner-notes-deploy/backup-known-hosts"
+  }
+}
