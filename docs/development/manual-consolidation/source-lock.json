@@ -35,7 +35,7 @@
   "linux/rpm/liner-notes.spec": "4792b755c46762e6ca4e0730e421e2a2dfa4762bc089bb9fe353bcdba790fbfc",
   "menus/ja.txt": "5dca1836a6b23d5db74ce6a1dcd36262253d97648040d8e3fa9fc045962b980f",
   "ports/README.md": "6ca4fb6854bc179c85e256d3ade9a10a6ab72ca0213281fc84d40d028c0bb744",
-  "ports/comms/liner-notes/Makefile": "98e1ac7bebfff6d77723d6e7c05b6c4923301af229e43d3cafdc42323f2a73c9",
+  "ports/comms/liner-notes/Makefile": "000e6401758a6450ddde85984894932a568d0f8edc396fd54ac85009e10a8e2e",
   "ports/comms/liner-notes/files/PORTS.md": "c5e0496ca5e2367cd142de2f505aefefd22a2127ace3ebf45a5596890fd843d7",
   "ports/comms/liner-notes/files/liner_notes.conf.in": "a02965ea8d2505101ef90efec584946b95200c2430bf6ab0207d4836f68341c2",
   "ports/comms/liner-notes/files/liner_notes.in": "e42460c324202635956856b6bc605f38dd004de3c3c67fe14396a08fdec500e2",

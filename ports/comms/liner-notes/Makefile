@@ -43,13 +43,14 @@ WEBUI_RUN_DEPENDS=	${PYTHON_PKGNAMEPREFIX}aiohttp>=3.11:www/py-aiohttp@${PY_FLAV
 LINK_DESC=	Install the optional public-key shared-board connector
 LINK_RUN_DEPENDS=	${PYTHON_PKGNAMEPREFIX}cryptography>=43:security/py-cryptography@${PY_FLAVOR}
 
+ZMODEM_DESC=	Depend on lrzsz 0.13.1 or newer for external file transfers
+ZMODEM_RUN_DEPENDS=	lrzsz>=0.13.1:comms/lrzsz
+
 .include <bsd.port.options.mk>
 .if ${PORT_OPTIONS:MWEBUI}
 USERS+=		liner_notes_web
 GROUPS+=	liner_notes_web
 .endif
-ZMODEM_DESC=	Depend on lrzsz 0.13.1 or newer for external file transfers
-ZMODEM_RUN_DEPENDS=	lrzsz>=0.13.1:comms/lrzsz
 
 # Public executables in sbin/bin; support files in DATADIR.
 do-install:
