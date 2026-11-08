@@ -49,6 +49,25 @@ All work runs without root and does not install packages or restart services.
 The candidate package is checked with pkg query and then SHA-256
 verified against the source revision in RELEASE-MANIFEST.json.
 Missing prerequisites or a package build failure stop the workflow.
+CI checks the selected Python-flavor packages for SQLite3, aiohttp >= 3.11,
+cryptography >= 43, and lrzsz >= 0.13.1 before staging, and passes
+`STRICT_DEPENDS=yes` to the Ports framework. This prevents any missing
+dependency from triggering a recursive Ports installation.
+
+The first observed FreeBSD CI failure (2026-11-08) was caused by missing
+`py311-sqlite3` on the **verification VM only**, after C compilation had
+already succeeded. The VM operator must check the installed Python flavor
+and preview any package transaction before installing prerequisites, for
+example:
+
+    pkg info -e py311-sqlite3
+    pkg install -n py311-sqlite3 py311-aiohttp py311-cryptography lrzsz
+
+Only on disposable FreeBSD VM 10.0.0.50, and only after reviewing the
+transaction, a privileged VM administrator may install necessary packages.
+Do not run this on any production host, and never have CI auto-install them.
+The source archive, native binary and existing BBS data are not modified
+by the preflight.
 
 The resulting pkg is an Actions artifact, not a production release.
 Production FreeBSD srv.ysni.org is not contacted by this workflow, and
