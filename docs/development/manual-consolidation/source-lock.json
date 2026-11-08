@@ -1,6 +1,6 @@
 {
   "LICENSE": "fb981668c18a279e285fc4d83fba1e836cc84dd4daa73c9697d3cfd2d8aca6e0",
-  "Makefile": "dae450be5237977db48c1c4d331e879639d86128a33b972441f3749dcb4129d4",
+  "Makefile": "6db2b9a1aab4b4607ebb5583712c1c4f427532f8d669c847ace644fd1ec77456",
   "boards.example.conf": "4bd1a17ecf3966d3829510e8495a1362fb8b922cd754badccc739f5e5ab0bde8",
   "doors.example.conf": "53b147bfddab948b3cbe628f6e3b4380ea97d47c9612a8f52c04a6875fd3703c",
   "help/en/content.txt": "9c264408a543ea4dd0ac471b36de0a1a9e32fa8b28b3e1c1ca333fa0019a511f",
@@ -53,7 +53,7 @@
   "src/board_policy.c": "0169bc17649ddc63599b43ca7ae49f6c1c756dac417bd030a79398229414165b",
   "src/catalog.c": "c96bab1f3042b7685cc27df9206ebfd63ad2c79b06ca92d3dd1ca219a0e2a361",
   "src/classic_commands.inc": "f39ecfe79522d5e05c7f5def00b0c05c1f9a68879288e88e08013d709eb08a9a",
-  "src/doors.c": "07118266dee7874e6fef0ad956d634b9fbd45fbe5fed9b69cd1adb45d72d5622",
+  "src/doors.c": "185d71b94c8c786e5a279bcff80e5949264bcd7cd1adbed552f72f3d36e0c932",
   "src/members.c": "ede8f3eede2bd71ded85d02fc7aa05a0f77fab30c66596ef1b724d60f82f288f",
   "src/profile_store.c": "9bd14cb1a44b9e117fb9465d036f2d5417bca8188a136a9162f91f8b46f33e2a",
   "src/runtime.c": "c290f67b41e9372002261c0f0d77a88476b061603d5c6586b6d644173e618bf0",

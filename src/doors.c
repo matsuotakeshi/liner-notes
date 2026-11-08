@@ -3,6 +3,9 @@
 #ifdef __FreeBSD__
 #define __BSD_VISIBLE 1
 #endif
+#ifdef __sun
+#define __EXTENSIONS__ 1
+#endif
 #include "doors.h"
 #include <stdio.h>
 #include <stdlib.h>
@@ -21,9 +24,10 @@
 #include <time.h>
 #ifdef __FreeBSD__
 #include <libutil.h>
-#else
+#elif !defined(__sun)
 #include <pty.h>
 #endif
+/* Solaris 11.4 declares openpty/login_tty in <termios.h>, in libc. */
 typedef struct { unsigned id,level,seconds,slots,drop;char exe[1024],dir[1024],title[161]; } Game;
 static Game games[32];static unsigned game_count;
 struct Door { pid_t pid;int fd,exited,after_cr,lock;char run[1200];uint64_t until,stop_until;unsigned char input[8192];size_t used;struct Door *next; };
@@ -113,7 +117,12 @@ Door *door_start(unsigned id,unsigned level,uint32_t user,const char *name,unsig
     char *env[]={"PATH=/usr/local/bin:/usr/bin:/bin","TERM=xterm","LANG=C.UTF-8",idenv,nameenv,cols,lines,home,nodeenv,dropenv,gameenv,NULL};char *argv[]={g->exe,NULL};
     long maxfd=sysconf(_SC_OPEN_MAX);if(maxfd<0)maxfd=65536;
     pid_t pid=fork();if(!pid) {
+#ifdef __sun
+        /* login_tty establishes the controlling STREAMS terminal and stdio. */
+        if(login_tty(slave))_exit(126);
+#else
         setsid();ioctl(slave,TIOCSCTTY,0);dup2(slave,0);dup2(slave,1);dup2(slave,2);
+#endif
         /* Inherit only the slot lock, so a surviving child still owns its slot. */
         for(int fd=3;fd<maxfd;fd++)if(fd!=d->lock)close(fd);
         signal(SIGTERM,SIG_DFL);signal(SIGINT,SIG_DFL);signal(SIGHUP,SIG_DFL);signal(SIGPIPE,SIG_DFL);
