@@ -7,6 +7,8 @@ on:
       - "debian/**"
       - "linux/**"
       - "scripts/install-linux.py"
+      - "scripts/release_manifest.py"
+      - "tests/test_release_manifest.py"
       - "webui/**"
       - "src/**"
       - "Makefile"
@@ -66,6 +68,15 @@ jobs:
               cd /out
               sha256sum ./*.deb > SHA256SUMS
               sha256sum -c SHA256SUMS
+              python3 /build/liner-notes/scripts/release_manifest.py create \
+                --platform debian13 --version 0.74-1 --source-sha "$SOURCE_SHA" \
+                --directory /out \
+                --package liner-notes=liner-notes_0.74-1_amd64.deb \
+                --package liner-notes-web=liner-notes-web_0.74-1_all.deb \
+                --package liner-notes-link=liner-notes-link_0.74-1_all.deb
+              python3 /build/liner-notes/scripts/release_manifest.py verify \
+                --platform debian13 --source-sha "$SOURCE_SHA" \
+                --manifest /out/RELEASE-MANIFEST.json
               printf "source_sha=%s\nbase=debian:trixie\n" "$SOURCE_SHA" > BUILD-INFO.txt
             '
       - name: Upload inspection artifacts (not a release)
@@ -75,6 +86,7 @@ jobs:
           path: |
             ${{ runner.temp }}/deb-artifacts/*.deb
             ${{ runner.temp }}/deb-artifacts/SHA256SUMS
+            ${{ runner.temp }}/deb-artifacts/RELEASE-MANIFEST.json
             ${{ runner.temp }}/deb-artifacts/BUILD-INFO.txt
           if-no-files-found: error
           retention-days: 14
