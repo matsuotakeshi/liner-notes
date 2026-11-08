@@ -37,7 +37,7 @@
 1. 選択ブランチは`main`、入力SHAは現在のmainのHEADと一致し、判定の前後にもmainが動いていない。
 2. 同じSHAでpush起動した`Multi-OS Native CI`と、FreeBSD 15 pkg / Rocky 10 RPM / Debian 13 DEBの3ワークフローがすべて成功している。
 3. 同じSHAに対応するFreeBSD CI完了起動の`Release Set Verification`が成功し、その実行に紐付いた未失効の`liner-notes-release-set-receipt`がある。
-4. 同じSHAで手動起動した`Production SSH Connectivity Test`が成功している。
+4. 同じSHAで手動起動した`Production SSH Connectivity Test`が成功し、3局のSSHユーザー`ln-deploy`が非rootであることと、配布候補の対象OS/CPU（FreeBSD 15 amd64 / Rocky 10 x86_64 / Debian 13 amd64）が一致している。
 5. 同じコミットでの古い成功履歴を流用して新しい失敗や未完了実行を隠さない。
 
 この判定は`ci/release_admission.py`で行い、GitHub-hosted PRテストで失敗条件を検査します。証跡のSHA-256チェックは暗号署名ではありません。署名済みReleaseや本番ホストのバックアップ状態を示すものでもありません。
