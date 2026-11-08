@@ -117,7 +117,7 @@ def options(text):
     for key,maximum in [('max-articles',2147483646),('max-mail',2147483646),('max-user-posts',2147483646),('idle-seconds',86400),('userlog-keep',1000000),('time-warning',1000000),('time-grace',1000000),('gather-count',1000)]:
         if key in out and (not out[key].isascii() or not out[key].isdigit() or int(out[key]) > maximum):
             raise ValueError('number')
-    if 'id-digits' in out and out['id-digits'] not in '12345678':
+    if 'id-digits' in out and (len(out['id-digits'])!=1 or out['id-digits'] not in '12345678'):
         raise ValueError('id digits')
     if 'disable' in out and out['disable'] not in {'chat','mail','vault'}:
         raise ValueError('feature')
@@ -327,7 +327,7 @@ class Doctor:
         if self.args.web_config:
             self.enabled.add('web')
         for feature, unit in [('core','liner-notes'), ('web','liner-notes-web'), ('links','liner-notes-link')]:
-            result = self.command('systemctl', ['show', unit+'.service', '--property=MainPID,ActiveState,UnitFileState,ExecStart', '--no-pager'])
+            result = self.command('systemctl', ['show', unit+'.service', '--property=MainPID,ActiveState,UnitFileState,ExecStart,User,WorkingDirectory', '--no-pager'])
             if result and result[0] == 0:
                 values = dict(line.split('=', 1) for line in result[1].splitlines() if '=' in line)
                 if values.get('ActiveState') == 'active' or values.get('UnitFileState') in {'enabled','enabled-runtime'}:
@@ -335,6 +335,10 @@ class Doctor:
                 if values.get('MainPID', '').isdigit() and int(values['MainPID']) > 0:
                     self.pid[feature] = int(values['MainPID'])
                 if feature == 'core':
+                    if values.get('User') and values['User']!=self.user:
+                        self.add('config','mismatch','warning',detail='service User differs; use --service-user for an intentional override')
+                    if values.get('WorkingDirectory') and values['WorkingDirectory']!=self.data_dir:
+                        self.add('config','mismatch','warning',detail='service WorkingDirectory differs; use --data-dir for an intentional override')
                     match = re.search(r'path=([^ ;}]+)', values.get('ExecStart',''))
                     if match:
                         self.service_program[feature] = match[1]
@@ -642,6 +646,7 @@ class Doctor:
     def check_link_certificates(self, cfg, boards):
         try:
             from cryptography import x509
+            from cryptography.exceptions import InvalidSignature
             from cryptography.hazmat.primitives import serialization
             from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey, Ed25519PublicKey
         except ImportError:
@@ -654,6 +659,8 @@ class Doctor:
             now = datetime.datetime.now(datetime.timezone.utc)
             if not isinstance(public,Ed25519PublicKey) or not cert.not_valid_before_utc <= now <= cert.not_valid_after_utc:
                 raise ValueError('certificate')
+            if cert.subject==cert.issuer:
+                public.verify(cert.signature,cert.tbs_certificate_bytes)
             return public.public_bytes(serialization.Encoding.Raw,serialization.PublicFormat.Raw)
         try:
             key_file = str(PurePosixPath(directory)/'identity.key')
@@ -674,7 +681,7 @@ class Doctor:
                     if section=='peers' and (not isinstance(entry['host'],str) or not entry['host'] or type(entry.get('port',9044)) is not int or not 1<=entry.get('port',9044)<=65535):
                         raise ValueError('endpoint')
             self.add('links','ok',location=directory,detail='Ed25519 identity/certificates/trust assignments; no secrets emitted')
-        except (ValueError,TypeError,KeyError,OSError):
+        except (ValueError,TypeError,KeyError,OSError,InvalidSignature):
             self.add('links','certificate','error',directory)
 
     def socket_item(self, group, value):

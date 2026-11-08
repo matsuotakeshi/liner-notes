@@ -148,7 +148,7 @@ class DoctorTests(unittest.TestCase):
 
     def test_cli_json_language_and_exit_codes(self):
         for lang in ('ja','en'):
-            p=subprocess.run([sys.executable,'-B',str(ROOT/'scripts/doctor.py'),'--root',str(self.root),'--os','Linux','--check-database','--json','--lang',lang],capture_output=True,encoding='utf-8')
+            p=subprocess.run([sys.executable,'-B',str(ROOT/'scripts/doctor.py'),'--root',str(self.root),'--os','Linux','--check-database','--json','--lang',lang],capture_output=True,encoding='utf-8',env=dict(os.environ,PYTHONIOENCODING='utf-8'))
             self.assertEqual(p.returncode,0,p.stderr)
             report=json.loads(p.stdout)
             self.assertTrue(report['read_only'])
