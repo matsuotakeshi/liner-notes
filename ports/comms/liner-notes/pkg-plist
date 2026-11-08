@@ -242,6 +242,8 @@ bin/liner-notes-serial
 %%PORTDOCS%%%%DOCSDIR%%/manual/install-freebsd.md
 %%PORTDOCS%%%%DOCSDIR%%/manual/install-linux.html
 %%PORTDOCS%%%%DOCSDIR%%/manual/install-linux.md
+%%PORTDOCS%%%%DOCSDIR%%/manual/install-solaris.html
+%%PORTDOCS%%%%DOCSDIR%%/manual/install-solaris.md
 %%PORTDOCS%%%%DOCSDIR%%/manual/INSTALL.html
 %%PORTDOCS%%%%DOCSDIR%%/manual/INSTALL.md
 %%PORTDOCS%%%%DOCSDIR%%/manual/layout.html
