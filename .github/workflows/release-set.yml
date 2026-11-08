@@ -1,0 +1,106 @@
+name: Release Set Verification
+
+# Manually attest that all 3 package sets came from the exact same main commit.
+# Never connect to production hosts or enable deployment credentials.
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      source_sha:
+        description: "Exact 40-character main HEAD commit SHA"
+        required: true
+        type: string
+
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: liner-notes-release-candidate-audit
+  cancel-in-progress: false
+
+jobs:
+  verify:
+    if: ${{ github.ref == 'refs/heads/main' }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Download exact-main candidate packages and verify their provenance
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SOURCE_SHA: ${{ github.event_name == 'workflow_dispatch' && inputs.source_sha || github.sha }}
+        run: |
+          set -euo pipefail
+          if [[ ! "$SOURCE_SHA" =~ ^[0-9a-f]{40}$ ]]; then
+            echo "::error::A full lowercase SHA is required"
+            exit 1
+          fi
+          if [[ "$GITHUB_SHA" != "$SOURCE_SHA" || "$(git rev-parse HEAD)" != "$SOURCE_SHA" ]]; then
+            echo "::error::Only the exact current main HEAD can be audited"
+            exit 1
+          fi
+          current_main="$(gh api "repos/$GITHUB_REPOSITORY/git/ref/heads/main" --jq '.object.sha')"
+          if [[ "$current_main" != "$SOURCE_SHA" ]]; then
+            echo "::error::Main has moved since this verification was started"
+            exit 1
+          fi
+          mkdir -p candidates
+          fetch_platform() {
+            local platform="$1" workflow="$2" artifact="$3"
+            local record run_id result attempt
+            # The independent main-push package workflows may not have
+            # completed yet. Poll with a bounded timeout; fail closed.
+            for attempt in {1..60}; do
+              record="$(gh api "repos/$GITHUB_REPOSITORY/actions/workflows/$workflow/runs?head_sha=$SOURCE_SHA&per_page=100" |
+                jq -r --arg sha "$SOURCE_SHA" '
+                  [.workflow_runs[] | select(
+                    .head_sha == $sha and .head_branch == "main" and
+                    .event == "push"
+                  )] | sort_by(.run_number, .run_attempt) | last |
+                  if . == null then "none pending"
+                  else "\(.id) \(.conclusion // .status)" end
+                ')"
+              read -r run_id result <<< "$record"
+              case "$result" in
+                success) break ;;
+                failure|cancelled|timed_out|action_required|skipped)
+                  echo "::error::$platform CI run $run_id ended with $result"
+                  return 1 ;;
+                queued|pending|waiting|in_progress)
+                  echo "$platform CI run $run_id is $result (poll $attempt/60)" ;;
+                *)
+                  echo "$platform CI run not available yet (poll $attempt/60)" ;;
+              esac
+              sleep 10
+            done
+            if [[ ! "$run_id" =~ ^[0-9]+$ || "$result" != success ]]; then
+              echo "::error::No successful main-push CI for $platform at $SOURCE_SHA"
+              return 1
+            fi
+            mkdir -p "candidates/$platform"
+            gh run download "$run_id" --name "$artifact" --dir "candidates/$platform"
+            echo "$platform source=$SOURCE_SHA run=$run_id"
+            printf '%s %s https://github.com/%s/actions/runs/%s\n' \
+              "$platform" "$SOURCE_SHA" "$GITHUB_REPOSITORY" "$run_id" >> RELEASE-SOURCES.txt
+          }
+          fetch_platform "freebsd15" "freebsd-package.yml" "liner-notes-freebsd15-packages"
+          fetch_platform "rocky10" "rocky-package.yml" "liner-notes-rocky10-packages"
+          fetch_platform "debian13" "debian-package.yml" "liner-notes-debian13-packages"
+          # A moving main must never be accepted as the current release set.
+          test "$(gh api "repos/$GITHUB_REPOSITORY/git/ref/heads/main" --jq '.object.sha')" = "$SOURCE_SHA"
+          python3 scripts/verify_release_set.py --root candidates \
+            --source-sha "$SOURCE_SHA" --output RELEASE-SET.json
+      - name: Save verified release-set receipt (no packages are deployed)
+        uses: actions/upload-artifact@v4
+        with:
+          name: liner-notes-release-set-receipt
+          path: |
+            RELEASE-SET.json
+            RELEASE-SOURCES.txt
+          if-no-files-found: error
+          retention-days: 30
