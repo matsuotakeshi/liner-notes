@@ -1,0 +1,67 @@
+name: Rocky SELinux policy
+on:
+  pull_request:
+    paths:
+      - 'linux/selinux/**'
+      - 'ci/selinux*'
+      - 'tests/test_selinux*'
+      - '.github/workflows/selinux.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'linux/selinux/**'
+      - 'ci/selinux*'
+      - 'tests/test_selinux*'
+      - '.github/workflows/selinux.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  policy:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Compile the policy and its optional RPM in Rocky 10
+        run: |
+          python3 tests/test_selinux_policy.py
+          mkdir -p build/selinux
+          docker run --rm -v "$GITHUB_WORKSPACE:/source:ro" -v "$GITHUB_WORKSPACE/build/selinux:/out" \
+            rockylinux/rockylinux:10 bash -euc '
+              dnf install -y --setopt=install_weak_deps=False selinux-policy-devel rpm-build make python3
+              mkdir -p /build/{SOURCES,SPECS,BUILD,BUILDROOT,RPMS,SRPMS}
+              cp /source/linux/selinux/* /build/SOURCES/
+              cp /source/LICENSE /build/SOURCES/
+              rpmbuild -ba --define "_topdir /build" /source/linux/selinux/liner-notes-selinux.spec
+              cp /build/RPMS/noarch/*.rpm /out/
+              cp /build/BUILD/liner-notes-selinux-*/liner_notes.pp /out/ || find /build/BUILD -name liner_notes.pp -exec cp {} /out/ \;
+              cd /out
+              sha256sum *.rpm *.pp > SHA256SUMS
+            '
+          printf 'source_sha=%s\n' "$GITHUB_SHA" > build/selinux/BUILD-INFO.txt
+      - uses: actions/upload-artifact@v4
+        with:
+          name: liner-notes-selinux-policy
+          path: build/selinux/
+          if-no-files-found: error
+  inventory:
+    needs: policy
+    if: ${{ github.repository == 'matsuotakeshi/liner-notes' && github.ref == 'refs/heads/main' && github.event_name != 'pull_request' }}
+    runs-on: [self-hosted, Linux, X64]
+    timeout-minutes: 5
+    steps:
+      - name: Read existing Rocky SELinux and privilege prerequisites
+        run: |
+          mkdir -p "$RUNNER_TEMP/selinux-inventory"
+          ssh -i /home/ci/.ssh/id_ed25519_rocky_ci \
+            -o IdentitiesOnly=yes -o BatchMode=yes -o PasswordAuthentication=no \
+            -o StrictHostKeyChecking=yes -o ConnectTimeout=10 ci-test@10.0.0.51 \
+            'id; cat /etc/os-release; getenforce; command -v semodule; command -v semanage; command -v runcon; command -v systemd-run; sudo -n -l' \
+            > "$RUNNER_TEMP/selinux-inventory/rocky.txt" 2>&1
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: selinux-native-inventory
+          path: ${{ runner.temp }}/selinux-inventory/

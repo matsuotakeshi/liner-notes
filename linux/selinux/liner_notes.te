@@ -1,0 +1,234 @@
+policy_module(liner_notes, 0.1.0)
+
+# No permissive domains, blanket unconfined attribute or audit2allow output.
+attribute liner_notes_domain;
+
+type liner_notes_t;
+type liner_notes_exec_t;
+init_daemon_domain(liner_notes_t, liner_notes_exec_t)
+typeattribute liner_notes_t liner_notes_domain;
+
+type liner_notes_web_t;
+type liner_notes_web_exec_t;
+init_daemon_domain(liner_notes_web_t, liner_notes_web_exec_t)
+typeattribute liner_notes_web_t liner_notes_domain;
+
+type liner_notes_link_t;
+type liner_notes_link_exec_t;
+init_daemon_domain(liner_notes_link_t, liner_notes_link_exec_t)
+typeattribute liner_notes_link_t liner_notes_domain;
+
+type liner_notes_admin_t;
+domain_type(liner_notes_admin_t)
+role system_r types liner_notes_admin_t;
+type liner_notes_admin_exec_t;
+domain_entry_file(liner_notes_admin_t, liner_notes_admin_exec_t)
+typeattribute liner_notes_admin_t liner_notes_domain;
+
+type liner_notes_door_t;
+domain_type(liner_notes_door_t)
+role system_r types liner_notes_door_t;
+type liner_notes_door_exec_t;
+domain_entry_file(liner_notes_door_t, liner_notes_door_exec_t)
+typeattribute liner_notes_door_t liner_notes_domain;
+
+type liner_notes_transfer_t;
+domain_type(liner_notes_transfer_t)
+role system_r types liner_notes_transfer_t;
+type liner_notes_transfer_exec_t;
+domain_entry_file(liner_notes_transfer_t, liner_notes_transfer_exec_t)
+typeattribute liner_notes_transfer_t liner_notes_domain;
+
+type liner_notes_etc_t;
+files_config_file(liner_notes_etc_t)
+type liner_notes_web_etc_t;
+files_config_file(liner_notes_web_etc_t)
+type liner_notes_link_etc_t;
+files_config_file(liner_notes_link_etc_t)
+type liner_notes_ro_t;
+files_type(liner_notes_ro_t)
+type liner_notes_transfer_receipt_t;
+files_type(liner_notes_transfer_receipt_t)
+
+type liner_notes_data_t;
+files_type(liner_notes_data_t)
+type liner_notes_web_data_t;
+files_type(liner_notes_web_data_t)
+type liner_notes_link_data_t;
+files_type(liner_notes_link_data_t)
+type liner_notes_link_secret_t;
+files_type(liner_notes_link_secret_t)
+type liner_notes_door_data_t;
+files_type(liner_notes_door_data_t)
+type liner_notes_door_drop_t;
+files_type(liner_notes_door_drop_t)
+type liner_notes_spool_t;
+files_type(liner_notes_spool_t)
+type liner_notes_tmp_t;
+files_tmp_file(liner_notes_tmp_t)
+type liner_notes_web_tmp_t;
+files_tmp_file(liner_notes_web_tmp_t)
+type liner_notes_link_tmp_t;
+files_tmp_file(liner_notes_link_tmp_t)
+type liner_notes_door_tmp_t;
+files_tmp_file(liner_notes_door_tmp_t)
+
+type liner_notes_run_t;
+files_pid_file(liner_notes_run_t)
+type liner_notes_web_run_t;
+files_pid_file(liner_notes_web_run_t)
+type liner_notes_link_run_t;
+files_pid_file(liner_notes_link_run_t)
+type liner_notes_log_t;
+logging_log_file(liner_notes_log_t)
+type liner_notes_web_log_t;
+logging_log_file(liner_notes_web_log_t)
+type liner_notes_link_log_t;
+logging_log_file(liner_notes_link_log_t)
+
+type liner_notes_port_t;
+corenet_port(liner_notes_port_t)
+type liner_notes_web_port_t;
+corenet_port(liner_notes_web_port_t)
+type liner_notes_link_port_t;
+corenet_port(liner_notes_link_port_t)
+type liner_notes_door_port_t;
+corenet_port(liner_notes_door_port_t)
+
+# Common interpreter/loader/locale and journal output; no other service data.
+allow liner_notes_domain self:process { fork sigchld signal sigkill sigstop signull setpgid getsched setrlimit };
+allow liner_notes_domain self:fifo_file rw_fifo_file_perms;
+allow liner_notes_domain self:unix_stream_socket create_stream_socket_perms;
+allow liner_notes_domain self:unix_dgram_socket create_socket_perms;
+libs_use_ld_so(liner_notes_domain)
+libs_use_shared_libs(liner_notes_domain)
+files_read_usr_files(liner_notes_domain)
+files_read_etc_files(liner_notes_domain)
+files_search_var_lib(liner_notes_domain)
+files_search_pids(liner_notes_domain)
+auth_read_passwd(liner_notes_domain)
+miscfiles_read_localization(liner_notes_domain)
+miscfiles_read_generic_certs(liner_notes_domain)
+dev_read_urand(liner_notes_domain)
+dev_rw_null(liner_notes_domain)
+kernel_read_system_state(liner_notes_domain)
+logging_send_syslog_msg(liner_notes_domain)
+corecmd_exec_shell(liner_notes_domain)
+corecmd_exec_bin(liner_notes_domain)
+list_dirs_pattern(liner_notes_domain, liner_notes_ro_t, liner_notes_ro_t)
+read_files_pattern(liner_notes_domain, liner_notes_ro_t, liner_notes_ro_t)
+allow liner_notes_domain liner_notes_etc_t:dir search_dir_perms;
+
+read_files_pattern(liner_notes_t, liner_notes_etc_t, liner_notes_etc_t)
+read_files_pattern(liner_notes_web_t, liner_notes_web_etc_t, liner_notes_web_etc_t)
+read_files_pattern(liner_notes_link_t, liner_notes_link_etc_t, liner_notes_link_etc_t)
+manage_dirs_pattern(liner_notes_t, liner_notes_data_t, liner_notes_data_t)
+manage_files_pattern(liner_notes_t, liner_notes_data_t, liner_notes_data_t)
+manage_dirs_pattern(liner_notes_web_t, liner_notes_web_data_t, liner_notes_web_data_t)
+manage_files_pattern(liner_notes_web_t, liner_notes_web_data_t, liner_notes_web_data_t)
+manage_dirs_pattern(liner_notes_link_t, liner_notes_link_data_t, liner_notes_link_data_t)
+manage_files_pattern(liner_notes_link_t, liner_notes_link_data_t, liner_notes_link_data_t)
+manage_dirs_pattern(liner_notes_link_t, liner_notes_link_secret_t, liner_notes_link_secret_t)
+manage_files_pattern(liner_notes_link_t, liner_notes_link_secret_t, liner_notes_link_secret_t)
+manage_dirs_pattern(liner_notes_t, liner_notes_run_t, liner_notes_run_t)
+manage_files_pattern(liner_notes_t, liner_notes_run_t, liner_notes_run_t)
+manage_dirs_pattern(liner_notes_web_t, liner_notes_web_run_t, liner_notes_web_run_t)
+manage_files_pattern(liner_notes_web_t, liner_notes_web_run_t, liner_notes_web_run_t)
+manage_dirs_pattern(liner_notes_link_t, liner_notes_link_run_t, liner_notes_link_run_t)
+manage_sock_files_pattern(liner_notes_link_t, liner_notes_link_run_t, liner_notes_link_run_t)
+manage_files_pattern(liner_notes_link_t, liner_notes_link_run_t, liner_notes_link_run_t)
+manage_files_pattern(liner_notes_t, liner_notes_log_t, liner_notes_log_t)
+manage_files_pattern(liner_notes_web_t, liner_notes_web_log_t, liner_notes_web_log_t)
+manage_files_pattern(liner_notes_link_t, liner_notes_link_log_t, liner_notes_link_log_t)
+manage_dirs_pattern(liner_notes_t, liner_notes_tmp_t, liner_notes_tmp_t)
+manage_files_pattern(liner_notes_t, liner_notes_tmp_t, liner_notes_tmp_t)
+files_tmp_filetrans(liner_notes_t, liner_notes_tmp_t, { dir file })
+manage_dirs_pattern(liner_notes_web_t, liner_notes_web_tmp_t, liner_notes_web_tmp_t)
+manage_files_pattern(liner_notes_web_t, liner_notes_web_tmp_t, liner_notes_web_tmp_t)
+files_tmp_filetrans(liner_notes_web_t, liner_notes_web_tmp_t, { dir file })
+manage_dirs_pattern(liner_notes_link_t, liner_notes_link_tmp_t, liner_notes_link_tmp_t)
+manage_files_pattern(liner_notes_link_t, liner_notes_link_tmp_t, liner_notes_link_tmp_t)
+files_tmp_filetrans(liner_notes_link_t, liner_notes_link_tmp_t, { dir file })
+
+# Listener labels are assigned explicitly; installing the RPM changes no ports.
+allow { liner_notes_t liner_notes_web_t liner_notes_link_t } self:tcp_socket create_stream_socket_perms;
+corenet_tcp_bind_generic_node(liner_notes_t)
+corenet_tcp_bind_generic_node(liner_notes_web_t)
+corenet_tcp_bind_generic_node(liner_notes_link_t)
+allow liner_notes_t liner_notes_port_t:tcp_socket name_bind;
+allow liner_notes_web_t liner_notes_web_port_t:tcp_socket name_bind;
+allow liner_notes_link_t liner_notes_link_port_t:tcp_socket { name_bind name_connect };
+allow { liner_notes_web_t liner_notes_link_t } liner_notes_port_t:tcp_socket name_connect;
+corenet_tcp_bind_telnet_port(liner_notes_t)
+corenet_tcp_connect_telnet_port(liner_notes_web_t)
+corenet_tcp_connect_telnet_port(liner_notes_link_t)
+allow liner_notes_t self:capability net_bind_service;
+sysnet_dns_name_resolve(liner_notes_link_t)
+sysnet_dns_name_resolve(liner_notes_web_t)
+
+# Existing local link management socket; no Web access to keys or link DB.
+allow liner_notes_web_t liner_notes_link_run_t:dir search_dir_perms;
+allow liner_notes_web_t liner_notes_link_run_t:sock_file write_sock_file_perms;
+allow liner_notes_web_t liner_notes_link_t:unix_stream_socket connectto;
+
+# Transfer helpers receive authenticated RPC FD3, not the BBS database path.
+domtrans_pattern(liner_notes_t, liner_notes_transfer_exec_t, liner_notes_transfer_t)
+allow liner_notes_t liner_notes_transfer_t:process { signal sigkill signull };
+allow liner_notes_transfer_t liner_notes_t:fd use;
+allow liner_notes_transfer_t liner_notes_t:unix_stream_socket { read write getattr ioctl };
+allow liner_notes_transfer_t liner_notes_t:tcp_socket { read write getattr ioctl shutdown };
+allow liner_notes_transfer_t liner_notes_data_t:dir search_dir_perms;
+allow { liner_notes_t liner_notes_transfer_t } liner_notes_transfer_receipt_t:file read_file_perms;
+manage_dirs_pattern({ liner_notes_t liner_notes_transfer_t }, liner_notes_spool_t, liner_notes_spool_t)
+manage_files_pattern({ liner_notes_t liner_notes_transfer_t }, liner_notes_spool_t, liner_notes_spool_t)
+manage_dirs_pattern(liner_notes_transfer_t, liner_notes_tmp_t, liner_notes_tmp_t)
+manage_files_pattern(liner_notes_transfer_t, liner_notes_tmp_t, liner_notes_tmp_t)
+files_tmp_filetrans(liner_notes_transfer_t, liner_notes_tmp_t, { dir file })
+
+# Only administrator-labelled Door entrypoints transition to the game domain.
+domtrans_pattern(liner_notes_t, liner_notes_door_exec_t, liner_notes_door_t)
+allow liner_notes_t liner_notes_door_t:process { signal sigkill sigstop signull };
+allow liner_notes_door_t liner_notes_t:fd use;
+allow liner_notes_t liner_notes_door_data_t:dir { search read open getattr write add_name remove_name };
+type_transition liner_notes_t liner_notes_door_data_t:dir liner_notes_door_drop_t;
+type_transition liner_notes_t liner_notes_door_data_t:file liner_notes_door_drop_t;
+manage_dirs_pattern({ liner_notes_t liner_notes_door_t }, liner_notes_door_drop_t, liner_notes_door_drop_t)
+manage_files_pattern({ liner_notes_t liner_notes_door_t }, liner_notes_door_drop_t, liner_notes_door_drop_t)
+manage_dirs_pattern(liner_notes_door_t, liner_notes_door_data_t, liner_notes_door_data_t)
+manage_files_pattern(liner_notes_door_t, liner_notes_door_data_t, liner_notes_door_data_t)
+manage_dirs_pattern(liner_notes_door_t, liner_notes_door_tmp_t, liner_notes_door_tmp_t)
+manage_files_pattern(liner_notes_door_t, liner_notes_door_tmp_t, liner_notes_door_tmp_t)
+files_tmp_filetrans(liner_notes_door_t, liner_notes_door_tmp_t, { dir file })
+type liner_notes_devpts_t;
+term_pty(liner_notes_devpts_t)
+term_create_pty(liner_notes_t, liner_notes_devpts_t)
+allow { liner_notes_t liner_notes_door_t liner_notes_transfer_t } liner_notes_devpts_t:chr_file rw_chr_file_perms;
+
+gen_tunable(liner_notes_door_network, false)
+tunable_policy(`liner_notes_door_network',`
+    allow liner_notes_door_t self:tcp_socket create_stream_socket_perms;
+    allow liner_notes_door_t liner_notes_door_port_t:tcp_socket name_connect;
+    corenet_tcp_connect_http_port(liner_notes_door_t)
+    sysnet_dns_name_resolve(liner_notes_door_t)
+')
+
+# Explicit offline administrator domain. Unix ownership still applies.
+optional_policy(`
+    gen_require(`type unconfined_t; role unconfined_r;')
+    role unconfined_r types liner_notes_admin_t;
+    domtrans_pattern(unconfined_t, liner_notes_admin_exec_t, liner_notes_admin_t)
+')
+allow liner_notes_admin_t liner_notes_admin_exec_t:file execute_no_trans;
+term_use_all_terms(liner_notes_admin_t)
+manage_dirs_pattern(liner_notes_admin_t, liner_notes_data_t, liner_notes_data_t)
+manage_files_pattern(liner_notes_admin_t, liner_notes_data_t, liner_notes_data_t)
+manage_dirs_pattern(liner_notes_admin_t, liner_notes_link_data_t, liner_notes_link_data_t)
+manage_files_pattern(liner_notes_admin_t, liner_notes_link_data_t, liner_notes_link_data_t)
+manage_dirs_pattern(liner_notes_admin_t, liner_notes_link_secret_t, liner_notes_link_secret_t)
+manage_files_pattern(liner_notes_admin_t, liner_notes_link_secret_t, liner_notes_link_secret_t)
+read_files_pattern(liner_notes_admin_t, liner_notes_etc_t, liner_notes_etc_t)
+read_files_pattern(liner_notes_admin_t, liner_notes_link_etc_t, liner_notes_link_etc_t)
+read_files_pattern(liner_notes_admin_t, liner_notes_web_etc_t, liner_notes_web_etc_t)
+manage_dirs_pattern(liner_notes_admin_t, liner_notes_tmp_t, liner_notes_tmp_t)
+manage_files_pattern(liner_notes_admin_t, liner_notes_tmp_t, liner_notes_tmp_t)
+files_tmp_filetrans(liner_notes_admin_t, liner_notes_tmp_t, { dir file })
