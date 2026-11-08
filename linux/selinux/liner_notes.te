@@ -6,16 +6,19 @@ attribute liner_notes_domain;
 type liner_notes_t;
 type liner_notes_exec_t;
 init_daemon_domain(liner_notes_t, liner_notes_exec_t)
+init_nnp_daemon_domain(liner_notes_t)
 typeattribute liner_notes_t liner_notes_domain;
 
 type liner_notes_web_t;
 type liner_notes_web_exec_t;
 init_daemon_domain(liner_notes_web_t, liner_notes_web_exec_t)
+init_nnp_daemon_domain(liner_notes_web_t)
 typeattribute liner_notes_web_t liner_notes_domain;
 
 type liner_notes_link_t;
 type liner_notes_link_exec_t;
 init_daemon_domain(liner_notes_link_t, liner_notes_link_exec_t)
+init_nnp_daemon_domain(liner_notes_link_t)
 typeattribute liner_notes_link_t liner_notes_domain;
 
 type liner_notes_admin_t;
@@ -173,6 +176,8 @@ allow liner_notes_web_t liner_notes_link_t:unix_stream_socket connectto;
 
 # Transfer helpers receive authenticated RPC FD3, not the BBS database path.
 domtrans_pattern(liner_notes_t, liner_notes_transfer_exec_t, liner_notes_transfer_t)
+allow liner_notes_t liner_notes_transfer_t:process2 nnp_transition;
+allow liner_notes_transfer_t liner_notes_transfer_exec_t:file execute_no_trans;
 allow liner_notes_t liner_notes_transfer_t:process { signal sigkill signull };
 allow liner_notes_transfer_t liner_notes_t:fd use;
 allow liner_notes_transfer_t liner_notes_t:unix_stream_socket { read write getattr ioctl };
@@ -187,6 +192,8 @@ files_tmp_filetrans(liner_notes_transfer_t, liner_notes_tmp_t, { dir file })
 
 # Only administrator-labelled Door entrypoints transition to the game domain.
 domtrans_pattern(liner_notes_t, liner_notes_door_exec_t, liner_notes_door_t)
+allow liner_notes_t liner_notes_door_t:process2 nnp_transition;
+allow liner_notes_door_t liner_notes_door_exec_t:file execute_no_trans;
 allow liner_notes_t liner_notes_door_t:process { signal sigkill sigstop signull };
 allow liner_notes_door_t liner_notes_t:fd use;
 allow liner_notes_t liner_notes_door_data_t:dir { search read open getattr write add_name remove_name };
