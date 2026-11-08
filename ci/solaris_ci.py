@@ -127,11 +127,19 @@ def test():
             capabilities["webui"] = "unverified: requires Python >=3.11"
             capabilities["link"] = "unverified: requires Python >=3.11"
         lrz, lsz = shutil.which("lrz"), shutil.which("lsz")
-        if lrz and lsz:
-            run(flags + ["test-zmodem", "LRZ=" + lrz, "LSZ=" + lsz])
-            capabilities["zmodem"] = "passed"
-        else:
-            capabilities["zmodem"] = "unverified: lrz/lsz not installed"
+        if not (lrz and lsz):
+            engine = ROOT / "build/solaris-lrzsz"
+            try:
+                run([sys.executable, "scripts/build-lrzsz.py", str(engine),
+                     "--cc", os.environ["CC"], "--make", flags[0]])
+            except subprocess.CalledProcessError:
+                log = engine / "build.txt"
+                if log.is_file():
+                    print(log.read_text(errors="replace"), flush=True)
+                raise
+            lrz, lsz = str(engine / "local/bin/lrz"), str(engine / "local/bin/lsz")
+        run(flags + ["test-zmodem", "LRZ=" + lrz, "LSZ=" + lsz])
+        capabilities["zmodem"] = "passed"
     finally:
         # Included in the native log artifact even when a suite fails.
         print("SOLARIS_CAPABILITIES " + json.dumps(capabilities, sort_keys=True), flush=True)

@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Hosted-only Solaris build/CI contracts. Does not contact a VM."""
 from pathlib import Path
+import importlib.util
 import sys
 import unittest
 from unittest.mock import patch
@@ -11,6 +12,10 @@ sys.path.insert(0, str(ROOT / "ci"))
 import native_ci
 import native_remote
 import solaris_ci
+
+spec = importlib.util.spec_from_file_location("build_lrzsz", ROOT / "scripts/build-lrzsz.py")
+build_lrzsz = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(build_lrzsz)
 
 
 class SolarisContracts(unittest.TestCase):
@@ -61,6 +66,20 @@ class SolarisContracts(unittest.TestCase):
         with patch.object(solaris_ci.shutil, "which", return_value=None):
             with self.assertRaisesRegex(RuntimeError, "Required installed tool missing"):
                 solaris_ci.find_tool(["gmake"])
+
+    def test_private_lrzsz_build_preserves_existing_os_defaults(self):
+        for system, flag in (("freebsd15", "-U_POSIX_C_SOURCE"), ("linux", "-D_DEFAULT_SOURCE")):
+            commands = build_lrzsz.build_commands("/private/local", system)
+            self.assertEqual(commands, [
+                ["./configure", "CC=cc", "CFLAGS=-O2 " + flag, "--prefix=/private/local"],
+                ["make", "-j2"], ["make", "install"]])
+        commands = build_lrzsz.build_commands("/private/local", "sunos5")
+        self.assertIn("CC=gcc", commands[0])
+        self.assertIn("CFLAGS=-O2 -m64 -D__EXTENSIONS__=1", commands[0])
+        self.assertEqual(commands[1:], [["gmake", "-j2"], ["gmake", "install"]])
+        explicit = build_lrzsz.build_commands("/private/local", "sunos5", "/usr/bin/gcc", "/usr/bin/gmake")
+        self.assertIn("CC=/usr/bin/gcc", explicit[0])
+        self.assertEqual(explicit[1], ["/usr/bin/gmake", "-j2"])
 
 
 if __name__ == "__main__":
