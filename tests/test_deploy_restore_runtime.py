@@ -42,7 +42,7 @@ with tempfile.TemporaryDirectory(prefix='liner-cd-restore-ci-', dir='/var/tmp') 
     destination.parent.mkdir(parents=True)
     shutil.copytree(data, destination)
     def login(name):
-        return [{'expect': 'RTBBS-PROBE 1'}, {'send': 'LOGIN ' + name + '\n', 'expect': 'PASSWORD'},
+        return [{'expect': 'RTBBS-PROBE '}, {'send': 'LOGIN ' + name + '\n', 'expect': 'PASSWORD'},
                 {'send': PASSWORD + '\n', 'expect': 'LOGGED IN ' + name}]
     profile = {'run_user': 'nobody', 'executable': str(binary), 'data_root': str(data),
                'structured': True, 'database': str(data / 'liner.sqlite'), 'board': str(data / 'notes'),
