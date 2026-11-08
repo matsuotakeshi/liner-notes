@@ -5,6 +5,7 @@ on:
   pull_request:
     paths:
       - "linux/rpm/**"
+      - "ci/test-rocky-package-upgrade.sh"
       - "scripts/build-rpm.py"
       - "scripts/release_manifest.py"
       - "tests/test_release_manifest.py"
@@ -77,6 +78,9 @@ jobs:
               python3 scripts/release_manifest.py verify \
                 --platform rocky10 --source-sha "$SOURCE_SHA" \
                 --manifest /out/RELEASE-MANIFEST.json
+              # The second revision is built and tested only in this container;
+              # never upload its artifacts as release candidates.
+              CI_DISPOSABLE_ROCKY=1 bash /build/liner-notes/ci/test-rocky-package-upgrade.sh
               cd /out
               sha256sum -- *.rpm > SHA256SUMS
               sha256sum -c SHA256SUMS
