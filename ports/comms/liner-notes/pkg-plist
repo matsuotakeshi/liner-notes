@@ -15,6 +15,7 @@ sbin/liner-notes
 %%DATADIR%%/scripts/zmodem_host.py
 bin/liner-notes-ssh
 bin/liner-notes-admin
+bin/liner-notes-doctor
 bin/liner-notes-dbconvert
 bin/liner-notes-maintenance
 bin/liner-notes-vaultctl
@@ -63,6 +64,7 @@ bin/liner-notes-check-resume
 @dir(liner_notes,liner_notes,0700) /var/db/liner-notes
 @sample %%ETCDIR%%/doors.conf.sample
 %%DATADIR%%/scripts/door_guess.py
+%%DATADIR%%/scripts/doctor.py
 %%DATADIR%%/scripts/door_clans.sh
 @dir(liner_notes,liner_notes,0700) /var/log/liner-notes
 @sample %%DATADIR%%/menus/board-ja.txt.sample

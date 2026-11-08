@@ -496,7 +496,9 @@
         "ZRESUME_FIX.md",
         "DATABASE_STRUCTURED.md",
         "DOOR_OPERATIONS.md",
-        "BBS_LINK_OPERATIONS.md"
+        "BBS_LINK_OPERATIONS.md",
+        "scripts/doctor.py",
+        "tests/test_doctor.py"
       ]
     }
   ]

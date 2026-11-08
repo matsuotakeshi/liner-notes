@@ -6,6 +6,7 @@
 
 - Solaris向けの設定保持staging installerと初期disabledのSMF contract定義を追加。JSON引数・非root/basic権限を使用し、サービス有効化とデータ初期化は自動実行しない。実SMFライフサイクル検証は保留。
 
+- 読み取り専用の`liner-notes-doctor`を追加。設定・DBの私有コピー・リンク鍵/証明書・Door・転送・権限・SELinuxを診断し、日本語/英語、JSON、終了コードを提供。設定の実行、原本DB接続、ネットワーク接続、サービス操作をせず、未使用機能と判定保留を区別。FreeBSD ports・Linux coreパッケージに同梱。
 - Rocky Linux 10向けの任意導入SELinuxポリシーRPMを追加。BBS・Web・リンク・管理・Door・転送の型を分離し、ローカル設定を保持する明示ラベル復旧を用意。専用ドメインでのEnforcing機能・拒否試験は検証中。
 - Solaris 11.4 x86-64向けのmain限定ネイティブCIと既存環境の依存調査を追加。libcのPTY APIとsocketライブラリを選択できるビルド設定を準備。移植検証中であり、Solarisの正式動作確認・SMF導入は未完了。
 
