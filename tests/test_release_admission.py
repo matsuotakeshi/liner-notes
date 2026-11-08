@@ -118,6 +118,10 @@ class AdmissionTests(unittest.TestCase):
                     ".github/workflows/production-ssh-smoke.yml").read_text(encoding="utf-8")
         self.assertIn("github.ref == 'refs/heads/main'", workflow)
         self.assertNotIn("host=%s", workflow)
+        self.assertIn("ci/production-os-check.sh", workflow)
+        self.assertIn("freebsd15", workflow)
+        self.assertIn("rocky10", workflow)
+        self.assertIn("debian13", workflow)
 
 
 if __name__ == "__main__":
