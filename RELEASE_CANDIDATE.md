@@ -48,6 +48,19 @@ All work runs without root and does not install packages or restart services.
 
 The candidate package is checked with pkg query and then SHA-256
 verified against the source revision in RELEASE-MANIFEST.json.
+The FreeBSD candidate builder also checks the Ports `PKGORIGIN` before
+packaging and the resulting archive's `pkg query -F ... '%o'` afterward.
+Both **must equal `comms/liner-notes`**, matching the production
+`liner-notes-0.73.a1` installation.
+
+**Known invalid candidate (2026-11-08):** an earlier CI build copied the
+port skeleton to a generic `port/` directory and published a validly hashed
+`liner-notes-0.74.pkg` with the wrong origin `comms/port`. It appeared as
+a *new installation* in `pkg install -n`, not an upgrade. Do **not** install
+that archive on production, rewrite the existing package origin with
+`pkg set -o`, force-install it, or delete the old package to bypass this
+check. Use a newly rebuilt artifact whose name, version, ABI, and origin
+match the installed port, and review the local `pkg install -n` plan first.
 Missing prerequisites or a package build failure stop the workflow.
 CI checks the selected Python-flavor packages for SQLite3, aiohttp >= 3.11,
 cryptography >= 43, and lrzsz >= 0.13.1 before staging, and passes
