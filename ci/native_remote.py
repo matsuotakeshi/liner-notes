@@ -78,11 +78,30 @@ def stop_group(process):
     process.wait()
 
 
-def run_commands(commands, heartbeat_fd, timeout=3300, lease=45, stopped=lambda: False):
+def heartbeat(heartbeat_fd, state, lease, stopped):
+    if stopped():
+        raise RuntimeError("Worker cancelled")
+    ready, _, _ = select.select([heartbeat_fd], [], [], 0.2)
+    if ready:
+        message = os.read(heartbeat_fd, 4096)
+        if not message:
+            raise RuntimeError("Runner disconnected")
+        state['pending'] += message
+        while b'\n' in state['pending']:
+            line, state['pending'] = state['pending'].split(b'\n', 1)
+            if line != b'alive':
+                raise RuntimeError("Invalid runner heartbeat")
+            state['last'] = time.monotonic()
+        if len(state['pending']) > 32:
+            raise RuntimeError("Invalid runner heartbeat")
+    if time.monotonic() - state['last'] > lease:
+        raise RuntimeError("Runner heartbeat expired")
+
+
+def run_commands(commands, heartbeat_fd, timeout=3300, lease=45, stopped=lambda: False, heartbeat_state=None):
     """EOF, lost heartbeat, cancellation and timeouts all fail closed."""
     deadline = time.monotonic() + timeout
-    last_heartbeat = time.monotonic()
-    pending = b""
+    state = heartbeat_state if heartbeat_state is not None else {'last': time.monotonic(), 'pending': b''}
     env = dict(os.environ, LINER_TEST_START_TIMEOUT="180")
     for command in commands:
         print("NATIVE_STEP " + json.dumps(command), flush=True)
@@ -94,21 +113,7 @@ def run_commands(commands, heartbeat_fd, timeout=3300, lease=45, stopped=lambda:
                     raise RuntimeError("Worker cancelled")
                 if now >= deadline:
                     raise RuntimeError("Native suite timed out")
-                ready, _, _ = select.select([heartbeat_fd], [], [], 0.2)
-                if ready:
-                    message = os.read(heartbeat_fd, 4096)
-                    if not message:
-                        raise RuntimeError("Runner disconnected")
-                    pending += message
-                    while b"\n" in pending:
-                        line, pending = pending.split(b"\n", 1)
-                        if line != b"alive":
-                            raise RuntimeError("Invalid runner heartbeat")
-                        last_heartbeat = now
-                    if len(pending) > 32:
-                        raise RuntimeError("Invalid runner heartbeat")
-                if now - last_heartbeat > lease:
-                    raise RuntimeError("Runner heartbeat expired")
+                heartbeat(heartbeat_fd, state, lease, stopped)
                 code = process.poll()
                 if code is not None:
                     if code != 0:
@@ -120,13 +125,26 @@ def run_commands(commands, heartbeat_fd, timeout=3300, lease=45, stopped=lambda:
 
 
 @contextmanager
-def host_lock(path):
+def host_lock(path, heartbeat_fd=None, timeout=1200, lease=45, stopped=lambda: False):
     import fcntl
     path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
     with path.open("a") as lock:
-        fcntl.flock(lock.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
-        yield
+        state = {'last': time.monotonic(), 'pending': b''}
+        deadline = time.monotonic() + timeout
+        while True:
+            if stopped():
+                raise RuntimeError("Worker cancelled")
+            try:
+                fcntl.flock(lock.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+                break
+            except BlockingIOError:
+                if heartbeat_fd is None:
+                    raise  # Preserve the original fail-fast interface.
+                if time.monotonic() >= deadline:
+                    raise RuntimeError("Native host lock wait timed out")
+                heartbeat(heartbeat_fd, state, lease, stopped)
+        yield state
 
 
 def worker(target, sha, timeout, lease):
@@ -142,14 +160,15 @@ def worker(target, sha, timeout, lease):
 
     for signum in (signal.SIGINT, signal.SIGTERM, signal.SIGHUP):
         signal.signal(signum, cancel)
-    with host_lock(lock_path):
+    deadline = time.monotonic() + timeout
+    with host_lock(lock_path, sys.stdin.fileno(), min(1200, timeout), lease, lambda: cancelled) as state:
         # All single-OS and parallel entry points share this per-host lock.
         print(platform.platform(), flush=True)
         if target != "freebsd":
             print(Path("/etc/os-release").read_text(), flush=True)
             for command in (["python3", "--version"], ["clang", "--version"], ["free", "-h"]):
                 subprocess.run(command, check=True, timeout=15)
-        run_commands(commands_for(target), sys.stdin.fileno(), timeout, lease, lambda: cancelled)
+        run_commands(commands_for(target), sys.stdin.fileno(), max(0, deadline-time.monotonic()), lease, lambda: cancelled, state)
 
 
 def main():
