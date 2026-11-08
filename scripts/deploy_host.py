@@ -5,6 +5,7 @@ Reads one signed request from stdin. No command/path/host arguments are accepted
 The dedicated sudo rule must permit this executable without arguments only.
 """
 import contextlib
+import datetime
 import hashlib
 import json
 import os
@@ -19,12 +20,28 @@ import sys
 import tarfile
 
 from deploy_policy import (PACKAGES, PLATFORMS, SERVICES, HEX64, canonical, digest_file, machine_identity,
-                           package_commands, require, service_command,
+                           package_commands, public_key_identity, require, service_command,
                            transaction_id, validate_authorization, validate_release, verify)
 from deploy_transaction import apply_host, atomic_json
 
 CONFIG = Path('/etc/liner-notes-deploy/host.json')
 REQUIRED_ROOTS = {'data', 'config', 'attachments', 'vault', 'spool', 'link', 'web', 'doors', 'binaries', 'old-packages'}
+COMMAND_LOG = None
+OPTIONAL_ROOTS = {'attachments', 'vault', 'spool', 'link', 'web', 'doors'}
+
+
+def validate_backup_inventory(profile, platform):
+    roots = profile['backup_roots']
+    require(set(roots) == REQUIRED_ROOTS and all(isinstance(value, list) for value in roots.values()),
+            'Incomplete backup inventory')
+    require(all(roots[name] for name in ('data', 'config', 'binaries', 'old-packages')), 'Required backup roots missing')
+    features = profile.get('backup_features', {})
+    require(set(features) == OPTIONAL_ROOTS and all(type(value) is bool for value in features.values()),
+            'Optional backup features require explicit enabled/disabled states')
+    for feature in OPTIONAL_ROOTS:
+        require(bool(roots[feature]) == features[feature], 'Enabled backup feature has no roots, or disabled feature has roots')
+    for feature, service in zip(('web', 'link'), SERVICES[platform][1:]):
+        require(service not in profile['services'] or features[feature], 'Enabled service has no corresponding backup roots')
 
 
 def trusted(path):
@@ -38,26 +55,46 @@ def trusted(path):
 
 
 def command(argv, *, accepted=(0,), input=None):
-    result = subprocess.run(argv, input=input, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
-                            env={'PATH': '/usr/bin:/bin:/usr/sbin:/sbin:/usr/local/bin:/usr/local/sbin',
-                                 'LC_ALL': 'C', 'HOME': '/root'}, timeout=1800, check=False)
+    try:
+        result = subprocess.run(argv, input=input, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                                env={'PATH': '/usr/bin:/bin:/usr/sbin:/sbin:/usr/local/bin:/usr/local/sbin',
+                                     'LC_ALL': 'C', 'HOME': '/root'}, timeout=1800, check=False)
+    except subprocess.TimeoutExpired as error:
+        result = subprocess.CompletedProcess(argv, -1, error.stdout or b'', (error.stderr or b'') + b'\nRestricted command timed out')
+    except OSError:
+        result = subprocess.CompletedProcess(argv, -1, b'', b'Restricted command could not start')
+    if COMMAND_LOG is not None:
+        # Root-local diagnostic only: never return this file in SSH responses or
+        # upload it as an Artifact. In particular, stdin may contain secrets and
+        # is deliberately not recorded.
+        fd = os.open(COMMAND_LOG, os.O_WRONLY | os.O_APPEND | os.O_CREAT | os.O_NOFOLLOW, 0o600)
+        with os.fdopen(fd, 'a', encoding='utf8') as stream:
+            info = os.fstat(stream.fileno())
+            require(stat.S_ISREG(info.st_mode) and info.st_uid == 0 and not info.st_mode & 0o077,
+                    'Private command log permissions are invalid')
+            stream.write(json.dumps({'time': datetime.datetime.now(datetime.timezone.utc).isoformat(),
+                                     'program': str(argv[0]), 'returncode': result.returncode,
+                                     'stdout': result.stdout[-65536:].decode('utf8', errors='replace'),
+                                     'stderr': result.stderr[-65536:].decode('utf8', errors='replace')}) + '\n')
+            stream.flush()
+            os.fsync(stream.fileno())
     require(result.returncode in accepted, 'Restricted host command failed')
     return result.stdout.decode('utf-8', errors='strict').strip()
 
 
 class Host:
     def __init__(self, profile):
+        global COMMAND_LOG
         self.profile = profile
         self.target = profile['target']
         require(self.target in PLATFORMS, 'Unknown target')
         self.platform = PLATFORMS[self.target]
         self.root = trusted(profile['state_directory'])
         require(self.root.is_dir() and not self.root.stat().st_mode & 0o077, 'Private deployment state directory required')
+        COMMAND_LOG = self.root / 'commands.log'
         require(set(profile['services']) <= set(SERVICES[self.platform]) and SERVICES[self.platform][0] in profile['services'], 'Unexpected service')
         require(profile['services'] == [s for s in SERVICES[self.platform] if s in profile['services']], 'Services must follow core/web/link order without duplicates')
-        require(set(profile['backup_roots']) == REQUIRED_ROOTS, 'Incomplete backup inventory')
-        require(all(isinstance(value, list) for value in profile['backup_roots'].values()), 'Backup roots must be lists')
-        require(profile['backup_roots']['data'] and profile['backup_roots']['config'] and profile['backup_roots']['old-packages'], 'Required backup roots missing')
+        validate_backup_inventory(profile, self.platform)
         # Root-maintained probes are declarative local TCP/SQLite checks, not shell hooks.
         require({'login', 'article', 'mail'} <= set(profile['probes']), 'Login/article/mail health probes are mandatory')
         for feature, service in zip(('web', 'link'), SERVICES[self.platform][1:]):
@@ -106,6 +143,9 @@ class Host:
         self.stage = self.root / (identity + '-packages')
         self.stage.mkdir(mode=0o700)
         self.before = self.inventory()
+        if self.platform == 'freebsd15':
+            require(getattr(self, 'tested_previous_version', None) == self.before.get('liner-notes', [None])[0],
+                    'Installed FreeBSD package differs from the tested upgrade starting version')
         self.packages = {n: p for n, p in release['platforms'][self.platform].items() if n in self.before}
         require('liner-notes' in self.packages, 'An installed BBS is required; CD does not initialize a host')
         for name, item in self.packages.items():
@@ -288,11 +328,12 @@ def main():
         require(set(request) == {'release', 'authorization'}, 'Invalid deployment request')
         release_key = trusted(profile['release_public_key']).read_bytes()
         approval_key = trusted(profile['approval_public_key']).read_bytes()
-        require(release_key != approval_key, 'Release signing and deployment approval keys must be separate')
+        require(public_key_identity(release_key) != public_key_identity(approval_key), 'Release signing and deployment approval keys must be separate')
         release = validate_release(verify(request['release'], release_key))
         auth = verify(request['authorization'], approval_key)
         validate_authorization(auth, release, profile['target'])
         host = Host(profile)
+        host.tested_previous_version = auth.get('freebsd_previous_version')
         result = apply_host(release, auth, profile['target'], host)
         print(json.dumps(result, sort_keys=True))
         return 0

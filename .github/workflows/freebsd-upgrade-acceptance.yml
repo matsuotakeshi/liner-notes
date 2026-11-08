@@ -1,0 +1,81 @@
+name: FreeBSD isolated upgrade acceptance
+on:
+  workflow_run:
+    workflows: [FreeBSD 15 Package CI]
+    types: [completed]
+    branches: [main]
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+concurrency:
+  group: liner-notes-freebsd-upgrade-acceptance
+  cancel-in-progress: false
+jobs:
+  admission:
+    if: >-
+      github.repository == 'matsuotakeshi/liner-notes' && github.ref == 'refs/heads/main' &&
+      (github.event_name == 'workflow_dispatch' ||
+       (github.event.workflow_run.conclusion == 'success' &&
+        github.event.workflow_run.head_branch == 'main' &&
+        github.event.workflow_run.head_repository.full_name == github.repository &&
+        (github.event.workflow_run.event == 'push' || github.event.workflow_run.event == 'workflow_dispatch')))
+    runs-on: ubuntu-24.04
+    outputs:
+      execute: ${{ steps.scope.outputs.execute }}
+    steps:
+      - id: scope
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SOURCE_SHA: ${{ github.event.workflow_run.head_sha || github.sha }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          [[ "$SOURCE_SHA" =~ ^[0-9a-f]{40}$ ]]
+          run_id=$(gh api "repos/matsuotakeshi/liner-notes/actions/workflows/freebsd-package.yml/runs?head_sha=$SOURCE_SHA&per_page=100" \
+            --jq '[.workflow_runs[] | select(.head_branch=="main" and (.event=="push" or .event=="workflow_dispatch"))] | sort_by(.run_number,.run_attempt) | last | .id')
+          [[ "$run_id" =~ ^[0-9]+$ ]]
+          count=$(gh api "repos/matsuotakeshi/liner-notes/actions/runs/$run_id/jobs?filter=latest&per_page=100" \
+            --jq '[.jobs[] | select(.conclusion=="success") | .steps[] | select(.name=="Build and inspect pkg on FreeBSD CI host" and .conclusion=="success")] | length')
+          if [ "$count" -gt 0 ]; then echo execute=true >> "$GITHUB_OUTPUT"; else echo execute=false >> "$GITHUB_OUTPUT"; fi
+  acceptance:
+    needs: admission
+    if: ${{ needs.admission.outputs.execute == 'true' && github.ref == 'refs/heads/main' }}
+    runs-on: [self-hosted, Linux, X64]
+    timeout-minutes: 50
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
+          persist-credentials: false
+      - name: Verify full package upgrade in a disposable VNET jail
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SOURCE_SHA: ${{ github.event.workflow_run.head_sha || github.sha }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$SOURCE_SHA"
+          for pair in 'ci/freebsd_upgrade_root.py:/usr/local/libexec/liner-notes-freebsd-upgrade-ci' 'ci/selinux_root.py:/usr/local/libexec/liner-notes-ci/selinux_root.py'; do
+            expected=$(sha256sum "${pair%%:*}" | cut -d' ' -f1)
+            actual=$(ssh -i /home/ci/.ssh/id_ed25519_freebsd_ci \
+              -o IdentitiesOnly=yes -o BatchMode=yes -o PasswordAuthentication=no \
+              -o StrictHostKeyChecking=yes -o ConnectTimeout=10 takeshi@10.0.0.50 \
+              "sha256 -q '${pair#*:}'")
+            test "$actual" = "$expected"
+          done
+          # The root helper independently fetches reviewed main source and the
+          # exact-SHA package Artifact. No checkout path is passed through sudo.
+          python3 -c 'import json,os; print(json.dumps({"token":os.environ["GH_TOKEN"]}))' |
+            ssh -i /home/ci/.ssh/id_ed25519_freebsd_ci \
+              -o IdentitiesOnly=yes -o BatchMode=yes -o PasswordAuthentication=no \
+              -o StrictHostKeyChecking=yes -o ConnectTimeout=10 takeshi@10.0.0.50 \
+              "sudo -n /usr/local/libexec/liner-notes-freebsd-upgrade-ci '$SOURCE_SHA'" \
+              > FREEBSD-SERVICE-UPGRADE.json
+          python3 -c 'import json,os; d=json.load(open("FREEBSD-SERVICE-UPGRADE.json")); assert d["source_sha"]==os.environ["SOURCE_SHA"] and d["full_service_update_verified"] is True'
+      - uses: actions/upload-artifact@v4
+        with:
+          name: liner-notes-freebsd-upgrade
+          path: FREEBSD-SERVICE-UPGRADE.json
+          if-no-files-found: error
+          retention-days: 90

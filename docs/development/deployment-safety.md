@@ -24,6 +24,14 @@ Reviewed against code on 2026-11-09:
   to the actual package payload and an independent rc configuration, retaining
   articles/mail/config, running logical backup/restore and old-package recovery.
   Account/ownership and maintainer scripts remain disabled and unverified.
+- `ci/freebsd_upgrade_root.py` is a separately installed privileged acceptance
+  entrypoint. It downloads current-main source through the installed A-phase
+  source verifier and same-SHA package artifacts itself, requires the Actions ZIP
+  digest and package SHA-256, then runs `ci/freebsd_upgrade_jail.py` in a private
+  VNET jail. It takes no source/package/command paths from the SSH user.
+- `freebsd-upgrade-acceptance.yml` first verifies actual package execution on a
+  GitHub-hosted runner. A documentation-only skipped package run does not contact
+  the test LAN. No production host is referenced by the privileged fixture.
 
 Known deployment blockers, not manual user acceptance tasks:
 
@@ -45,3 +53,40 @@ Hosted fixture CI proves ordering, duplicate application, partial failure,
 signature/approval/hash denial and recovery stopping; it does not impersonate
 native OS service validation. Real RPM/DEB package upgrade containers use the
 same offline package command builder as the host helper.
+
+## Privileged FreeBSD acceptance prerequisites (not yet installed or executed)
+
+The designated FreeBSD VM needs a VNET-capable FreeBSD 15/amd64 kernel, Python
+3.12, pkg and the existing CI SSH key. Do not grant arbitrary sudo to takeshi.
+From a root-owned, reviewed exact-main source copy, explicitly run
+`sh ci/install-freebsd-upgrade-helper.sh`; this also installs the reviewed
+`ci/selinux_root.py` acquisition functions as a root-owned import (it does not
+execute the Rocky helper). Check installed-file hashes against that main copy.
+Permit only `/usr/local/libexec/liner-notes-freebsd-upgrade-ci` through sudo; the
+program itself accepts exactly one lowercase 40-hex SHA and checks current main
+twice. Never use a writable checkout as a sudo command or module source.
+
+Prepare `/var/db/liner-notes-ci/freebsd-template` as a root-owned, mode-0700
+directory, using a verified FreeBSD base distribution and a disposable jail,
+following the [FreeBSD jail handbook](https://docs.freebsd.org/en/books/handbook/jails/).
+This is a test fixture, not a copy of the live OS or BBS. Its `root/` subtree must
+contain a bootable FreeBSD userland, Python 3.12, pkg, the candidate's dependencies
+(SQLite, lrzsz, py312-aiohttp and py312-cryptography), and the previous official
+`comms/liner-notes` package installed normally so accounts/permissions exist.
+Include WebUI/link options. No SSH keys, host configuration, mounted filesystems,
+real users or BBS/game records belong in the template; `/var/db/liner-notes` must
+be empty. Do not auto-delete a populated directory to satisfy this condition.
+Place the verified previous package at `old.pkg`, outside `root/`, and a
+root-only `template.json` with exactly `old_version`, `old_package_sha256` and
+`old_release_source_sha`, recording the official release's version/hash/SHA.
+Verify its release asset hash before creating the template. Preserve the setup
+evidence outside the template; the CI helper only copies an already approved
+template and never installs its dependencies on the host.
+
+The jail has its own VNET loopback and no interface to the LAN. All runtime,
+package scripts, account creation/ownership checks and restored application
+checks execute inside it. Root-private failed fixtures/logs remain under
+`/var/db/liner-notes-ci/freebsd-upgrade` for diagnosis; remove them only after
+confirming their jail and devfs mount are gone. Only the secret-free JSON receipt
+is returned to CI. Initial template/bootstrap and acceptance have not been run;
+their absence deliberately prevents production admission.

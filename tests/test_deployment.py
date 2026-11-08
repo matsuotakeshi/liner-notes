@@ -23,8 +23,8 @@ import deploy_policy as policy
 from deploy_transaction import apply_host, atomic_json, rollout
 from deploy_backup_store import receive
 from deploy_restore import health_probes
-from deploy_release import successful_execution, latest_full_run, main as controller_main, record_target
-from deploy_host import Host
+from deploy_release import successful_execution, latest_full_run, trusted_release_ancestor, main as controller_main, record_target
+from deploy_host import Host, validate_backup_inventory
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 from cryptography.hazmat.primitives.serialization import Encoding, PrivateFormat, PublicFormat, NoEncryption
 
@@ -154,7 +154,8 @@ class Deployment(unittest.TestCase):
              self.assertRaises(ValueError):
             controller_main()
         result = json.loads(output.read_text())
-        self.assertEqual(result['source_sha'], self.doc['source_sha'])
+        self.assertEqual(result['controller_sha'], self.doc['source_sha'])
+        self.assertNotIn('source_sha', result)  # unverified release identity is unknown at this point
         self.assertEqual(result['result'], 'rejected-or-stopped')
         self.assertEqual(result['run_attempt'], '2')
 
@@ -242,6 +243,12 @@ class Deployment(unittest.TestCase):
         with self.assertRaises(ValueError):
             policy.validate_environment(env, {'branch_policies': [{'name': '*'}]}, [approval], self.doc, 100, 2)
 
+    def test_pem_reformatting_is_not_a_separate_approval_key(self):
+        key = Ed25519PrivateKey.generate().public_key().public_bytes(Encoding.PEM, PublicFormat.SubjectPublicKeyInfo)
+        self.assertEqual(policy.public_key_identity(key), policy.public_key_identity(key.replace(b'\n', b'\r\n')))
+        other = Ed25519PrivateKey.generate().public_key().public_bytes(Encoding.PEM, PublicFormat.SubjectPublicKeyInfo)
+        self.assertNotEqual(policy.public_key_identity(key), policy.public_key_identity(other))
+
     def test_skipped_successful_workflow_does_not_count_as_test(self):
         jobs = {'total_count': 1, 'jobs': [{'conclusion': 'success', 'steps': [{'name': 'actual test', 'conclusion': 'skipped'}]}]}
         with self.assertRaises(ValueError):
@@ -262,6 +269,21 @@ class Deployment(unittest.TestCase):
         with self.assertRaises(ValueError):
             latest_full_run({'workflow_runs': [dict(manual, head_branch='feature')]}, self.doc['source_sha'], 'push', 'test')
 
+    def test_later_main_controller_requires_release_ancestry(self):
+        release_sha, controller_sha = 'a' * 40, 'b' * 40
+        comparison = {'status': 'ahead', 'base_commit': {'sha': release_sha},
+                      'merge_base_commit': {'sha': release_sha}}
+        with patch('deploy_release.api', side_effect=[{'object': {'sha': controller_sha}}, comparison]):
+            trusted_release_ancestor(release_sha, controller_sha)
+        for changed in (dict(comparison, status='diverged'),
+                        dict(comparison, merge_base_commit={'sha': 'c' * 40})):
+            with patch('deploy_release.api', side_effect=[{'object': {'sha': controller_sha}}, changed]):
+                with self.assertRaises(ValueError):
+                    trusted_release_ancestor(release_sha, controller_sha)
+        with patch('deploy_release.api', return_value={'object': {'sha': 'c' * 40}}):
+            with self.assertRaises(ValueError):
+                trusted_release_ancestor(release_sha, controller_sha)
+
     def test_package_and_service_commands_are_closed(self):
         for platform, packages in self.doc['platforms'].items():
             command = policy.package_commands(platform, packages, self.base)[0]
@@ -275,6 +297,24 @@ class Deployment(unittest.TestCase):
                     policy.service_command(platform, forbidden, 'stop')
             with self.assertRaises(ValueError):
                 policy.package_commands(platform, {'apache24': {'filename': 'apache.pkg'}}, self.base)
+
+    def test_backup_inventory_requires_explicit_feature_coverage(self):
+        profile = json.loads((ROOT/'ci/deploy-host.example.json').read_text())
+        validate_backup_inventory(profile, 'freebsd15')
+        for feature in ('binaries', 'web', 'link', 'vault'):
+            broken = copy.deepcopy(profile)
+            broken['backup_roots'][feature] = []
+            with self.assertRaises(ValueError):
+                validate_backup_inventory(broken, 'freebsd15')
+        broken = copy.deepcopy(profile)
+        broken['backup_features']['web'] = False
+        broken['backup_roots']['web'] = []
+        with self.assertRaises(ValueError):
+            validate_backup_inventory(broken, 'freebsd15')
+        profile['services'] = ['liner_notes']
+        profile['backup_features']['web'] = False
+        profile['backup_roots']['web'] = []
+        validate_backup_inventory(profile, 'freebsd15')
 
     def test_installed_inventory_preserves_multiple_kernel_versions(self):
         host = object.__new__(Host)

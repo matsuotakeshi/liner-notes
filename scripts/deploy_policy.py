@@ -76,6 +76,14 @@ def verify(envelope, public_pem):
     return envelope['document']
 
 
+def public_key_identity(public_pem):
+    from cryptography.hazmat.primitives.serialization import load_pem_public_key, Encoding, PublicFormat
+    from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey
+    key = load_pem_public_key(public_pem)
+    require(isinstance(key, Ed25519PublicKey), 'An Ed25519 verification key is required')
+    return key.public_bytes(Encoding.Raw, PublicFormat.Raw)
+
+
 def validate_release(doc):
     require(isinstance(doc, dict) and set(doc) == {'schema', 'version', 'source_sha', 'release_id', 'tag', 'platforms', 'rollback_compatible'}, 'Invalid deployment manifest fields')
     require(doc['schema'] == 1 and HEX40.fullmatch(doc['source_sha']), 'Invalid release source SHA')
@@ -103,10 +111,13 @@ def approval_phrase(doc, run_id, attempt):
     return 'DEPLOY ' + doc['tag'] + ' ' + doc['source_sha'] + ' ' + ','.join(TARGETS) + f' RUN {run_id}/{attempt}'
 
 
-def authorization(doc, run_id, attempt, actor_id, now=None):
+def authorization(doc, run_id, attempt, actor_id, now=None, freebsd_previous_version=None):
     now = int(time.time() if now is None else now)
     require(all(type(x) is int and x > 0 for x in (run_id, attempt, actor_id)), 'Invalid approval identity')
+    require(freebsd_previous_version is None or (isinstance(freebsd_previous_version, str) and
+            re.fullmatch(r'[0-9][A-Za-z0-9.+_~-]*', freebsd_previous_version)), 'Invalid tested previous FreeBSD version')
     return dict(schema=1, manifest_sha256=hashlib.sha256(canonical(doc)).hexdigest(),
+                freebsd_previous_version=freebsd_previous_version,
                 source_sha=doc['source_sha'], release_id=doc['release_id'], targets=list(TARGETS),
                 run_id=run_id, run_attempt=attempt, actor_id=actor_id,
                 issued_at=now, expires_at=now + 3600)
@@ -114,7 +125,7 @@ def authorization(doc, run_id, attempt, actor_id, now=None):
 
 def validate_authorization(auth, doc, target, now=None):
     now = int(time.time() if now is None else now)
-    expected = authorization(doc, auth.get('run_id'), auth.get('run_attempt'), auth.get('actor_id'), auth.get('issued_at'))
+    expected = authorization(doc, auth.get('run_id'), auth.get('run_attempt'), auth.get('actor_id'), auth.get('issued_at'), auth.get('freebsd_previous_version'))
     require(auth == expected and auth['targets'] == list(TARGETS), 'Authorization does not match this release/run/target set')
     require(target in TARGETS and auth['issued_at'] <= now < auth['expires_at'], 'Expired or future deployment authorization')
     return auth

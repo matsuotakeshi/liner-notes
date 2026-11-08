@@ -14,8 +14,8 @@
 更新順序はRocky Linux → Debian → FreeBSDです。各局のヘルスチェックが成功してから
 次局へ進みます。必要な条件は次のとおりです。
 
-1. 公開済み安定リリースのtag、署名付き `DEPLOYMENT-MANIFEST.json`、現在のmainと実行runが同じ完全SHAであること。
-2. native/Linux/pkg/RPM/DEB/Release Set/manual/deployment安全性CIと本番SSH事前検査が同一SHAで成功していること。文書変更によるskipは実行済み試験として認めません。
+1. 公開済み安定リリースのtagと署名付き `DEPLOYMENT-MANIFEST.json` が同じ完全SHAであること。配備controllerは実行時の最新mainに固定し、release SHAがその祖先であることを確認します。リリース後の文書更新だけで既存リリースを作り直す必要はありません。ただし承認待ち中にmainが進んだ場合は新しいrunと承認が必要です。
+2. native/Linux/pkg/RPM/DEB/Release Set/manual/deployment安全性、Solaris native、Rocky SELinux Enforcing、FreeBSD jail更新CIと本番SSH事前検査がreleaseと同一SHAで成功していること。文書変更によるskipは実行済み試験として認めません。controllerだけが新しいSHAであることを理由に過去のrelease検証を他のreleaseへ流用しません。
 3. CI由来manifest・Release Set receiptと、ダウンロードしたpackageの名前・版・サイズ・SHA-256が一致すること。
 4. `production-release` Environmentにmain専用のブランチ制限とオーナーのrequired reviewerが実在すること。
 5. 今回のrun summaryに示す `DEPLOY v版 SHA rocky.ysni.org,debian.ysni.org,srv.ysni.org RUN run番号/attempt` を、承認コメントへそのまま記載すること。古いrun/attemptの承認は再利用できません。
@@ -41,9 +41,14 @@ root管理profileにはtarget、private state directory、incoming directory、�
 probeはlocalhostへの送受信で、任意のroot shellコマンドではありません。
 
 バックアップ対象はdata/config/attachments/vault/spool/link/web/doors/binaries/old-packages
-の10区分すべてを明記します。未使用区分は空配列、使用中の外部保存先は実パスを列挙します。
+の10区分すべてを明記します。data/config/binaries/old-packagesは空にできません。
+他の区分は `backup_features` で使用/未使用を明記し、未使用は空配列、使用中は実パスを列挙します。
+Web/linkサービスを有効にして対応する保存先を空にする設定は拒否します。data配下にまとめて
+保存している機能は同じdataパスを指定して構いません。外部保存先・Doorデータは個別に含めます。
 停止後に専用サービスアカウントのworkerが残っていないことを確認し、ACL・拡張属性を含むarchiveを作成します。
 別コピーへ復元して全file hash、SQLite integrity、指定の会員・記事・メール等のSELECT結果を照合し、
+SQLiteの照合はDB/WALのさらに別コピーで行います。原本DBへSQLite接続せず、原本側にSHMを
+作成することも避けます。コピー中の変化・未回復のrollback journalは更新を拒否する理由です。
 さらに使い捨てコピー上のBBSを非root・loopbackで起動してlogin/article/mailを確認します。外部のゲームdaemon等が
 まだデータを書いている場合は停止し、ゲーム側の整合バックアップ手順を先に設計します。別ホストの専用backup
 receiverへ転送し、保管後hashが一致するまでpackage更新を開始しません。
@@ -67,6 +72,9 @@ off-host backupと旧packageを確認して[計画的な復元](backup-recovery.
 失敗状態が一つでも残る局は別releaseへの更新も拒否します。計画復元の完了を管理者が確認してから、
 失敗stateを復元証跡と一緒にroot専用の履歴directoryへ移して保持し、新しい承認で再検査します。
 監査出力はSHA、版、対象、承認run/attempt、更新前後、backup識別子・hash、結果・停止理由です。
+release SHAとcontroller SHAは別々に記録します。制限付きOSコマンドの詳細stdout/stderrは
+private state directoryのroot専用 `commands.log`（0600）へ記録します。このログは秘密を含む
+可能性があるため、SSH応答やActions Artifactには含めません。コマンドの標準入力は記録しません。
 
 **検証上の区別:** hostedの3局試験はfile/SQLite/subprocessの隔離fixtureです。
 RPM/DEBの既存disposable更新CIでは実package操作も検証します。
@@ -76,6 +84,13 @@ login/article/mail・論理backup/restore・旧package回復の試験も用意�
 こちらも非rootのrootdir内でmaintainer scriptsを無効化して実行するため、アカウント作成・
 所有権設定を含む完全なOS更新試験の代わりにはなりません。
 適用controllerは `FREEBSD-SERVICE-UPGRADE.json` に同一SHAの完全なpackage/service更新・復元証跡がない限りapplyを拒否します。
+専用の `FreeBSD isolated upgrade acceptance` は、10.0.0.50上のroot所有テンプレートを
+VNET jailへ複製し、maintainer script・会員/データ所有権、実rc起動、記事/メール、Web、link、
+Door、バックアップからの復元と旧package回復を検査する候補実装です。宿主のサービスや
+packageを更新しません。テンプレート・固定sudo entryの初期準備とネイティブ実行は別途必要です。
+同一バージョンの開発候補はrevisionだけを上げて更新経路を試験できますが、その証跡だけでは
+本番applyを許可しません。実release packageのhash/版と試験結果を照合し、試験開始時の旧版を
+短期署名承認へ含め、本番局の旧版が異なる場合も停止します。
 FreeBSDの実Liner Notes package・サービスを含む完全な隔離更新、全保存領域のsite profile、
 本番用root helper/鍵/backup先の設置が確認できるまでは、本番更新可能と扱いません。
 

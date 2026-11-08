@@ -7,10 +7,75 @@ import socket
 import sqlite3
 import shutil
 import signal
+import stat
 import subprocess
 import tempfile
 import time
 from deploy_policy import digest_file, require
+
+
+def snapshot_rows(source, query):
+    """Query a private DB/WAL copy; even a SQLite read-only source can create SHM.
+
+    The caller has already stopped services. A changing file or rollback journal
+    rejects the backup instead of letting SQLite recover or lock the original.
+    """
+    source = Path(source)
+    paths = [source, Path(str(source) + '-wal'), Path(str(source) + '-journal')]
+    def identity(info):
+        return (info.st_dev, info.st_ino, info.st_size, info.st_mtime_ns,
+                info.st_ctime_ns if os.name != 'nt' else None)
+    def metadata():
+        values = {}
+        for path in paths:
+            try:
+                info = path.lstat()
+            except FileNotFoundError:
+                values[path] = None
+                continue
+            require(stat.S_ISREG(info.st_mode) and info.st_nlink == 1,
+                    'Unsafe database snapshot source')
+            values[path] = identity(info)
+        return values
+    require(isinstance(query, str) and query.lstrip().upper().startswith('SELECT '),
+            'Restore verification requires SELECT')
+    before = metadata()
+    require(before[source] is not None, 'Database snapshot source is missing')
+    require(before[paths[2]] is None or before[paths[2]][2] == 0,
+            'Stopped database has a rollback journal; recovery must be planned')
+    total = sum(item[2] for item in before.values() if item)
+    deadline = time.monotonic() + 120
+    with tempfile.TemporaryDirectory(prefix='liner-restore-sql-') as temporary:
+        os.chmod(temporary, 0o700)
+        require(shutil.disk_usage(temporary).free >= total * 2 + 16 * 1024**2,
+                'Insufficient space for private database verification')
+        copy = Path(temporary) / 'database.sqlite'
+        for path in paths[:2]:
+            if before[path] is None:
+                continue
+            flags = os.O_RDONLY | getattr(os, 'O_NOFOLLOW', 0) | getattr(os, 'O_NONBLOCK', 0)
+            with os.fdopen(os.open(path, flags), 'rb') as incoming:
+                info = os.fstat(incoming.fileno())
+                require(stat.S_ISREG(info.st_mode) and info.st_nlink == 1 and identity(info) == before[path],
+                        'Database changed before private copy')
+                destination = copy if path == source else Path(str(copy) + '-wal')
+                with destination.open('xb') as outgoing:
+                    os.chmod(destination, 0o600)
+                    remaining = before[path][2]
+                    while remaining:
+                        require(time.monotonic() < deadline, 'Database snapshot exceeded its time budget')
+                        block = incoming.read(min(remaining, 1024 * 1024))
+                        require(block, 'Database changed during private copy')
+                        outgoing.write(block)
+                        remaining -= len(block)
+        require(metadata() == before, 'Database changed during private copy')
+        with contextlib.closing(sqlite3.connect(copy.as_uri() + '?mode=ro', uri=True, timeout=0)) as db:
+            db.execute('PRAGMA query_only=ON')
+            db.execute('PRAGMA trusted_schema=OFF')
+            db.set_progress_handler(lambda: int(time.monotonic() >= deadline), 1000)
+            rows = db.execute(query).fetchall()
+        require(metadata() == before, 'Database changed during verification')
+        return rows
 
 
 def verify_restored(restored, roots, checks):
@@ -29,12 +94,8 @@ def verify_restored(restored, roots, checks):
         source = Path(check['path'])
         require(source.is_absolute() and any(source.is_relative_to(Path(root)) for root in roots), 'Database check is outside backup inventory')
         copy = restored / str(source).lstrip('/')
-        def rows(path):
-            with contextlib.closing(sqlite3.connect(path.as_uri() + '?mode=ro', uri=True)) as db:
-                db.execute('PRAGMA query_only=ON')
-                require(check['query'].lstrip().upper().startswith('SELECT '), 'Restore verification requires SELECT')
-                return db.execute(check['query']).fetchall()
-        require(rows(source) == rows(copy), 'Restored application records differ')
+        require(snapshot_rows(source, check['query']) == snapshot_rows(copy, check['query']),
+                'Restored application records differ')
 
 
 def health_probes(probes, readiness_seconds=30):

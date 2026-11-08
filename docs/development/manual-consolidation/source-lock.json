@@ -85,11 +85,13 @@
   "src/ui.c": "c1e54ca7309614d5c8bd35236ada6f18067f8938060d9eae57b5a4c5cdafb093",
   "help/en/adminboards.txt": "921f0f5d9b492dd07477fe803c16f9f8432811f819a75990abcd49ab1ef01667",
   "webui/static/app.js": "ff79c5ac310c835df7e13595f2027d4c4ee8e699fc77c5192b102cca33ddba8c",
-  "ci/deploy_release.py": "e78ae86170d2a1a7b52b1e20f0da7a71ef94bdd9987af9c105bf9a58a9743085",
-  "scripts/deploy_policy.py": "c16091642f269eca46f4c500f1a2ce05923e4b7524cf4f8d3a3df8c5c1e9d96d",
-  "scripts/deploy_host.py": "c5cdf1562c4a4ccc60f8a44cab78be6c596230779434e787b912067aef56725c",
-  "scripts/deploy_restore.py": "0942a9dbf22be8f40f5850073767fd1a1ffa14a010663869b0e071d11964a572",
+  "ci/deploy_release.py": "9f849ab1e749431e2dcb70f576d04376e0dc9798cbf1e0374039d9628de6a650",
+  "scripts/deploy_policy.py": "650baa5a8246e859158791d93c4f64cc3b5bc6003f1fa25608f06a13c870e958",
+  "scripts/deploy_host.py": "f51139704dc233e4e5fb8ee0ece0b8eac32ce3ad7591c9994ab4852885d103fc",
+  "scripts/deploy_restore.py": "11222533e6f54c94799abc4218aaabf587e5b3bea358c59d437bd8f3e5ec4dea",
   "scripts/deploy_transaction.py": "57b3b0c7ad16420e1922974c3dfffd0ca2bd43ffc4960c2bc373abef08e912e5",
   "scripts/deploy_backup_store.py": "ff1a26a98e9a2ba20dae1e31789e8dc4bbb74edc8ac3e9893f271ede716b2d5d",
-  "scripts/deploy_manifest.py": "f49aaa2d98c6e09e3a2a0e00608dcc4d84bf61d283431d8c30dd70aaf51c204c"
+  "scripts/deploy_manifest.py": "f49aaa2d98c6e09e3a2a0e00608dcc4d84bf61d283431d8c30dd70aaf51c204c",
+  "ci/freebsd_upgrade_root.py": "2fe589ddde4ca06466516dd93046d1509a6ce62dfa40d3ce38bda38759da51d8",
+  "ci/freebsd_upgrade_jail.py": "c89bb4a9233924ba4e051787395106bab8799260171e75219865d3c2da2b9d00"
 }

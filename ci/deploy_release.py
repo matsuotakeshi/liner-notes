@@ -34,6 +34,9 @@ GATES = {
     'manual': ('manual.yml', 'push', None, 'canonical-manual'),
     'connectivity': ('production-ssh-smoke.yml', 'workflow_dispatch', None, None),
     'deployment': ('deployment-safety.yml', 'push', 'Test closed deployment policy and isolated three-node transactions', None),
+    'freebsd_upgrade': ('freebsd-upgrade-acceptance.yml', 'workflow_run', 'Verify full package upgrade in a disposable VNET jail', 'liner-notes-freebsd-upgrade'),
+    'solaris': ('solaris-build-test.yml', 'push', 'Build and test exact main using the existing Solaris CI account', 'native-ci-solaris-results'),
+    'selinux': ('selinux.yml', 'push', 'Verify the installed root-owned acceptance helper and run exact main', 'selinux-native-acceptance'),
 }
 
 
@@ -77,9 +80,21 @@ def latest_full_run(document, sha, event, label):
     return latest_successful_run(document, sha, latest['event'], label)
 
 
+def trusted_release_ancestor(release_sha, controller_sha):
+    """A later reviewed controller may deploy an older, still verified release."""
+    require(api(f'repos/{REPO}/git/ref/heads/main')['object']['sha'] == controller_sha,
+            'Main moved after controller dispatch; dispatch again and obtain fresh approval')
+    if release_sha != controller_sha:
+        comparison = api(f'repos/{REPO}/compare/{release_sha}...{controller_sha}')
+        require(comparison.get('status') == 'ahead' and
+                comparison.get('base_commit', {}).get('sha') == release_sha and
+                comparison.get('merge_base_commit', {}).get('sha') == release_sha,
+                'Release is not an ancestor of the reviewed main controller')
+
+
 def fresh_evidence(release):
     sha = release['source_sha']
-    require(api(f'repos/{REPO}/git/ref/heads/main')['object']['sha'] == sha, 'Main moved; create a new exact-SHA release')
+    trusted_release_ancestor(sha, os.environ['GITHUB_SHA'])
     released = api(f'repos/{REPO}/releases/{release["release_id"]}')
     require(released.get('tag_name') == release['tag'] and released.get('draft') is False and released.get('prerelease') is False,
             'An approved published stable release is required')
@@ -93,6 +108,9 @@ def fresh_evidence(release):
         successful_execution(jobs, step, 2 if label == 'linux' else 1)
         if label == 'deployment':
             successful_execution(jobs, 'Restore and boot the actual BBS using a disposable unprivileged account')
+        if label == 'selinux':
+            successful_execution(jobs, 'Compile the policy and its optional RPM in Rocky 10')
+            successful_execution(jobs, 'Write exact-SHA Enforcing acceptance receipt')
         evidence[label] = run_id
         if artifact_name:
             document = api(f'repos/{REPO}/actions/runs/{run_id}/artifacts?per_page=100')
@@ -107,6 +125,14 @@ def fresh_evidence(release):
     require(native.get('ok') is True and native.get('source_sha') == sha and
             {r.get('target') for r in native.get('results', [])} == {'freebsd', 'rocky', 'ubuntu'} and
             all(r.get('source_sha') == sha and r.get('status') == 'passed' for r in native['results']), 'Native OS execution evidence is incomplete')
+    solaris = artifact_json(artifacts['solaris'], 'results.json')
+    require(solaris.get('ok') is True and solaris.get('source_sha') == sha and
+            len(solaris.get('results', [])) == 1 and solaris['results'][0].get('target') == 'solaris' and
+            solaris['results'][0].get('source_sha') == sha and solaris['results'][0].get('status') == 'passed',
+            'Solaris native execution evidence is incomplete')
+    selinux = artifact_json(artifacts['selinux'], 'SELINUX-ACCEPTANCE.json')
+    require(selinux.get('source_sha') == sha and selinux.get('enforcing') is True and
+            selinux.get('acceptance') == 'success', 'Dedicated-domain Enforcing acceptance evidence is missing')
     receipt = artifact_json(artifacts['release_set'], 'RELEASE-SET.json')
     require(receipt.get('source_sha') == sha and receipt.get('version') == release['version'], 'Release-set receipt differs')
     for label, platform in (('freebsd', 'freebsd15'), ('rocky', 'rocky10'), ('debian', 'debian13')):
@@ -122,11 +148,15 @@ def fresh_evidence(release):
                     {'filename': package['filename'], 'sha256': package['sha256']}, 'Package is absent from verified release set')
     # A resolver fixture is deliberately not a substitute for the actual
     # package/scripts/services/restore acceptance required for srv.ysni.org.
-    full = artifact_json(artifacts['freebsd'], 'FREEBSD-SERVICE-UPGRADE.json', optional=True)
-    evidence['freebsd_service_upgrade_verified'] = bool(full and full.get('source_sha') == sha and all(
+    full = artifact_json(artifacts['freebsd_upgrade'], 'FREEBSD-SERVICE-UPGRADE.json')
+    evidence['freebsd_service_upgrade_verified'] = bool(full and full.get('source_sha') == sha and
+        full.get('candidate_package_sha256') == release['platforms']['freebsd15']['liner-notes']['sha256'] and
+        full.get('candidate_version') == release['platforms']['freebsd15']['liner-notes']['version'] and
+        full.get('revision_only_fixture') is False and all(
         full.get(field) is True for field in ('full_service_update_verified', 'backup_restore_verified',
                                               'config_data_retained', 'unrelated_services_untouched',
                                               'old_package_restoration_verified')))
+    evidence['freebsd_previous_version'] = full.get('previous_version')
     return evidence, released
 
 
@@ -171,7 +201,7 @@ def main():
     parser.add_argument('--output', type=Path, required=True)
     args = parser.parse_args()
     args.output.write_text(json.dumps({'mode': args.mode, 'release_id': args.release_id,
-                                      'source_sha': os.environ.get('GITHUB_SHA'), 'targets': list(TARGETS),
+                                      'controller_sha': os.environ.get('GITHUB_SHA'), 'targets': list(TARGETS),
                                       'run_id': os.environ.get('GITHUB_RUN_ID'),
                                       'run_attempt': os.environ.get('GITHUB_RUN_ATTEMPT'),
                                       'started_at': datetime.datetime.now(datetime.timezone.utc).isoformat(),
@@ -202,11 +232,14 @@ def execute(args):
         subprocess.run(['gh', 'release', 'download', published['tag_name'], '--repo', REPO, '--pattern', 'DEPLOYMENT-MANIFEST.json', '--dir', str(folder)], check=True)
         envelope = json.loads((folder / 'DEPLOYMENT-MANIFEST.json').read_text())
         release = validate_release(verify(envelope, os.environ['LN_RELEASE_PUBLIC_KEY'].encode()))
-        require(release['release_id'] == args.release_id and release['source_sha'] == os.environ['GITHUB_SHA'], 'Run/release identity mismatch')
+        require(release['release_id'] == args.release_id, 'Release identity mismatch')
+        initial = json.loads(args.output.read_text())
+        initial.update(source_sha=release['source_sha'], release=release['tag'])
+        args.output.write_text(json.dumps(initial, indent=2) + '\n')
         evidence, published = fresh_evidence(release)
         phrase = approval_phrase(release, run_id, attempt)
         if args.mode == 'plan':
-            args.output.write_text(json.dumps({'mode': 'plan', 'source_sha': release['source_sha'], 'targets': list(TARGETS),
+            args.output.write_text(json.dumps({'mode': 'plan', 'source_sha': release['source_sha'], 'controller_sha': os.environ['GITHUB_SHA'], 'targets': list(TARGETS),
                                               'approval_comment': phrase, 'ci_runs': evidence}, indent=2) + '\n')
             print(phrase)
             return
@@ -214,7 +247,7 @@ def execute(args):
         actor = validate_environment(api(f'repos/{REPO}/environments/production-release'),
                                      api(f'repos/{REPO}/environments/production-release/deployment-branch-policies'),
                                      api(f'repos/{REPO}/actions/runs/{run_id}/approvals'), release, run_id, attempt)
-        auth = authorization(release, run_id, attempt, actor)
+        auth = authorization(release, run_id, attempt, actor, freebsd_previous_version=evidence['freebsd_previous_version'])
         signed_auth = sign(auth, os.environ['LN_DEPLOY_AUTH_KEY'].encode())
         key = folder / 'ssh-key'
         key.write_text(os.environ['ID_ED25519_LN_DEPLOY'])
@@ -228,7 +261,7 @@ def execute(args):
         fresh_evidence(release)
         results = []
         def save_audit():
-            args.output.write_text(json.dumps({'release': release['tag'], 'source_sha': release['source_sha'], 'targets': list(TARGETS),
+            args.output.write_text(json.dumps({'release': release['tag'], 'source_sha': release['source_sha'], 'controller_sha': os.environ['GITHUB_SHA'], 'targets': list(TARGETS),
                                               'package_hashes': {p: {n: i['sha256'] for n, i in packages.items()} for p, packages in release['platforms'].items()},
                                               'approval': {'run_id': run_id, 'run_attempt': attempt, 'actor_id': actor},
                                               'ci_runs': evidence, 'results': results}, indent=2) + '\n')
