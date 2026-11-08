@@ -184,11 +184,12 @@ static const char *mail_body(const MailMessage *m) {
     const char *body=mailbox_body(m);if(mailbox_broken())body_read_failed=1;return body;
 }
 static void display_article(uint32_t id,BoardResult *r,int inspect) {
+    int hidden=unavailable(id);
     Article *a=&(*article_at(id-1)); r->selected=id;
     if(extras_removed(id)) { snprintf(r->text,sizeof(r->text),"WITHDRAWN %u PARENT %u\r\n",id,a->parent); return; }
-    if(unavailable(id) && !inspect) { snprintf(r->text,sizeof(r->text),"HIDDEN %u PARENT %u\r\n",id,a->parent); return; }
+    if(hidden && !inspect) { snprintf(r->text,sizeof(r->text),"HIDDEN %u PARENT %u\r\n",id,a->parent); return; }
     snprintf(r->text,sizeof(r->text),"ARTICLE %u PARENT %u AUTHOR %.32s%s\r\nTITLE %.80s\r\nBODY %zu\r\n%sEND\r\n",
-             id,a->parent,a->author[0]?a->author:"guest",unavailable(id)?" HIDDEN 1":"",a->title,(size_t)a->body_size,article_body(a));
+             id,a->parent,a->author[0]?a->author:"guest",hidden?" HIDDEN 1":"",a->title,(size_t)a->body_size,article_body(a));
     if(failed) { r->selected=0;strcpy(r->text,"ERR article storage\r\n"); }
 }
 static uint32_t checksum(const unsigned char *p,size_t n) {
@@ -292,8 +293,9 @@ static int extra_text(const char *text,size_t max,int empty) {
     return 1;
 }
 static int matches(const BoardRequest *q,uint32_t id) {
+    if(unavailable(id))return 0;
     Article *a=&(*article_at(id-1));
-    return catalog_read(a->board,q->user) && (q->scope==1 || (q->scope==2?catalog_under(a->board,q->board):a->board==q->board)) && !unavailable(id) &&
+    return catalog_read(a->board,q->user) && (q->scope==1 || (q->scope==2?catalog_under(a->board,q->board):a->board==q->board)) &&
            (!strcmp(q->username,"*") || !strcmp(q->username,a->author)) &&
            (!strcmp(q->title,"*") || strstr(a->title,q->title) || strstr(article_body(a),q->title));
 }
@@ -316,7 +318,7 @@ static void extra_execute(const BoardRequest *q,BoardResult *r) {
         if(!catalog_write(q->board,q->user)) { strcpy(r->text,"ERR posting denied\r\n"); return; }
         if(!extra_text(q->title,80,0)) { strcpy(r->text,"ERR title 1..80 bytes, no controls\r\n"); return; }
         if(!extras_set('T',q->number,q->user,q->title)) { strcpy(r->text,"ERR extras storage\r\n"); return; }
-        strcpy(a->title,q->title);db_search_title(&article_db,q->number,q->title); snprintf(r->text,sizeof(r->text),"RETITLED %u\r\n",q->number); return;
+        a=article_at(q->number-1);strcpy(a->title,q->title);db_search_title(&article_db,q->number,q->title); snprintf(r->text,sizeof(r->text),"RETITLED %u\r\n",q->number); return;
     }
     if(q->action==11) {
         uint64_t since;
@@ -325,8 +327,9 @@ static void extra_execute(const BoardRequest *q,BoardResult *r) {
         size_t pos=(size_t)snprintf(r->text,sizeof(r->text),"NEWS %s %s\r\n",q->scope==2?"SUBTREE":q->scope?"ALL":"HERE",q->title);
         uint32_t id=q->cursor?q->cursor:1;unsigned shown=0,scanned=0;
         for(;id<=article_count && shown<8 && scanned<256;id++,scanned++) {
+            if(unavailable(id))continue;
             Article *a=&(*article_at(id-1));
-            if(!a->created || a->created<since || (q->until && a->created>q->until) || unavailable(id) || (!q->scope && a->board!=q->board) || (q->scope==2 && !catalog_under(a->board,q->board)) || !catalog_read(a->board,q->user))continue;
+            if(!a->created || a->created<since || (q->until && a->created>q->until) || (!q->scope && a->board!=q->board) || (q->scope==2 && !catalog_under(a->board,q->board)) || !catalog_read(a->board,q->user))continue;
             pos+=(size_t)snprintf(r->text+pos,sizeof(r->text)-pos,"%u %u %u %.80s\r\n",id,a->board,a->parent,a->title);shown++;
         }
         snprintf(r->text+pos,sizeof(r->text)-pos,"END NEXT %u\r\n",id<=article_count?id:0);return;
@@ -907,8 +910,9 @@ static void execute(const BoardRequest *q,BoardResult *r) {
         unsigned shown=0,scanned=0;
         for(;id<=article_count && shown<8 && scanned<256;id++,scanned++) {
             id=db_search_next(&article_db,id,q->title,0);if(!id) { id=article_count+1;break; }
+            if(unavailable(id))continue;
             Article *a=&(*article_at(id-1));
-            if(a->board!=q->board || unavailable(id)) continue;
+            if(a->board!=q->board) continue;
             if(!strstr(a->title,q->title) && !strstr(article_body(a),q->title)) continue;
             pos+=(size_t)snprintf(r->text+pos,sizeof(r->text)-pos,"%u %u %.80s\r\n",id,a->parent,a->title);
             shown++;
@@ -998,7 +1002,8 @@ static void execute(const BoardRequest *q,BoardResult *r) {
         size_t pos=(size_t)snprintf(r->text,sizeof(r->text),q->notes_unread?"NOTES UNREAD %u\r\n":"NOTES %u\r\n",count);
         int shown=0;
         for(;id<=article_count;id++) {
-            Article *a=&(*article_at(id-1)); if(a->board!=q->board || a->parent || unavailable(id)) continue;
+            if(unavailable(id))continue;
+            Article *a=&(*article_at(id-1)); if(a->board!=q->board || a->parent) continue;
             if(q->notes_unread && !unread_counts[id]) continue;
             if(shown++==5) break;
             uint32_t replies=0,latest=id;
@@ -1012,7 +1017,7 @@ static void execute(const BoardRequest *q,BoardResult *r) {
             if(q->user) snprintf(unread_text,sizeof(unread_text),"%u",unread_counts[id]);
             else strcpy(unread_text,"-");
             pos+=(size_t)snprintf(r->text+pos,sizeof(r->text)-pos,"#%u replies=%u latest=%u updated=%s unread=%s %.80s\r\n",
-                                 id,replies,latest,date,unread_text,a->title);
+                                 id,replies,latest,date,unread_text,article_at(id-1)->title);
         }
         snprintf(r->text+pos,sizeof(r->text)-pos,"END NEXT %u\r\n",id<=article_count?id:0);
         free(unread_counts);

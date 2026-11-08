@@ -1,4 +1,5 @@
 Board administration
+Withdrawals and hides conceal all descendants on every board; IDs and parent links remain. Receiving administrators/SIGOPs use HIDE locally; WITHDRAW is restricted to the origin BBS. RESTORE never reverses an origin withdrawal.
 BOARDINFO id / BOARDSET id|parent|read|write|title|description
 BOARDOPTIONS id BOARD|MENU order article-limit body-byte-limit access-log-limit
 BOARDPASS id / BOARDPASS id NONE CONFIRM / INFOEDIT id

@@ -79,7 +79,7 @@ static void link_execute(const BoardRequest *q,BoardResult *r) {
         for(unsigned item=0;item<(q->action=='B'?32U:1U);item++) {
         while(id<=article_count && !on_board(id,q->board))id++;
         if(id>article_count) { snprintf(r->text+used,sizeof(r->text)-used,"LINK END\r\n");return; }
-        Article *a=article_at(id-1);const char *state=extras_removed(id)?"WITHDRAWN":unavailable(id)?"HIDDEN":"LIVE";
+        const char *state=extras_removed(id)?"WITHDRAWN":unavailable(id)?"HIDDEN":"LIVE";Article *a=article_at(id-1);
         sqlite3_stmt *s=feature_stmt("SELECT origin,article,revision FROM link_articles WHERE local_id=? AND done=1");if(!s)goto storage;
         sqlite3_bind_int64(s,1,id);int rc=sqlite3_step(s);char origin[65]="-",key[65]="-";uint32_t revision=0;
         if(rc==SQLITE_ROW) { snprintf(origin,sizeof(origin),"%s",sqlite3_column_text(s,0));snprintf(key,sizeof(key),"%s",sqlite3_column_text(s,1));revision=(uint32_t)sqlite3_column_int64(s,2); }

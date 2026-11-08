@@ -88,6 +88,7 @@ static const char *error_text(const Ui *u,const char *p) {
         {"ERR rights syntax",MSG_ERR_RIGHTS},
         {"ERR article owner",MSG_ERR_OWNER},
         {"ERR article withdrawn",MSG_ERR_WITHDRAWN},
+        {"ERR imported article; use HIDE for local moderation",MSG_ERR_IMPORTED},
         {"ERR extras storage",MSG_ERR_EXTRAS},
         {"ERR find syntax",MSG_ERR_FIND},
         {"ERR extended syntax",MSG_ERR_EXTENDED},

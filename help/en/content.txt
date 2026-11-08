@@ -1,4 +1,5 @@
 Published articles, cross-board search and sequential reading
+Withdrawals and hides conceal all descendants on every board; IDs and parent links remain. Receiving administrators/SIGOPs use HIDE locally; WITHDRAW is restricted to the origin BBS. RESTORE never reverses an origin withdrawal.
 WITHDRAW id asks for confirmation; WITHDRAW id CONFIRM executes. The author, admin or responsible SIGOP (including inherited authority) may withdraw.
 Withdrawal cannot be undone. IDs, replies and history remain. Physical body reclamation is a separate maintenance operation.
 RETITLE id title lets the author, admin or responsible SIGOP rename an article in the current board; read and post permissions are also required.
