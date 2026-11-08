@@ -48,6 +48,7 @@ def install(destdir,prefix,python,unitdir='/usr/local/lib/systemd/system'):
         text='#!/bin/sh\n'+setup+'exec '+shlex.quote(python)+' -B '+shlex.quote(share+'/scripts/'+script)+' '+arguments+' "$@"\n'
         put(prefix+'/bin/'+name,text.encode(),0o755)
     wrapper('liner-notes-admin','maintenance.py','export LINER_NOTES_TOOLS_DIR='+shlex.quote(prefix+'/bin')+'\n')
+    wrapper('liner-notes-doctor','doctor.py',arguments='--prefix '+shlex.quote(prefix))
     wrapper('liner-notes-check-resume','check-resume.py')
     wrapper('liner-notes-serial','serial_connector.py')
     wrapper('liner-notes-link','link_service.py')

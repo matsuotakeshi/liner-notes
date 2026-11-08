@@ -30,7 +30,7 @@ GROUPS=		liner_notes
 UID_FILES=	${FILESDIR}/UIDs
 GID_FILES=	${FILESDIR}/GIDs
 
-SUB_FILES=	liner-notes-admin liner-notes-maintenance \
+SUB_FILES=	liner-notes-admin liner-notes-doctor liner-notes-maintenance \
 		liner-notes-zmodem liner-notes-check-resume liner-notes-link liner-notes-serial \
 		liner_notes.conf doors.conf pkg-message
 SUB_LIST=	PYTHON_CMD=${PYTHON_CMD}
@@ -67,7 +67,7 @@ do-install:
 	${INSTALL_DATA} ${WRKSRC}/webui/bbs_transport.py ${STAGEDIR}${DATADIR}/scripts/bbs_transport.py
 	${INSTALL_DATA} ${WRKSRC}/ports/test-resume.py ${STAGEDIR}${DATADIR}/scripts/check-resume.py
 	${INSTALL_SCRIPT} ${WRKSRC}/scripts/liner-notes-ssh ${STAGEDIR}${PREFIX}/bin/liner-notes-ssh
-.for wrapper in admin maintenance zmodem check-resume serial
+.for wrapper in admin doctor maintenance zmodem check-resume serial
 	${INSTALL_SCRIPT} ${WRKDIR}/liner-notes-${wrapper} ${STAGEDIR}${PREFIX}/bin/
 .endfor
 	${MKDIR} ${STAGEDIR}${ETCDIR} ${STAGEDIR}${DATADIR}/menus ${STAGEDIR}${DATADIR}/help/ja ${STAGEDIR}${DATADIR}/help/en
