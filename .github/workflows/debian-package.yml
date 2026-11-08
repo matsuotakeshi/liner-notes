@@ -5,6 +5,7 @@ on:
   pull_request:
     paths:
       - "debian/**"
+      - "ci/test-debian-package-upgrade.sh"
       - "linux/**"
       - "scripts/install-linux.py"
       - "scripts/release_manifest.py"
