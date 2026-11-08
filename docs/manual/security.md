@@ -13,3 +13,35 @@ Webアカウントは私有spoolと設定を必要範囲で読み書きします
 バックアップは会員・私信・認証情報を含み、暗号化ファイルではありません。所有者だけが読める場所へ保存し、第三者提供や公開ZIPへ混入させません。手順の設定例に実際のパスワード・秘密鍵を書き込まないでください。
 
 SELinuxが有効な環境で動作することと、専用の制約ドメインを提供することは異なります。0.74.1 RPMは専用SELinuxポリシーを提供しません。拒否をSELinux無効化で回避せず、ラベル・サービス権限・パスと拒否ログを確認します。
+
+## 次期版のSELinuxポリシー（検証中）
+
+`linux/selinux/` にRocky Linux 10向けの任意導入パッケージ
+`liner-notes-selinux` を用意しています。既存の本体・Web・リンクの3 RPMとは別です。
+コンパイル成功とEnforcingでの機能・拒否試験は異なるため、後者の確認完了までは
+本番向けの全機能対応として扱いません。0.74.1の配布物は変更しません。
+
+|対象|専用ドメイン|主な保存領域|
+|---|---|---|
+|BBS|`liner_notes_t`|`/var/lib/liner-notes`|
+|WebUI|`liner_notes_web_t`|`/var/lib/liner-notes-web`|
+|リンク|`liner_notes_link_t`|`/var/lib/liner-notes-link`|
+|管理コマンド|`liner_notes_admin_t`|オフライン管理対象|
+|Door|`liner_notes_door_t`|`/var/lib/liner-notes-doors`|
+|転送helper|`liner_notes_transfer_t`|`/var/lib/liner-notes/spool`|
+
+WebUIからBBS原本やリンク秘密鍵への直接アクセス、DoorからBBS原本へのアクセスは許可しません。
+転送helperは既存の認証済みRPC用FDを使用します。Doorへの切替には管理者が設定した
+`liner_notes_door_exec_t` の実行ファイルが必要です。任意の外部ゲームを無条件に許可する仕様ではありません。
+Doorの外向き通信は既定で無効です。必要な場合だけ `liner_notes_door_network` と接続先ポートを検討します。
+
+ポリシーRPMは優先度200で導入し、優先度400のローカルポリシーを置き換えません。
+導入・更新ではサービスを再起動せず、データや設定を再ラベルせず、ポート定義も変更しません。
+稼働中の専用ドメインがある場合は削除を拒否します。削除時も管理者の
+`semanage fcontext` / `semanage port` の設定と保存データを消しません。
+
+`liner-notes-selinux` は既定で現在のモードとモジュール登録を表示するだけです。
+明示的な `liner-notes-selinux --relabel` はroot専用で、標準配置の存在するパスだけに
+`restorecon -R` を実行します。ローカルなfcontext定義を尊重し、`-F` は使用しません。
+独自配置は管理者が対象パスと適切な型を確認して登録してください。ポートの既存割当は
+`semanage port -l` で確認し、他のサービス用の型を機械的に変更しないでください。
