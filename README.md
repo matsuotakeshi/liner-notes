@@ -12,6 +12,8 @@ FreeBSD向けのC製BBSです。Rocky Linux／AlmaLinux向けの構築・イン�
 
 ## 最初に読む文書
 
+- [CI/CD運用設計・本番リリース保護方針](CI_CD.md)
+
 - **[詳細導入マニュアル（0.74・2026-11-04改訂）](INSTALL.md)** — ダウンロード照合、管理者登録、ポート23、Apache/WebUI、ゲーム、バックアップ、トラブル対応。
 - [WebUI・別プロセス構成と導入](WEBUI.md)
 - [Rocky Linux / AlmaLinuxでの構築・systemd](LINUX.md) / [対応OSの見通し](PLATFORMS.md)

@@ -1,0 +1,48 @@
+name: Multi-OS Native CI
+
+# Native SSH tests use trusted LAN hosts and must not execute untrusted PR code.
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: liner-notes-native-ci-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  freebsd:
+    name: FreeBSD native regression
+    uses: ./.github/workflows/freebsd-build-test.yml
+
+  rocky:
+    name: Rocky Linux native regression
+    uses: ./.github/workflows/rocky-build-test.yml
+
+  ubuntu:
+    name: Ubuntu native regression
+    uses: ./.github/workflows/ubuntu-build-test.yml
+
+  release-gate:
+    name: All required native suites passed
+    if: ${{ always() }}
+    needs: [freebsd, rocky, ubuntu]
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Fail closed if a required suite failed, was skipped, or was cancelled
+        shell: bash
+        env:
+          FREEBSD_RESULT: ${{ needs.freebsd.result }}
+          ROCKY_RESULT: ${{ needs.rocky.result }}
+          UBUNTU_RESULT: ${{ needs.ubuntu.result }}
+        run: |
+          set -euo pipefail
+          printf 'FreeBSD=%s Rocky=%s Ubuntu=%s\n' "$FREEBSD_RESULT" "$ROCKY_RESULT" "$UBUNTU_RESULT"
+          if [[ "$FREEBSD_RESULT" != success || "$ROCKY_RESULT" != success || "$UBUNTU_RESULT" != success ]]; then
+            echo "::error::Required native CI suite failed, skipped, or was cancelled"
+            exit 1
+          fi
+          echo "PASS: All 3 native OS suites passed on this exact commit."

@@ -3,6 +3,7 @@ name: Rocky Linux Build and Test
 
 on:
   workflow_dispatch:
+  workflow_call:
 
 permissions:
   contents: read
