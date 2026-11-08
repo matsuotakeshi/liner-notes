@@ -24,3 +24,8 @@ override_dh_auto_install:
 # No package-triggered service activation or restart.
 override_dh_installsystemd:
 	dh_installsystemd --no-start --no-enable --no-stop-on-upgrade
+
+# Debian 13's dwz cannot read Clang's DWARF5 .debug_addr sections.
+# dh_strip still handles binaries; this optional size optimization is skipped.
+override_dh_dwz:
+	@echo "Skipping optional dwz compression for Clang DWARF5"
