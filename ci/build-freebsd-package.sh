@@ -66,13 +66,15 @@ test -f "$work/source/scripts/release_manifest.py"
 cp -R "$work/source/ports/comms/liner-notes" "$work/port"
 cp "$archive" "$work/distfiles/liner-notes-stage74.tar.gz"
 
-# Query the exact Python package flavor selected by the installed ports.
+# Pin Python 3.12 only for this CI port build. The FreeBSD pkg repository
+# carries py312-aiohttp/cryptography; do not alter the VM-wide default.
+# Derive and verify the flavor before evaluating any dependencies.
 python_pkg_prefix=$(make -C "$work/port" BATCH=yes \
-    OPTIONS_SET="WEBUI LINK ZMODEM" -V PYTHON_PKGNAMEPREFIX)
-case "$python_pkg_prefix" in
-    py[0-9][0-9][0-9]-) ;;
-    *) echo "Unexpected Python package prefix: $python_pkg_prefix" >&2; exit 1 ;;
-esac
+    PYTHON_VERSION=python3.12 OPTIONS_SET="WEBUI LINK ZMODEM" -V PYTHON_PKGNAMEPREFIX)
+if [ "$python_pkg_prefix" != "py312-" ]; then
+    echo "Unexpected Python package prefix: $python_pkg_prefix (expected py312-)" >&2
+    exit 1
+fi
 
 # Port dependency resolution can descend to dependency "install" targets.
 # This verification VM must never have packages auto-installed by CI.
@@ -120,7 +122,8 @@ esac
 
 # The port distfile must be the exact Git archive, never the old v0.74 archive.
 make -C "$work/port" BATCH=yes \
-    PORTSDIR=/usr/ports DISTDIR="$work/distfiles" STRICT_DEPENDS=yes makesum
+    PORTSDIR=/usr/ports DISTDIR="$work/distfiles" \
+    PYTHON_VERSION=python3.12 STRICT_DEPENDS=yes makesum
 grep -Fqx "SHA256 (liner-notes-stage74.tar.gz) = $source_digest" "$work/port/distinfo" || {
     echo "Ports distinfo and Git source archive are inconsistent" >&2; exit 1;
 }
@@ -130,7 +133,8 @@ grep -Fqx "SHA256 (liner-notes-stage74.tar.gz) = $source_digest" "$work/port/dis
 make -C "$work/port" BATCH=yes \
     PORTSDIR=/usr/ports DISTDIR="$work/distfiles" \
     PACKAGES="$work/packages" OPTIONS_SET="WEBUI LINK ZMODEM" \
-    STRICT_DEPENDS=yes stage check-plist stage-qa package
+    PYTHON_VERSION=python3.12 STRICT_DEPENDS=yes \
+    stage check-plist stage-qa package
 
 find "$work/packages" -type f -name 'liner-notes-*.pkg' > "$work/packages-found.txt"
 [ "$(wc -l < "$work/packages-found.txt" | tr -d ' ')" -eq 1 ] || {
