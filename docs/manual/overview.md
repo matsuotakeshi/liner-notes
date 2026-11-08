@@ -8,7 +8,7 @@ Liner Notesは、親記事と返信をツリーでたどるHyperNotes型掲示�
 
 | 目的 | 参照先 |
 |---|---|
-| サーバーを新設する | [FreeBSD](install-freebsd.md)、[Linux](install-linux.md)、[初期設定](initial-setup.md) |
+| サーバーを新設する | [FreeBSD](install-freebsd.md)、[Linux](install-linux.md)、[Solaris移植状況](install-solaris.md)、[初期設定](initial-setup.md) |
 | 利用を始める | [ログイン・登録](accounts.md)、[メニュー](navigation.md) |
 | 記事を読む・書く | [ボードと読書](boards.md)、[検索と未読](article-search.md)、[エディタ](editor.md) |
 | メール・会話・ファイル | [メール](mail.md)、[チャット・Gather](conversation.md)、[保管庫](files.md) |

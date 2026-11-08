@@ -11,6 +11,7 @@ permissions:
 jobs:
   test:
     name: Solaris Remote Test
+    if: ${{ github.repository == 'matsuotakeshi/liner-notes' && github.ref == 'refs/heads/main' }}
     runs-on: [self-hosted, Linux, X64]
     timeout-minutes: 5
 
@@ -19,7 +20,9 @@ jobs:
         run: |
           ssh \
             -i /home/ci/.ssh/id_ed25519_solaris_ci \
+            -o IdentitiesOnly=yes \
             -o BatchMode=yes \
+            -o PasswordAuthentication=no \
             -o StrictHostKeyChecking=yes \
             -o ConnectTimeout=10 \
             ci-test@10.0.0.52 \

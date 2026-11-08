@@ -45,6 +45,9 @@ def unpack(directory, digest, sha):
 
 
 def commands_for(target):
+    if target == "solaris":
+        return [[sys.executable, "ci/solaris_ci.py", "inventory"],
+                [sys.executable, "ci/solaris_ci.py", "test"]]
     if target == "freebsd":
         return [["make", "-j2"], ["make", "check"]]
     flags = ["CC=clang", "PYTHON=python3", "SQLITE_CFLAGS=", "SQLITE_LIBS=-lsqlite3"]
@@ -52,7 +55,12 @@ def commands_for(target):
 
 
 def verify_os(target):
-    if target == "freebsd":
+    if target == "solaris":
+        if (platform.system() != "SunOS" or platform.release() != "5.11"
+                or platform.machine() not in ("i86pc", "i386", "amd64", "x86_64")
+                or "11.4" not in Path("/etc/release").read_text()):
+            raise ValueError("Expected Oracle Solaris 11.4 x86-64")
+    elif target == "freebsd":
         if platform.system() != "FreeBSD":
             raise ValueError("Expected FreeBSD")
     else:
@@ -164,7 +172,9 @@ def worker(target, sha, timeout, lease):
     with host_lock(lock_path, sys.stdin.fileno(), min(1200, timeout), lease, lambda: cancelled) as state:
         # All single-OS and parallel entry points share this per-host lock.
         print(platform.platform(), flush=True)
-        if target != "freebsd":
+        if target == "solaris":
+            print(Path("/etc/release").read_text(), flush=True)
+        elif target != "freebsd":
             print(Path("/etc/os-release").read_text(), flush=True)
             for command in (["python3", "--version"], ["clang", "--version"], ["free", "-h"]):
                 subprocess.run(command, check=True, timeout=15)
@@ -179,7 +189,7 @@ def main():
     bootstrap.add_argument("digest")
     bootstrap.add_argument("sha")
     run = sub.add_parser("worker")
-    run.add_argument("target", choices=["freebsd", "rocky", "ubuntu"])
+    run.add_argument("target", choices=["freebsd", "rocky", "ubuntu", "solaris"])
     run.add_argument("sha")
     run.add_argument("--timeout", type=int, default=3300)
     run.add_argument("--lease", type=int, default=45)
