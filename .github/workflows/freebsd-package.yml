@@ -87,5 +87,6 @@ jobs:
             ${{ runner.temp }}/freebsd-pkg-artifacts/SHA256SUMS
             ${{ runner.temp }}/freebsd-pkg-artifacts/BUILD-INFO.txt
             ${{ runner.temp }}/freebsd-pkg-artifacts/FREEBSD-DEPLOY-RESOLVER.json
+            ${{ runner.temp }}/freebsd-pkg-artifacts/FREEBSD-ACTUAL-UPGRADE.json
           if-no-files-found: error
           retention-days: 14

@@ -69,6 +69,10 @@ off-host backupと旧packageを確認して[計画的な復元](backup-recovery.
 **検証上の区別:** hostedの3局試験はfile/SQLite/subprocessの隔離fixtureです。
 RPM/DEBの既存disposable更新CIでは実package操作も検証します。
 FreeBSDのrootdir合成package試験は実pkg resolverを使用しますが、service/maintainer script試験ではありません。
+同じCIに実Liner Notes packageのrevision更新と `LINER_NOTES_RC_CONF` による独立rc起動・
+login/article/mail・論理backup/restore・旧package回復の試験も用意しています。
+こちらも非rootのrootdir内でmaintainer scriptsを無効化して実行するため、アカウント作成・
+所有権設定を含む完全なOS更新試験の代わりにはなりません。
 適用controllerは `FREEBSD-SERVICE-UPGRADE.json` に同一SHAの完全なpackage/service更新・復元証跡がない限りapplyを拒否します。
 FreeBSDの実Liner Notes package・サービスを含む完全な隔離更新、全保存領域のsite profile、
 本番用root helper/鍵/backup先の設置が確認できるまでは、本番更新可能と扱いません。

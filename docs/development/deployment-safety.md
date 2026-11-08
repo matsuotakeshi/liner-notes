@@ -20,6 +20,10 @@ Reviewed against code on 2026-11-09:
 - `ci/build-freebsd-package.sh` additionally executes an unprivileged rootdir
   resolver fixture. This uses synthetic packages with scripts disabled; it is
   deliberately not evidence of full Liner Notes package/service update safety.
+- `ci/test-freebsd-package-upgrade.py` extends the same private-root technique
+  to the actual package payload and an independent rc configuration, retaining
+  articles/mail/config, running logical backup/restore and old-package recovery.
+  Account/ownership and maintainer scripts remain disabled and unverified.
 
 Known deployment blockers, not manual user acceptance tasks:
 

@@ -79,7 +79,7 @@
   "src/locales/ja.def": "f1bfc81da3a79ec04547b4acfdfc7499417f2d5c6fb3d7c4a65bf077632a787e",
   "src/locales/en.def": "1eebc4e2040b1fc3057582bf486eac584f5c31298202cb52253d0458c3b6c59b",
   "tests/test_freebsd_plist.py": "b0d63881c93d6adbfcfa2a77fc80c2cb839ec4ac83604ad0244b03e1b3786ff0",
-  "ci/build-freebsd-package.sh": "2eb506106694b2de6c6c30c14a448749c0f244b63b3666f0abb59988755eba34",
+  "ci/build-freebsd-package.sh": "bc8140ead2bce0f57dea32aab877f2fe9ea89b4239f63d147c81928843caf880",
   "debian/changelog": "8f3574a094f5a3677a9a7188e530ecdbdc006138b082b57243ca8441c644114d",
   "src/board_link.inc": "29373e73de2f120879b4bfc6254e5b165382a046fcf94246a34f9a931ff335e3",
   "src/ui.c": "c1e54ca7309614d5c8bd35236ada6f18067f8938060d9eae57b5a4c5cdafb093",

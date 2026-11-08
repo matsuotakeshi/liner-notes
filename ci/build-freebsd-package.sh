@@ -182,4 +182,6 @@ printf "source_sha=%s\nplatform=freebsd15\nsource_archive_sha256=%s\n" \
     "$revision" "$source_digest" > "$work/artifacts/BUILD-INFO.txt"
 printf "%s  %s\n" "$(sha256 -q "$work/artifacts/$pkg_name")" "$pkg_name" > "$work/artifacts/SHA256SUMS"
 LINER_FREEBSD_PACKAGE_CI=1 python3 "$work/source/ci/test-freebsd-deploy-resolver.py" "$work" "$revision"
+stage_dir=$(make -C "$port_dir" -V STAGEDIR)
+LINER_FREEBSD_PACKAGE_CI=1 python3 "$work/source/ci/test-freebsd-package-upgrade.py" "$work" "$package" "$stage_dir" "$revision"
 echo "PASS: FreeBSD 15 pkg from source commit $revision"
