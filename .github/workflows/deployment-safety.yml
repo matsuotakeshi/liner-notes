@@ -1,0 +1,17 @@
+name: Deployment safety
+on:
+  push:
+    branches: [main]
+  pull_request:
+permissions:
+  contents: read
+jobs:
+  isolation:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - run: python3 -m pip install cryptography
+      - name: Test closed deployment policy and isolated three-node transactions
+        run: python3 tests/test_deployment.py

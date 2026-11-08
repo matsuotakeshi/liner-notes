@@ -74,7 +74,7 @@ while IFS= read -r -d '' filename; do
   esac
 done < <(find /build/rpm-upgrade-work/RPMS -type f -name '*.rpm' -print0)
 test "${#upgrade_packages[@]}" -eq 3
-dnf upgrade -y --setopt=install_weak_deps=False "${upgrade_packages[@]}"
+python3 ci/test-deploy-package-adapter.py rocky10 "${upgrade_packages[@]}"
 
 for package in "${packages[@]}"; do
   rpm -q --qf '%{VERSION}-%{RELEASE}\n' "$package" | grep -Eq '^0\.74\.1-2(\.|$)'
