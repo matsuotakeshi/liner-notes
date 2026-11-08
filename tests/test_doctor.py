@@ -253,6 +253,13 @@ class DoctorTests(unittest.TestCase):
         obj.check_web()
         self.assertTrue(any(r['code']=='missing' and r['location']=='/missing/templates' for r in obj.results),obj.results)
 
+    def test_invalid_template_has_its_own_diagnostic(self):
+        self.write('/etc/liner-notes/web/web.toml','[web]\norigin="https://example.test"\ntemplates="/templates"\n[bbs]\nport=2222\n')
+        self.write('/templates/index.html',b'\xff')
+        self.write('/templates/components.html','<div></div>')
+        obj=self.instance('--check-config','--web-config','/etc/liner-notes/web/web.toml');obj.check_web()
+        self.assertTrue(any(r['code']=='syntax' and r['location']=='/templates/index.html' for r in obj.results),obj.results)
+
     @unittest.skipIf(os.name=='nt','POSIX private-file permissions are verified by hosted/native CI')
     def test_resume_receipt_valid_then_receiver_changed(self):
         receiver=self.write('/usr/bin/lrz',b'not executed',0o755)
@@ -267,6 +274,9 @@ class DoctorTests(unittest.TestCase):
         receiver.write_bytes(b'upgraded binary')
         obj.results=[];obj.check_transfers()
         self.assertTrue(any(r['code']=='resume' for r in obj.results))
+        obj.results=[];obj.access=lambda path,user,bits:path.name!='lrz-resume.json'
+        obj.check_transfers()
+        self.assertTrue(any(r['code']=='permission' and r['location'].endswith('lrz-resume.json') for r in obj.results))
 
     @unittest.skipIf(os.name=='nt','POSIX private-file permissions are verified by hosted/native CI')
     def test_private_file_and_ancestor_access(self):

@@ -24,6 +24,7 @@ import tempfile
 import time
 import tomllib
 from urllib.parse import urlsplit
+from zoneinfo import ZoneInfo
 
 # No BBS/Web/link modules are imported: several initialise stores on construction.
 CHECKS = ('config', 'database', 'links', 'doors', 'transfers', 'permissions', 'selinux')
@@ -552,6 +553,7 @@ class Doctor:
                     raise ValueError('port')
             if not web.get('secure_cookies',True) and web.get('listen','127.0.0.1') not in {'127.0.0.1','::1'}:
                 raise ValueError('cookie')
+            ZoneInfo(web.get('timezone','Asia/Tokyo'))
             self.add('config', 'ok', location=file)
             self.listener('config','web',web.get('port',8088))
             if bbs.get('host') in {'127.0.0.1','localhost'} and bbs['port'] != self.core.get('port'):
@@ -559,7 +561,25 @@ class Doctor:
             for key in ('spool','messages','templates'):
                 if key in web:
                     value = str(PurePosixPath(file).parent / web[key])
-                    self.item('config', value, user='liner_notes_web', directory=True, writable=key=='spool', private=key=='spool')
+                    self.item('config', value, user='liner_notes_web', directory=True, writable=key=='spool', private=key=='spool',optional=key=='templates')
+                    if key=='templates':
+                        for name in ('index.html','components.html'):
+                            template=str(PurePosixPath(value)/name)
+                            if not self.path(template).exists():
+                                template=self.prefix+'/share/liner-notes/web/webui/templates/'+name
+                            if self.item('config',template,user='liner_notes_web'):
+                                try:self.read(template,2097152).decode('utf-8')
+                                except (UnicodeError,ValueError):self.add('config','syntax','error',template)
+                    if key=='messages':
+                        for name in ('ja.json','en.json'):
+                            message=str(PurePosixPath(value)/name)
+                            if self.item('config',message,user='liner_notes_web'):
+                                content=json.loads(self.read(message,65536).decode('utf-8'))
+                                if not isinstance(content,dict) or any(not isinstance(content.get(k,''),str) for k in ('name','tagline','banner','welcome','news','goodbye','system','birthday')):
+                                    raise ValueError('messages')
+                                greetings=content.get('greetings',{})
+                                if not isinstance(greetings,dict) or not all(isinstance(v,str) for v in greetings.values()):
+                                    raise ValueError('greetings')
             if importlib.util.find_spec('aiohttp') is None:
                 self.add('config', 'library', 'error', detail='aiohttp')
         except (KeyError, TypeError, ValueError, UnicodeError):
@@ -850,6 +870,7 @@ class Doctor:
         for value in (lrz,lsz):
             self.item('transfers',value,executable=True)
         receipt = self.env.get('LINER_NOTES_RESUME_RECEIPT',self.data_dir+'/lrz-resume.json')
+        self.item('transfers',receipt,private=True,optional=True)
         try:
             value = json.loads(self.read(receipt,8192,secret=True))
             binary = self.read(lrz,16777216)
