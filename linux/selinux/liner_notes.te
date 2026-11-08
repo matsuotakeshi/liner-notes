@@ -216,7 +216,20 @@ tunable_policy(`liner_notes_door_network',`
     allow liner_notes_door_t self:tcp_socket create_stream_socket_perms;
     allow liner_notes_door_t liner_notes_door_port_t:tcp_socket name_connect;
     corenet_tcp_connect_http_port(liner_notes_door_t)
-    sysnet_dns_name_resolve(liner_notes_door_t)
+    # The full resolver interface contains optional policy blocks, which are
+    # illegal inside a boolean conditional. Permit direct DNS, not NSS daemon
+    # transitions, only while this explicitly enabled network option is on.
+    allow liner_notes_door_t self:udp_socket create_socket_perms;
+    allow liner_notes_door_t self:netlink_route_socket r_netlink_socket_perms;
+    corenet_tcp_sendrecv_generic_if(liner_notes_door_t)
+    corenet_udp_sendrecv_generic_if(liner_notes_door_t)
+    corenet_tcp_sendrecv_generic_node(liner_notes_door_t)
+    corenet_udp_sendrecv_generic_node(liner_notes_door_t)
+    corenet_tcp_sendrecv_dns_port(liner_notes_door_t)
+    corenet_udp_sendrecv_dns_port(liner_notes_door_t)
+    corenet_tcp_connect_dns_port(liner_notes_door_t)
+    corenet_sendrecv_dns_client_packets(liner_notes_door_t)
+    sysnet_read_config(liner_notes_door_t)
 ')
 
 # Explicit offline administrator domain. Unix ownership still applies.
