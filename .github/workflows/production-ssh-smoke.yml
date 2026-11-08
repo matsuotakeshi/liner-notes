@@ -13,6 +13,7 @@ concurrency:
 jobs:
   connectivity:
     name: Read-only SSH checks (3 VPS)
+    if: "${{ github.ref == 'refs/heads/main' }}"
     runs-on: ubuntu-24.04
     environment: production
     timeout-minutes: 10
@@ -81,7 +82,7 @@ jobs:
               -o "UserKnownHostsFile=$known_hosts_file" \
               -o ConnectTimeout=10 \
               "ln-deploy@$host" \
-              'test "$(id -un)" = "ln-deploy" && printf "user=%s host=%s os=%s\n" "$(id -un)" "$(hostname)" "$(uname -s)"'
+              'test "$(id -un)" = "ln-deploy" && printf "access=ok os=%s\n" "$(uname -s)"'
             echo "::endgroup::"
           }
 
