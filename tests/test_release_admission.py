@@ -113,6 +113,12 @@ class AdmissionTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             verify_gates(SHA, {"native": fixture()["native"]})
 
+    def test_production_ssh_secrets_are_guarded_by_main_branch(self):
+        workflow = (Path(__file__).resolve().parents[1] /
+                    ".github/workflows/production-ssh-smoke.yml").read_text(encoding="utf-8")
+        self.assertIn("github.ref == 'refs/heads/main'", workflow)
+        self.assertNotIn("host=%s", workflow)
+
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)
