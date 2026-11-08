@@ -38,13 +38,14 @@ jobs:
             debian:trixie bash -euc '
               export DEBIAN_FRONTEND=noninteractive
               apt-get update -qq
-              apt-get install -y -qq build-essential debhelper devscripts clang \
+              apt-get install -y -qq build-essential debhelper clang \
                 libssl-dev libsqlite3-dev python3 ca-certificates
               mkdir -p /build/liner-notes
               cp -a /source/. /build/liner-notes/
               cd /build/liner-notes
               dpkg-buildpackage -b -us -uc
-              cp /build/*.deb /out/
+              cp /build/liner-notes_[0-9]*_amd64.deb /build/liner-notes-web_*.deb \
+                /build/liner-notes-link_*.deb /out/
               test "$(find /out -maxdepth 1 -type f -name "*.deb" | wc -l)" -eq 3
               for package in /out/*.deb; do
                 dpkg-deb --info "$package"
