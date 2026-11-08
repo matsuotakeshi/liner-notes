@@ -1,0 +1,3 @@
+#!/bin/sh
+# Read-only diagnostics; never starts/stops services or modifies BBS data.
+exec "%%PYTHON_CMD%%" -B "%%DATADIR%%/scripts/doctor.py" --prefix "%%PREFIX%%" "$@"
