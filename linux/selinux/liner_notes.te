@@ -162,9 +162,9 @@ allow liner_notes_t liner_notes_port_t:tcp_socket name_bind;
 allow liner_notes_web_t liner_notes_web_port_t:tcp_socket name_bind;
 allow liner_notes_link_t liner_notes_link_port_t:tcp_socket { name_bind name_connect };
 allow { liner_notes_web_t liner_notes_link_t } liner_notes_port_t:tcp_socket name_connect;
-corenet_tcp_bind_telnet_port(liner_notes_t)
-corenet_tcp_connect_telnet_port(liner_notes_web_t)
-corenet_tcp_connect_telnet_port(liner_notes_link_t)
+corenet_tcp_bind_telnetd_port(liner_notes_t)
+corenet_tcp_connect_telnetd_port(liner_notes_web_t)
+corenet_tcp_connect_telnetd_port(liner_notes_link_t)
 allow liner_notes_t self:capability net_bind_service;
 sysnet_dns_name_resolve(liner_notes_link_t)
 sysnet_dns_name_resolve(liner_notes_web_t)
