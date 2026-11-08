@@ -11,6 +11,11 @@ LDLIBS?=
 
 all: runtime vaultctl memberctl dbconvert
 
+test-doctor:
+	$(PYTHON) tests/test_doctor.py
+
+check: test-doctor
+
 runtime test-adapters: src/board_link.inc src/link_schema.h
 
 dbconvert: src/dbconvert.c src/storage_sqlite.c src/storage_sqlite.h src/storage_records.inc

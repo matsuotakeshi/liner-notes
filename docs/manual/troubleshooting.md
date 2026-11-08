@@ -2,6 +2,39 @@
 
 <a id="troubleshooting"></a>
 
+## 読み取り専用の設定診断（次期版）
+
+`liner-notes-doctor` は次期版向けに追加された外部管理コマンドです。公開済み0.74.1には含まれません。本体の機能を起動せず、設定・保存先・実行権限・補助プログラムを調べます。
+
+```sh
+liner-notes-doctor --check-all
+liner-notes-doctor --check-config --check-database --lang en
+liner-notes-doctor --check-all --json > doctor-report.json
+liner-notes-doctor --check-selinux --require-selinux
+```
+
+| 選択 | 検査内容 |
+| --- | --- |
+| `--check-config` | OS/CPU、Python/SQLite/OpenSSL、パッケージ版、実行ファイル、Linux/FreeBSDの起動プログラム照合、カーネル上の待受、limits、Web設定・外部文書 |
+| `--check-database` | SQLiteの一時コピーに対するquick_check、保存スキーマ、外部キー。原本のSQLite接続は作らない |
+| `--check-links` | TOML、共有ID・peers/origins、Ed25519識別鍵と証明書、有効期限、リンク会員許可リスト、リンクDB・管理ソケット |
+| `--check-doors` | doors.confの項目・ID重複・同時枠・DORINFO1設定、実行/作業パス、shebang、Clansラッパーの基本依存ファイル |
+| `--check-transfers` | helper、lrz/lsz、保管庫・spool、ディスク空き容量、受信バイナリと再開検査記録のSHA-256照合 |
+| `--check-permissions` | サービスアカウントのUID/グループ、モード、親ディレクトリの通過権、データの保護 |
+| `--check-selinux` | Linuxのモード、専用ポリシー、稼働中本体/Web/リンクのドメイン、設定対象のファイルラベルとローカルマッピング |
+
+終了コードは **0＝検査成功、1＝警告・判定保留、2＝設定/データ/権限エラー** です。引数の誤りも2です。JSONは`schema: 1`、`read_only: true`、`exit_code`と`results`を持ち、各結果には`check`、`code`、`status`、`location`、`message`、`remedy`、`detail`があります。`--lang ja|en`で原因と改善方法を切り替えます。警告を無条件に正常として扱わず、`code`と改善方法を確認してください。
+
+FreeBSDは配布`liner_notes.conf`、`/etc/rc.conf`、`/etc/rc.conf.local`の順、Linuxは`/etc/liner-notes/liner-notes.env`を静的に読みます。シェルのsource/eval、コマンド置換、設定されたバイナリの実行はしません。動的設定は警告となるため、必要に応じて`--config`、`--program`、`--data-dir`、`--database`、`--service-user`で対象を明示します。`--prefix`はソース導入の配置変更、`--config-dir`は設定ディレクトリ変更に使用します。
+
+未設定のWeb・リンク・Door・転送は正常な「対象外」です。設定された本体オプションとLinuxのサービス有効状態から検査対象を判断します。停止中のオプション機能を調べる場合は`--enable web|links|doors|transfers`、`--web-config`、`--link-config`、`--doors-config`を指定します。`--root`と`--os Linux|FreeBSD|SunOS`で配置済みの別ルートを調べる場合、ホストのプロセス・パッケージ照会は行いません。
+
+DB本体とWALだけを権限0700の診断用一時ディレクトリへコピーし、そのコピーを検査・削除します。原本へSHM/WALやロックファイルを作りません。コピー中・検査後のファイル変更、残存rollback journal、時間/容量制限では警告にして判定を保留します。既定はコピー対象合計1GiB、30秒です。`--max-database-bytes`と`--database-timeout`で調整できます。稼働中に変化するDBの整合性を断定せず、停止済みの整合バックアップで再検査してください。旧ジャーナル保存は存在・権限の検査に留め、バックアップに対して管理ツールのverifyを使います。
+
+診断は設定変更、DB更新、再開検査の再実行、ゲーム起動、サービス停止/再起動、外部への接続をしません。秘密鍵・パスワード・設定原文を結果へ出しません。読めない項目は権限エラー/警告です。ACL、systemd sandbox、外部ゲーム独自のライブラリ/環境、リンク会員の認証・停止状態とボードACLは静的検査だけで確定できないため、判定範囲を結果に明記します。診断成功は実際のログイン・ゲーム実行・転送成功の代替ではありません。
+
+SELinux専用ポリシーがない状態と`unconfined_service_t`で動作する状態は、専用ドメインによる制約の成功とは区別します。`--require-selinux`はEnforcingと専用ポリシーを必須にするCI向け指定です。SELinuxのない非Linux OSでは対象外です。SolarisのJSON設定診断はPython 3.11以上が必要で、ネイティブ対応状況は[対応環境](overview.md)に従います。
+
 ## 起動と接続のトラブル
 
 まず実行中のホスト名、待受、ログを確認します。
