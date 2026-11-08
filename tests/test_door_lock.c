@@ -47,6 +47,12 @@ int main(int argc, char **argv) {
     const char *path = argv[1];
     int lease = acquire(path);
     assert(lease >= 0);
+    /* Normal completion must permit immediate menu re-entry. */
+    for (int i = 0; i < 10; ++i) {
+        door_lock_release(lease);
+        lease = acquire(path);
+        assert(lease >= 0);
+    }
     blocked(path); /* Different open in the same BBS must conflict. */
     int control[2], ready[2];
     assert(!pipe(control) && !pipe(ready));

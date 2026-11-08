@@ -37,7 +37,7 @@ static uint64_t door_clock(void) { struct timespec t;clock_gettime(CLOCK_MONOTON
 static Door *reaping;
 static void door_clean(Door *d) {
     if(*d->run) { char path[1240];snprintf(path,sizeof(path),"%s/DORINFO1.DEF",d->run);unlink(path);rmdir(d->run); }
-    if(d->lock>=0)close(d->lock);
+    if(d->lock>=0)door_lock_release(d->lock);
     free(d);
 }
 int doors_pending(void) { return reaping!=NULL; }
