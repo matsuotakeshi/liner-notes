@@ -1,0 +1,483 @@
+#!/usr/bin/env python3
+"""Explicit Rocky CI-only Enforcing acceptance in fresh state/transient units.
+
+Requires the candidate policy already loaded. No production service is used.
+Do not invoke from a PR: the orchestrator must pin reviewed main first.
+"""
+import argparse
+import asyncio
+import json
+import os
+from pathlib import Path
+import pwd
+import re
+import shutil
+import socket
+import subprocess
+import sys
+import tempfile
+import time
+
+ROOT = Path(__file__).resolve().parents[1]
+sys.path[:0] = [str(ROOT), str(ROOT / 'tests'), str(ROOT / 'scripts')]
+
+
+def run(*args, check=True):
+    result = subprocess.run([str(a) for a in args], capture_output=True, text=True, timeout=120)
+    if check and result.returncode:
+        raise RuntimeError('fixture command failed: ' + str(args[0]) + '\n' + result.stderr[-4096:])
+    return result
+
+
+class Fixture:
+    def __init__(self):
+        if os.geteuid() != 0 or run('getenforce').stdout.strip() != 'Enforcing':
+            raise ValueError('This acceptance requires root and Enforcing, never changes either')
+        if '10.0.0.51' not in run('hostname', '-I').stdout.split():
+            raise ValueError('Only the designated Rocky test VM is accepted')
+        if 'ID="rocky"' not in Path('/etc/os-release').read_text():
+            raise ValueError('Expected the Rocky test VM')
+        self.account = pwd.getpwnam('ci-test')
+        if self.account.pw_uid == 0:
+            raise ValueError('Dedicated non-root CI user required')
+        self.path = Path(tempfile.mkdtemp(prefix='liner-notes-selinux-ci-', dir='/var/lib'))
+        self.path.chmod(0o755)
+        run('chcon', '-t', 'liner_notes_ro_t', self.path)
+        self.units, self.ports, self.results = [], [], []
+
+    def label(self, path, kind, recursive=False):
+        if not Path(path).resolve().is_relative_to(self.path):
+            raise ValueError('Only newly created fixture labels can change')
+        run('chcon', *(['-R'] if recursive else []), '-t', kind, path)
+
+    def directory(self, name, kind):
+        path = self.path / name
+        path.mkdir(mode=0o700)
+        os.chown(path, self.account.pw_uid, self.account.pw_gid)
+        self.label(path, kind)
+        return path
+
+    def text(self, name, text, kind, executable=False):
+        path = self.path / name
+        path.write_text(text)
+        path.chmod(0o755 if executable else 0o644)
+        self.label(path, kind)
+        return path
+
+    def port(self, kind):
+        with socket.socket() as stream:
+            stream.bind(('127.0.0.1', 0))
+            port = stream.getsockname()[1]
+        # -a only: a preexisting mapping must never be overwritten by a test.
+        run('semanage', 'port', '-a', '-t', kind, '-p', 'tcp', port)
+        self.ports.append(port)
+        return port
+
+    def start(self, name, executable, arguments, directory, domain):
+        unit = self.path.name + '-' + name
+        if run('systemctl', 'show', unit, '-p', 'LoadState', '--value').stdout.strip() != 'not-found':
+            raise ValueError('Refuse existing service identity')
+        self.units.append(unit)
+        run('systemd-run', '--quiet', '--unit=' + unit,
+            '--property=User=ci-test', '--property=Group=' + str(self.account.pw_gid),
+            '--property=NoNewPrivileges=yes', '--property=PrivateTmp=yes',
+            '--property=ProtectHome=yes', '--property=RuntimeMaxSec=300',
+            '--property=WorkingDirectory=' + str(directory), '--', executable, *arguments)
+        for _ in range(50):
+            value = run('systemctl', 'show', unit, '-p', 'MainPID', '--value').stdout.strip()
+            if value.isdigit() and int(value):
+                try:
+                    actual = Path('/proc/' + value + '/attr/current').read_text().strip('\x00\n')
+                    if actual.split(':')[2] == domain:
+                        self.results.append({'service': name, 'domain': domain, 'pid': int(value)})
+                        return unit
+                except FileNotFoundError:
+                    pass
+            time.sleep(.1)
+        raise RuntimeError('Expected confined domain was not entered: ' + name)
+
+    def stop(self, unit):
+        run('systemctl', 'stop', unit)
+
+    def close(self):
+        for unit in reversed(self.units):
+            # All names are fresh fixture-generated units, never installed ones.
+            run('systemctl', 'stop', unit, check=False)
+            log = run('journalctl', '--no-pager', '-u', unit, '-n', '150', check=False)
+            print(log.stdout)
+            run('systemctl', 'reset-failed', unit, check=False)
+        for port in reversed(self.ports):
+            run('semanage', 'port', '-d', '-p', 'tcp', port)
+        # Keep the private fixture for diagnosis; never erase original BBS data.
+        print(json.dumps({'fixture': str(self.path), 'checks': self.results}))
+
+
+async def bbs_probe(port, create):
+    from webui.bridge import Bridge, response_data
+    bridges = []
+    try:
+        for name in ('alice', 'bob'):
+            b = await Bridge('127.0.0.1', port, timeout=10).open()
+            bridges.append(b)
+            await b.command(('REGISTER ' if create else 'LOGIN ') + name)
+            await b.command('selinux-only-fixture-password')
+            assert b.state['user'], b.state
+        a, b = bridges
+        if create:
+            await a.command('POST confined article')
+            async with a.lock:
+                await a.literal('Persisted under Enforcing')
+            assert 'SAVED' in (await a.command('.'))['text']
+            await a.command('MAIL SEND bob confined mail')
+            async with a.lock:
+                await a.literal('Private mail under Enforcing')
+            assert 'MAIL SENT' in (await a.command('.'))['text']
+        article = response_data((await a.command('READ 1'))['text'])['article']
+        assert 'Persisted under Enforcing' in article['body']
+        assert 'Private mail under Enforcing' in (await b.command('MAIL READ 1'))['text']
+    finally:
+        for b in bridges:
+            await b.close()
+
+
+def door_probe(port):
+    from test_telnet import Client
+    from test_door_resize import gone
+    c = Client(port)
+    try:
+        c.until()
+        time.sleep(1.1)  # Respect the existing authentication cooldown.
+        c.cmd('LOGIN alice', b'> ')
+        c.cmd('selinux-only-fixture-password')
+        c.cmd('GAME', b'0:main] > ')
+        for key in (b'q', b'x', None):
+            text = c.cmd('1', b'KEY> ')
+            match = re.search(rb'CONFINED (\d+) DENIED', text)
+            assert match, text
+            pid = int(match[1])
+            assert Path(f'/proc/{pid}/attr/current').read_text().split(':')[2] == 'liner_notes_door_t'
+            if key is None:
+                c.close()
+            else:
+                c.send(key)
+                assert b'Back to BBS' in c.until(b'0:main] > ')
+            gone(pid)
+    finally:
+        c.close()
+
+
+async def web_probe(port):
+    import aiohttp
+    origin = f'http://127.0.0.1:{port}'
+    async with aiohttp.ClientSession(cookie_jar=aiohttp.CookieJar(unsafe=True), headers={'Origin': origin}) as client:
+        for _ in range(50):
+            try:
+                async with client.get(origin + '/notes/') as response:
+                    assert response.status == 200
+                break
+            except aiohttp.ClientConnectorError:
+                await asyncio.sleep(.1)
+        async with client.post(origin + '/notes/api/session', json={}) as response:
+            assert response.status == 200
+            client.headers['X-CSRF-Token'] = (await response.json())['csrf']
+        await asyncio.sleep(1.1)
+        async with client.post(origin + '/notes/api/auth', json={'login':'alice','password':'selinux-only-fixture-password'}) as response:
+            data = await response.json()
+            assert response.status == 200 and data['state']['user'], data
+            client.headers['X-CSRF-Token'] = data['csrf']
+        async with client.post(origin + '/notes/api/query', json={'kind':'read','id':1}) as response:
+            data = await response.json()
+            assert response.status == 200 and 'Persisted under Enforcing' in data['data']['article']['body'], data
+
+
+def web_fixture(fixture, core_port, secret):
+    source = fixture.path / 'source'
+    source.mkdir(mode=0o755)
+    shutil.copytree(ROOT / 'webui', source / 'webui', ignore=shutil.ignore_patterns('__pycache__'))
+    fixture.label(source, 'liner_notes_ro_t', True)
+    data = fixture.directory('web', 'liner_notes_web_data_t')
+    port = fixture.port('liner_notes_web_port_t')
+    config = fixture.text('web.toml', f'''[web]
+listen = "127.0.0.1"
+port = {port}
+origin = "http://127.0.0.1:{port}"
+secure_cookies = false
+spool = "{data}"
+[bbs]
+host = "127.0.0.1"
+port = {core_port}
+telnet = true
+''', 'liner_notes_web_etc_t')
+    entry = fixture.text('web-entry', '#!/usr/bin/python3\n'
+        'import sys,runpy\nfrom pathlib import Path\n'
+        'try:\n'
+        f'    Path({str(secret)!r}).read_text()\n'
+        'except PermissionError:\n'
+        f'    Path({str(data / "MAC_OK")!r}).write_text("denied")\n'
+        'else:\n'
+        '    raise RuntimeError("Web read BBS original data")\n'
+        f'sys.path.insert(0,{str(source)!r})\n'
+        'runpy.run_module("webui",run_name="__main__")\n', 'liner_notes_web_exec_t', True)
+    unit = fixture.start('web', entry, ['--config', str(config)], data, 'liner_notes_web_t')
+    asyncio.run(web_probe(port))
+    assert (data / 'MAC_OK').read_text() == 'denied'
+    fixture.stop(unit)
+    fixture.results.append({'web': 'HTTP login/article and original-data MAC denial'})
+
+
+async def link_probe(fixture, core_port):
+    from cryptography.hazmat.primitives.serialization import load_pem_private_key
+    from webui.bridge import Bridge
+    import link_transport
+    from link_store import Store
+    own = fixture.directory('link', 'liner_notes_link_data_t')
+    private = own / 'identity'
+    own_id = link_transport.generate(private, 'Confined fixture')
+    fixture.label(private, 'liner_notes_link_secret_t', True)
+    for path in (private, *private.iterdir()):
+        os.chown(path, fixture.account.pw_uid, fixture.account.pw_gid)
+    peer = fixture.directory('peer', 'liner_notes_ro_t')
+    peer_id = link_transport.generate(peer / 'identity', 'Synthetic peer')
+    certificate = fixture.text('peer.crt', (peer/'identity/identity.crt').read_text(), 'liner_notes_ro_t')
+    password = own / 'password'
+    password.write_text('selinux-only-fixture-password\n')
+    password.chmod(0o600)
+    os.chown(password, fixture.account.pw_uid, fixture.account.pw_gid)
+    fixture.label(password, 'liner_notes_link_secret_t')
+    port, peer_port = fixture.port('liner_notes_link_port_t'), fixture.port('liner_notes_link_port_t')
+    board = 'a'*64
+    _, own_public = link_transport.certificate_node(private/'identity.crt')
+    _, peer_public = link_transport.certificate_node(certificate)
+    origins = {own_id: {'public':own_public,'boards':{board}}, peer_id:{'public':peer_public,'boards':{board}}}
+    key = load_pem_private_key((peer/'identity/identity.key').read_bytes(), None)
+    store = Store(peer/'peer.sqlite', key, origins, {own_id:origins[own_id]})
+    store.accept(store.sign(dict(version=1, origin=peer_id, board=board, article='b'*64,
+                                parent=None, revision=1, kind='post', author='remote',
+                                title='Confined link import', body='Signed incoming body', created=1)))
+    context = link_transport.context(peer/'identity', [private/'identity.crt'], server=True)
+    server = await asyncio.start_server(lambda r,w: link_transport.serve(store,r,w),
+                                       '127.0.0.1', peer_port, ssl=context)
+    bridge = await Bridge('127.0.0.1', core_port, timeout=10).open()
+    unit = None
+    try:
+        await bridge.command('REGISTER link')
+        await bridge.command('selinux-only-fixture-password')
+        assert bridge.state['user'] == 3
+        config = fixture.text('link.toml', f'''[node]
+identity = "{private}"
+database = "{own/'link.sqlite'}"
+listen = "127.0.0.1"
+port = {port}
+interval = 1
+rotate_tls = true
+[bbs]
+host = "127.0.0.1"
+port = {core_port}
+login = "link"
+password_file = "{password}"
+[[boards]]
+id = "{board}"
+local = 1
+[[origins]]
+certificate = "{certificate}"
+boards = ["{board}"]
+[[peers]]
+certificate = "{certificate}"
+boards = ["{board}"]
+host = "127.0.0.1"
+port = {peer_port}
+''', 'liner_notes_link_etc_t')
+        scripts = fixture.path / 'source/scripts'
+        shutil.copytree(ROOT/'scripts', scripts, ignore=shutil.ignore_patterns('__pycache__'))
+        fixture.label(scripts, 'liner_notes_ro_t', True)
+        entry = fixture.text('link-entry', '#!/usr/bin/python3\nimport sys,runpy\n'
+            f'sys.path.insert(0,{str(scripts)!r})\n'
+            f'runpy.run_path({str(scripts/"link_service.py")!r},run_name="__main__")\n',
+            'liner_notes_link_exec_t', True)
+        unit = fixture.start('link', entry, ['serve','--config',str(config)], own, 'liner_notes_link_t')
+        for _ in range(150):
+            result = await bridge.command('READ 2')
+            if 'Signed incoming body' in result['text'] and store.db.execute('SELECT COUNT(*) FROM events').fetchone()[0] >= 2:
+                break
+            await asyncio.sleep(.2)
+        else:
+            raise AssertionError('Confined signed import/export did not converge')
+        assert (private/'tls-current.json').is_file()
+        fixture.results.append({'link':'signed TLS import/export, dedicated domain, TLS rotation'})
+    finally:
+        if unit:
+            fixture.stop(unit)
+        await bridge.close()
+        server.close()
+        await server.wait_closed()
+        store.close()
+
+
+def transfer_fixture(fixture, core, secret):
+    receiver = shutil.which('lrz') or shutil.which('rz')
+    sender = shutil.which('lsz') or shutil.which('sz')
+    if not receiver or not sender:
+        raise ValueError('Real lrzsz is required; no mocked transfer acceptance')
+    copies = []
+    for source, name in ((receiver,'lrz'),(sender,'lsz')):
+        target = fixture.path / name
+        shutil.copyfile(source, target)
+        target.chmod(0o755)
+        fixture.label(target, 'bin_t')
+        copies.append(target)
+    spool = fixture.directory('spool', 'liner_notes_spool_t')
+    marker = spool / 'mac-probe'
+    scripts = fixture.path / 'transfer-scripts'
+    shutil.copytree(ROOT/'scripts', scripts, ignore=shutil.ignore_patterns('__pycache__'))
+    fixture.label(scripts, 'liner_notes_ro_t', True)
+    arguments = ['--receiver',str(copies[0]),'--sender',str(copies[1]),'--spool-root',str(spool),'--timeout','15','--']
+    entry = fixture.text('transfer-entry', '#!/usr/bin/python3\n'
+        'import os,sys,runpy\nfrom pathlib import Path\n'
+        'try:\n'
+        f'    Path({str(secret)!r}).read_text()\n'
+        'except PermissionError:\n'
+        f'    Path({str(marker)!r}).write_text(str(os.getpid()))\n'
+        'else:\n'
+        '    raise RuntimeError("Transfer helper read BBS original data")\n'
+        f'sys.path.insert(0,{str(scripts)!r})\n'
+        f'sys.argv=[{str(scripts/"zmodem_host.py")!r}]+{arguments!r}+sys.argv[1:]\n'
+        f'runpy.run_path({str(scripts/"zmodem_host.py")!r},run_name="__main__")\n',
+        'liner_notes_transfer_exec_t', True)
+    vault = core/'vault'
+    run(ROOT/'vaultctl', 'init', vault)
+    for path in (vault, *vault.rglob('*')):
+        os.chown(path, fixture.account.pw_uid, fixture.account.pw_gid)
+    fixture.label(vault, 'liner_notes_data_t', True)
+    return entry, vault, marker, copies
+
+
+def transfer_probe(fixture, port, marker, binaries):
+    from test_telnet import Client
+    from test_zmodem_menu import transfer
+    from test_door_resize import gone
+    data = fixture.path / 'client-files'
+    data.mkdir()
+    output = fixture.path / 'client-output'
+    output.mkdir()
+    payload = bytes(range(256))*257
+    (data/'payload.bin').write_bytes(payload)
+    c = Client(port)
+    try:
+        c.until()
+        time.sleep(1.1)
+        c.cmd('LOGIN alice',b'> ')
+        c.cmd('selinux-only-fixture-password')
+        last = 0
+        for command, program, arguments, directory in (
+            ('ZUPLOAD fixture upload', binaries[1], ['--','payload.bin'], data),
+            ('ZDOWNLOAD 1', binaries[0], ['--restricted'], output)):
+            c.cmd(command, b'1 GiB.\r\n')
+            for _ in range(100):
+                if marker.exists():
+                    value = marker.read_text()
+                    if value.isdigit() and int(value) != last:
+                        last = int(value)
+                        break
+                time.sleep(.02)
+            else:
+                raise AssertionError('Confined transfer helper never reached its denial probe')
+            assert Path(f'/proc/{last}/attr/current').read_text().split(':')[2] == 'liner_notes_transfer_t'
+            code, text, error = transfer(c, str(program), arguments, directory)
+            assert code == 0 and b'failed or cancelled' not in text, (code, text, error)
+            gone(last)
+        assert (output/'payload.bin').read_bytes() == payload
+        fixture.results.append({'transfer':'real ZMODEM upload/download byte equality, domain and original-data MAC denial'})
+    finally:
+        c.close()
+
+
+def admin_probe(fixture, vault):
+    binary = fixture.path/'vaultctl'
+    shutil.copyfile(ROOT/'vaultctl',binary)
+    binary.chmod(0o755)
+    fixture.label(binary,'liner_notes_admin_exec_t')
+    entry = fixture.text('admin-entry', '#!/usr/bin/python3\n'
+        'import os,time\n'
+        'print(os.getpid(),flush=True)\n'
+        'time.sleep(1)\n'
+        f'os.execv({str(binary)!r},[{str(binary)!r},"list",{str(vault)!r}])\n',
+        'liner_notes_admin_exec_t',True)
+    # Uses the owning uid, with no capability/DAC override granted to a daemon.
+    process = subprocess.Popen([str(entry)], user=fixture.account.pw_uid,
+                               group=fixture.account.pw_gid, cwd=fixture.path,
+                               stdout=subprocess.PIPE,stderr=subprocess.PIPE,text=True)
+    try:
+        pid = process.stdout.readline().strip()
+        assert pid.isdigit()
+        assert Path('/proc/'+pid+'/attr/current').read_text().split(':')[2] == 'liner_notes_admin_t'
+        output,error = process.communicate(timeout=15)
+        assert process.returncode==0 and 'payload.bin' in output,(output,error)
+        fixture.results.append({'admin':'offline vault list in dedicated owning-user domain'})
+    finally:
+        if process.poll() is None:
+            process.kill()
+            process.wait()
+
+
+def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('--designated-ci-vm', action='store_true', required=True)
+    parser.parse_args()
+    fixture = Fixture()
+    try:
+        core = fixture.directory('core', 'liner_notes_data_t')
+        games = fixture.directory('games', 'liner_notes_door_data_t')
+        executable = fixture.path / 'runtime'
+        shutil.copyfile(ROOT / 'runtime', executable)
+        executable.chmod(0o755)
+        fixture.label(executable, 'liner_notes_exec_t')
+        # Same DAC uid for both domains deliberately proves that MAC denies it.
+        secret = core / 'fixture-secret'
+        secret.write_text('synthetic data, not a real credential')
+        secret.chmod(0o644)
+        fixture.label(secret, 'liner_notes_data_t')
+        helper, vault, marker, binaries = transfer_fixture(fixture, core, secret)
+        game = fixture.text('door', '#!/usr/bin/python3\n'
+            'import os,sys,tty\n'
+            'from pathlib import Path\n'
+            'tty.setraw(0)\n'
+            'try:\n'
+            f'    Path({str(secret)!r}).read_text()\n'
+            'except PermissionError:\n'
+            '    print("CONFINED",os.getpid(),"DENIED\\r\\nKEY> ",end="",flush=True)\n'
+            'else:\n'
+            '    raise RuntimeError("Door read BBS data")\n'
+            'key=os.read(0,1)\n'
+            'sys.exit(42 if key==b"x" else 0)\n', 'liner_notes_door_exec_t', True)
+        config = fixture.text('doors.conf', f'1|0|30|{game}|{games}|MAC probe|dorinfo1:1\n', 'liner_notes_etc_t')
+        accounts = fixture.text('link-accounts', '1 3\n', 'liner_notes_etc_t')
+        port = fixture.port('liner_notes_port_t')
+        args = ['--telnet', '--menu', '--lang', 'en', '--doors', str(config),
+                '--link-accounts', str(accounts),
+                '--vault-dir', str(vault), '--zmodem-helper', str(helper),
+                '--database-structured', str(core/'notes.sqlite'), str(port), str(core/'notes'), str(core/'members')]
+        for iteration in range(2):
+            unit = fixture.start('core'+str(iteration), executable, args, core, 'liner_notes_t')
+            # Readiness retries are safe: only connection attempts precede writes.
+            for _ in range(60):
+                try:
+                    with socket.create_connection(('127.0.0.1', port), timeout=1):
+                        break
+                except OSError:
+                    time.sleep(.1)
+            asyncio.run(bbs_probe(port, iteration == 0))
+            if iteration == 0:
+                door_probe(port)
+                web_fixture(fixture, port, secret)
+                asyncio.run(link_probe(fixture, port))
+                transfer_probe(fixture, port, marker, binaries)
+            fixture.stop(unit)
+        admin_probe(fixture,vault)
+        fixture.results.append({'bbs': 'Telnet/articles/mail/SQLite restart', 'door': 'PTY/normal/abnormal/disconnect/MAC denial'})
+        assert run('getenforce').stdout.strip() == 'Enforcing'
+    finally:
+        fixture.close()
+
+
+if __name__ == '__main__':
+    main()

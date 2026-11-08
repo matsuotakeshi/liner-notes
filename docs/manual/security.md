@@ -45,3 +45,45 @@ Doorの外向き通信は既定で無効です。必要な場合だけ `liner_no
 `restorecon -R` を実行します。ローカルなfcontext定義を尊重し、`-F` は使用しません。
 独自配置は管理者が対象パスと適切な型を確認して登録してください。ポートの既存割当は
 `semanage port -l` で確認し、他のサービス用の型を機械的に変更しないでください。
+
+### Enforcing受入CIの準備（検証機専用）
+
+`Rocky SELinux policy` のPRジョブはポリシーのコンパイル、許可ルール、RPMの導入・
+更新・削除とローカルラベル保持を検査します。mainジョブは既存CI専用鍵でRocky検証機へ
+接続し、Telnet、記事、メール、SQLite再起動、Web、署名付きリンク、Door、実ZMODEMと
+管理コマンドを専用ドメインで試験します。Web・Door・転送から原本を読めないことは、
+同じUnix所有者のファイルを用いてMAC拒否として確認します。
+
+実機ジョブには、検証機の管理者による次の準備が必要です。これは本番導入手順ではありません。
+通常のCIアカウントへ任意のsudo権限を与えず、レビュー・統合済みmainにある
+`ci/selinux_root.py` だけをroot所有の `/usr/local/libexec/liner-notes-ci-selinux` として
+配置します。CIは配置したファイルのSHA-256が対象コミットと一致することを検査します。
+
+```sh
+# 10.0.0.51 の管理者が、レビュー済みmainのソースディレクトリで実行
+dnf install selinux-policy-devel policycoreutils-python-utils gcc make \
+    openssl-devel sqlite-devel python3-aiohttp python3-cryptography lrzsz
+install -d -o root -g root -m 755 /usr/local/libexec
+install -o root -g root -m 755 ci/selinux_root.py /usr/local/libexec/liner-notes-ci-selinux
+visudo -f /etc/sudoers.d/liner-notes-selinux-ci
+```
+
+sudoersには固定ヘルパーのみを許可します。受け付ける引数は40文字のコミットSHAだけで、
+ヘルパー自身もGitHub上の最新mainと二度照合します。ファイルパス、URL、任意コマンドは
+受け付けません。環境変数も固定し、SSHユーザーが書けるチェックアウトは実行しません。
+
+```text
+ci-test ALL=(root) NOPASSWD: /usr/local/libexec/liner-notes-ci-selinux
+```
+
+ヘルパーは検証機のアドレスとOS、Enforcingを確認し、root専用領域に取得したmainから
+固定のビルドと試験を行います。既存の `liner_notes` ポリシーがあれば上書きせず停止します。
+試験中だけ優先度200でポリシーを導入し、新規のループバック待受・一時systemdユニット・
+専用データ領域を使用します。既存サービス、会員データ、ローカルラベル定義は変更しません。
+終了後は当該ユニットと追加したポート定義を除去してポリシーを外します。プロセスが残った
+場合はポリシーを残して失敗とし、root専用の記録と作業領域を保全します。準備不足や試験失敗を
+スキップ成功にはしません。
+
+配布元のlrzszがない場合や必要な転送試験に失敗する場合は、[Linux導入](install-linux.md)の
+隔離ビルド手順で用意した実エンジンを使います。版名だけで転送成功を判断しません。
+この実機CIの成功までは、専用SELinuxポリシーは検証中です。

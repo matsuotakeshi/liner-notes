@@ -27,6 +27,8 @@ jobs:
       - name: Compile the policy and its optional RPM in Rocky 10
         run: |
           python3 tests/test_selinux_policy.py
+          python3 tests/test_selinux_root.py
+          python3 -m py_compile ci/selinux_native.py ci/selinux_root.py
           mkdir -p build/selinux
           docker run --rm -v "$GITHUB_WORKSPACE:/source:ro" -v "$GITHUB_WORKSPACE/build/selinux:/out" \
             rockylinux/rockylinux:10 bash -euc '
@@ -47,22 +49,35 @@ jobs:
           name: liner-notes-selinux-policy
           path: build/selinux/
           if-no-files-found: error
-  inventory:
+  native:
     needs: policy
     if: ${{ github.repository == 'matsuotakeshi/liner-notes' && github.ref == 'refs/heads/main' && github.event_name != 'pull_request' }}
     runs-on: [self-hosted, Linux, X64]
-    timeout-minutes: 5
+    timeout-minutes: 30
     steps:
-      - name: Read existing Rocky SELinux and privilege prerequisites
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Verify the installed root-owned acceptance helper and run exact main
+        env:
+          SOURCE_SHA: ${{ github.sha }}
         run: |
+          set -euo pipefail
+          [[ "$SOURCE_SHA" =~ ^[0-9a-f]{40}$ ]]
           mkdir -p "$RUNNER_TEMP/selinux-inventory"
+          expected=$(sha256sum ci/selinux_root.py | cut -d' ' -f1)
+          actual=$(ssh -i /home/ci/.ssh/id_ed25519_rocky_ci \
+            -o IdentitiesOnly=yes -o BatchMode=yes -o PasswordAuthentication=no \
+            -o StrictHostKeyChecking=yes -o ConnectTimeout=10 ci-test@10.0.0.51 \
+            'sha256sum /usr/local/libexec/liner-notes-ci-selinux' | cut -d' ' -f1)
+          test "$actual" = "$expected"
           ssh -i /home/ci/.ssh/id_ed25519_rocky_ci \
             -o IdentitiesOnly=yes -o BatchMode=yes -o PasswordAuthentication=no \
             -o StrictHostKeyChecking=yes -o ConnectTimeout=10 ci-test@10.0.0.51 \
-            'id; cat /etc/os-release; getenforce; command -v semodule; command -v semanage; command -v runcon; command -v systemd-run; sudo -n -l' \
+            "sudo -n /usr/local/libexec/liner-notes-ci-selinux $SOURCE_SHA" \
             > "$RUNNER_TEMP/selinux-inventory/rocky.txt" 2>&1
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: selinux-native-inventory
+          name: selinux-native-acceptance
           path: ${{ runner.temp }}/selinux-inventory/
