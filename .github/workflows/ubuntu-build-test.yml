@@ -1,81 +1,33 @@
-
 name: Ubuntu Build and Test
 
+# Manual/reusable entry point shares the same worker and host exclusion.
 on:
   workflow_dispatch:
   workflow_call:
-
 permissions:
   contents: read
-
 concurrency:
-  group: ubuntu-build-test
+  group: liner-notes-native-hosts
   cancel-in-progress: false
-
 jobs:
   test:
     name: Ubuntu Native Tests
+    if: ${{ github.repository == 'matsuotakeshi/liner-notes' && github.ref == 'refs/heads/main' }}
     runs-on: [self-hosted, Linux, X64]
     timeout-minutes: 60
-
     steps:
-      - name: Checkout source
-        uses: actions/checkout@v7
-
-      - name: Transfer clean source
-        shell: bash
-        run: |
-          set -euo pipefail
-
-          SSH=(
-            ssh
-            -i /home/ci/.ssh/id_ed25519_ubuntu_ci
-            -o BatchMode=yes
-            -o StrictHostKeyChecking=yes
-            -o ConnectTimeout=10
-          )
-
-          "${SSH[@]}" ci-test@10.0.0.53 \
-            'mkdir -p "$HOME/ci";
-             rm -rf "$HOME/ci/liner-notes";
-             mkdir -p "$HOME/ci/liner-notes"'
-
-          tar --exclude=.git -czf - \
-            -C "$GITHUB_WORKSPACE" . |
-            "${SSH[@]}" ci-test@10.0.0.53 \
-            'tar -xzf - -C "$HOME/ci/liner-notes"'
-
-      - name: Verify Ubuntu environment
-        shell: bash
-        run: |
-          ssh \
-            -i /home/ci/.ssh/id_ed25519_ubuntu_ci \
-            -o BatchMode=yes \
-            -o StrictHostKeyChecking=yes \
-            ci-test@10.0.0.53 \
-            'cat /etc/os-release;
-             python3 --version;
-             clang --version;
-             free -h'
-
-      - name: Build and run regression tests
-        shell: bash
-        run: |
-          set -euo pipefail
-
-          ssh \
-            -i /home/ci/.ssh/id_ed25519_ubuntu_ci \
-            -o BatchMode=yes \
-            -o StrictHostKeyChecking=yes \
-            ci-test@10.0.0.53 \
-            'set -eu
-             cd "$HOME/ci/liner-notes"
-             export LINER_TEST_START_TIMEOUT=180
-             make -j2 CC=clang PYTHON=python3 \
-               SQLITE_CFLAGS= SQLITE_LIBS=-lsqlite3
-             make CC=clang PYTHON=python3 \
-               SQLITE_CFLAGS= SQLITE_LIBS=-lsqlite3 check'
-
-      - name: Test completed
-        run: |
-          echo "Ubuntu build and regression tests: PASS"
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Run native suites through existing CI SSH accounts
+        run: python3 ci/native_ci.py --target ubuntu --output "$RUNNER_TEMP/native-results"
+      - name: Retain OS logs and exact-commit results
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: native-ci-ubuntu-results
+          path: |
+            ${{ runner.temp }}/native-results/*.log
+            ${{ runner.temp }}/native-results/results.json
+          if-no-files-found: warn
+          retention-days: 30
