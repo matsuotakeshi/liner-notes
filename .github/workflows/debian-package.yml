@@ -61,8 +61,9 @@ jobs:
               test -f /etc/liner-notes/liner-notes.env
               test -f /etc/liner-notes/link.toml
               test -f /etc/liner-notes/web/web.toml
-              mkdir -p /var/lib/liner-notes
-              echo keep > /var/lib/liner-notes/package-removal-test
+              # Separate same-source package-revision upgrade rehearsal in this
+              # throwaway container (no production data or services).
+              CI_DISPOSABLE_DEBIAN=1 bash /build/liner-notes/ci/test-debian-package-upgrade.sh
               apt-get remove -y liner-notes-link liner-notes-web liner-notes
               test "$(cat /var/lib/liner-notes/package-removal-test)" = keep
               cd /out
