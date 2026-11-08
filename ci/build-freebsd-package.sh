@@ -55,24 +55,38 @@ actual=$(sha256 -q "$archive")
 [ "$actual" = "$source_digest" ] || {
     echo "Source archive SHA-256 mismatch" >&2; exit 1;
 }
-if [ -e "$work/port" ] || [ -e "$work/source" ]; then
+port_dir="$work/comms/liner-notes"
+if [ -e "$port_dir" ] || [ -e "$work/source" ]; then
     echo "Refusing to reuse a previous build workspace" >&2
     exit 1
 fi
-mkdir -p "$work/source" "$work/distfiles" "$work/packages" "$work/artifacts"
+mkdir -p "$work/source" "$work/comms" "$work/distfiles" "$work/packages" "$work/artifacts"
 tar -xzf "$archive" -C "$work/source"
 test -f "$work/source/ports/comms/liner-notes/Makefile"
 test -f "$work/source/scripts/release_manifest.py"
-cp -R "$work/source/ports/comms/liner-notes" "$work/port"
+# Keep the original category/port directory name: FreeBSD derives PKGORIGIN
+# from the port directory and categories, not just the package name.
+cp -R "$work/source/ports/comms/liner-notes" "$port_dir"
 cp "$archive" "$work/distfiles/liner-notes-stage74.tar.gz"
 
 # Pin Python 3.12 only for this CI port build. The FreeBSD pkg repository
 # carries py312-aiohttp/cryptography; do not alter the VM-wide default.
 # Derive and verify the flavor before evaluating any dependencies.
-python_pkg_prefix=$(make -C "$work/port" BATCH=yes \
+python_pkg_prefix=$(make -C "$port_dir" BATCH=yes \
     PYTHON_VERSION=python3.12 OPTIONS_SET="WEBUI LINK ZMODEM" -V PYTHON_PKGNAMEPREFIX)
 if [ "$python_pkg_prefix" != "py312-" ]; then
     echo "Unexpected Python package prefix: $python_pkg_prefix (expected py312-)" >&2
+    exit 1
+fi
+
+# Refuse to publish a pkg with a different origin from the installed port.
+# For example, a CI directory named "port" produces "comms/port" and pkg(8)
+# then treats 0.74 as a new package instead of upgrading 0.73.a1.
+port_origin=$(make -C "$port_dir" BATCH=yes \
+    PORTSDIR=/usr/ports PYTHON_VERSION=python3.12 \
+    OPTIONS_SET="WEBUI LINK ZMODEM" -V PKGORIGIN)
+if [ "$port_origin" != "comms/liner-notes" ]; then
+    echo "Unexpected Ports origin: $port_origin (expected comms/liner-notes)" >&2
     exit 1
 fi
 
@@ -115,22 +129,22 @@ if [ "$missing" -ne 0 ]; then
     exit 1
 fi
 
-version=$(awk -F= '/^DISTVERSION[[:space:]]*=/{gsub(/[[:space:]]/, "", $2);print $2;exit}' "$work/port/Makefile")
+version=$(awk -F= '/^DISTVERSION[[:space:]]*=/{gsub(/[[:space:]]/, "", $2);print $2;exit}' "$port_dir/Makefile")
 case "$version" in
     ""|*[!0-9.]*) echo "Unrecognized FreeBSD port version" >&2; exit 1 ;;
 esac
 
 # The port distfile must be the exact Git archive, never the old v0.74 archive.
-make -C "$work/port" BATCH=yes \
+make -C "$port_dir" BATCH=yes \
     PORTSDIR=/usr/ports DISTDIR="$work/distfiles" \
     PYTHON_VERSION=python3.12 STRICT_DEPENDS=yes makesum
-grep -Fqx "SHA256 (liner-notes-stage74.tar.gz) = $source_digest" "$work/port/distinfo" || {
+grep -Fqx "SHA256 (liner-notes-stage74.tar.gz) = $source_digest" "$port_dir/distinfo" || {
     echo "Ports distinfo and Git source archive are inconsistent" >&2; exit 1;
 }
 
 # Use the existing ports recipe with WebUI, signed link and ZMODEM enabled.
 # Stage and package as an unprivileged account. Never run "make install".
-make -C "$work/port" BATCH=yes \
+make -C "$port_dir" BATCH=yes \
     PORTSDIR=/usr/ports DISTDIR="$work/distfiles" \
     PACKAGES="$work/packages" OPTIONS_SET="WEBUI LINK ZMODEM" \
     PYTHON_VERSION=python3.12 STRICT_DEPENDS=yes \
@@ -146,6 +160,13 @@ pkg_version=$(pkg query -F "$package" '%n %v')
 [ "$pkg_version" = "liner-notes $version" ] || {
     echo "Generated pkg name/version differs from port" >&2; exit 1;
 }
+pkg_origin=$(pkg query -F "$package" '%o') || {
+    echo "Cannot inspect generated pkg origin" >&2; exit 1;
+}
+if [ "$pkg_origin" != "$port_origin" ]; then
+    echo "Generated pkg origin mismatch: $pkg_origin (expected $port_origin)" >&2
+    exit 1
+fi
 cp "$package" "$work/artifacts/$pkg_name"
 python3 "$work/source/scripts/release_manifest.py" create \
     --platform freebsd15 --source-sha "$revision" \
