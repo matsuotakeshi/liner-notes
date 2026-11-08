@@ -64,6 +64,17 @@
       ]
     },
     {
+      "id": "install-solaris",
+      "title": "Solarisへの導入（移植検証中）",
+      "chapter": 2,
+      "sources": [
+        "ci/solaris_ci.py",
+        "ci/native_ci.py",
+        "src/doors.c",
+        "Makefile"
+      ]
+    },
+    {
       "id": "upgrade",
       "title": "バージョンアップと切り戻し",
       "chapter": 2,

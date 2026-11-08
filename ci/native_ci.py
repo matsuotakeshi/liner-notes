@@ -23,7 +23,9 @@ TARGETS = {
     "freebsd": ("takeshi@10.0.0.50", "/home/ci/.ssh/id_ed25519_freebsd_ci"),
     "rocky": ("ci-test@10.0.0.51", "/home/ci/.ssh/id_ed25519_rocky_ci"),
     "ubuntu": ("ci-test@10.0.0.53", "/home/ci/.ssh/id_ed25519_ubuntu_ci"),
+    "solaris": ("ci-test@10.0.0.52", "/home/ci/.ssh/id_ed25519_solaris_ci"),
 }
+DEFAULT_TARGETS = ("freebsd", "rocky", "ubuntu")
 
 
 def timestamp():
@@ -113,6 +115,16 @@ def execute_target(target, archive, digest, sha, output, cancelled):
         try:
             if not Path(key).is_file():
                 raise ValueError("Configured CI SSH key is unavailable")
+            python = "python3"
+            if target == "solaris":
+                inventory = "uname -a; /usr/bin/isainfo -kv; cat /etc/release; command -v python3 gmake gcc clang pkg-config; true"
+                run_setup(ssh + ["/bin/sh -c " + shlex.quote(inventory)], log, cancelled)
+                # Use an existing interpreter only. Never install/update the VM.
+                probe = ("for p in /usr/bin/python3.13 /usr/bin/python3.12 /usr/bin/python3.11 /usr/bin/python3.9 /usr/bin/python3; do "
+                         "if test -x \"$p\" && \"$p\" -c 'import sys;sys.exit(sys.version_info < (3,9))'; then printf '%s\\n' \"$p\"; exit 0; fi; done; exit 1")
+                python = run_setup(ssh + ["/bin/sh -c " + shlex.quote(probe)], log, cancelled, capture=True)
+                if not re.fullmatch(r"/usr/bin/python3(?:\.[0-9]+)?", python):
+                    raise ValueError("No existing Solaris Python >=3.9 interpreter found")
             directory = run_setup(ssh + [
                 'umask 077; mkdir -p "$HOME/ci" && mktemp -d "$HOME/ci/native-' + target + '-XXXXXXXX"'
             ], log, cancelled, capture=True)
@@ -124,9 +136,9 @@ def execute_target(target, archive, digest, sha, output, cancelled):
             # Single-line command works with existing sh/csh login shells alike.
             encoded = base64.b64encode(bootstrap.encode("utf8")).decode("ascii")
             loader = 'import base64;exec(base64.b64decode("' + encoded + '"))'
-            run_setup(ssh + [shlex.join(["python3", "-c", loader, "unpack", directory, digest, sha])], log, cancelled)
+            run_setup(ssh + [shlex.join([python, "-c", loader, "unpack", directory, digest, sha])], log, cancelled)
             command = "cd " + shlex.quote(directory + "/source") + " && exec " + shlex.join([
-                "python3", "ci/native_remote.py", "worker", target, sha])
+                python, "ci/native_remote.py", "worker", target, sha])
             result["tests_started_at"] = timestamp()
             code = supervise(ssh + [command], log, cancelled)
             result["tests_finished_at"] = timestamp()
@@ -180,7 +192,7 @@ def main():
     cancelled = threading.Event()
     for signum in (signal.SIGINT, signal.SIGTERM):
         signal.signal(signum, lambda signum, frame: cancelled.set())
-    targets = list(TARGETS) if args.target == "all" else [args.target]
+    targets = list(DEFAULT_TARGETS) if args.target == "all" else [args.target]
     started = time.monotonic()
     results = run_parallel(targets, lambda target: execute_target(target, archive, digest, sha, output, cancelled))
     ok = all_passed(results, targets, sha) and not cancelled.is_set()
