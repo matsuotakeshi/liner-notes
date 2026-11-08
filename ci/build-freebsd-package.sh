@@ -66,6 +66,53 @@ test -f "$work/source/scripts/release_manifest.py"
 cp -R "$work/source/ports/comms/liner-notes" "$work/port"
 cp "$archive" "$work/distfiles/liner-notes-stage74.tar.gz"
 
+# Query the exact Python package flavor selected by the installed ports.
+python_pkg_prefix=$(make -C "$work/port" BATCH=yes \
+    OPTIONS_SET="WEBUI LINK ZMODEM" -V PYTHON_PKGNAMEPREFIX)
+case "$python_pkg_prefix" in
+    py[0-9][0-9][0-9]-) ;;
+    *) echo "Unexpected Python package prefix: $python_pkg_prefix" >&2; exit 1 ;;
+esac
+
+# Port dependency resolution can descend to dependency "install" targets.
+# This verification VM must never have packages auto-installed by CI.
+missing=0
+check_pkg() {
+    name=$1
+    min_version=$2
+    if ! pkg info -e "$name" >/dev/null 2>&1; then
+        echo "MISSING FreeBSD CI prerequisite: $name" >&2
+        missing=1
+        return
+    fi
+    if [ -n "$min_version" ]; then
+        installed=$(pkg query '%v' "$name") || {
+            echo "Cannot query version for $name" >&2
+            missing=1
+            return
+        }
+        comparison=$(pkg version -t "$installed" "$min_version") || {
+            echo "Cannot compare version for $name" >&2
+            missing=1
+            return
+        }
+        if [ "$comparison" = '<' ]; then
+            echo "OUTDATED FreeBSD CI prerequisite: $name $installed (need >= $min_version)" >&2
+            missing=1
+        fi
+    fi
+}
+check_pkg "${python_pkg_prefix}sqlite3" ""
+check_pkg "${python_pkg_prefix}aiohttp" "3.11"
+check_pkg "${python_pkg_prefix}cryptography" "43"
+check_pkg "lrzsz" "0.13.1"
+if [ "$missing" -ne 0 ]; then
+    echo "CI stopped before stage: install listed prerequisites only on" >&2
+    echo "the FreeBSD verification VM 10.0.0.50, then rerun the job." >&2
+    echo "No dependency installation or production change was attempted." >&2
+    exit 1
+fi
+
 version=$(awk -F= '/^DISTVERSION[[:space:]]*=/{gsub(/[[:space:]]/, "", $2);print $2;exit}' "$work/port/Makefile")
 case "$version" in
     ""|*[!0-9.]*) echo "Unrecognized FreeBSD port version" >&2; exit 1 ;;
@@ -73,7 +120,7 @@ esac
 
 # The port distfile must be the exact Git archive, never the old v0.74 archive.
 make -C "$work/port" BATCH=yes \
-    PORTSDIR=/usr/ports DISTDIR="$work/distfiles" makesum
+    PORTSDIR=/usr/ports DISTDIR="$work/distfiles" STRICT_DEPENDS=yes makesum
 grep -Fqx "SHA256 (liner-notes-stage74.tar.gz) = $source_digest" "$work/port/distinfo" || {
     echo "Ports distinfo and Git source archive are inconsistent" >&2; exit 1;
 }
@@ -83,7 +130,7 @@ grep -Fqx "SHA256 (liner-notes-stage74.tar.gz) = $source_digest" "$work/port/dis
 make -C "$work/port" BATCH=yes \
     PORTSDIR=/usr/ports DISTDIR="$work/distfiles" \
     PACKAGES="$work/packages" OPTIONS_SET="WEBUI LINK ZMODEM" \
-    stage check-plist stage-qa package
+    STRICT_DEPENDS=yes stage check-plist stage-qa package
 
 find "$work/packages" -type f -name 'liner-notes-*.pkg' > "$work/packages-found.txt"
 [ "$(wc -l < "$work/packages-found.txt" | tr -d ' ')" -eq 1 ] || {
