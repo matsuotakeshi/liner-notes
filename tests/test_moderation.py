@@ -146,7 +146,7 @@ def run(binary):
             assert '非表示' in a.cmd('READ 2')
             assert '管理者確認' in a.cmd('INSPECT 2')
             a.cmd('LANG en'); assert 'Administrator' in a.cmd('ADMIN')
-            assert 'now visible' in a.cmd('RESTORE 2')
+            assert 'Local hide cleared' in a.cmd('RESTORE 2')
             assert 'now hidden' in a.cmd('HIDE 2')
         finally: a.close(); s.close()
         s=Server(binary,data,members=users,catalog=catalog,admins=admins,menu=True,telnet=True,language='en')
@@ -154,7 +154,7 @@ def run(binary):
         try:
             a.until(); a.cmd('LOGIN alice',b'> '); a.cmd(PASSWORD)
             assert b'Administrator' in a.cmd('ADMIN')
-            assert b'now visible' in a.cmd('RESTORE 2')
+            assert b'Local hide cleared' in a.cmd('RESTORE 2')
             assert b'now hidden' in a.cmd('HIDE 2')
         finally: a.close(); s.close()
         print('PASS: Japanese/English menus and real Telnet share moderation authority and behavior')

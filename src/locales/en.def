@@ -83,7 +83,7 @@ MESSAGE(HIDDEN_ARTICLE, "\r\nArticle #%u / Parent #%u is hidden.\r\nD:Parent A:C
 MESSAGE(HIDDEN_ROW, "%*s%u  [Hidden] [Parent #%u]\r\n")
 MESSAGE(INSPECT_HIDDEN, "\r\n[Administrator inspection: original hidden article]\r\n")
 MESSAGE(HIDE_SAVED, "\r\nArticle #%u is now hidden.\r\n")
-MESSAGE(RESTORED, "\r\nArticle #%u is now visible.\r\n")
+MESSAGE(RESTORED, "\r\nLocal hide cleared for article #%u. Hidden or withdrawn ancestors still prevent display.\r\n")
 MESSAGE(ROLE_ADMIN, "\r\nRole: Administrator\r\nHIDE [id]:Hide RESTORE [id]:Restore INSPECT [id]:Inspect original\r\nDefaults to current article. Current board read access is also required.\r\nMEMBERS:List MEMBER id:Details SUSPEND id:Disable RESUME id:Enable\r\nAUDIT [sequence]: Moderation history (newest first)\r\n")
 MESSAGE(ROLE_MEMBER, "\r\nRole: Member\r\n")
 MESSAGE(ROLE_GUEST, "\r\nRole: Guest\r\n")

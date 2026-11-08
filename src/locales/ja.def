@@ -83,7 +83,7 @@ MESSAGE(HIDDEN_ARTICLE, "\r\n記事 #%u / 返信先 #%u は非表示です。\r\
 MESSAGE(HIDDEN_ROW, "%*s%u  [非表示] [返信先 #%u]\r\n")
 MESSAGE(INSPECT_HIDDEN, "\r\n[管理者確認: 非表示記事の原文]\r\n")
 MESSAGE(HIDE_SAVED, "\r\n記事 #%u を非表示にしました。\r\n")
-MESSAGE(RESTORED, "\r\n記事 #%u を復元しました。\r\n")
+MESSAGE(RESTORED, "\r\n記事 #%u の自局の非表示設定を解除しました。親・祖先が非表示または取り消し済みの場合は表示されません。\r\n")
 MESSAGE(ROLE_ADMIN, "\r\n権限: 管理者\r\nHIDE [番号]:非表示 RESTORE [番号]:復元 INSPECT [番号]:原文確認\r\n省略時は現在の記事。現在ボードの閲覧権限も必要です。\r\nMEMBERS:会員一覧 MEMBER ID:確認 SUSPEND ID:停止 RESUME ID:解除\r\nAUDIT [履歴番号]: 管理操作履歴（新しい順）\r\n")
 MESSAGE(ROLE_MEMBER, "\r\n権限: 一般会員\r\n")
 MESSAGE(ROLE_GUEST, "\r\n権限: ゲスト\r\n")
