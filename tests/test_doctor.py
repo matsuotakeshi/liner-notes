@@ -110,6 +110,12 @@ class DoctorTests(unittest.TestCase):
         self.assertEqual(report['exit_code'],0,report)
         self.assertEqual([r['code'] for r in report['results']],['disabled']*3)
 
+    def test_explicitly_enabled_features_require_configuration(self):
+        for feature in ('doors','transfers'):
+            report=self.instance('--check-'+feature,'--enable',feature).run()
+            self.assertEqual(report['exit_code'],2,report)
+            self.assertEqual(report['results'][-1]['code'],'missing')
+
     def test_invalid_core_options_are_rejected_without_echo(self):
         for text in ('--unknown SECRET 23','--lang SECRET 23','--bind hostname 23','70000','--database --menu 23','--max-mail -1 23','--id-digits 12 23','--idle-seconds 86401 23'):
             self.write('/etc/liner-notes/liner-notes.env',f'LINER_NOTES_OPTIONS="{text}"\n')
@@ -364,8 +370,15 @@ boards=["{board}"]
             if name=='ls':return 0,'system_u:object_r:default_t:s0 /file\n'
             return None
         obj.command=query;obj.check_selinux()
-        self.assertTrue(any(r['code']=='unconfined' and r['status']=='error' for r in obj.results),obj.results)
+        self.assertTrue(any(r['code']=='unconfined' and r['status']=='warning' for r in obj.results),obj.results)
+        self.assertFalse(any(r['status']=='error' for r in obj.results),obj.results)
         self.assertTrue(any(r['detail']=='liner_notes policy module missing' for r in obj.results))
+        obj.results=[];obj.args.require_selinux=True;obj.check_selinux()
+        self.assertTrue(any(r['code']=='unconfined' and r['status']=='error' for r in obj.results))
+        obj.results=[];obj.args.require_selinux=False
+        obj.command=lambda name,args:(0,'liner_notes 0.1.0\n') if name=='semodule' else query(name,args)
+        obj.check_selinux()
+        self.assertTrue(any(r['code']=='unconfined' and r['status']=='error' for r in obj.results))
 
 
 if __name__=='__main__':unittest.main()

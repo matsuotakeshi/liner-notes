@@ -809,7 +809,8 @@ class Doctor:
     def check_doors(self):
         file = self.core.get('doors')
         if not file:
-            self.add('doors','disabled')
+            required='doors' in self.enabled
+            self.add('doors','missing' if required else 'disabled','error' if required else 'ok',detail='doors configuration' if required else '')
             return
         try:
             lines = self.read(file).decode('utf-8').splitlines()
@@ -860,7 +861,8 @@ class Doctor:
     def check_transfers(self):
         helper = self.core.get('zmodem-helper')
         if not helper:
-            self.add('transfers','disabled')
+            required='transfers' in self.enabled
+            self.add('transfers','missing' if required else 'disabled','error' if required else 'ok',detail='transfer helper configuration' if required else '')
             return
         self.item('transfers',helper,executable=True)
         vault = self.core.get('vault-dir')
@@ -921,11 +923,13 @@ class Doctor:
             return
         self.add('selinux','ok',detail='Enforcing')
         modules=self.command('semodule',['-l'])
+        policy_required=self.args.require_selinux
         if not modules or modules[0]!=0:
             self.add('selinux','unreadable','warning',detail='policy inventory (administrator query may be required)')
         elif not any(line.split() and line.split()[0]=='liner_notes' for line in modules[1].splitlines()):
             self.add('selinux','selinux','error' if self.args.require_selinux else 'warning',detail='liner_notes policy module missing')
         else:
+            policy_required=True
             self.add('selinux','ok',detail='liner_notes policy module')
         for feature,domain in [('core','liner_notes_t'),('web','liner_notes_web_t'),('links','liner_notes_link_t')]:
             pid=self.pid.get(feature)
@@ -936,7 +940,7 @@ class Doctor:
             try:
                 context=self.read('/proc/'+str(pid)+'/attr/current',4096).decode().strip('\x00\n')
                 actual=context.split(':')[2]
-                self.add('selinux','ok' if actual==domain else 'unconfined','ok' if actual==domain else 'error',detail=feature+': '+actual)
+                self.add('selinux','ok' if actual==domain else 'unconfined','ok' if actual==domain else 'error' if policy_required else 'warning',detail=feature+': '+actual)
             except (OSError,ValueError,UnicodeError,IndexError):
                 self.add('selinux','unreadable','warning',detail=feature)
         labels=[(self.program,'liner_notes_exec_t'),(self.data_dir,'liner_notes_data_t')]
@@ -960,7 +964,7 @@ class Doctor:
                 tokens=current[1].split()
                 context=next((x for x in tokens if re.fullmatch(r'[^: ]+:[^: ]+:[^: ]+:.*',x)), '')
                 actual=context.split(':')[2] if context else ''
-                self.add('selinux','ok' if actual==expected else 'selinux','ok' if actual==expected else 'error',path, 'type='+actual)
+                self.add('selinux','ok' if actual==expected else 'selinux','ok' if actual==expected else 'error' if policy_required else 'warning',path, 'type='+actual)
                 if mapping and mapping[0]==0 and mapping[1].strip()!=context:
                     self.add('selinux','selinux','warning',path,detail='label differs from configured mapping; local override is not changed')
             else:
