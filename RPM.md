@@ -84,3 +84,15 @@ python3 scripts/build-rpm.py /新しい作業ディレクトリ
 Git作業ツリー、または`SOURCE-MANIFEST`を持つ検証ソースで実行します。
 出力先の再利用は拒否します。`RPMS/`にバイナリ、`SRPMS/`にソースRPMを生成します。
 `tests/test_rpm_systemd.py`、`tests/test_rpm_update.py`は専用検証機限定です。
+
+## CI限定のRPMリビジョン更新試験
+
+`Rocky 10 Package CI` はGitHub-hosted runnerの使い捨てRocky Linux 10コンテナ内で、
+生成済みの0.74-1本体/Web/Link RPMを導入後、**同じソースからCI専用の0.74-2を生成して更新**します。
+`%config(noreplace)` 対象のローカル編集済み設定、合成SQLiteデータ、ダミーのリンク鍵が
+更新後に保持され、削除後もBBSデータ・鍵が残ることを確認します。
+
+CI専用の0.74-2はGitHub Actionsのリリース候補に保存しません。
+この試験ではsystemdサービスを稼働していないため、**実稼働プロセスの無停止更新、
+旧バージョンとのDB/API互換性、実バックアップからの復元は未検証**です。
+本番3局への配備やOS/Apache/SofChatの停止・再起動はしません。
