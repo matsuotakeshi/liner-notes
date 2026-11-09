@@ -73,6 +73,8 @@ def runner(directory, sha, digest):
     for number in (signal.SIGTERM, signal.SIGINT):
         signal.signal(number, lambda number, frame: stopped.set())
     run_setup(ssh + [shlex.join(['python3', '-c', loader, directory, sha, payload])], sys.stdout.buffer, stopped)
+    if stopped.is_set():
+        raise RuntimeError('Package run cancelled during supervisor transfer')
     code = supervise(ssh + [shlex.join(['python3', str(Path(directory)/'supervisor/freebsd_package_lease.py'),
                                       'remote', directory, sha, digest])], sys.stdout.buffer, stopped, timeout=3400)
     if code or stopped.is_set():

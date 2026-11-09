@@ -100,7 +100,7 @@
   "scripts/doctor.py": "9a808233ca27a0718d175d6adeb461a35f532e6a5a9239d89227f1fb0276ef6a",
   "tests/test_doctor.py": "ab12b80d1fe3590e16c3653053553bb73fe3db46ae1599a672f9cb902f016fee",
   "tests/test_doctor_runtime.py": "2f49786b53071f4a684a21bf08b67b55319e230d61f1a2d963c35a41050da4a4",
-  "ci/freebsd_package_lease.py": "76c682196960d37983cce90c666d79c7bf68305c11f298a91d63a4c5bb5514e1",
+  "ci/freebsd_package_lease.py": "3e9c9cd0ba429b1a16c84a415a74fec57d6573e9c536e4e2a352e84985843712",
   ".github/workflows/freebsd-package.yml": "70a24a35f10e3672189f2cac0fa889d4ec87e13b51828a6cb02623aca9d31cd3",
   "CI_CD.md": "a62c1849bad237d013546205b72fe168e0d1b50f41d79e156c3e4ead2e0d92d2",
   "ci/solaris_ci.py": "20cfdcef5a54345ca00fe3c5a3e5af0ca44560bd1b89a794f6139268ddf6d6ae",
