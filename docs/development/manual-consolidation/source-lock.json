@@ -122,6 +122,7 @@
   "tests/test_release_manifest.py": "08b5c8cab61c4556d1ac5e6137e252e195c76c0572fd72577bce92a1529b3791",
   "tests/test_verify_release_set.py": "0cd280b9bcee29864ec41d7787f6eb2148ede7d361ff0ba464a1f744249d6997",
   "ci/freebsd_fixture_libraries.py": "a70991ba8ba616012bd2e1e1d6ecfa2dc5133ce5814a8274adb4bc8513d38dcf",
-  "ci/test-freebsd-package-upgrade.py": "c18cde109c7015819acfa6a6982187d0c7d827cf772dd6dcd9971c6b49c0bd68",
-  ".github/workflows/freebsd-package-lint.yml": "a959467043a4a8af16a6c3918197f87127d02c660cc9af4577f7352ed74322e3"
+  "ci/test-freebsd-package-upgrade.py": "01e82ec0a53176ed211d01f17effb29b28d162693a6787c17046b95489470007",
+  ".github/workflows/freebsd-package-lint.yml": "ebcbe519e49ddb0d4ba19821c77b0c5c05e1bcf091db49bc3e50fbbc63c2bd48",
+  "ci/freebsd_fixture_config.py": "cc02dfa2642271aa64b05fdeb0b82a2ce969ed45fd4ebcf52331bd21942caa01"
 }

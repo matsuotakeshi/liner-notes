@@ -172,3 +172,11 @@ package lifecycle and recorded in its partial receipt. No shlib-ignore or
 force-missing dependency option is enabled. Hosted tests compile real ELF
 libraries and exercise transitive dependencies and rejection paths. This
 remains a rootless payload/rc test, not the full privileged jail acceptance.
+
+With package scripts disabled, @sample does not create the default menu files.
+The rootless fixture explicitly copies the two shipped menu samples into its
+new private root, refusing symlinks and retaining existing operator edits.
+Optional banner/system/goodbye paths are also private absolute paths; empty rc
+values would select the installed host defaults via shell `:=` expansion.
+This preparation does not claim that package sample/account scripts ran. The
+separate jail gate remains mandatory for a full update acceptance receipt.
