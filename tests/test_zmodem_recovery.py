@@ -2,7 +2,8 @@
 import os,pathlib,sys,tempfile,hashlib,json
 sys.path.insert(0,str(pathlib.Path(__file__).resolve().parents[1]/'scripts'))
 import vault_zmodem as gateway
-from test_zmodem_workflows import fails,Engine
+from test_zmodem_workflows import fails,Engine,spool_contents
+from posix_locks import file_lock
 from zmodem_connector import TransferFailure
 class Ledger:
  name='line-v1';chunk_size=257;upload_category='group/tools'
@@ -29,33 +30,31 @@ class Batch:
 
 def run():
  if os.name!='posix':print('SKIP: private spool locking needs POSIX');return
- import fcntl
  with tempfile.TemporaryDirectory() as d:
   root=pathlib.Path(d);c=Ledger()
   def receive(**kw):return gateway.runtime_receive(c,Batch(),'host',2222,kw.pop('user','alice'),root,description=kw.pop('description','description'),batch=True,**kw)
   fails(receive,gateway.PublicationFailure);assert len(c.records)==2
   # A new upload must not archive uncertain publication or duplicate files.
   fails(receive,gateway.PublicationFailure);assert len(c.records)==2
-  work=next(root.iterdir());assert work.stat().st_mode&0o077==0
+  work=next(iter(spool_contents(root)));assert work.stat().st_mode&0o077==0
   assert 'password' not in (work/'transfer.json').read_text()
   fails(lambda:receive(resume=True,description='changed'));assert work.exists()
-  fails(lambda:receive(resume=True,user='bob'));assert list(root.iterdir())==[work]
-  with (work/'lock').open('rb') as lock:
-   fcntl.flock(lock,fcntl.LOCK_EX|fcntl.LOCK_NB);fails(lambda:receive(resume=True),OSError);assert work.exists()
+  fails(lambda:receive(resume=True,user='bob'));assert spool_contents(root)==[work]
+  with file_lock(work/'lock',create=False):
+   fails(lambda:receive(resume=True),OSError);assert work.exists()
   target=work/'data/a.bin';original=target.read_bytes();target.write_bytes(b'tampered');fails(lambda:receive(resume=True));target.write_bytes(original)
-  receipt=receive(resume=True);assert receipt[0]==2 and len(c.records)==2 and all(r[5] for r in c.records.values());assert not list(root.iterdir())
+  receipt=receive(resume=True);assert receipt[0]==2 and len(c.records)==2 and all(r[5] for r in c.records.values());assert not spool_contents(root)
   class Partial(Engine):
    def receive(self,directory,*args):
     (directory/'part.bin').write_bytes(b'partial');raise TransferFailure('Wire lost')
   def single(engine,resume=False):return gateway.runtime_receive(c,engine,'host',2222,'alice',root,resume=resume,description=None if resume else 'saved')
-  fails(lambda:single(Partial(b'')));work=next(root.iterdir());assert (work/'data/part.bin').read_bytes()==b'partial'
+  fails(lambda:single(Partial(b'')));work=next(iter(spool_contents(root)));assert (work/'data/part.bin').read_bytes()==b'partial'
   class Continued:
    def receive_resume(self,directory,fdin,fdout,authorize):
     authorize();path=directory/'part.bin';assert path.read_bytes()==b'partial';path.write_bytes(b'partial-completed');return path
-  receipt=single(Continued(),True);assert receipt[0]==3 and len(c.records)==3 and not list(root.iterdir())
-  fails(lambda:single(Partial(b'')));work=next(root.iterdir())
-  with (work/'lock').open('rb') as lock:
-   fcntl.flock(lock,fcntl.LOCK_EX|fcntl.LOCK_NB)
+  receipt=single(Continued(),True);assert receipt[0]==3 and len(c.records)==3 and not spool_contents(root)
+  fails(lambda:single(Partial(b'')));work=next(iter(spool_contents(root)))
+  with file_lock(work/'lock',create=False):
    fails(lambda:single(Engine(b'fresh')),OSError)
    assert not list(root.glob('retained-*'))
   receipt=single(Engine(b'fresh'));assert receipt[0]==4 and len(c.records)==4
@@ -65,6 +64,6 @@ def run():
   assert retained[0].stat().st_mode&0o077==0
   # Another fresh upload remains usable and leaves the old partial untouched.
   assert single(Engine(b'another'))[0]==5
-  assert list(root.iterdir())==retained
+  assert spool_contents(root)==retained
  print('PASS: batch publication lost-receipt retry without duplication; private account/metadata binding; concurrent lock; staged integrity; retained single partial and continuation')
 if __name__=='__main__':run()

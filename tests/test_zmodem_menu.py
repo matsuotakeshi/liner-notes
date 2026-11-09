@@ -1,4 +1,5 @@
 """Actual lrzsz over the runtime Telnet menu; no password in the helper."""
+from test_zmodem_workflows import spool_contents
 import hashlib,os,pathlib,select,shlex,socket,subprocess,sys,tempfile,time
 sys.path.insert(0,str(pathlib.Path(__file__).resolve().parents[1]/'scripts'))
 from test_board import Server
@@ -75,7 +76,7 @@ def run(binary,ctl,receiver,sender,rights=False):
                 assert (target/name).read_bytes()==payload
                 assert downloaded(ident)==1
                 assert b'PONG' in c.cmd('PING')
-            assert not list(spool.iterdir())
+            assert not spool_contents(spool)
             batch_target=p/'batch-target';batch_target.mkdir()
             for ident in [1,2,3,1]:assert b'Selected' in c.cmd('BATCH ADD '+str(ident))
             assert b'3 files: 1,2,3' in c.cmd('BATCH LIST')
@@ -96,12 +97,12 @@ def run(binary,ctl,receiver,sender,rights=False):
             assert [downloaded(i) for i in (1,2,3)]==[2,2,2]  # skip/cancel must never count
             assert b'Selected 0' in c.cmd('BATCH CLEAR')
             assert b'BATCH ADD/REMOVE' in c.cmd('BATCH SEND')
-            assert not list(spool.iterdir())
+            assert not spool_contents(spool)
             c.cmd('D 1',b'1 GiB.\r\n');code,out,err=transfer(c,receiver,['--restricted','--protect'],target);assert failed(out)
             c.cmd('U',b'> ');c.cmd('ZMODEM',b'> ');c.cmd('',b'1 GiB.\r\n');c.send(b'\x18'*8+b'\x08'*8);assert failed(c.until())
-            assert not list(spool.iterdir())
+            assert not spool_contents(spool)
             c.cmd('U',b'> ');c.cmd('ZMODEM',b'> ');c.cmd('',b'1 GiB.\r\n');code,out,err=transfer(c,sender,['--','payload-0.bin','payload-1.bin'],source);assert failed(out)
-            assert not list(spool.iterdir())
+            assert not spool_contents(spool)
             # A private-talk attempt while the engine owns the wire is refused.
             api.protocol.send('ONLINE');target=None
             for _ in range(32):
@@ -140,7 +141,7 @@ def run(binary,ctl,receiver,sender,rights=False):
             code,out,err=transfer(c,sender,['--','payload-0.bin'],source);assert code==0 and b'published' in out,(code,out,err)
             assert b'payload-0.bin' in c.cmd('FILESIN private')
             c.cmd('UIN private|denied',b'1 GiB.\r\n');assert failed(c.until())
-            assert not list(spool.iterdir())
+            assert not spool_contents(spool)
             c.cmd('0');c.cmd('LANG ja')
             # Authorization changes close the bound transfer; no partial upload becomes public.
             c.cmd('ZUPLOAD', '1GiBまで。\r\n'.encode());api.protocol.request('LEVEL 2 1' if rights else 'SUSPEND 2',lambda x:x.startswith(b'RIGHTS' if rights else b'SUSPENDED'))
@@ -149,6 +150,6 @@ def run(binary,ctl,receiver,sender,rights=False):
                 if not c.sock.recv(4096):break
             else:raise AssertionError('revoked connection did not close')
         finally:c.close();api.close();s.close()
-        time.sleep(.1);assert not list(spool.iterdir()),list(spool.iterdir())
+        time.sleep(.1);assert not spool_contents(spool),spool_contents(spool)
     print('PASS: menu ZMODEM upload/download all bytes and empty files, original names, SHA-256, listing/search, JP/EN, skip/cancel, guest denial, revocation and spool cleanup')
 if __name__=='__main__':run(*sys.argv[1:])

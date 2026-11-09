@@ -1,4 +1,5 @@
 """Stage64: 16 private attachments transferred in one ZMODEM session."""
+from test_zmodem_workflows import spool_contents
 import hashlib,pathlib,shlex,subprocess,sys,tempfile
 from test_board import Server
 from test_runtime import Client
@@ -53,7 +54,7 @@ def run(binary,ctl,receiver,sender):
             for filename,content in extras.items():assert (batch/filename).read_bytes()==content
             assert len(list(batch.iterdir()))==16
             assert b'unavailable' in sysop.cmd('ZMAILDOWNLOADALL 1')
-            assert not list(spool.iterdir())
+            assert not spool_contents(spool)
             # A board/member epoch change interrupts a private transfer too.
             c.cmd('ZMAILUPLOAD',b'1 GiB.\r\n');sysop.cmd('LEVEL 2 1')
             import time

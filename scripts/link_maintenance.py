@@ -1,6 +1,6 @@
 """Offline, bounded-memory link checkpoints and portable signed snapshots."""
 from contextlib import contextmanager
-import fcntl
+from posix_locks import file_lock
 import json,base64,hashlib
 import os
 from pathlib import Path
@@ -11,11 +11,8 @@ from link_store import Store, canonical,Ed25519PublicKey,hexid
 
 @contextmanager
 def exclusive(database):
-    fd=os.open(str(database)+'.lock',os.O_RDWR|os.O_CREAT|os.O_NOFOLLOW,0o600)
-    try:
-        fcntl.flock(fd,fcntl.LOCK_EX|fcntl.LOCK_NB)
+    with file_lock(str(database)+'.lock'):
         yield
-    finally:os.close(fd)
 
 
 def snapshot(store,destination,peer=None):

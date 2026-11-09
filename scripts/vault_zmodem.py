@@ -13,6 +13,7 @@ import shutil
 import signal
 import sys
 import tempfile
+from posix_locks import file_lock, namespace_lock
 
 from transfer_connectors import LineConnector, download_begin, download_read, download_done, download_abort
 from zmodem_connector import ZmodemProcess, TransferFailure, safe_name, MAX_BYTES
@@ -84,7 +85,7 @@ def runtime_receive(connection,engine,host,port,user,spool_root,input_fd=0,outpu
     A fresh upload archives an interrupted wire transfer instead of blocking all
     later ZUPLOADs. Uncertain publication still requires an explicit resume.
     """
-    import fcntl,json,stat
+    import json,stat
     from zmodem_connector import staged_file,staged_files
     _upload.metadata('received.bin',description if description is not None else '')
     category=getattr(connection,'upload_category','')
@@ -98,17 +99,16 @@ def runtime_receive(connection,engine,host,port,user,spool_root,input_fd=0,outpu
     authorize()
     fresh=False;lockfd=None
     # Serialize namespace changes only, not the transfer itself. Locking the
-    # spool directory avoids persistent per-member lock files and unlink races.
-    rootfd=os.open(spool_root,os.O_RDONLY|os.O_DIRECTORY|os.O_NOFOLLOW)
+    # spool directory retains native flock; Solaris uses one persistent
+    # namespace lock file and a separate record-lock holder.
+    rootlease=namespace_lock(spool_root)
     try:
-        fcntl.flock(rootfd,fcntl.LOCK_EX)
         try:work.mkdir(mode=0o700);fresh=True
         except FileExistsError:pass
         if work.is_symlink() or not work.is_dir() or work.stat().st_uid!=os.getuid() or work.stat().st_mode&0o077:
             raise TransferFailure('Invalid private resume directory')
-        lockfd=os.open(work/'lock',os.O_RDWR|os.O_CREAT|os.O_NOFOLLOW,0o600)
+        lockfd=file_lock(work/'lock')
         # Also respects older helpers which lock only the pending directory.
-        fcntl.flock(lockfd,fcntl.LOCK_EX|fcntl.LOCK_NB)
         if not fresh and not resume:
             meta=work/'transfer.json'
             if meta.is_symlink() or meta.stat().st_size>8192:raise TransferFailure('Invalid resume metadata')
@@ -121,15 +121,14 @@ def runtime_receive(connection,engine,host,port,user,spool_root,input_fd=0,outpu
             retained=pathlib.Path(tempfile.mkdtemp(prefix='retained-'+key+'-',dir=spool_root))
             os.rename(work,retained)
             _upload.sync_directory(pathlib.Path(spool_root))
-            os.close(lockfd);lockfd=None
+            lockfd.close();lockfd=None
             work.mkdir(mode=0o700);fresh=True
-            lockfd=os.open(work/'lock',os.O_RDWR|os.O_CREAT|os.O_NOFOLLOW,0o600)
-            fcntl.flock(lockfd,fcntl.LOCK_EX|fcntl.LOCK_NB)
+            lockfd=file_lock(work/'lock')
     except BaseException:
-        if lockfd is not None:os.close(lockfd)
+        if lockfd is not None:lockfd.close()
         raise
     finally:
-        os.close(rootfd)
+        rootlease.close()
     keep=True
     try:
         meta=work/'transfer.json';data=work/'data'
@@ -195,7 +194,7 @@ def runtime_receive(connection,engine,host,port,user,spool_root,input_fd=0,outpu
         return (len(receipts),sum(r[1] for r in receipts),'') if batch else receipts[0]
     finally:
         if not keep:shutil.rmtree(work)
-        os.close(lockfd)
+        lockfd.close()
 
 
 def send(connection, engine, ident, spool_root, input_fd=0, output_fd=1, name=None):

@@ -159,7 +159,11 @@ test-userlog: tests/test_userlog.c src/userlog.c src/userlog.h src/durable.h src
 	$(CC) $(CPPFLAGS) $(SQLITE_CFLAGS) $(CFLAGS) $(LDFLAGS) -std=c11 -Wall -Wextra -Werror -Isrc tests/test_userlog.c src/userlog.c -lcrypto $(SQLITE_LIBS) $(LDLIBS) src/storage_sqlite.c $(SQLITE_CFLAGS) -pthread -lcrypto $(SQLITE_LIBS) -o test-userlog
 
 .PHONY: all test clean check test-stage61 test-legacy-transfers test-zmodem test-zmodem-limits
-check: test test-stage61 test-maintenance test-stage63 test-stage64
+check: test test-stage61 test-maintenance test-stage63 test-stage64 test-posix-locks
+
+.PHONY: test-posix-locks
+test-posix-locks:
+	$(PYTHON) tests/test_posix_locks.py
 
 .PHONY: test-maintenance
 test-maintenance: runtime vaultctl memberctl
