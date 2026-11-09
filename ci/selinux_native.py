@@ -393,7 +393,9 @@ port = {peer_port}
         fixture.results.append({'link':'signed TLS import/export, dedicated domain, TLS rotation'})
     finally:
         if unit:
-            fixture.stop(unit)
+            # Keep servicing the peer while the daemon finishes an in-flight
+            # pull during orderly shutdown; blocking this loop can deadlock it.
+            await asyncio.to_thread(fixture.stop, unit)
         await bridge.close()
         server.close()
         await server.wait_closed()
