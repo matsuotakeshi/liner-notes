@@ -158,3 +158,17 @@ checks source hashes, modes, timestamps and absent SHM remain unchanged.
 Remote temporary-directory preparation explicitly uses `/bin/sh -s`; login
 shells such as csh cannot reinterpret `set -eu`, and failed preparation stops
 before a package build starts. Native CI must rerun on the integrated SHA.
+
+The rootless pkg fixture materializes actual shared-library providers because
+pkg scans `/lib` and `/usr/lib` relative to its target root. The package manifest
+SONAME list and recursively inspected ELF NEEDED entries determine the bounded
+copy set, including dependencies such as FreeBSD libc -> libsys. Providers must
+be amd64 ELF shared libraries with matching SONAME, selected from host `/lib`,
+`/usr/lib`, or `/usr/local/lib`; symlinks may resolve only within these roots.
+Copies are independent files, not host hardlinks or fabricated package records.
+Missing/mismatched providers, escaping symlinks and existing destination files
+reject the fixture. Host and fixture hashes are checked before and after the
+package lifecycle and recorded in its partial receipt. No shlib-ignore or
+force-missing dependency option is enabled. Hosted tests compile real ELF
+libraries and exercise transitive dependencies and rejection paths. This
+remains a rootless payload/rc test, not the full privileged jail acceptance.

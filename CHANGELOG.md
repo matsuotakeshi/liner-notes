@@ -4,6 +4,8 @@
 
 - SELinux受入試験と同じZMODEM送受信手順を、実BBS・実lrzszを使うhosted回帰へ追加。転送後の応答待ち失敗時にpeer終了コードと合成試験の受信内容を記録し、Enforcing検査とタイムアウト値は維持。
 
+- FreeBSD rootless package試験へ実ELFライブラリの依存closureを配置。manifestの要求名・SONAME・実物のバイト一致を検査し、pkgのshlib検査を維持したままbase library不足を解消。宿主のDB・ライブラリは変更しない。
+
 - Solaris向けDoor排他を強制した実runtimeのhosted回帰と、複数slotの排他寿命検査を追加。汎用Door試験の起動失敗時に接続・番号・受信応答を記録し、既存のtimeoutと判定は維持。
 
 - FreeBSD package更新試験の依存DB複製を修正。原本DB/WALの安定したバイトコピーだけを取得し、SQLite backupは私有コピーで実行。SSH先のlogin shellに依存せず準備を/bin/shで実行し、準備失敗を即時検出。

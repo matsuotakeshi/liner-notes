@@ -33,7 +33,7 @@ def fixture_denials(text):
     """Export only AVC records for the dedicated fixture, never other audit data."""
     domain = re.compile(r'\bscontext=[^\s:]+:[^\s:]+:liner_notes(?:_(?:web|link|admin|door|transfer))?_t:')
     for line in text.splitlines():
-        if 'type=AVC ' in line and re.search(r'\bavc:\s+denied\s', line) and domain.search(line):
+        if re.search(r'\btype=(?:AVC|1400)\s', line) and re.search(r'\bavc:\s+denied\s', line) and domain.search(line):
             yield line[:4096]
 
 
@@ -146,14 +146,23 @@ class Fixture:
         # The root orchestrator already refuses any pre-existing Liner Notes
         # policy. These domains therefore belong to this isolated acceptance.
         # Do not copy PATH/SYSCALL/EXECVE records or unrelated system denials.
+        denials = set()
         if shutil.which('ausearch'):
             try:
                 audit = subprocess.run(['ausearch', '-m', 'AVC', '-ts', 'recent', '--raw'],
                                        capture_output=True, text=True, timeout=10, check=False)
-                for denial in fixture_denials(audit.stdout):
-                    print('SELINUX_DENIAL ' + denial)
+                denials.update(fixture_denials(audit.stdout))
             except (OSError, subprocess.TimeoutExpired):
                 print('SELINUX_DIAGNOSTIC unavailable; original acceptance result retained')
+        # Minimal installations may send AVCs only to the kernel journal.
+        # Apply the same narrow filter before exporting any kernel log text.
+        try:
+            kernel = run('journalctl', '--no-pager', '-k', '--since=-10min', '-o', 'cat', check=False)
+            denials.update(fixture_denials(kernel.stdout))
+        except (OSError, subprocess.TimeoutExpired):
+            print('SELINUX_DIAGNOSTIC kernel journal unavailable')
+        for denial in sorted(denials):
+            print('SELINUX_DENIAL ' + denial)
         for port in reversed(self.ports):
             run('semanage', 'port', '-d', '-p', 'tcp', port)
         # Keep the private fixture for diagnosis; never erase original BBS data.

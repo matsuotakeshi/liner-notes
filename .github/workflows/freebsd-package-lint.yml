@@ -5,6 +5,9 @@ on:
   pull_request:
     paths:
       - "ci/build-freebsd-package.sh"
+      - "ci/test-freebsd-package-upgrade.py"
+      - "ci/freebsd_fixture_libraries.py"
+      - "tests/test_freebsd_package_libraries.py"
       - "scripts/release_manifest.py"
       - "tests/test_release_manifest.py"
       - ".github/workflows/freebsd-package.yml"
@@ -32,6 +35,7 @@ jobs:
           set -euo pipefail
           sh -n ci/build-freebsd-package.sh
           python3 tests/test_release_manifest.py
+          python3 tests/test_freebsd_package_libraries.py
           python3 -m venv "$RUNNER_TEMP/manual-venv"
           "$RUNNER_TEMP/manual-venv/bin/pip" install -r scripts/manual/requirements.txt
           "$RUNNER_TEMP/manual-venv/bin/python" tests/test_freebsd_plist.py

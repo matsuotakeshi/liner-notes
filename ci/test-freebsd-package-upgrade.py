@@ -21,6 +21,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path[:0] = [str(ROOT / 'scripts'), str(ROOT / 'tests')]
 from deploy_policy import package_commands
 from deploy_restore import backup_database_snapshot
+from freebsd_fixture_libraries import seed_libraries, verify_libraries
 from test_board import Server, post
 from test_runtime import Client as RawClient
 from test_members import auth, PASSWORD
@@ -58,6 +59,9 @@ with tempfile.TemporaryDirectory(prefix='actual-upgrade-', dir=work) as temporar
     # Even a SQLite mode=ro connection can need source SHM/recovery writes.
     # Copy stable DB/WAL bytes first, then use SQLite only on private copies.
     backup_database_snapshot(Path('/var/db/pkg/local.sqlite'), dbdir / 'local.sqlite')
+    # pkg's base-provider scan is rootdir-relative. Real files (including ELF
+    # NEEDED closure such as libc -> libsys) are required, not invented records.
+    libraries = seed_libraries(root, metadata.get('shlibs_required'))
     common = [PKG, '-r', str(root), '-o', 'RUN_SCRIPTS=false', '-o', 'PKG_ENABLE_PLUGINS=false', '-o', 'PKG_TRIGGERS_ENABLE=false']
     command([*common, 'add', '-f', str(package)])
     binary = root / 'usr/local/sbin/liner-notes'
@@ -152,11 +156,13 @@ with tempfile.TemporaryDirectory(prefix='actual-upgrade-', dir=work) as temporar
     finally:
         if running:
             command(['/bin/sh', str(rc), 'stop'], env=rc_env)
+    verify_libraries(root, libraries)
 assert command([PKG, 'query', '%n %v %o']) == host_before
 (work / 'artifacts/FREEBSD-ACTUAL-UPGRADE.json').write_text(json.dumps({
     'source_sha': sha, 'actual_package_payload_upgrade': True, 'isolated_rc_lifecycle': True,
     'login_article_mail_preserved': True, 'logical_backup_restore': True, 'old_package_recovery': True,
     'host_packages_unchanged': True, 'maintainer_scripts_executed': False, 'account_ownership_verified': False,
+    'host_libraries_unchanged': True, 'fixture_libraries': libraries,
     'full_service_update_verified': False
 }, indent=2) + '\n')
 print('PASS actual FreeBSD package/rootdir rc update/recovery; maintainer/account tests remain separate')
