@@ -69,9 +69,10 @@ Doorの外向き通信は既定で無効です。必要な場合だけ `liner_no
 ```sh
 # 10.0.0.51 の管理者が、レビュー済みmainのソースディレクトリで実行
 dnf install selinux-policy-devel policycoreutils-python-utils gcc make \
-    openssl-devel sqlite-devel python3-aiohttp python3-cryptography lrzsz
+    openssl-devel sqlite-devel python3-aiohttp python3-cryptography
+# 実転送用のlrz/lszは、下記のLinux導入手順に従って別途用意する。
 # 未作成の場合だけ追加。CI SSHアカウントとUID・グループを分離する。
-useradd --system --no-create-home --home-dir /nonexistent --shell /sbin/nologin liner_notes_ci
+useradd --system --user-group --no-create-home --home-dir /nonexistent --shell /sbin/nologin liner_notes_ci
 install -d -o root -g root -m 755 /usr/local/libexec
 install -o root -g root -m 755 ci/selinux_root.py /usr/local/libexec/liner-notes-ci-selinux
 visudo -f /etc/sudoers.d/liner-notes-selinux-ci
@@ -100,6 +101,10 @@ ci-test ALL=(root) NOPASSWD: /usr/local/libexec/liner-notes-ci-selinux
 `fixture-state.json` と `acceptance.log` を確認し、記録された一時ユニットの停止・
 当該ポート定義の除去・専用ドメインの残留がないことを確認してから、試験用の優先度200の
 ポリシーを除去します。既存ポリシーを無条件に削除する回復コマンドは用意しません。
+
+試験終了時は、専用ドメインに対する直近のAVC拒否だけをCIログへ記録します。
+無関係なサービスの拒否や、PATH・EXECVE等の監査レコード全体は公開しません。
+拒否ログを無条件に許可ルールへ変換せず、操作・保存先・必要な権限を確認してください。
 
 配布元のlrzszがない場合や必要な転送試験に失敗する場合は、[Linux導入](install-linux.md)の
 隔離ビルド手順で用意した実エンジンを使います。版名だけで転送成功を判断しません。

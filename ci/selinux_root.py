@@ -58,6 +58,10 @@ def current_main():
                                      '/git/ref/heads/main', 65536))['object']['sha'])
 
 
+def installed_modules():
+    return command('/usr/sbin/semodule', '-lfull').stdout
+
+
 def extract(content, destination, sha):
     """No links/devices, duplicate paths, writable modes, or escaping members."""
     prefix = 'liner-notes-' + validate_sha(sha)
@@ -126,7 +130,7 @@ def main():
     import fcntl
     with (BASE / 'lock').open('a') as lock:
         fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
-        existing = command('/usr/sbin/semodule', '-l', 'full').stdout
+        existing = installed_modules()
         if re.search(r'\bliner_notes\b', existing):
             raise ValueError('Existing Liner Notes policy must not be replaced by this isolated test')
         for path in ('/usr/share/selinux/devel/Makefile', '/usr/bin/gcc', '/usr/bin/make'):
