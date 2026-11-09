@@ -7,6 +7,7 @@
 #define __EXTENSIONS__ 1
 #endif
 #include "doors.h"
+#include "door_lock.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -36,10 +37,12 @@ static uint64_t door_clock(void) { struct timespec t;clock_gettime(CLOCK_MONOTON
 static Door *reaping;
 static void door_clean(Door *d) {
     if(*d->run) { char path[1240];snprintf(path,sizeof(path),"%s/DORINFO1.DEF",d->run);unlink(path);rmdir(d->run); }
-    if(d->lock>=0)close(d->lock);free(d);
+    if(d->lock>=0)door_lock_release(d->lock);
+    free(d);
 }
 int doors_pending(void) { return reaping!=NULL; }
 void doors_reap(void) {
+    door_lock_reap();
     Door **link=&reaping;
     while(*link) {
         Door *d=*link;int status;
@@ -56,7 +59,8 @@ static int door_slot(Door *d,const Game *g,unsigned *node) {
         char path[1100];struct stat st;snprintf(path,sizeof(path),"%s/.liner-door-slot-%u",g->dir,n);
         int fd=open(path,O_RDWR|O_CREAT|O_NOFOLLOW,0600);if(fd<0)return 0;
         if(fstat(fd,&st) || !S_ISREG(st.st_mode) || st.st_uid!=geteuid() || (st.st_mode&077) || st.st_nlink!=1) { close(fd);errno=EPERM;return 0; }
-        if(!flock(fd,LOCK_EX|LOCK_NB)) { d->lock=fd;*node=n;return 1; }
+        int lease=door_lock_acquire(fd);
+        if(lease>=0) { if(lease!=fd)close(fd);d->lock=lease;*node=n;return 1; }
         int e=errno;close(fd);if(e!=EWOULDBLOCK && e!=EAGAIN)return 0;
     }
     errno=EBUSY;return 0;
@@ -70,14 +74,16 @@ static int door_drop(Door *d,const Game *g,uint32_t user,unsigned level) {
     /* ASCII permanent identity, not a truncated handle or private real name.
      * COM0 selects local stdio for native OpenDoors; no modem is emulated. */
     int ok=fprintf(f,"Liner notes\r\nSYSOP\r\n\r\nCOM0\r\n0 BAUD,N,8,1\r\n0\r\nLN%09u\r\n\r\n\r\n1\r\n%u\r\n%u\r\n",user,level,(g->seconds+59)/60)>0;
-    if(fclose(f))ok=0;return ok;
+    if(fclose(f))ok=0;
+    return ok;
 }
 int doors_config(const char *path) {
     game_count=0;if(!path)return 1;FILE *f=fopen(path,"r");if(!f)return 0;
     char line[4096];int ok=1;
     while(fgets(line,sizeof(line),f)) {
         size_t n=strlen(line);if(n && line[n-1]=='\n')line[--n]=0;else if(!feof(f)) { ok=0;break; }
-        if(n && line[n-1]=='\r')line[--n]=0;if(!*line || *line=='#')continue;
+        if(n && line[n-1]=='\r')line[--n]=0;
+        if(!*line || *line=='#')continue;
         if(game_count==32) { ok=0;break; }Game *g=&games[game_count];memset(g,0,sizeof(*g));char *options=NULL;char *parts[6],*p=line;unsigned i;
         for(i=0;i<6;i++) { parts[i]=p;char *bar=strchr(p,'|');if(i<5) { if(!bar)break;*bar=0;p=bar+1; }else if(bar) { *bar=0;options=bar+1; } }
         if(i!=6) { ok=0;break; }unsigned *numbers[]={&g->id,&g->level,&g->seconds};
@@ -93,9 +99,16 @@ int doors_config(const char *path) {
         for(const unsigned char *q=(unsigned char *)parts[5];*q;q++)if(*q<32 || *q==127)ok=0;
         for(i=0;i<game_count;i++)if(games[i].id==g->id)ok=0;
         struct stat st;if(stat(parts[3],&st) || !S_ISREG(st.st_mode) || access(parts[3],X_OK) || stat(parts[4],&st) || !S_ISDIR(st.st_mode))ok=0;
-        if(!ok)break;strcpy(g->exe,parts[3]);strcpy(g->dir,parts[4]);strcpy(g->title,parts[5]);game_count++;
+        if(!ok)break;
+        strcpy(g->exe,parts[3]);
+        strcpy(g->dir,parts[4]);
+        strcpy(g->title,parts[5]);
+        game_count++;
     }
-    if(ferror(f))ok=0;fclose(f);if(!ok)game_count=0;return ok;
+    if(ferror(f))ok=0;
+    fclose(f);
+    if(!ok)game_count=0;
+    return ok;
 }
 void doors_list(unsigned level,char *out,size_t size) {
     size_t n=(size_t)snprintf(out,size,"GAMES\r\n");
@@ -104,7 +117,8 @@ void doors_list(unsigned level,char *out,size_t size) {
 }
 Door *door_start(unsigned id,unsigned level,uint32_t user,const char *name,unsigned columns,unsigned rows,uint64_t now) {
     errno=0;if(!user || geteuid()==0)return NULL;doors_reap();errno=0;Game *g=NULL;
-    for(unsigned i=0;i<game_count;i++)if(games[i].id==id && level>=games[i].level)g=&games[i];if(!g)return NULL;
+    for(unsigned i=0;i<game_count;i++)if(games[i].id==id && level>=games[i].level)g=&games[i];
+    if(!g)return NULL;
     Door *d=calloc(1,sizeof(*d));if(!d)return NULL;d->lock=-1;d->fd=-1;
     unsigned node=0;
     if((g->slots && !door_slot(d,g,&node)) || (g->drop && !door_drop(d,g,user,level))) { int saved=errno;door_clean(d);errno=saved;return NULL; }
@@ -127,7 +141,9 @@ Door *door_start(unsigned id,unsigned level,uint32_t user,const char *name,unsig
         for(int fd=3;fd<maxfd;fd++)if(fd!=d->lock)close(fd);
         signal(SIGTERM,SIG_DFL);signal(SIGINT,SIG_DFL);signal(SIGHUP,SIG_DFL);signal(SIGPIPE,SIG_DFL);
         struct rlimit cpu={g->seconds,g->seconds+1},files={64,64},core={0,0};setrlimit(RLIMIT_CPU,&cpu);setrlimit(RLIMIT_NOFILE,&files);setrlimit(RLIMIT_CORE,&core);
-        if(chdir(g->dir))_exit(126);execve(g->exe,argv,env);_exit(127);
+        if(chdir(g->dir))_exit(126);
+        execve(g->exe,argv,env);
+        _exit(127);
     }
     close(slave);if(pid<0) { close(master);door_clean(d);return NULL; }
     d->pid=pid;d->fd=master;d->until=now+(uint64_t)g->seconds*1000;

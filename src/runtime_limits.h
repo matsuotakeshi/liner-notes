@@ -37,6 +37,8 @@ static inline int ln_limits_load(const char *path) {
 #endif
         seen|=1u<<i;
     }
-    if(ferror(f))ok=0;if(fclose(f))ok=0;return ok;
+    if(ferror(f))ok=0;
+    if(fclose(f))ok=0;
+    return ok;
 }
 #endif
