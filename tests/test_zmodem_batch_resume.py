@@ -1,4 +1,5 @@
 """Real terminal batch upload and interrupted upload/download wire resumption."""
+from test_zmodem_workflows import spool_contents
 import hashlib,os,pathlib,select,shlex,socket,subprocess,sys,tempfile,time
 sys.path.insert(0,str(pathlib.Path(__file__).resolve().parents[1]/'scripts'))
 from test_board import Server
@@ -45,14 +46,14 @@ def run(binary,ctl,receiver,sender):
    c.cmd('ZUPLOADBATCH open|batch description',b'16 GiB total.\r\n')
    code,out,err=transfer(c,sender,['--']+list(payloads),source);assert code==0 and b'Uploaded 2 files' in out,(code,out,err)
    for ident,body in enumerate(payloads.values(),1):assert api.info(ident)==(len(body),hashlib.sha256(body).hexdigest())
-   assert not list(spool.iterdir())
+   assert not spool_contents(spool)
    api.protocol.send('FILE 1');rows=[]
    while True:
     row=api.protocol.line();rows.append(row)
     if row==b'END FILE':break
    assert any(b'open' in row for row in rows) and any(b'batch description' in row for row in rows),rows
    # This check fails before receiving or reserving a private-board file.
-   c.cmd('ZUPLOADBATCH private|denied',b'16 GiB total.\r\n');assert b'failed or cancelled' in c.until();assert not list(spool.iterdir())
+   c.cmd('ZUPLOADBATCH private|denied',b'16 GiB total.\r\n');assert b'failed or cancelled' in c.until();assert not spool_contents(spool)
    payload=bytes(range(256))*8192;name='resume.bin';(source/name).write_bytes(payload)
    c.cmd('ZUPLOADIN open|resume description',b'1 GiB.\r\n');interrupt(c,sender,source,name)
    time.sleep(1.5)
@@ -67,7 +68,7 @@ def run(binary,ctl,receiver,sender):
    assert code==0 and b'published' in out,(code,out,err)
    assert api.info(3)==(len(payload),hashlib.sha256(payload).hexdigest())
    assert sent[0]<len(payload),(retained,sent[0],len(payload))
-   assert not list(spool.iterdir())
+   assert not spool_contents(spool)
    # Batch retry includes the completed first file and interrupted second file.
    c.cmd('ZUPLOADBATCH open|resume batch',b'16 GiB total.\r\n');interrupt(c,sender,source,['one.bin',name])
    time.sleep(1.5);assert len(list(spool.glob('pending-*/data/*')))==2
@@ -76,7 +77,7 @@ def run(binary,ctl,receiver,sender):
    code,out,err=transfer(c,sender,['--','one.bin',name],source);assert code==0 and b'Uploaded 2 files' in out,(code,out,err)
    assert api.info(4)==(len(payloads['one.bin']),hashlib.sha256(payloads['one.bin']).hexdigest())
    assert api.info(5)==(len(payload),hashlib.sha256(payload).hexdigest())
-   assert not list(spool.iterdir())
+   assert not spool_contents(spool)
    # Receiver preserves its own partial and requests resumption from the sender.
    (target/name).write_bytes(payload[:1048576]);c.cmd('ZDOWNLOAD 3',b'1 GiB.\r\n')
    code,out,err=transfer(c,receiver,['--resume','--resume'],target)
@@ -105,7 +106,7 @@ def run(binary,ctl,receiver,sender):
    private_api=MailConnector('127.0.0.1',s.port,'alice',PASSWORD)
    try:assert private_api.info(1)==(len(private),hashlib.sha256(private).hexdigest())
    finally:private_api.close()
-   assert not list(spool.iterdir())
+   assert not spool_contents(spool)
    print(f'PASS: real Telnet batch upload/board ACL/description; TCP cut retained {retained} bytes; resumed upload wire {sent[0]} < full payload {len(payload)}; SHA-256 matches; batch/download/private-mail resume, path rejection and changed-prefix restart')
   finally:c.close();api.close();s.close()
 if __name__=='__main__':run(*sys.argv[1:])

@@ -4,10 +4,26 @@ import json
 import pathlib
 import sys
 import tempfile
+import os
+import stat
 
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1] / 'scripts'))
 import vault_zmodem as gateway
+import posix_locks
 from zmodem_connector import safe_name, staged_file, TransferFailure
+
+
+def spool_contents(root):
+    """Only Solaris' one validated infrastructure file is not payload residue."""
+    entries = list(root.iterdir())
+    marker = root / posix_locks.NAMESPACE_FILE
+    if marker in entries:
+        assert posix_locks.RECORD_LOCKS, 'Unexpected namespace metadata on native flock'
+        info = marker.lstat()
+        assert stat.S_ISREG(info.st_mode) and info.st_nlink == 1 and info.st_size == 0
+        assert info.st_mode & 0o077 == 0 and info.st_uid == os.geteuid()
+        entries.remove(marker)
+    return entries
 
 
 class Member:

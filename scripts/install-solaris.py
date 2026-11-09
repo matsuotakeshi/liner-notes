@@ -87,10 +87,20 @@ def install(destdir, prefix="/opt/liner-notes", python="/usr/bin/python3.11"):
     for name in ("banner", "sysinfo", "goodbye", "welcome", "systemnews", "birthday", "greeting-06", "greeting-12", "greeting-18"):
         put(share + "/" + name + ".txt", (ROOT / (name + ".txt")).read_bytes(), sample=True)
     for name in ("limits", "vault-limits", "doors"):
-        put(config + "/" + name + ".conf", (ROOT / (name + ".example.conf")).read_bytes(), sample=True)
+        data = (ROOT / (name + ".example.conf")).read_bytes()
+        if name == "doors":
+            data = data.replace(b"/usr/local/libexec/liner-notes/scripts", (share + "/scripts").encode())
+            data = data.replace(b"/var/db/liner_notes/games", b"/var/opt/liner-notes/games")
+        put(config + "/" + name + ".conf", data, sample=True)
     for name in ("link.toml", "link-accounts.conf"):
         source = "link.example.toml" if name.endswith("toml") else "link-accounts.example.conf"
-        put(config + "/" + name, (ROOT / source).read_bytes(), 0o640, sample=True)
+        data = (ROOT / source).read_bytes()
+        if name == "link.toml":
+            data = data.replace(b"/var/db/liner-notes-link", b"/var/opt/liner-notes/link")
+            data = data.replace(b"/var/run/liner-notes-link", b"/var/opt/liner-notes/link")
+            data = data.replace(b"/usr/local/etc/liner-notes", config.encode())
+            data = data.replace(b"port = 23\n", b"port = 2222\n")
+        put(config + "/" + name, data, 0o640, sample=True)
     args = ["--telnet", "--menu", "--lang", "ja", "--bind", "127.0.0.1", "--timezone", "Asia/Tokyo",
             "--limits", config + "/limits.conf", "--menu-dir", share + "/menus", "--help-dir", share + "/help",
             "--banner", share + "/banner.txt", "--login-text-dir", share, "--sysinfo", share + "/sysinfo.txt",

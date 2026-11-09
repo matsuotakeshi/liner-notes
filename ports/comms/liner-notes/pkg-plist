@@ -98,6 +98,7 @@ bin/liner-notes-check-resume
 @sample %%DATADIR%%/systemnews.txt.sample
 @sample %%DATADIR%%/birthday.txt.sample
 %%DATADIR%%/scripts/transfer_spool.py
+%%DATADIR%%/scripts/posix_locks.py
 %%DATADIR%%/scripts/structured_db.py
 @sample %%DATADIR%%/greeting-06.txt.sample
 @sample %%DATADIR%%/greeting-12.txt.sample

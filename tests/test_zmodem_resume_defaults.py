@@ -1,5 +1,6 @@
 """Real Telnet: saved description, receiver checks, progress timeout, exact payload."""
 from pathlib import Path
+from test_zmodem_workflows import spool_contents
 import sys,tempfile,subprocess,shlex,hashlib,time,os
 from test_board import Server
 from test_runtime import Client
@@ -40,7 +41,7 @@ def run(binary,ctl,receiver,sender,payload_file=None):
    assert b'Registering received data:' in out,out
    assert api.info(1)==(len(original),hashlib.sha256(original).hexdigest());assert elapsed>3
    if payload_file:assert elapsed>120,elapsed
-   assert not list(spool.iterdir())
+   assert not spool_contents(spool)
    c.cmd('ZRESUME',b'1 GiB.\r\n');assert b'No interrupted transfer in this board' in c.until()
    print(f'PASS: bare ZRESUME reuses current board and saved description; missing receipt/mismatch/no partial diagnosed; {len(original)} bytes SHA256 {hashlib.sha256(original).hexdigest()} resumed in {elapsed:.1f}s with 3s idle timeout; original name preserved')
   finally:c.close();api.close();s.close()
