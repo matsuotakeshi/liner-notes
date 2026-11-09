@@ -91,14 +91,21 @@ def test():
     for assignment in flags[1:]:
         key, value = assignment.split("=", 1)
         os.environ[key] = value
-    capabilities = {"core": "not-tested", "door": "not-tested",
+    capabilities = {"build": "not-tested", "lock_lifetime": "not-tested",
+                    "smf_manifest": "not-tested", "smf_lifecycle": "unverified: no SMF management authorization",
+                    "core": "not-tested", "door": "not-tested",
                     "webui": "not-tested", "link": "not-tested", "zmodem": "not-tested"}
     try:
         run(flags + ["-j2", "all"])
+        capabilities["build"] = "passed"
         run([sys.executable, "tests/test_door_lock.py"])
+        run([sys.executable, "tests/test_posix_locks.py"])
+        capabilities["lock_lifetime"] = "passed"
         run([sys.executable, "tests/test_solaris_service.py"])
         run([sys.executable, "scripts/install-solaris.py", "--destdir", "build/solaris-stage", "--python", sys.executable])
         run(["/usr/sbin/svccfg", "validate", "build/solaris-stage/opt/liner-notes/share/smf/liner-notes.xml"])
+        capabilities["smf_manifest"] = "passed"
+        capabilities["core"] = "incomplete"
         run(flags + ["check"])
         run([sys.executable, "tests/test_stage73_database.py", "./runtime"])
         capabilities["core"] = "passed"

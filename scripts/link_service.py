@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Liner notes shared-board link daemon (opt-in, separate from the BBS)."""
-import argparse,asyncio,fcntl,json,logging,os,secrets,signal,sqlite3,stat,tomllib,time
+import argparse,asyncio,json,logging,os,secrets,signal,sqlite3,stat,tomllib,time
+from posix_locks import file_lock
 from pathlib import Path
 from contextlib import closing
 from types import SimpleNamespace
@@ -61,8 +62,7 @@ def inspect_store(filename,reset_peer=None):
     try:
         if reset_peer is not None:
             if reset_peer not in peers:raise ValueError('Unknown peer; use its full public-key fingerprint')
-            lock=os.open(str(path)+'.lock',os.O_RDWR|os.O_CREAT|os.O_NOFOLLOW,0o600)
-            fcntl.flock(lock,fcntl.LOCK_EX|fcntl.LOCK_NB)
+            lock=file_lock(str(path)+'.lock')
         with closing(sqlite3.connect(path.as_uri()+'?mode='+('rw' if reset_peer else 'ro'),uri=True)) as db:
             if reset_peer:
                 db.execute('DELETE FROM cursors WHERE peer=?',(reset_peer,));db.commit()
@@ -78,13 +78,17 @@ def inspect_store(filename,reset_peer=None):
                         cursors=dict(db.execute('SELECT peer,sequence FROM cursors')),
                         retry_reasons=list(db.execute('SELECT seq,reason FROM retry ORDER BY seq LIMIT 20')))
     finally:
-        if lock is not None:os.close(lock)
+        if lock is not None:lock.close()
 
 async def run(filename):
-    cfg,key,boards,origins,peers,endpoints,certificates=configuration(filename);node=cfg['node']
-    database=Path(node['database']).absolute();database.parent.mkdir(mode=0o700,parents=True,exist_ok=True)
-    lock=os.open(str(database)+'.lock',os.O_RDWR|os.O_CREAT|os.O_NOFOLLOW,0o600)
-    fcntl.flock(lock,fcntl.LOCK_EX|fcntl.LOCK_NB)
+    settings=configuration(filename)
+    database=Path(settings[0]['node']['database']).absolute()
+    database.parent.mkdir(mode=0o700,parents=True,exist_ok=True)
+    with file_lock(str(database)+'.lock'):
+        await run_locked(settings,database)
+
+async def run_locked(settings,database):
+    cfg,key,boards,origins,peers,endpoints,certificates=settings;node=cfg['node']
     store=Store(database,key,origins,peers,max_events=node.get('max_events',1000000),max_bytes=node.get('max_bytes',1073741824));core=None;server=None;control=None;tasks=set()
     use_rotation=node.get('rotate_tls',False)
     if type(use_rotation) is not bool:raise ValueError('rotate_tls must be true or false')
@@ -167,7 +171,7 @@ async def run(filename):
         for task in list(tasks):task.cancel()
         if tasks:await asyncio.gather(*tasks,return_exceptions=True)
         if core:await core.close()
-        store.close();os.close(lock)
+        store.close()
 
 def main():
     p=argparse.ArgumentParser(description=__doc__);sub=p.add_subparsers(dest='command',required=True)

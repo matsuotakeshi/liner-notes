@@ -37,9 +37,32 @@ Manual observations supplement Actions and do not replace native verification.
 
 ## Remaining verification
 
-The next trusted-main native run must prove the C build, core BBS and management
-commands, database restart/backup/restore, PTY Door behavior and inherited-lock
-lifetime. WebUI/link dependencies are installed into a private venv only;
+The next trusted-main native run must finish core BBS regression, database
+restart/backup/restore and PTY Door integration. WebUI/link dependencies are installed into a private venv only;
 transfer tooling is built into a private prefix if absent. Failures remain CI
 failures. SMF lifecycle testing requires a separately authorized suitable test
 context and is not marked successful on the strength of manifest validation.
+
+## Trusted-main build and partial regression
+
+- Source: `310976797a53c32a62810612e9a847cd920902cc`.
+- Actions: https://github.com/matsuotakeshi/liner-notes/actions/runs/42539443413
+- Artifact ID: `13640937372`, SHA-256:
+  `70f06871fc4b3b97505095b4ebc085d2f52fb2c385b2370e4778312ad0debe4e`.
+- Passed: full strict C build; C Door lock lifetime units; SMF staging tests and
+  native `svccfg validate`; doctor 31 units plus blocks/structured DB read-only
+  checks; chat/userlog/session/Telnet and vault/transfer workflows before recovery.
+- FAILED in `test_zmodem_recovery`: Python's Solaris flock emulation cannot lock
+  a read-only directory. Full core, PTY integration, WebUI, link and real ZMODEM
+  have not passed. SMF lifecycle was not executed and is separately unverified.
+- Solaris headers have no `F_OFD_SETLK`/BSD flock extension. Python transfer and
+  link locks therefore use a fresh isolated helper interpreter holding a POSIX
+  record lock, with a pipe lease and separate session. Existing FreeBSD/Linux
+  flock behavior is retained. A persistent validated private namespace file
+  replaces directory locking only on Solaris. Its inode is never replaced by
+  the transfer manager; protocol names cannot target it.
+- Hosted tests must prove same-process conflict, unrelated close, thread wait,
+  fork/exec inheritance, owner process-group death, legacy record-lock conflict,
+  EOF cleanup, immediate reacquisition and namespace metadata rejection. An
+  explicitly inherited pipe can keep a child lease; ordinary subprocesses do
+  not inherit it. No service account privileges are changed.

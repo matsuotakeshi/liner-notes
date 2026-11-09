@@ -2,6 +2,7 @@
 
 Usage: python3 tests/test_zmodem.py ./runtime ./vaultctl /prefix/bin/lrz /prefix/bin/lsz
 """
+from test_zmodem_workflows import spool_contents
 import hashlib
 import os
 import pathlib
@@ -66,7 +67,7 @@ def run(binary, ctl, receiver, sender):
                 peer(receiver,['--restricted'],target,
                     lambda fd: gateway.send(c,engine,ident,spool,fd,fd,name=filename))
                 assert (target/filename).read_bytes()==payload
-                assert not list(spool.iterdir())
+                assert not spool_contents(spool)
                 # A receiver skipping an existing file must not be called success.
                 fails(lambda: peer(receiver,['--restricted','--protect'],target,
                     lambda fd: gateway.send(c,engine,ident,spool,fd,fd,name=filename)))
@@ -74,22 +75,22 @@ def run(binary, ctl, receiver, sender):
             # Batches must never publish even their first successfully received file.
             fails(lambda:peer(sender,['--','payload-0.bin','payload-1.bin'],origin,
                 lambda fd:gateway.receive(c,engine,'127.0.0.1',s.port,'bob',spool,fd,fd)))
-            assert (vault/'index.dat').read_bytes()==journal and not list(spool.iterdir())
+            assert (vault/'index.dat').read_bytes()==journal and not spool_contents(spool)
             outside=p/'outside.bin';outside.write_bytes(b'unchanged source')
             fails(lambda:peer(sender,['--full-path','--','../outside.bin'],origin,
                 lambda fd:gateway.receive(c,engine,'127.0.0.1',s.port,'bob',spool,fd,fd)))
             assert outside.read_bytes()==b'unchanged source'
-            assert (vault/'index.dat').read_bytes()==journal and not list(spool.iterdir())
+            assert (vault/'index.dat').read_bytes()==journal and not spool_contents(spool)
             with (origin/'oversize.bin').open('wb') as f:f.truncate(1024*1024*1024+1024)
             fails(lambda:peer(sender,['--','oversize.bin'],origin,
                 lambda fd:gateway.receive(c,engine,'127.0.0.1',s.port,'bob',spool,fd,fd)))
-            assert (vault/'index.dat').read_bytes()==journal and not list(spool.iterdir())
+            assert (vault/'index.dat').read_bytes()==journal and not spool_contents(spool)
             a,b=socket.socketpair()
             try:
                 b.sendall(b'\x18'*8+b'\x08'*8);b.shutdown(socket.SHUT_WR)
                 fails(lambda:gateway.receive(c,engine,'127.0.0.1',s.port,'bob',spool,a.fileno(),a.fileno()))
             finally:a.close();b.close()
-            assert (vault/'index.dat').read_bytes()==journal and not list(spool.iterdir())
+            assert (vault/'index.dat').read_bytes()==journal and not spool_contents(spool)
             # Complete CLI path, with a separate secret FD and pure protocol stdout.
             a,b=socket.socketpair(); secret_r,secret_w=os.pipe()
             os.write(secret_w,(PASSWORD+'\n').encode());os.close(secret_w)
@@ -110,7 +111,7 @@ def run(binary, ctl, receiver, sender):
                 for child in (entry,partner):
                     if child.poll() is None:child.kill();child.wait()
                     child.stderr.close()
-            assert not list(spool.iterdir())
+            assert not spool_contents(spool)
             journal=(vault/'index.dat').read_bytes()
             # Timeout restores terminal flags and reaps the receiver process.
             import pty,termios
@@ -120,7 +121,7 @@ def run(binary, ctl, receiver, sender):
                 fails(lambda:gateway.receive(c,ZmodemProcess(receiver,sender,1),'127.0.0.1',s.port,'bob',spool,slave,slave))
                 assert time.monotonic()-started<4 and termios.tcgetattr(slave)==before
             finally:os.close(master);os.close(slave)
-            assert not list(spool.iterdir())
+            assert not spool_contents(spool)
             # Revoke the actual BBS session while the ZMODEM child is running.
             class Revoke(ZmodemProcess):
                 def receive(self,directory,stdin,stdout,authorize):
@@ -135,7 +136,7 @@ def run(binary, ctl, receiver, sender):
             try:
                 fails(lambda:gateway.receive(c,Revoke(receiver,sender,5),'127.0.0.1',s.port,'bob',spool,a.fileno(),a.fileno()))
             finally:a.close();b.close()
-            assert (vault/'index.dat').read_bytes()==journal and not list(spool.iterdir())
+            assert (vault/'index.dat').read_bytes()==journal and not spool_contents(spool)
         finally:c.close();admin.close();s.close()
     print('PASS: real lrzsz 0.13.1 send/receive, all-byte/empty roundtrip, SHA-256 publication, skipped files, batch/cancel/timeout rejection, PTY restoration and live member revocation')
 

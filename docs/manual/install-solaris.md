@@ -2,7 +2,7 @@
 
 ## 次期版（未リリース）：移植検証中
 
-対象はOracle Solaris 11.4 CBE x86-64です。安定版0.74.1の正式対応OSには含まれません。SPARC・ARMは対象外です。現在はネイティブビルド・機能試験の基盤を用意した段階で、実機試験の成功や全機能対応を意味しません。
+対象はOracle Solaris 11.4 CBE x86-64です。安定版0.74.1の正式対応OSには含まれません。SPARC・ARMは対象外です。ネイティブビルドと一部の基本機能・診断試験は成功しましたが、全体の回帰試験は継続中です。全機能対応を意味しません。
 
 ## 検証と依存関係
 
@@ -10,11 +10,13 @@
 
 必要な構築環境はGNU make、64ビットC11コンパイラ（ClangまたはGCC）、SQLiteとOpenSSLの開発用ヘッダー・ライブラリ、Python 3.11以上です。読み取り専用診断ツールdoctorも含めて検証します。WebUIとBBS間リンクは、それぞれaiohttp、cryptographyを必要とします。ZMODEM相互運用試験はlrz/lszを使います。未導入の場合、既存の公式ソース取得・SHA-256検証helperで作業コピー内だけにビルドします。Solarisではgcc/gmakeと64ビット指定を使用し、OSのパッケージは変更しません。
 
-CIログにはOS、コンパイラ候補、ライブラリ配置、Python、正確なソースSHAを記録します。OSパッケージは自動導入しません。WebUI・リンクのPython依存は作業コピー内の専用venvにrequirementsから導入し、既存のsystem Pythonを変更しません。インストール失敗もCI失敗として記録します。基本BBS、Door、WebUI、リンク、ZMODEMの検証状態は`SOLARIS_CAPABILITIES`行で区別します。追加依存がなく実行できなかった機能を成功扱いしません。
+CIログにはOS、コンパイラ候補、ライブラリ配置、Python、正確なソースSHAを記録します。OSパッケージは自動導入しません。WebUI・リンクのPython依存は作業コピー内の専用venvにrequirementsから導入し、既存のsystem Pythonを変更しません。インストール失敗もCI失敗として記録します。ビルド、排他寿命、SMF定義検証、基本BBS、Door、WebUI、リンク、ZMODEMの検証状態は`SOLARIS_CAPABILITIES`行で区別します。追加依存がなく実行できなかった機能を成功扱いしません。
 
 ## ビルド上のOS差
 
 Solaris 11.4の`openpty`と`login_tty`はlibcにあり、`termios.h`で宣言されます。FreeBSD/Linux向けの`libutil`をSolarisへリンクしません。ソケットは`-lsocket -lnsl`を明示します。既存のPTYと端末サイズ伝達を維持し、端末の制御取得はSolarisの`login_tty`へ委ねます。SolarisにはBSDの`flock`がないため、専用の小さな子プロセスがPOSIXファイルロックを保持します。BBSとDoorへ継承したpipeがすべて閉じるまで保持し、BBSの異常終了後も生存中のDoorが同じ枠を占有します。FreeBSD/Linuxは従来の`flock`を使用します。
+
+Python補助ツールもSolarisでは独立したロック保持プロセスを使用します。転送spoolとリンク保守の排他を、同一プロセスの別FDのcloseで解除させません。spool直下の固定ファイル`.namespace-lock`は空の0600管理用ファイルです。削除・置換しないでください。symlink、hardlink、公開権限、不正な内容は拒否します。転送一覧・削除・復元はこのファイルを転送データとして扱いません。既存SunOSの通常ファイルに対するPOSIX記録ロックとは競合しますが、旧版のディレクトリロックは動作しないため、同じspoolで旧新プロセスを並行使用しないでください。FreeBSD/Linuxのflockと保存データ形式は維持します。
 
 独立した作業コピーでの検証入口は次のとおりです。CIでは上記のmain検証を通った後に同じコマンドを使用します。
 
@@ -57,7 +59,7 @@ SMFのcontractモデルで子プロセスを追跡し、停止は`:kill`で当�
 
 ## 現在の制約
 
-- 最初の実機CIではGCC15の厳密な警告とBSD flockの未提供を確認しました。警告の抑制はせず、該当箇所の改行と排他方式を修正中です。ビルド・機能試験の成功はまだ確認できていません。
+- GCC15で本体・管理コマンドのビルド、Door排他単体試験、doctorの31項目と実DBの非変更診断、SMF staging・定義検証が成功しました。基本回帰は転送spoolのロックで停止しており、基本BBS全体・DB復旧・Door PTY統合・WebUI・リンク・実ZMODEMの成功はまだ確認できていません。
 - 検証機にはPython3.11/3.13、cryptography、OpenSSL3、SQLite3.51がありますが、aiohttpはありません。CIでは作業コピー内の専用venvへrequirementsからaiohttpを導入してからWebUIを検証します。依存導入・機能試験の成否は次の実機CIで確認します。
 - CIアカウントにはSMF管理権限がありません。既存OS設定や権限を自動変更せず、実サービス登録・稼働は未検証とします。
 - SMFマニフェストと設定保持を行うstaging installerを用意しています。実SMFでの登録・起動・停止・自動起動、および本番用の導入・更新手順は未検証です。FreeBSDのrc.dやLinuxのsystemdの手順をそのまま使用しないでください。
