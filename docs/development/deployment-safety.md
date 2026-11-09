@@ -121,3 +121,11 @@ policy manifest from `liner-notes-selinux-policy` in the exact same-SHA SELinux
 workflow run that passed Enforcing acceptance. Its independent package version,
 size/hash/name and Release Set `components` record must all agree. The normal
 Rocky core/web/link manifest remains a separate, mandatory three-package set.
+
+Before production helper provisioning, reconcile the root-owned backup profile
+with the actual runtime Door configuration and wrapper-specific save paths.
+Every registered Door requires `backup_features.doors=true`, all game working
+and data directories in the `doors` roots, and a Door startup/return probe. The
+helper trusts this administrator-maintained declaration; it does not infer
+external save paths from arbitrary wrapper scripts. An empty roots list or
+false declaration is not valid merely because a game has not been played yet.

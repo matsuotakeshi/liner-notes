@@ -53,6 +53,11 @@ worker確認で非稼働を確かめます。稼働サービスの漏れや、�
 バックアップ対象はdata/config/attachments/vault/spool/link/web/doors/binaries/old-packages
 の10区分すべてを明記します。data/config/binaries/old-packagesは空にできません。
 他の区分は `backup_features` で使用/未使用を明記し、未使用は空配列、使用中は実パスを列挙します。
+Doorが1件でも登録されている場合は `backup_features.doors=true` が必須です。
+導入前に実際に使用する `doors.conf` と各ラッパーの設定を確認し、全登録ゲームの作業領域・
+保存先（BBSのdataディレクトリ外も含む）をdoorsのバックアップ一覧へ列挙してください。
+ゲーム側の保存先は自動推測しません。この宣言をfalseにして登録済みゲームのデータや
+必要なDoor起動・復帰probeを省略してはいけません。
 Web/linkサービスを有効にして対応する保存先を空にする設定は拒否します。data配下にまとめて
 保存している機能は同じdataパスを指定して構いません。外部保存先・Doorデータは個別に含めます。
 停止後に専用サービスアカウントのworkerが残っていないことを確認し、ACL・拡張属性を含むarchiveを作成します。
