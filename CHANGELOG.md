@@ -6,6 +6,8 @@
 
 ## 未リリース（次期版0.75候補）
 
+- FreeBSD jail受入試験のPython隔離起動に必要なCIモジュールのパスを明示。hosted CIで実エントリポイントを`-I`付きで読み込み、作業ディレクトリやPYTHONPATHへ依存しないことを確認します。
+
 - doctorのSolaris Door診断試験で、正常fixtureの親ディレクトリ権限を明示。Ubuntu CIのumask 0002でも安全な設置状態を再現し、Python 3.14のhosted試験と0775/0777拒否を追加。実装の信頼条件は変更しない。
 
 - Solarisの再開検査記録の保存を共通のnamespace排他へ変更。既存記録の再利用・原子的更新・退避を維持し、競合保存・予約名・不正なロックの拒否と導入後の独立したimportを回帰検査。FreeBSD/Linuxのflockは変更しない。

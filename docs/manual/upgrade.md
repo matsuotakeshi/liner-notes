@@ -108,6 +108,8 @@ login/article/mail・論理backup/restore・旧package回復の試験も用意�
 VNET jailへ複製し、maintainer script・会員/データ所有権、実rc起動、記事/メール、Web、link、
 Door、バックアップからの復元と旧package回復を検査する候補実装です。宿主のサービスや
 packageを更新しません。テンプレート・固定sudo entryの初期準備とネイティブ実行は別途必要です。
+実jailの前にhosted CIで同じエントリポイントをPythonの`-I`付きで読み込みます。
+このimport検査は依存モジュールの解決だけを確認し、実際のサービス更新試験の代わりにはしません。
 同一バージョンの開発候補はrevisionだけを上げて更新経路を試験できますが、その証跡だけでは
 本番applyを許可しません。実release packageのhash/版と試験結果を照合し、試験開始時の旧版を
 短期署名承認へ含め、本番局の旧版が異なる場合も停止します。
