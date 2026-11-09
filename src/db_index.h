@@ -81,10 +81,16 @@ static inline int db_cache_load(DbIndex *d,const int *fds,unsigned count,void *m
     unsigned char digest[32];if(!db_signature(fds,count,digest))return 0;
     sqlite3_stmt *q=NULL;if(sqlite3_prepare_v2(d->sql,"SELECT signature,metadata,cellsize,format FROM checkpoint WHERE id=1",-1,&q,NULL)!=SQLITE_OK)db_die(d);
     int ok=sqlite3_step(q)==SQLITE_ROW && sqlite3_column_bytes(q,0)==32 && !memcmp(sqlite3_column_blob(q,0),digest,32) && sqlite3_column_bytes(q,1)==(int)size && sqlite3_column_int64(q,2)==(sqlite3_int64)d->size && sqlite3_column_int(q,3)==6501;
-    if(ok)memcpy(meta,sqlite3_column_blob(q,1),size);sqlite3_finalize(q);return ok;
+    if(ok)memcpy(meta,sqlite3_column_blob(q,1),size);
+    sqlite3_finalize(q);
+    return ok;
 }
 static inline void db_cache_store(DbIndex *d,const int *fds,unsigned count,const void *meta,size_t size) {
-    if(!d->sql)return;unsigned char digest[32];if(!db_signature(fds,count,digest)) { db_exec(d,"DELETE FROM checkpoint");return; }
+    if(!d->sql)return;
+    unsigned char digest[32];
+    if(!db_signature(fds,count,digest)) { db_exec(d,"DELETE FROM checkpoint");
+    return;
+    }
     sqlite3_stmt *q=NULL;if(sqlite3_prepare_v2(d->sql,"INSERT OR REPLACE INTO checkpoint VALUES(1,?,?,?,6501)",-1,&q,NULL)!=SQLITE_OK)db_die(d);
     sqlite3_bind_blob(q,1,digest,32,SQLITE_STATIC);sqlite3_bind_blob(q,2,meta,(int)size,SQLITE_STATIC);sqlite3_bind_int64(q,3,(sqlite3_int64)d->size);if(sqlite3_step(q)!=SQLITE_DONE)db_die(d);sqlite3_finalize(q);
 }

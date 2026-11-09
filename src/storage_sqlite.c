@@ -81,7 +81,9 @@ int storage_init(const char *path) {
     int d=open(directory,O_RDONLY);ok=d>=0 && fsync(d)==0;if(d>=0)close(d);return ok;
 }
 static int length_refresh(Store *s) {
-    if(!s->get_length && sqlite3_prepare_v2(s->db,"SELECT length FROM streams WHERE id=?",-1,&s->get_length,NULL)!=SQLITE_OK)return 0;sqlite3_stmt *q=s->get_length;int ok=1;
+    if(!s->get_length && sqlite3_prepare_v2(s->db,"SELECT length FROM streams WHERE id=?",-1,&s->get_length,NULL)!=SQLITE_OK)return 0;
+    sqlite3_stmt *q=s->get_length;
+    int ok=1;
     if(ok) { sqlite3_bind_int64(q,1,s->id);ok=sqlite3_step(q)==SQLITE_ROW;if(ok)s->length=sqlite3_column_int64(q,0); }
     sqlite3_reset(q);sqlite3_clear_bindings(q);return ok;
 }
@@ -142,7 +144,15 @@ int storage_fstat(int fd,struct stat *st) {
 }
 int storage_close(int fd) {
     pthread_mutex_lock(&registry);Store **p=&handles;while(*p && (*p)->fd!=fd)p=&(*p)->next;Store *s=*p;if(s)*p=s->next;pthread_mutex_unlock(&registry);
-    if(!s)return close(fd);if(s->dirty)sql(s->db,"ROLLBACK");sqlite3_finalize(s->get_block);sqlite3_finalize(s->put_block);sqlite3_finalize(s->get_length);free(s->row_cache);sqlite3_close(s->db);free(s);return close(fd);
+    if(!s)return close(fd);
+    if(s->dirty)sql(s->db,"ROLLBACK");
+    sqlite3_finalize(s->get_block);
+    sqlite3_finalize(s->put_block);
+    sqlite3_finalize(s->get_length);
+    free(s->row_cache);
+    sqlite3_close(s->db);
+    free(s);
+    return close(fd);
 }
 int storage_open(const char *path,int flags,mode_t mode) {
     if(owner<0 || strstr(path,".retaining-"))return open(path,flags,mode);
@@ -183,7 +193,11 @@ int storage_open(const char *path,int flags,mode_t mode) {
     if(original>=0) {
         unsigned char buffer[65536];ssize_t n;int ok=1;
         while((n=read(original,buffer,sizeof(buffer)))>0)if(storage_write(s->fd,buffer,(size_t)n)!=n) { ok=0;break; }
-        if(n<0)ok=0;close(original);if(!ok) { storage_close(s->fd);return -1; }
+        if(n<0)ok=0;
+        close(original);
+        if(!ok) { storage_close(s->fd);
+        return -1;
+        }
     }
     if(s->dirty && storage_sync(s->fd)) { storage_close(s->fd);return -1; }
     s->readonly=(flags&O_ACCMODE)==O_RDONLY;s->position=flags&O_APPEND?s->length:0;return s->fd;
@@ -212,7 +226,12 @@ int storage_rename(const char *from,const char *to) {
     }
     s->kind=0;s->row_bytes=0;s->committed=s->length=s->position=0;
     unsigned char data[65536];ssize_t n=0;while(ok && (n=read(input,data,sizeof(data)))>0)ok=storage_write(fd,data,(size_t)n)==n;
-    if(n<0)ok=0;if(ok)ok=storage_sync(fd)==0;close(input);storage_close(fd);if(ok)unlink(from);return ok?0:-1;
+    if(n<0)ok=0;
+    if(ok)ok=storage_sync(fd)==0;
+    close(input);
+    storage_close(fd);
+    if(ok)unlink(from);
+    return ok?0:-1;
 }
 static int rows_flush(Store *s) {
     if(storage_version<2 || s->length<8)return 1;
@@ -228,7 +247,8 @@ static int rows_flush(Store *s) {
         size_t head=kind==15?32:128;s->position=at;ok=storage_read(s->fd,r,head)==(ssize_t)head;size_t n=ok?row_size((unsigned)kind,r):0;
         if(n<head || n>ROW_MAX || n>(uint64_t)(s->length-at)) { ok=0;break; }
         if(n>head)ok=storage_read(s->fd,r+head,n-head)==(ssize_t)(n-head);
-        if(ok)ok=row_insert(s,at,r,n);at+=(sqlite3_int64)n;
+        if(ok)ok=row_insert(s,at,r,n);
+        at+=(sqlite3_int64)n;
     }
     free(r);s->position=saved;s->row_bytes=0;
     if(ok) { q=NULL;ok=sqlite3_prepare_v2(s->db,"DELETE FROM blocks WHERE stream=?",-1,&q,NULL)==SQLITE_OK;if(ok) { sqlite3_bind_int64(q,1,s->id);ok=sqlite3_step(q)==SQLITE_DONE; }sqlite3_finalize(q); }

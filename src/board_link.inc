@@ -22,13 +22,16 @@ int board_link_config(const char *path) {
         if(sscanf(line,"%u %u %c",&board,&user,&extra)!=2 || !board || board>CATALOG_MAX || !user || user>MEMBER_MAX || link_users[board]) { ok=0;break; }
         link_users[board]=user;
     }
-    if(ferror(f))ok=0;fclose(f);return ok;
+    if(ferror(f))ok=0;
+    fclose(f);
+    return ok;
 }
 static int link_hex(const char *text) { if(strlen(text)!=64)return 0;for(unsigned i=0;i<64;i++)if(!strchr("0123456789abcdef",text[i]))return 0;return 1; }
 static int link_hash(const char *body,char out[65]) {
     unsigned char digest[32];unsigned size=0;
     if(!EVP_Digest(body,strlen(body),digest,&size,EVP_sha256(),NULL) || size!=32)return 0;
-    for(unsigned i=0;i<32;i++)snprintf(out+i*2,3,"%02x",digest[i]);return 1;
+    for(unsigned i=0;i<32;i++)snprintf(out+i*2,3,"%02x",digest[i]);
+    return 1;
 }
 static int link_done(uint32_t id) {
     sqlite3_stmt *s=feature_stmt("UPDATE link_articles SET done=1 WHERE local_id=?");if(!s)return 0;
@@ -86,7 +89,9 @@ static void link_execute(const BoardRequest *q,BoardResult *r) {
         sqlite3_finalize(s);if(rc!=SQLITE_ROW && rc!=SQLITE_DONE)goto storage;
         const char *body=q->action=='S' && !strcmp(state,"LIVE")?article_body(a):"";if(body_read_failed)goto storage;
         int size=snprintf(r->text+used,sizeof(r->text)-used,"LINK ITEM %u %u %llu %s %s %s %u\r\nAUTHOR %s\r\nTITLE %s\r\nBODY %zu\r\n%s",id,a->parent,(unsigned long long)a->created,state,origin,key,revision,a->author,!strcmp(state,"LIVE")?a->title:"",strlen(body),body);
-        if(size<0 || (size_t)size>=sizeof(r->text)-used)goto storage;used+=(size_t)size;id++;
+        if(size<0 || (size_t)size>=sizeof(r->text)-used)goto storage;
+        used+=(size_t)size;
+        id++;
         }return;
     }
     if(!link_hex(q->link_origin) || !link_hex(q->link_article)) { strcpy(r->text,"ERR link identity\r\n");return; }

@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """Solaris native checks. Uses installed tools; never modifies the host OS."""
 import argparse
-import importlib.util
 import json
+import os
 from pathlib import Path
 import platform
 import shlex
@@ -30,8 +30,10 @@ def find_tool(names):
 def inventory():
     print(json.dumps({"platform": platform.platform(), "machine": platform.machine(),
                       "python": sys.version, "executable": sys.executable}, indent=2), flush=True)
-    for command in (["uname", "-a"], ["/usr/bin/isainfo", "-kv"]):
+    for command in (["uname", "-a"], ["/usr/bin/isainfo", "-kv"], ["id"]):
         run(command)
+    if Path("/usr/bin/auths").is_file():
+        run(["/usr/bin/auths"])
     print(Path("/etc/release").read_text(), flush=True)
     for name in ("gmake", "clang", "gcc", "pkg-config", "openssl", "lrz", "lsz"):
         print(name + ": " + str(shutil.which(name)), flush=True)
@@ -71,6 +73,10 @@ def build_arguments():
                     cppflags.append("-I" + str(prefix / "include"))
                     ldflags.append("-L" + str(lib))
                     break
+    # Solaris pkg-config can return the 32-bit lib directory even for -m64.
+    ldflags = ["-L" + str(Path(flag[2:]) / "amd64")
+               if flag.startswith("-L") and (Path(flag[2:]) / "amd64").is_dir()
+               else flag for flag in ldflags]
     # Libraries found through pkg-config must also be discoverable by the runtime.
     ldflags.extend("-Wl,-R," + flag[2:] for flag in list(ldflags) if flag.startswith("-L"))
     return [make, "CC=" + compiler, "PYTHON=" + sys.executable,
@@ -82,27 +88,44 @@ def build_arguments():
 
 def test():
     flags = build_arguments()
+    for assignment in flags[1:]:
+        key, value = assignment.split("=", 1)
+        os.environ[key] = value
     capabilities = {"core": "not-tested", "door": "not-tested",
                     "webui": "not-tested", "link": "not-tested", "zmodem": "not-tested"}
     try:
         run(flags + ["-j2", "all"])
+        run([sys.executable, "tests/test_door_lock.py"])
+        run([sys.executable, "tests/test_solaris_service.py"])
+        run([sys.executable, "scripts/install-solaris.py", "--destdir", "build/solaris-stage", "--python", sys.executable])
+        run(["/usr/sbin/svccfg", "validate", "build/solaris-stage/opt/liner-notes/share/smf/liner-notes.xml"])
         run(flags + ["check"])
         run([sys.executable, "tests/test_stage73_database.py", "./runtime"])
         capabilities["core"] = "passed"
         run(flags + ["test-doors"])
         capabilities["door"] = "passed"
-        # Python 3.11/tomllib is an application dependency of WebUI and link tools.
-        if sys.version_info >= (3, 11) and importlib.util.find_spec("aiohttp"):
-            run(flags + ["test-web"])
+        # Match existing Linux CI's isolated dependency setup. Reuse installed
+        # cryptography, but never install into system Python or change the OS.
+        if sys.version_info >= (3, 11):
+            environment = ROOT / "build/solaris-python"
+            run([sys.executable, "-m", "venv", "--system-site-packages", str(environment)])
+            python = str(environment / "bin/python")
+            run([python, "-m", "pip", "install", "--disable-pip-version-check", "--no-input",
+                 "-r", "webui/requirements.txt", "-r", "link-requirements.txt"])
+            run([python, "-c", "import aiohttp,cryptography;print('aiohttp',aiohttp.__version__,'cryptography',cryptography.__version__)"])
+            web_flags = ["PYTHON=" + python if item.startswith("PYTHON=") else item for item in flags]
+            run(web_flags + ["test-web"])
             capabilities["webui"] = "passed"
-        else:
-            capabilities["webui"] = "unverified: requires Python >=3.11 and aiohttp"
-        if sys.version_info >= (3, 11) and importlib.util.find_spec("cryptography"):
-            run([sys.executable, "tests/test_link_bbs.py", "./runtime"])
-            run([sys.executable, "tests/test_stage74_link_bbs.py", "./runtime"])
+            run([python, "tests/test_link_store.py"])
+            run([python, "tests/test_link_tls.py"])
+            run([python, "tests/test_link_bbs.py", "./runtime"])
+            run([python, "tests/test_link_service.py", "./runtime"])
+            run([python, "tests/test_stage74_links.py"])
+            run([python, "tests/test_stage74_link_bbs.py", "./runtime"])
             capabilities["link"] = "passed"
         else:
-            capabilities["link"] = "unverified: requires Python >=3.11 and cryptography"
+            capabilities["webui"] = "unverified: requires Python >=3.11"
+            capabilities["link"] = "unverified: requires Python >=3.11"
         lrz, lsz = shutil.which("lrz"), shutil.which("lsz")
         if lrz and lsz:
             run(flags + ["test-zmodem", "LRZ=" + lrz, "LSZ=" + lsz])

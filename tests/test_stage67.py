@@ -1,3 +1,4 @@
+import shlex, os
 """Permission, shared-buffer, scoped vault and timezone regression checks."""
 from pathlib import Path
 import sys,tempfile,subprocess
@@ -54,7 +55,7 @@ def run(binary,vaultctl):
  with tempfile.TemporaryDirectory(prefix='date67-') as tmp:
   p=Path(tmp);code=p/'date.c';exe=p/'date'
   code.write_text('#define _POSIX_C_SOURCE 200809L\n#include "date_filter.h"\n#include <stdio.h>\nint main(int n,char **v){uint64_t t;if(n!=3)return 2;setenv("TZ",v[1],1);tzset();if(!date_filter(v[2],&t))return 1;printf("%llu\\n",(unsigned long long)t);return 0;}\n')
-  subprocess.run(['cc','-std=c11','-Wall','-Wextra','-Werror','-I'+str(source),str(code),'-o',str(exe)],check=True)
+  subprocess.run([*shlex.split(os.environ.get('CC','cc')),*shlex.split(os.environ.get('CFLAGS','')), '-std=c11','-Wall','-Wextra','-Werror','-I'+str(source),str(code),'-o',str(exe)],check=True)
   def stamp(zone,date):return int(subprocess.check_output([exe,zone,date]))
   assert stamp('UTC','2026-10-31')-stamp('Asia/Tokyo','2026-10-31')==9*3600
   assert stamp('America/New_York','2026-03-09')-stamp('America/New_York','2026-03-08')==23*3600
