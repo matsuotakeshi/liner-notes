@@ -497,7 +497,33 @@ def transfer_probe(fixture, port, marker, binaries, *, observe=confined_transfer
         c.close()
 
 
-def admin_probe(fixture, vault):
+def confined_admin_process(pid):
+    assert Path(f'/proc/{pid}/attr/current').read_text().split(':')[2] == 'liner_notes_admin_t'
+
+
+def confined_admin_launch(fixture, command):
+    # Uses the owning uid, with no capability/DAC override granted to a daemon.
+    return subprocess.Popen(command, user=fixture.account.pw_uid,
+                            group=fixture.account.pw_gid, extra_groups=[], cwd=fixture.path,
+                            stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+
+
+def admin_command(fixture, command, *, observe, launch, timeout):
+    process = launch(fixture, [str(value) for value in command])
+    try:
+        pid = process.stdout.readline().strip()
+        assert pid.isdigit(), ('admin process did not report its PID', pid)
+        observe(int(pid))
+        output, error = process.communicate(timeout=timeout)
+        assert process.returncode == 0, (process.returncode, output, error)
+        return output
+    finally:
+        if process.poll() is None:
+            process.kill()
+            process.wait()
+
+
+def admin_probe(fixture, vault, *, observe=confined_admin_process, launch=confined_admin_launch):
     binary = fixture.path/'vaultctl'
     shutil.copyfile(ROOT/'vaultctl',binary)
     binary.chmod(0o755)
@@ -508,24 +534,13 @@ def admin_probe(fixture, vault):
         'time.sleep(1)\n'
         f'os.execv({str(binary)!r},[{str(binary)!r},"list",{str(vault)!r}])\n',
         'liner_notes_admin_exec_t',True)
-    # Uses the owning uid, with no capability/DAC override granted to a daemon.
-    process = subprocess.Popen([str(entry)], user=fixture.account.pw_uid,
-                               group=fixture.account.pw_gid, extra_groups=[], cwd=fixture.path,
-                               stdout=subprocess.PIPE,stderr=subprocess.PIPE,text=True)
-    try:
-        pid = process.stdout.readline().strip()
-        assert pid.isdigit()
-        assert Path('/proc/'+pid+'/attr/current').read_text().split(':')[2] == 'liner_notes_admin_t'
-        output,error = process.communicate(timeout=15)
-        assert process.returncode==0 and 'payload.bin' in output,(output,error)
-        fixture.results.append({'admin':'offline vault list in dedicated owning-user domain'})
-    finally:
-        if process.poll() is None:
-            process.kill()
-            process.wait()
+    output = admin_command(fixture, [entry], observe=observe, launch=launch, timeout=15)
+    assert 'payload.bin' in output, ('successful list lacked exported upload', output)
+    fixture.results.append({'admin':'offline vault list from logical SQL export',
+                            'process_observer':observe.__name__})
 
 
-def maintenance_probe(fixture, core):
+def maintenance_probe(fixture, core, *, observe=confined_admin_process, launch=confined_admin_launch):
     backup = fixture.directory('backups', 'liner_notes_backup_t')
     converter = fixture.path / 'dbconvert'
     shutil.copyfile(ROOT / 'dbconvert', converter)
@@ -536,31 +551,33 @@ def maintenance_probe(fixture, core):
         'import os,sys,time,runpy\n'
         'print(os.getpid(),flush=True)\ntime.sleep(1)\n'
         f'sys.path.insert(0,{str(scripts)!r})\n'
+        'if sys.argv[1:2]==["fixture-copy"]:\n'
+        '    from database_tools import copy_instance\n'
+        '    copy_instance(sys.argv[2],sys.argv[3])\n'
+        '    raise SystemExit(0)\n'
         f'runpy.run_path({str(scripts / "maintenance.py")!r},run_name="__main__")\n',
         'liner_notes_admin_exec_t', True)
-    archive, restored = backup / 'instance.tar.gz', backup / 'restored'
+    archive, restored, exported = backup/'instance.tar.gz', backup/'restored', backup/'exported'
+    # Even SQLite mode=ro may create WAL/SHM. Copy the stopped instance using
+    # file reads inside the confined admin domain before opening any SQL DB.
+    working = backup/'source'
+    admin_command(fixture, [entry, 'fixture-copy', core, working],
+                  observe=observe, launch=launch, timeout=60)
     for arguments in (
-        ['db-backup', '--root', core, '--database', core/'notes.sqlite',
+        ['db-backup', '--root', working, '--database', working/'notes.sqlite',
          '--board', 'notes', '--members', 'members', archive],
         ['verify', archive],
         ['db-restore', archive, restored, '--database', 'notes.sqlite', '--tools-dir', fixture.path],
+        ['db-export', '--root', working, '--database', working/'notes.sqlite', '--board', 'notes', exported],
     ):
-        process = subprocess.Popen([str(entry), *map(str, arguments)],
-            user=fixture.account.pw_uid, group=fixture.account.pw_gid, extra_groups=[],
-            cwd=fixture.path, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
-        try:
-            pid = process.stdout.readline().strip()
-            assert pid.isdigit()
-            assert Path('/proc/'+pid+'/attr/current').read_text().split(':')[2] == 'liner_notes_admin_t'
-            output, error = process.communicate(timeout=60)
-            assert process.returncode == 0, (arguments[0], output, error)
-        finally:
-            if process.poll() is None:
-                process.kill()
-                process.wait()
+        admin_command(fixture, [entry, *arguments], observe=observe, launch=launch, timeout=60)
+    # vaultctl reads portable index.dat, not the runtime's authoritative SQL
+    # stream. Inspect only the new private export; never the stale original.
+    admin_probe(fixture, exported/'vault', observe=observe, launch=launch)
     # A restored copy is explicitly relabelled for its future BBS role.
     fixture.label(restored, 'liner_notes_data_t', True)
-    fixture.results.append({'admin': 'confined logical backup, verification and structured restore'})
+    fixture.results.append({'admin':'logical backup, verification, export and structured restore',
+                            'process_observer':observe.__name__})
     return restored
 
 
@@ -624,7 +641,6 @@ def main():
                 asyncio.run(link_probe(fixture, port))
                 transfer_probe(fixture, port, marker, binaries)
             fixture.stop(unit)
-        admin_probe(fixture,vault)
         restored = maintenance_probe(fixture, core)
         restored_args = [str(restored) + value[len(str(core)):] if value.startswith(str(core)+'/') else value
                          for value in args]

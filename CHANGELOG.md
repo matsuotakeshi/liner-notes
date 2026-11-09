@@ -2,6 +2,8 @@
 
 ## 未リリース（次期版0.75候補）
 
+- SELinux管理受入試験でSQL保存の保管庫を私有コピーへ論理書き出ししてから一覧検証するよう修正。既存の書き出し・バックアップ・復元を実runtimeのhosted回帰にも追加し、原本とポリシー権限は変更しない。
+
 - SolarisのDoor排他holderをBBSから独立した小さい実行ファイルへexecし、長寿命のforkが約1GiBずつswapを予約して次のゲーム起動がENOMEMになる問題へ対応。既存のpipe寿命・排他・子回収を維持し、全installer/packageへ非特権helperを同梱。実機の最終回帰は継続中。
 
 - maintainer scriptsを無効にしたFreeBSDのrootless試験で、パッケージ内のメニューsampleを私有領域へ初期配置。編集済みメニューは保持し、任意の案内文もホストの既定パスへ戻らないよう試験設定を明示。正式なsample処理は別のjail受入試験で検証する。
