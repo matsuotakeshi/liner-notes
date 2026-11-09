@@ -35,6 +35,25 @@ def archive(entries):
 
 
 class RootBoundaryTests(unittest.TestCase):
+    @unittest.skipUnless(native.os.name == 'posix', 'POSIX DAC mode required')
+    def test_web_source_is_public_code_under_private_root_umask(self):
+        with tempfile.TemporaryDirectory() as directory:
+            target = Path(directory) / 'source'
+            previous = native.os.umask(0o077)
+            try:
+                native.stage_web_source(target)
+            finally:
+                native.os.umask(previous)
+            # A separate service uid needs search/read access to code; the
+            # surrounding fixture data and root work tree remain private.
+            self.assertEqual(target.stat().st_mode & 0o777, 0o755)
+            self.assertTrue((target / 'webui' / '__main__.py').is_file())
+            self.assertEqual((target / 'webui').stat().st_mode & 0o005, 0o005)
+            target.chmod(0o700)
+            with self.assertRaises(FileExistsError):
+                native.stage_web_source(target)
+            self.assertEqual(target.stat().st_mode & 0o777, 0o700)
+
     def test_only_fixture_avc_denials_leave_private_audit_log(self):
         allowed = 'type=AVC msg=audit(1:1): avc:  denied { read } scontext=system_u:system_r:liner_notes_web_t:s0 tcontext=system_u:object_r:liner_notes_data_t:s0'
         unrelated = allowed.replace('liner_notes_web_t', 'httpd_t')

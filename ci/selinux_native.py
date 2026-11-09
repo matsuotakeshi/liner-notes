@@ -245,10 +245,16 @@ async def web_probe(port):
             assert response.status == 200 and 'Persisted under Enforcing' in data['data']['article']['body'], data
 
 
+def stage_web_source(source):
+    """Publish only fresh fixture code despite the root helper's private umask."""
+    source.mkdir(mode=0o755)
+    source.chmod(0o755)
+    shutil.copytree(ROOT / 'webui', source / 'webui', ignore=shutil.ignore_patterns('__pycache__'))
+
+
 def web_fixture(fixture, core_port, secret):
     source = fixture.path / 'source'
-    source.mkdir(mode=0o755)
-    shutil.copytree(ROOT / 'webui', source / 'webui', ignore=shutil.ignore_patterns('__pycache__'))
+    stage_web_source(source)
     fixture.label(source, 'liner_notes_ro_t', True)
     data = fixture.directory('web', 'liner_notes_web_data_t')
     port = fixture.port('liner_notes_web_port_t')
