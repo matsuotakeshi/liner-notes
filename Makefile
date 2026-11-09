@@ -10,7 +10,12 @@ SQLITE_LIBS?=-L/usr/local/lib -lsqlite3
 LDLIBS?=
 PTY_LIBS?=-lutil
 
-all: runtime vaultctl memberctl dbconvert
+all: runtime vaultctl memberctl dbconvert liner-notes-door-lock
+
+liner-notes-door-lock: src/door_lock_helper.c
+	$(CC) $(CPPFLAGS) $(CFLAGS) $(LDFLAGS) -std=c11 -Wall -Wextra -Werror src/door_lock_helper.c -o liner-notes-door-lock
+
+runtime: liner-notes-door-lock
 
 test-doctor:
 	$(PYTHON) tests/test_doctor.py
@@ -183,7 +188,7 @@ test-legacy-transfers: runtime vaultctl
 	$(PYTHON) tests/test_stage61_transfer_menu.py ./runtime ./vaultctl $(LRZ) $(LSZ)
 
 clean:
-	rm -f runtime vaultctl memberctl dbconvert generate-scale generate-members test-adapters test-chat test-vault-core test-upload-core test-transfer-connector test-userlog test-stage61-userlog test-zhost
+	rm -f liner-notes-door-lock runtime vaultctl memberctl dbconvert generate-scale generate-members test-adapters test-chat test-vault-core test-upload-core test-transfer-connector test-userlog test-stage61-userlog test-zhost
 
 memberctl: src/db_index.h src/memberctl.c src/members.c src/members.h src/app_limits.h src/store_limits.h
 	$(CC) $(CPPFLAGS) $(SQLITE_CFLAGS) $(CFLAGS) $(LDFLAGS) -std=c11 -Wall -Wextra -Werror src/memberctl.c src/members.c -lcrypto $(SQLITE_LIBS) $(LDLIBS) src/storage_sqlite.c $(SQLITE_CFLAGS) -pthread -lcrypto $(SQLITE_LIBS) -o memberctl

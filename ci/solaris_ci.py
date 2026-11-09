@@ -105,12 +105,12 @@ def test():
         run([sys.executable, "scripts/install-solaris.py", "--destdir", "build/solaris-stage", "--python", sys.executable])
         run(["/usr/sbin/svccfg", "validate", "build/solaris-stage/opt/liner-notes/share/smf/liner-notes.xml"])
         capabilities["smf_manifest"] = "passed"
+        run(flags + ["test-doors"])
+        capabilities["door"] = "passed"
         capabilities["core"] = "incomplete"
         run(flags + ["check"])
         run([sys.executable, "tests/test_stage73_database.py", "./runtime"])
         capabilities["core"] = "passed"
-        run(flags + ["test-doors"])
-        capabilities["door"] = "passed"
         # Match existing Linux CI's isolated dependency setup. Reuse installed
         # cryptography, but never install into system Python or change the OS.
         if sys.version_info >= (3, 11):

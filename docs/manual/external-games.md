@@ -188,3 +188,13 @@ DOS実行環境やWindows ConPTYの追加は別案件です。
 ## Solaris移植での排他
 
 次期版のSolarisでは専用ロック保持プロセスとpipeを使い、BBSが異常終了しても生存するDoorの排他を維持します。FreeBSD/Linuxは従来のflockです。Solarisの実機検証済み範囲とSMFの制約は[Solarisへの導入](install-solaris.md)を確認してください。
+
+
+## Solarisの排他helper（次期版、検証中）
+
+Solarisでは`liner-notes-door-lock`という小さい非特権実行ファイルが、
+Doorの生存中だけPOSIXロックを保持します。本体と同じ配布物を使用し、
+本体の隣（ビルド領域）または同じprefixの`libexec/liner-notes-door-lock`へ
+0755で配置します。データ領域やPATHへ追加する設定は不要です。
+FreeBSD/Linuxは従来のnative flockを使い、このhelperを実行しません。
+詳しい対応状況と制約は[必須ファイルとSolarisの導入](install-solaris.md)を参照してください。

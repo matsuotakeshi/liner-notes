@@ -1,3 +1,4 @@
+libexec/liner-notes-door-lock
 sbin/liner-notes
 %%DATADIR%%/scripts/activity-export.py
 %%DATADIR%%/scripts/build-lrzsz.py

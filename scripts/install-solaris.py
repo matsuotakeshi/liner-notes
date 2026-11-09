@@ -64,7 +64,7 @@ def install(destdir, prefix="/opt/liner-notes", python="/usr/bin/python3.11"):
             if os.path.exists(name):
                 os.unlink(name)
 
-    for source, target in (("runtime", "sbin/liner-notes"), ("memberctl", "bin/liner-notes-memberctl"),
+    for source, target in (("liner-notes-door-lock", "libexec/liner-notes-door-lock"), ("runtime", "sbin/liner-notes"), ("memberctl", "bin/liner-notes-memberctl"),
                            ("vaultctl", "bin/liner-notes-vaultctl"), ("dbconvert", "bin/liner-notes-dbconvert")):
         put(prefix + "/" + target, (ROOT / source).read_bytes(), 0o755)
     for source in (ROOT / "scripts").glob("*.py"):

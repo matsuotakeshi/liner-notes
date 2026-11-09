@@ -807,12 +807,54 @@ class Doctor:
         except OSError:
             self.add(group,'notrunning','warning',value)
 
+    def check_door_lock_helper(self):
+        # Match the native Solaris resolver without launching the helper.
+        account = self.account(self.user)
+        if account is None:
+            self.add('doors','account','warning',detail='Solaris Door lock helper owner cannot be verified')
+            return
+        uid = account[0]
+        unsafe = False
+        try:
+            binary = self.path(self.program).resolve(strict=True)
+            candidates = (binary.parent/'liner-notes-door-lock',
+                          binary.parent.parent/'libexec/liner-notes-door-lock')
+            for candidate in candidates:
+                try:
+                    path = candidate.resolve(strict=True)
+                    if self.staged and not path.is_relative_to(self.root):
+                        raise ValueError('outside root')
+                    st = path.stat()
+                    if not stat.S_ISREG(st.st_mode) or st.st_uid not in (0,uid) or st.st_mode & 0o6022 or not self.access(path,self.user,1):
+                        raise ValueError('unsafe helper')
+                    for parent in path.parents:
+                        ps = parent.stat()
+                        if not stat.S_ISDIR(ps.st_mode) or ps.st_uid not in (0,uid):
+                            raise ValueError('unsafe ancestor owner')
+                        if ps.st_mode & 0o022 and not (ps.st_uid==0 and ps.st_mode & stat.S_ISVTX):
+                            raise ValueError('unsafe ancestor mode')
+                        if self.staged and parent==self.root:
+                            break
+                    location='/'+path.relative_to(self.root).as_posix() if self.staged else str(path)
+                    self.add('doors','ok',location=location,detail='Solaris Door lock helper; owner/modes/ancestors checked, not executed')
+                    return
+                except FileNotFoundError:
+                    continue
+                except (OSError,ValueError):
+                    unsafe = True
+        except (OSError,ValueError):
+            pass
+        self.add('doors','permission' if unsafe else 'missing','error',self.program,
+                 detail='Solaris Door lock helper: executable sibling or ../libexec/liner-notes-door-lock')
+
     def check_doors(self):
         file = self.core.get('doors')
         if not file:
             required='doors' in self.enabled
             self.add('doors','missing' if required else 'disabled','error' if required else 'ok',detail='doors configuration' if required else '')
             return
+        if self.system=='SunOS':
+            self.check_door_lock_helper()
         try:
             lines = self.read(file).decode('utf-8').splitlines()
             ids = set()

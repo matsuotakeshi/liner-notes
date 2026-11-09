@@ -12,6 +12,10 @@
 #include <errno.h>
 #include <fcntl.h>
 #include <stdlib.h>
+#include <stdio.h>
+#include <string.h>
+#include <limits.h>
+#include <sys/stat.h>
 #include <unistd.h>
 #if defined(__sun) || defined(LINER_TEST_POSIX_DOOR_LOCK)
 #include <poll.h>
@@ -24,6 +28,53 @@
  * This preserves flock's fork/exec lifetime and same-process exclusion. */
 typedef struct Holder { pid_t pid; int lease, done; struct Holder *next; } Holder;
 static Holder *holders;
+static char helper_path[PATH_MAX];
+
+static int trusted_helper(const char *path) {
+    struct stat st;
+    if (stat(path, &st) || !S_ISREG(st.st_mode) ||
+        (st.st_uid != 0 && st.st_uid != geteuid()) ||
+        (st.st_mode & (S_IWGRP | S_IWOTH | S_ISUID | S_ISGID)) || access(path, X_OK)) return 0;
+    char directory[PATH_MAX];
+    if (strlen(path) >= sizeof(directory)) return 0;
+    strcpy(directory, path);
+    for (;;) {
+        char *slash = strrchr(directory, '/');
+        if (!slash) return 0;
+        if (slash == directory) slash[1] = 0; else *slash = 0;
+        if (stat(directory, &st) || !S_ISDIR(st.st_mode) ||
+            (st.st_uid != 0 && st.st_uid != geteuid())) return 0;
+        /* A root-owned sticky /tmp does not allow another user to replace
+         * this user's private entry. Other writable ancestors are unsafe. */
+        if ((st.st_mode & (S_IWGRP | S_IWOTH)) &&
+            !(st.st_uid == 0 && (st.st_mode & S_ISVTX))) return 0;
+        if (!strcmp(directory, "/")) return 1;
+    }
+}
+
+int door_lock_init(const char *program) {
+    char binary[PATH_MAX], candidate[PATH_MAX];
+    const char *image = program;
+#if defined(__sun)
+    image = "/proc/self/path/a.out";
+#elif defined(__linux__)
+    image = "/proc/self/exe";
+#endif
+    if (!realpath(image, binary) && !realpath(program, binary)) return 0;
+    char *slash = strrchr(binary, '/');
+    if (!slash) { errno = EINVAL; return 0; }
+    *slash = 0;
+    const char *suffixes[] = {"/liner-notes-door-lock", "/../libexec/liner-notes-door-lock"};
+    helper_path[0] = 0;
+    for (unsigned i = 0; i < sizeof(suffixes) / sizeof(suffixes[0]); ++i) {
+        int count = snprintf(candidate, sizeof(candidate), "%s%s", binary, suffixes[i]);
+        if (count < 0 || count >= (int)sizeof(candidate)) continue;
+        if (realpath(candidate, helper_path) && trusted_helper(helper_path)) return 1;
+        helper_path[0] = 0;
+    }
+    errno = ENOENT;
+    return 0;
+}
 
 static long long lock_clock(void) {
     struct timespec value;
@@ -96,23 +147,18 @@ static void hold_lock(int fd, int watch, int ack, long maxfd) {
     signal(SIGINT, SIG_DFL);
     signal(SIGHUP, SIG_DFL);
     signal(SIGPIPE, SIG_DFL);
-    struct flock record = {0};
-    record.l_type = F_WRLCK;
-    record.l_whence = SEEK_SET;
-    int error = fcntl(3, F_SETLK, &record) < 0 ? errno : 0;
-    if (write(5, &error, sizeof(error)) != (ssize_t)sizeof(error)) _exit(1);
-    if (error) _exit(1);
-    char value;
-    for (;;) {
-        ssize_t count = read(4, &value, 1);
-        if (count == 0 || (count < 0 && errno != EINTR)) break;
-    }
-    close(3);
-    close(5);
-    _exit(0);
+    /* Exec a tiny image before acknowledging the lease. Keeping this fork's
+     * BBS address space reserves about 1 GiB of Solaris swap per live holder. */
+    char *argv[] = {helper_path, "--lease-v1", NULL};
+    char *env[] = {"PATH=/usr/bin:/bin", "LANG=C", NULL};
+    execve(helper_path, argv, env);
+    int error = errno;
+    (void)write(5, &error, sizeof(error));
+    _exit(1);
 }
 
 int door_lock_acquire(int fd) {
+    if (!*helper_path) { errno = ENOENT; return -1; }
     door_lock_reap();
     Holder *holder = malloc(sizeof(*holder));
     if (!holder) return -1;
@@ -149,11 +195,13 @@ int door_lock_acquire(int fd) {
 }
 #else
 #include <sys/file.h>
+int door_lock_init(const char *program) { (void)program; return 1; }
 int door_lock_acquire(int fd) { return flock(fd, LOCK_EX | LOCK_NB) ? -1 : fd; }
 void door_lock_release(int fd) { close(fd); }
 void door_lock_reap(void) {}
 #endif
 #else
+int door_lock_init(const char *program) { (void)program; return 1; }
 int door_lock_acquire(int fd) { (void)fd; return -1; }
 void door_lock_release(int fd) { (void)fd; }
 void door_lock_reap(void) {}

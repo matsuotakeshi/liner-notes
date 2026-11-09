@@ -159,6 +159,42 @@ class DoctorTests(unittest.TestCase):
             self.write('/etc/liner-notes/doors.conf',text)
             self.assertEqual(self.instance('--check-doors','--doors-config','/etc/liner-notes/doors.conf').run()['exit_code'],2)
 
+    @unittest.skipUnless(os.name=='posix', 'Native helper ownership/modes')
+    def test_solaris_door_helper_readonly_trust_and_fallback(self):
+        self.write('/opt/liner-notes/sbin/liner-notes',b'ELF-fixture',0o755)
+        helper=self.write('/opt/liner-notes/libexec/liner-notes-door-lock',b'helper never executed',0o755)
+        self.write('/etc/liner-notes/doors.conf','# no enabled games yet\n')
+        self.write('/etc/liner-notes/solaris.json',json.dumps(dict(
+            program='/opt/liner-notes/sbin/liner-notes',working_directory='/var/opt/liner-notes',
+            arguments=['--doors','/etc/liner-notes/doors.conf','2222'])))
+        def report():
+            before=self.state()
+            with patch.object(subprocess,'run',side_effect=AssertionError('No helper or host command')):
+                result=self.instance('--os','SunOS','--check-doors').run()
+            self.assertEqual(before,self.state())
+            return result
+        self.assertEqual(report()['exit_code'],0)
+        sibling=self.write('/opt/liner-notes/sbin/liner-notes-door-lock',b'unsafe',0o777)
+        self.assertEqual(report()['exit_code'],0) # unsafe first candidate, valid fallback
+        helper.unlink()
+        self.assertEqual(report()['exit_code'],2)
+        sibling.unlink()
+        self.assertEqual(report()['exit_code'],2)
+        helper=self.write('/opt/liner-notes/libexec/liner-notes-door-lock',b'helper',0o755)
+        for mode in (0o777,0o4755,0o2755,0o644):
+            helper.chmod(mode)
+            self.assertEqual(report()['exit_code'],2)
+        helper.chmod(0o755)
+        helper.parent.chmod(0o777)
+        self.assertEqual(report()['exit_code'],2)
+        helper.parent.chmod(0o755)
+        self.assertEqual(report()['exit_code'],0)
+        # Optional Doors disabled: no helper is needed or diagnosed.
+        helper.unlink()
+        self.write('/etc/liner-notes/solaris.json',json.dumps(dict(
+            program='/opt/liner-notes/sbin/liner-notes',working_directory='/var/opt/liner-notes',arguments=['2222'])))
+        self.assertEqual(report()['exit_code'],0)
+
     def test_link_syntax_and_secret_not_echoed(self):
         self.write('/etc/liner-notes/link.toml','[node]\nidentity="SECRET-do-not-print"\n[bbs]\npassword_file="PRIVATE"\n')
         report=self.instance('--check-links','--link-config','/etc/liner-notes/link.toml').run()

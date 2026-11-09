@@ -143,3 +143,47 @@ record-lock backend, and the lease unit test covers concurrent distinct slot
 files and acquisition after a busy slot. No runtime behavior is changed on the
 basis of an unconfirmed cause. Core as a whole, generic Door completion,
 WebUI, link, real ZMODEM and SMF lifecycle remain unverified.
+
+
+## Isolated ENOMEM diagnosis and tiny exec holder
+
+Main `6d958e0f85f0e690be240cbeadc7f86c5371112a`, run
+https://github.com/matsuotakeshi/liner-notes/actions/runs/42566262082 failed for
+bob/game 3 with only input echo, while both runtimes remained alive. Artifact
+`13651932277` SHA-256 was verified as
+`0514c90babfc05fb669b7028fc1e6f4b55b5a9d17a713e0cd2d2514cdb0dc93e`.
+The new concurrent distinct-slot C unit tests passed on Solaris.
+
+A supplemental reproduction used the exact existing CI source (six relevant
+source/test hashes checked), unchanged runtime SHA-256
+`a5c71472c2e03704dfa5afdfe385924cdc0354601024acb6b4d07acfafda51ba`,
+and newly generated fixture data. The final reproduction acquired the same
+`~/ci/.liner-notes-native.lock` as native CI, after the normal cancellation and
+cleanup of run `42568148241`. Only its own runtime PID 11627 was traced, without
+following other processes. Directory:
+`/export/home/ci-test/ci/solaris-door-diagnostic-ncun5lgc`.
+The trace records successful forks for the existing holder/game, busy-slot
+attempt and bob's new holder, followed by **forkx Err#12 ENOMEM** for bob's game.
+Before the test swap reported 4,980,352 KiB available. The BBS and each old
+long-lived holder have approximately 1 GiB virtual size; the holder retains
+that reservation despite having only approximately 1 MiB RSS.
+
+An earlier supplemental trace used the wrong lock path (home rather than
+home/ci) and could overlap a native run. It is excluded from cause verification.
+Its known trace/fixture processes were terminated by verified PID and private
+argument path, without touching the native job or OS. The corrected isolated
+trace above reproduced ENOMEM independently. No unreviewed application or test
+code was executed on the VM; the final fix must still pass hosted PR checks and
+trusted-main native CI.
+
+The record holder now execs `liner-notes-door-lock`, a tiny image not linked
+with the BBS, before acknowledging successful lock acquisition. Pipe inheritance,
+separate process group, conflict behavior and known-PID reaping remain unchanged.
+The executable is found relative to the actual BBS executable, not PATH or the
+working/data directory; owner/mode/executable checks reject unsafe candidates.
+The source build places it beside runtime and installers place it in libexec.
+FreeBSD/Linux native flock does not execute the helper. Hosted regression creates
+a 1 GiB owner and verifies the holder's distinct executable and virtual size
+below 128 MiB, plus installed layout and unsafe helper mode rejection.
+Solaris Door integration now runs before the long core suite to expose failures
+earlier while preserving both suites and their assertions.
