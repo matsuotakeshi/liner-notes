@@ -2,6 +2,8 @@
 
 ## 未リリース（次期版0.75候補）
 
+- Solaris移植後のFreeBSDビルド回帰を修正。Door排他モジュールではFreeBSDの既定機能名前空間を維持し、従来のflock宣言とロック定数を利用する。
+
 - Solaris実機CIで検出したGCCの条件文後の表記をトークンを変えずに整理し、厳密な警告を維持。SolarisではPOSIXロック保持プロセスと継承pipeでDoorの排他寿命を維持し、同一BBS/別BBS・fork/exec・BBS終了後の保持をhosted試験へ追加。64bit OpenSSL配置とテスト用コンパイラ選択を修正。
 
 - Solaris向けの設定保持staging installerと初期disabledのSMF contract定義を追加。JSON引数・非root/basic権限を使用し、サービス有効化とデータ初期化は自動実行しない。実SMFライフサイクル検証は保留。
