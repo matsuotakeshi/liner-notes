@@ -177,7 +177,18 @@ def main():
     require(re.fullmatch(r'[0-9a-f]{40}', profile['old_release_source_sha']), 'Template needs stable release provenance')
     trusted(TEMPLATE / 'old.pkg')
     require(hashlib.sha256((TEMPLATE / 'old.pkg').read_bytes()).hexdigest() == profile['old_package_sha256'], 'Old package escrow hash differs')
-    require(not list((TEMPLATE / 'root/var/db/liner-notes').glob('*')), 'Template must not contain BBS data')
+    require(all(p.is_dir() and not p.is_symlink() for p in (TEMPLATE / 'root/var/db/liner-notes').rglob('*')),
+            'Template must contain only empty BBS/spool directory trees')
+    template_root = (TEMPLATE / 'root').resolve()
+    for row in command('/sbin/mount', '-p').splitlines():
+        fields = row.split()
+        require(len(fields) >= 2, 'Cannot inspect mount inventory')
+        mountpoint = Path(fields[1])
+        require(mountpoint != template_root and not mountpoint.is_relative_to(template_root),
+                'Template contains a mounted filesystem; unmount it before acceptance')
+    template_size = sum(p.lstat().st_size for p in template_root.rglob('*') if stat.S_ISREG(p.lstat().st_mode))
+    require(shutil.disk_usage(BASE).free >= 3 * template_size + 2 * 1024 ** 3,
+            'Insufficient space for isolated jail and recovery copies')
     import fcntl
     with (BASE / 'lock').open('a') as lock:
         fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
@@ -205,7 +216,7 @@ def main():
         root.mkdir(mode=0o755)
         template_tar = work / 'template.tar'
         command('/usr/bin/tar', '-cf', template_tar, '-C', TEMPLATE / 'root', '.', timeout=600)
-        command('/usr/bin/tar', '-xf', template_tar, '-C', root, timeout=600)
+        command('/usr/bin/tar', '-xpf', template_tar, '-C', root, timeout=600)
         validate_jail_paths(root)
         shutil.copytree(source, root / 'ci/source', symlinks=False)
         shutil.copytree(packages, root / 'ci/packages')

@@ -63,7 +63,7 @@ def main():
         assert Path(directory).stat().st_uid == owner.pw_uid
     binary = '/usr/local/sbin/liner-notes'
     data = Path('/var/db/liner-notes')
-    assert not list(data.iterdir())
+    assert all(p.is_dir() and not p.is_symlink() for p in data.rglob('*'))
     (data / 'catalog.dat').write_text('1|0|all|member|Deployment acceptance\n')
     source = Server(binary, data / 'notes.dat', members=data / 'members.dat', catalog=data / 'catalog.dat',
                     options=['--database-structured', str(data / 'liner.sqlite')])

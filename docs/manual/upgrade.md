@@ -15,7 +15,7 @@
 次局へ進みます。必要な条件は次のとおりです。
 
 1. 公開済み安定リリースのtagと署名付き `DEPLOYMENT-MANIFEST.json` が同じ完全SHAであること。配備controllerは実行時の最新mainに固定し、release SHAがその祖先であることを確認します。リリース後の文書更新だけで既存リリースを作り直す必要はありません。ただし承認待ち中にmainが進んだ場合は新しいrunと承認が必要です。
-2. native/Linux/pkg/RPM/DEB/Release Set/manual/deployment安全性、Solaris native、Rocky SELinux Enforcing、FreeBSD jail更新CIと本番SSH事前検査がreleaseと同一SHAで成功していること。文書変更によるskipは実行済み試験として認めません。controllerだけが新しいSHAであることを理由に過去のrelease検証を他のreleaseへ流用しません。
+2. native/Linux/pkg/RPM/DEB/Release Set/manual/deployment安全性、Solaris native、Rocky SELinux Enforcing、FreeBSD jail更新CIがreleaseと同一SHAで成功していること。本番SSH事前検査は現在のcontroller SHAで実行し、実際の検査step完了から1時間以内であること。文書変更によるskipは実行済み試験として認めません。controllerだけが新しいSHAであることを理由に過去のrelease検証を他のreleaseへ流用しません。
 3. CI由来manifest・Release Set receiptと、ダウンロードしたpackageの名前・版・サイズ・SHA-256が一致すること。
 4. `production-release` Environmentにmain専用のブランチ制限とオーナーのrequired reviewerが実在すること。
 5. 今回のrun summaryに示す `DEPLOY v版 SHA rocky.ysni.org,debian.ysni.org,srv.ysni.org RUN run番号/attempt` を、承認コメントへそのまま記載すること。古いrun/attemptの承認は再利用できません。
@@ -39,6 +39,11 @@ root管理profileにはtarget、private state directory、incoming directory、�
 有効なWeb/link/登録Doorには追加のprobeが必須です。profileのprobeには検証会員の
 秘密情報が入り得るためrootのみが読み書きできるようにし、GitHubへアップロードしません。
 probeはlocalhostへの送受信で、任意のroot shellコマンドではありません。
+profileから省略した既知のBBS/Web/linkサービスは、read-only statusと専用アカウントの
+worker確認で非稼働を確かめます。稼働サービスの漏れや、停止確認対象から外れた所有者を
+検出した場合は、BBSを止める前に拒否します。FreeBSDの標準配布には現時点でlink専用rcが
+含まれません。手動起動したlink daemonをこのCDで扱うには、別途承認した専用rc/PID・
+専用アカウント管理を先に整える必要があります。未管理daemonを任意のpkillで停止しません。
 
 バックアップ対象はdata/config/attachments/vault/spool/link/web/doors/binaries/old-packages
 の10区分すべてを明記します。data/config/binaries/old-packagesは空にできません。
@@ -65,7 +70,9 @@ Debianの既存conffileは保持します。FreeBSDはOrigin `comms/liner-notes`
 helperのサービス許可一覧に追加しないでください。更新前後で無関係packageが変わっていないことも確認します。
 
 成功済みの同一計画を新しい承認で再実行すると、healthのみを確認し再インストールしません。
-中断・失敗状態は後続局を停止し、`planned-restore-required` として保持します。
+その再検査が失敗した場合は `health-recheck-failed` として今回の承認と時刻を保存し、旧成功結果を
+再利用しません。サービス停止前の拒否は `preflight-failed`、停止開始後の中断・失敗は
+`planned-restore-required` として保持し、いずれも後続局への更新を止めます。
 DB互換性の推測による自動バイナリ切り戻しは行いません。private host state、
 off-host backupと旧packageを確認して[計画的な復元](backup-recovery.md)を実施し、
 整合性を確認した後に新しいrun/承認で再開します。状態fileを消すだけの再実行は禁止です。

@@ -32,7 +32,7 @@ GATES = {
     'debian': ('debian-package.yml', 'push', 'Build and test in isolated Debian 13', 'liner-notes-debian13-packages'),
     'release_set': ('release-set.yml', 'workflow_run', 'Save verified release-set receipt (no packages are deployed)', 'liner-notes-release-set-receipt'),
     'manual': ('manual.yml', 'push', None, 'canonical-manual'),
-    'connectivity': ('production-ssh-smoke.yml', 'workflow_dispatch', None, None),
+    'connectivity': ('production-ssh-smoke.yml', 'workflow_dispatch', 'Verify production SSH access', None),
     'deployment': ('deployment-safety.yml', 'push', 'Test closed deployment policy and isolated three-node transactions', None),
     'freebsd_upgrade': ('freebsd-upgrade-acceptance.yml', 'workflow_run', 'Verify full package upgrade in a disposable VNET jail', 'liner-notes-freebsd-upgrade'),
     'solaris': ('solaris-build-test.yml', 'push', 'Build and test exact main using the existing Solaris CI account', 'native-ci-solaris-results'),
@@ -64,6 +64,16 @@ def successful_execution(jobs, step, minimum=1):
         return
     executed = [j for j in jobs['jobs'] if any(s.get('name') == step and s.get('conclusion') == 'success' for s in j.get('steps', []))]
     require(len(executed) >= minimum and all(j.get('conclusion') == 'success' for j in executed), 'Required tests were not actually executed')
+
+
+def fresh_connectivity(jobs, now=None):
+    now = now or datetime.datetime.now(datetime.timezone.utc)
+    steps = [s for j in jobs.get('jobs', []) if j.get('conclusion') == 'success'
+             for s in j.get('steps', []) if s.get('name') == 'Verify production SSH access' and s.get('conclusion') == 'success']
+    require(len(steps) == 1, 'Current production preflight step is missing or ambiguous')
+    completed = datetime.datetime.fromisoformat(steps[0]['completed_at'].replace('Z', '+00:00'))
+    require(completed.tzinfo is not None and 0 <= (now-completed).total_seconds() <= 3600,
+            'Production connectivity check must have completed within the last hour')
 
 
 def latest_full_run(document, sha, event, label):
@@ -102,10 +112,15 @@ def fresh_evidence(release):
     require(commit['sha'] == sha, 'Release tag points to another commit')
     evidence, artifacts = {}, {}
     for label, (workflow, event, step, artifact_name) in GATES.items():
-        runs = api(f'repos/{REPO}/actions/workflows/{workflow}/runs?head_sha={sha}&per_page=100')
-        run_id = latest_full_run(runs, sha, event, label)
+        # Package/application evidence belongs to the immutable release. The
+        # environmental preflight belongs to this newly reviewed controller.
+        gate_sha = os.environ['GITHUB_SHA'] if label == 'connectivity' else sha
+        runs = api(f'repos/{REPO}/actions/workflows/{workflow}/runs?head_sha={gate_sha}&per_page=100')
+        run_id = latest_full_run(runs, gate_sha, event, label)
         jobs = api(f'repos/{REPO}/actions/runs/{run_id}/jobs?filter=latest&per_page=100')
         successful_execution(jobs, step, 2 if label == 'linux' else 1)
+        if label == 'connectivity':
+            fresh_connectivity(jobs)
         if label == 'deployment':
             successful_execution(jobs, 'Restore and boot the actual BBS using a disposable unprivileged account')
         if label == 'selinux':

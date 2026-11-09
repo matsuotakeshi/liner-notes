@@ -48,6 +48,10 @@ Known deployment blockers, not manual user acceptance tasks:
    services or assuming a live tar is a consistent game backup.
 4. Optional SELinux package must enter same-SHA package and Release Set manifests;
    allowlisted name alone does not authorize its installation.
+5. FreeBSD's standard package does not currently ship `liner_notes_link` rc.d.
+   A manually started link daemon is refused before BBS shutdown. Managed link
+   update needs separately approved rc/PID/dedicated-account setup; the fixed
+   service allowlist is not evidence that this operational integration exists.
 
 Hosted fixture CI proves ordering, duplicate application, partial failure,
 signature/approval/hash denial and recovery stopping; it does not impersonate
@@ -69,6 +73,16 @@ twice. Never use a writable checkout as a sudo command or module source.
 Prepare `/var/db/liner-notes-ci/freebsd-template` as a root-owned, mode-0700
 directory, using a verified FreeBSD base distribution and a disposable jail,
 following the [FreeBSD jail handbook](https://docs.freebsd.org/en/books/handbook/jails/).
+The reviewed one-time setup command is
+`/usr/local/bin/python3.12 -I ci/prepare_freebsd_upgrade_template.py REVIEWED_MAIN_SHA`.
+Run it only from a root-owned copy after explicit setup approval. It independently
+downloads main and compares all three privileged script bytes before acting;
+it pins the FreeBSD 15.1 base and previous v0.74.1 package hashes. Dependencies
+are installed only inside a new bootstrap jail, using the test VM's existing
+IPv4 address without adding an alias. The host package inventory is compared
+before/after; no host service is started or stopped. Existing templates are never
+overwritten. Initial network-enabled dependency setup is separate from the
+offline VNET acceptance clone.
 This is a test fixture, not a copy of the live OS or BBS. Its `root/` subtree must
 contain a bootable FreeBSD userland, Python 3.12, pkg, the candidate's dependencies
 (SQLite, lrzsz, py312-aiohttp and py312-cryptography), and the previous official

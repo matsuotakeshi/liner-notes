@@ -2,6 +2,7 @@
 """No SSH or package manager access: isolated files/SQLite/transport fixtures."""
 import contextlib
 import copy
+import datetime
 import hashlib
 import io
 import json
@@ -14,6 +15,7 @@ import sys
 import tempfile
 import threading
 import time
+from types import SimpleNamespace
 import unittest
 from unittest.mock import patch
 
@@ -23,8 +25,8 @@ import deploy_policy as policy
 from deploy_transaction import apply_host, atomic_json, rollout
 from deploy_backup_store import receive
 from deploy_restore import health_probes
-from deploy_release import successful_execution, latest_full_run, trusted_release_ancestor, main as controller_main, record_target
-from deploy_host import Host, validate_backup_inventory
+from deploy_release import successful_execution, latest_full_run, trusted_release_ancestor, fresh_connectivity, main as controller_main, record_target
+from deploy_host import Host, validate_backup_inventory, validate_link_processes
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 from cryptography.hazmat.primitives.serialization import Encoding, PrivateFormat, PublicFormat, NoEncryption
 
@@ -145,6 +147,22 @@ class Deployment(unittest.TestCase):
         self.assertEqual(contacted, [policy.TARGETS[0]])
         self.assertEqual(json.loads(output.read_text())[0]['result'], 'transport-or-admission-failed')
         self.assertNotIn('SECRET', output.read_text())
+
+    def test_failed_repeated_health_never_returns_old_success_audit(self):
+        host = self.fixtures()[policy.TARGETS[0]]
+        old = {'result': 'healthy', 'source_sha': self.doc['source_sha'], 'target': policy.TARGETS[0],
+               'manifest_sha256': hashlib.sha256(policy.canonical(self.doc)).hexdigest(),
+               'approval': {'run_id': 99}, 'finished_at': 'earlier'}
+        host.save_state('', old)
+        with patch.object(host, 'health', side_effect=ValueError('SECRET failure')):
+            with self.assertRaises(ValueError):
+                apply_host(self.doc, self.auth, policy.TARGETS[0], host)
+        saved = host.load_state('')
+        self.assertEqual(saved['result'], 'health-recheck-failed')
+        self.assertEqual(saved['approval']['run_id'], 100)
+        self.assertNotIn('SECRET', json.dumps(saved))
+        self.assertNotIn('install', host.calls)
+        self.assertNotIn('stop', host.calls)
 
     def test_admission_failure_still_emits_redacted_identity_audit(self):
         output = self.base / 'audit.json'
@@ -284,6 +302,19 @@ class Deployment(unittest.TestCase):
             with self.assertRaises(ValueError):
                 trusted_release_ancestor(release_sha, controller_sha)
 
+    def test_production_preflight_requires_recent_executed_step(self):
+        now = datetime.datetime(2026, 11, 9, tzinfo=datetime.timezone.utc)
+        for seconds, accepted in [(0, True), (3600, True), (3601, False), (-1, False)]:
+            jobs = {'jobs': [{'conclusion': 'success', 'steps': [{'name': 'Verify production SSH access',
+                'conclusion': 'success', 'completed_at': (now-datetime.timedelta(seconds=seconds)).isoformat()}]}]}
+            if accepted:
+                fresh_connectivity(jobs, now)
+            else:
+                with self.assertRaises(ValueError):
+                    fresh_connectivity(jobs, now)
+        with self.assertRaises(ValueError):
+            fresh_connectivity({'jobs': []}, now)
+
     def test_package_and_service_commands_are_closed(self):
         for platform, packages in self.doc['platforms'].items():
             command = policy.package_commands(platform, packages, self.base)[0]
@@ -301,6 +332,7 @@ class Deployment(unittest.TestCase):
     def test_backup_inventory_requires_explicit_feature_coverage(self):
         profile = json.loads((ROOT/'ci/deploy-host.example.json').read_text())
         validate_backup_inventory(profile, 'freebsd15')
+
         for feature in ('binaries', 'web', 'link', 'vault'):
             broken = copy.deepcopy(profile)
             broken['backup_roots'][feature] = []
@@ -315,6 +347,36 @@ class Deployment(unittest.TestCase):
         profile['backup_features']['web'] = False
         profile['backup_roots']['web'] = []
         validate_backup_inventory(profile, 'freebsd15')
+
+    def test_unmanaged_link_is_rejected_before_service_stop(self):
+        process = '64964 /usr/local/bin/python3.12 -B /usr/local/share/liner-notes/scripts/link_service.py serve --config /etc/fixture.toml'
+        validate_link_processes(process, True, {64964})
+        for managed, owners, text in [(False, {64964}, process), (True, {64963}, process),
+                                     (True, {0}, process.replace('64964 ', '0 ', 1))]:
+            with self.assertRaises(ValueError):
+                validate_link_processes(text, managed, owners)
+        validate_link_processes('80 /usr/local/sbin/httpd -D FOREGROUND', False, set())
+
+    @unittest.skipUnless(os.name == 'posix', 'POSIX service accounts are exercised on hosted Linux')
+    def test_omitted_running_service_is_rejected_without_stop(self):
+        host = object.__new__(Host)
+        host.platform = 'rocky10'
+        host.profile = {'services': ['liner-notes.service'], 'quiescence_users': ['liner_notes']}
+        commands = []
+        def status(argv, **kwargs):
+            commands.append(argv)
+            self.assertNotIn('stop', argv)
+            if argv[0].endswith('/ps'):
+                return ''
+            if 'show' in argv:
+                return 'liner_notes'
+            if 'is-active' in argv:
+                return 0, 'active'
+            self.fail('Unexpected service operation')
+        with patch('pwd.getpwnam', return_value=SimpleNamespace(pw_uid=1001)), patch('deploy_host.command', side_effect=status):
+            with self.assertRaisesRegex(ValueError, 'Omitted BBS service'):
+                host.check_service_inventory()
+        self.assertEqual(commands[-1][-1], 'liner-notes-web.service')
 
     def test_installed_inventory_preserves_multiple_kernel_versions(self):
         host = object.__new__(Host)

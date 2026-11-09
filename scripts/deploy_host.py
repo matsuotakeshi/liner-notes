@@ -44,6 +44,15 @@ def validate_backup_inventory(profile, platform):
         require(service not in profile['services'] or features[feature], 'Enabled service has no corresponding backup roots')
 
 
+def validate_link_processes(lines, managed, allowed_uids):
+    for line in lines.splitlines():
+        fields = line.strip().split(None, 1)
+        if len(fields) == 2 and re.search(r'(?:^|\s)(?:\S*/)?(?:link_service\.py|liner-notes-link)\s+serve(?:\s|$)', fields[1]):
+            uid = int(fields[0])
+            require(managed and uid != 0 and uid in allowed_uids,
+                    'Running link daemon has no managed stop/backup owner; configure its service first')
+
+
 def trusted(path):
     path = Path(path)
     require(path.is_absolute(), 'Absolute trusted path required')
@@ -54,7 +63,7 @@ def trusted(path):
     return path
 
 
-def command(argv, *, accepted=(0,), input=None):
+def command(argv, *, accepted=(0,), input=None, with_status=False):
     try:
         result = subprocess.run(argv, input=input, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
                                 env={'PATH': '/usr/bin:/bin:/usr/sbin:/sbin:/usr/local/bin:/usr/local/sbin',
@@ -79,7 +88,8 @@ def command(argv, *, accepted=(0,), input=None):
             stream.flush()
             os.fsync(stream.fileno())
     require(result.returncode in accepted, 'Restricted host command failed')
-    return result.stdout.decode('utf-8', errors='strict').strip()
+    output = result.stdout.decode('utf-8', errors='strict').strip()
+    return (result.returncode, output) if with_status else output
 
 
 class Host:
@@ -101,6 +111,47 @@ class Host:
             require(service not in profile['services'] or feature in profile['probes'], 'Enabled service has no health probe')
         require(not profile['backup_roots']['doors'] or 'door' in profile['probes'], 'Registered Doors require a health probe')
         require(profile.get('quiescence_users'), 'Dedicated service accounts must be checked for remaining workers')
+        required_users = {'liner_notes'}
+        for user, service in zip(('liner_notes_web', 'liner_notes_link'), SERVICES[self.platform][1:]):
+            if service in profile['services']:
+                required_users.add(user)
+        require(required_users <= set(profile['quiescence_users']), 'Known service owner missing from quiescence inventory')
+
+    def check_service_inventory(self):
+        """Only the three known BBS services; never operate unrelated services."""
+        import pwd
+        ps = '/bin/ps' if self.platform == 'freebsd15' else '/usr/bin/ps'
+        validate_link_processes(command([ps, '-ax', '-o', 'uid=,command=']),
+                                SERVICES[self.platform][2] in self.profile['services'],
+                                {pwd.getpwnam(name).pw_uid for name in self.profile['quiescence_users']})
+        for service, user_name in zip(SERVICES[self.platform], ('liner_notes', 'liner_notes_web', 'liner_notes_link')):
+            included = service in self.profile['services']
+            if self.platform == 'freebsd15':
+                rc = Path('/usr/local/etc/rc.d') / service
+                if included:
+                    trusted(rc)
+                    require(rc.is_file(), 'Managed FreeBSD service has no installed rc script')
+                if rc.exists() and not included:
+                    trusted(rc)
+                    status, output = command(service_command(self.platform, service, 'status'), accepted=(0, 1), with_status=True)
+                    require(status == 1 and ('is not running' in output or 'is not ready' in output),
+                            'Omitted BBS service is active or its state is unknown')
+            elif included:
+                owner = command(['/usr/bin/systemctl', 'show', '-p', 'User', '--value', service])
+                require(owner in self.profile['quiescence_users'] and pwd.getpwnam(owner).pw_uid != 0,
+                        'Configured systemd service owner is absent from quiescence inventory')
+            else:
+                status, output = command(service_command(self.platform, service, 'status'), accepted=(0, 3, 4), with_status=True)
+                require(status != 0 and output in ('inactive', 'failed', 'unknown'),
+                        'Omitted BBS service is active or its state is unknown')
+            if not included:
+                try:
+                    user = pwd.getpwnam(user_name)
+                except KeyError:
+                    continue
+                pgrep = '/bin/pgrep' if self.platform == 'freebsd15' else '/usr/bin/pgrep'
+                require(not command([pgrep, '-u', str(user.pw_uid)], accepted=(0, 1)),
+                        'Omitted BBS service account still has running workers')
 
     @contextlib.contextmanager
     def lock(self):
@@ -182,6 +233,7 @@ class Host:
             path = trusted(old['path'])
             require(old['version'] == self.before[name][0] and digest_file(path) == old['sha256'], 'Old package escrow is missing/stale')
             require(any(path.is_relative_to(Path(r)) for r in self.profile['backup_roots']['old-packages']), 'Escrow is outside the backup inventory')
+        self.check_service_inventory()
         if self.platform == 'freebsd15':
             command(['/usr/local/sbin/pkg', 'repo', str(self.stage)])
             (self.stage / 'repos').mkdir()
@@ -223,7 +275,8 @@ class Host:
         for name in self.profile['quiescence_users']:
             user = pwd.getpwnam(name)
             require(user.pw_uid != 0, 'Root cannot be a BBS worker account')
-            processes = command(['/usr/bin/pgrep', '-u', str(user.pw_uid)], accepted=(0, 1))
+            pgrep = '/bin/pgrep' if self.platform == 'freebsd15' else '/usr/bin/pgrep'
+            processes = command([pgrep, '-u', str(user.pw_uid)], accepted=(0, 1))
             require(not processes, 'A process still runs under a dedicated BBS/Door/transfer account')
 
     def start(self):
@@ -303,6 +356,10 @@ class Host:
             rows = command(['/usr/bin/procstat', '-b', str(pid)]).splitlines()
             require(len(rows) == 2 and rows[1].split()[-1] == expected_binary,
                     'Runtime does not execute the packaged binary; inspect rc.conf program override')
+            import pwd
+            owner_uid = int(command(['/bin/ps', '-o', 'uid=', '-p', str(pid)]))
+            require(owner_uid != 0 and owner_uid in {pwd.getpwnam(n).pw_uid for n in self.profile['quiescence_users']},
+                    'Runtime owner is absent from quiescence inventory')
         else:
             expected_binary = '/usr/sbin/liner-notes'
             pid = int(command(['/usr/bin/systemctl', 'show', '-p', 'MainPID', '--value', 'liner-notes.service']))
