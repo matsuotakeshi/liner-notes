@@ -110,7 +110,7 @@ def test():
             environment = ROOT / "build/solaris-python"
             run([sys.executable, "-m", "venv", "--system-site-packages", str(environment)])
             python = str(environment / "bin/python")
-            run([python, "-m", "pip", "install", "--disable-pip-version-check", "--no-input",
+            run([python, "-m", "pip", "install", "--disable-pip-version-check", "--no-input", "--no-cache-dir",
                  "-r", "webui/requirements.txt", "-r", "link-requirements.txt"])
             run([python, "-c", "import aiohttp,cryptography;print('aiohttp',aiohttp.__version__,'cryptography',cryptography.__version__)"])
             web_flags = ["PYTHON=" + python if item.startswith("PYTHON=") else item for item in flags]
