@@ -18,6 +18,7 @@ from test_zmodem_workflows import fails
 from transfer_connectors import LineConnector
 import vault_zmodem as gateway
 from zmodem_connector import ZmodemProcess, TransferFailure
+from transfer_terminal_fixture import terminal_baseline, assert_timeout_cleanup
 
 
 def peer(executable, arguments, directory, action):
@@ -115,11 +116,11 @@ def run(binary, ctl, receiver, sender):
             journal=(vault/'index.dat').read_bytes()
             # Timeout restores terminal flags and reaps the receiver process.
             import pty,termios
-            master,slave=pty.openpty();before=termios.tcgetattr(slave)
+            master,slave=pty.openpty();before=terminal_baseline(slave)
             try:
                 started=time.monotonic()
                 fails(lambda:gateway.receive(c,ZmodemProcess(receiver,sender,1),'127.0.0.1',s.port,'bob',spool,slave,slave))
-                assert time.monotonic()-started<4 and termios.tcgetattr(slave)==before
+                assert_timeout_cleanup(slave,before,time.monotonic()-started)
             finally:os.close(master);os.close(slave)
             assert not spool_contents(spool)
             # Revoke the actual BBS session while the ZMODEM child is running.

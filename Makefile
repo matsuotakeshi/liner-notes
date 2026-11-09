@@ -143,6 +143,7 @@ test-transfer-connector: tests/test_transfer_connector.c src/transfer_line.c src
 LRZ?=lrz
 LSZ?=lsz
 test-zmodem: runtime vaultctl test-zhost
+	$(PYTHON) tests/test_transfer_terminal.py
 	./test-zhost
 	$(PYTHON) tests/test_system_control.py ./runtime ./vaultctl
 	$(PYTHON) tests/test_zmodem.py ./runtime ./vaultctl $(LRZ) $(LSZ)

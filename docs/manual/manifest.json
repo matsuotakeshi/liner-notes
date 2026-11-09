@@ -86,7 +86,10 @@
         "src/door_lock_helper.c",
         "tests/test_door_lock.py",
         "ports/test-resume.py",
-        "tests/test_resume_receipt.py"
+        "tests/test_resume_receipt.py",
+        "tests/test_zmodem.py",
+        "tests/transfer_terminal_fixture.py",
+        "tests/test_transfer_terminal.py"
       ]
     },
     {
