@@ -36,6 +36,7 @@ jobs:
           sh -n ci/build-freebsd-package.sh
           python3 tests/test_release_manifest.py
           python3 tests/test_freebsd_package_libraries.py
+          python3 tests/test_freebsd_fixture_config.py
           python3 -m venv "$RUNNER_TEMP/manual-venv"
           "$RUNNER_TEMP/manual-venv/bin/pip" install -r scripts/manual/requirements.txt
           "$RUNNER_TEMP/manual-venv/bin/python" tests/test_freebsd_plist.py
