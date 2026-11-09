@@ -3,6 +3,7 @@
 ## 未リリース（次期版0.75候補）
 
 - SELinux受入試験と同じZMODEM送受信手順を、実BBS・実lrzszを使うhosted回帰へ追加。転送後の応答待ち失敗時にpeer終了コードと合成試験の受信内容を記録し、Enforcing検査とタイムアウト値は維持。
+- 転送helperが継承RPCソケットをPythonで開く際に必要な`getopt`を専用ドメイン間で許可。`setopt`・新規`connectto`と原本データ読み取りの拒否は維持し、ポリシーの許可グラフで回帰検査。
 
 - FreeBSD rootless package試験へ実ELFライブラリの依存closureを配置。manifestの要求名・SONAME・実物のバイト一致を検査し、pkgのshlib検査を維持したままbase library不足を解消。宿主のDB・ライブラリは変更しない。
 

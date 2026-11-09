@@ -88,7 +88,7 @@
   "src/locales/ja.def": "f1bfc81da3a79ec04547b4acfdfc7499417f2d5c6fb3d7c4a65bf077632a787e",
   "src/locales/en.def": "1eebc4e2040b1fc3057582bf486eac584f5c31298202cb52253d0458c3b6c59b",
   "webui/static/app.js": "ff79c5ac310c835df7e13595f2027d4c4ee8e699fc77c5192b102cca33ddba8c",
-  "linux/selinux/liner_notes.te": "7c8d006049c195cd87edc155a4066686046a6202376978d3b905118dc62da8d7",
+  "linux/selinux/liner_notes.te": "a8afe5895e2008f66d494dd03e319e2da7275eb12c59116db2508a3c475b7e3d",
   "linux/selinux/liner_notes.fc": "7989a4ead559cf484cd792bf9c293fe5478f3b3de7a55c8850fd1718dd94497d",
   "linux/selinux/liner-notes-selinux.spec": "accace08e47c7329448bd9a4dab6eba1c80a402cce0ce475080bdcf6c0c3e7de",
   "linux/selinux/selinux_labels.py": "b510853830441309bd9c4253de0ae83a10e9edc75ccb5c83fdb7c61cc844dd6c",
