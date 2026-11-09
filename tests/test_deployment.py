@@ -26,7 +26,7 @@ from deploy_transaction import apply_host, atomic_json, rollout
 from deploy_backup_store import receive
 from deploy_restore import health_probes
 from deploy_release import successful_execution, latest_full_run, trusted_release_ancestor, fresh_connectivity, main as controller_main, record_target
-from deploy_host import Host, validate_backup_inventory, validate_link_processes
+from deploy_host import Host, command as host_command, validate_backup_inventory, validate_link_processes
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 from cryptography.hazmat.primitives.serialization import Encoding, PrivateFormat, PublicFormat, NoEncryption
 
@@ -440,6 +440,45 @@ class Deployment(unittest.TestCase):
         with self.assertRaises(ValueError):
             receive(meta, io.BytesIO(b'x' * len(payload)), root)
         self.assertEqual((root / (meta['id'] + '.tar')).read_bytes(), payload)
+
+    @unittest.skipUnless(os.name == 'posix', 'Real subprocess umask runs on hosted Linux')
+    def test_real_install_adapter_scopes_public_umask_to_package_children(self):
+        previous = os.umask(0o077)
+        try:
+            private = self.base/'adapter-private'
+            private.mkdir()
+            configuration = private/'operator.conf'
+            configuration.write_bytes(b'preserve private configuration')
+            for platform in ('freebsd15', 'rocky10', 'debian13'):
+                host = object.__new__(Host)
+                host.platform, host.stage = platform, private
+                host.packages = {'liner-notes': {'version': '0.75'}}
+                host.before = {'liner-notes': ['0.74.1'], 'unrelated': ['1.0']}
+                host.inventory = lambda: {'liner-notes': ['0.75'], 'unrelated': ['1.0']}
+                destination = private/platform
+                program = ('from pathlib import Path; import sys; '
+                           'p=Path(sys.argv[1]); p.mkdir(); (p/"payload").write_bytes(b"package")')
+                # Substitute only the package executable. Exercise the actual
+                # Host.install -> command -> subprocess path and permissions.
+                with patch('deploy_host.package_commands', return_value=[
+                        [sys.executable, '-c', program, str(destination)]]):
+                    host.install(self.doc)
+                self.assertEqual(destination.stat().st_mode & 0o777, 0o755)
+                self.assertEqual((destination/'payload').stat().st_mode & 0o777, 0o644)
+            private_child = private/'non-package-output'
+            host_command([sys.executable, '-c',
+                          'from pathlib import Path; import sys; Path(sys.argv[1]).write_bytes(b"private")',
+                          str(private_child)])
+            self.assertEqual(private_child.stat().st_mode & 0o777, 0o600)
+            following = private/'parent-output'
+            following.write_bytes(b'private')
+            self.assertEqual(following.stat().st_mode & 0o777, 0o600)
+            self.assertEqual(private.stat().st_mode & 0o777, 0o700)
+            self.assertEqual(configuration.stat().st_mode & 0o777, 0o600)
+            self.assertEqual(configuration.read_bytes(), b'preserve private configuration')
+            self.assertEqual(os.umask(0o077), 0o077)
+        finally:
+            os.umask(previous)
 
     def test_local_tcp_health_probe_executes(self):
         with socket.socket() as server:

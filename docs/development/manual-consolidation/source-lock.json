@@ -103,7 +103,7 @@
   "ci/native_ci.py": "65cb55363b95d3b3ead8113733e0fa16213f08e2c615479cfb69886f4be71c53",
   "ci/deploy_release.py": "c9b230f967b86b43aa951e00afd19a2ee77d1de2501c16be775c6bd6249814c6",
   "scripts/deploy_policy.py": "650baa5a8246e859158791d93c4f64cc3b5bc6003f1fa25608f06a13c870e958",
-  "scripts/deploy_host.py": "6e3ac87a5051f7ac2d7721894aba8b1fe75c946598400f7dae8cfbc35d84767d",
+  "scripts/deploy_host.py": "e77ba50264824a71c0ef81b0fbfac2773c7915207f9ea3e46a35c3e0c64ee461",
   "scripts/deploy_restore.py": "4aba798239e8b357789f85c4a4fa889aa949361049a928a0b465d55fb0e77c19",
   "scripts/deploy_transaction.py": "7487299f4f706650425811d7f3160dd39880cca1027863b0bde2b6a495c34367",
   "scripts/deploy_backup_store.py": "ff1a26a98e9a2ba20dae1e31789e8dc4bbb74edc8ac3e9893f271ede716b2d5d",

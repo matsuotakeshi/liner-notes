@@ -63,11 +63,12 @@ def trusted(path):
     return path
 
 
-def command(argv, *, accepted=(0,), input=None, with_status=False):
+def command(argv, *, accepted=(0,), input=None, with_status=False, package_install=False):
     try:
         result = subprocess.run(argv, input=input, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
                                 env={'PATH': '/usr/bin:/bin:/usr/sbin:/sbin:/usr/local/bin:/usr/local/sbin',
-                                     'LC_ALL': 'C', 'HOME': '/root'}, timeout=1800, check=False)
+                                     'LC_ALL': 'C', 'HOME': '/root'}, timeout=1800, check=False,
+                                umask=0o022 if package_install else -1)
     except subprocess.TimeoutExpired as error:
         result = subprocess.CompletedProcess(argv, -1, error.stdout or b'', (error.stderr or b'') + b'\nRestricted command timed out')
     except OSError:
@@ -341,7 +342,9 @@ class Host:
 
     def install(self, release):
         for argv in package_commands(self.platform, self.packages, self.stage):
-            command(argv)
+            # Match the native package acceptance: only the package-manager
+            # child creates public directories. Parent backups/keys stay 077.
+            command(argv, package_install=True)
         after = self.inventory()
         require({n:v for n,v in after.items() if n not in self.packages} ==
                 {n:v for n,v in self.before.items() if n not in self.packages}, 'Unrelated package inventory changed')
