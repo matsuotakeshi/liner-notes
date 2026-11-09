@@ -331,6 +331,7 @@ async def link_probe(fixture, core_port):
                                 parent=None, revision=1, kind='post', author='remote',
                                 title='Confined link import', body='Signed incoming body', created=1)))
     context = link_transport.context(peer/'identity', [private/'identity.crt'], server=True)
+    peer_client = link_transport.context(peer/'identity', [private/'identity.crt'])
     server = await asyncio.start_server(lambda r,w: link_transport.serve(store,r,w),
                                        '127.0.0.1', peer_port, ssl=context)
     bridge = await Bridge('127.0.0.1', core_port, timeout=10).open()
@@ -372,8 +373,18 @@ port = {peer_port}
             'liner_notes_link_exec_t', True)
         unit = fixture.start('link', entry, ['serve','--config',str(config)], own, 'liner_notes_link_t')
         for _ in range(150):
+            # Exchanges are pull-based in both directions. The peer server
+            # supplies incoming events; it cannot receive the daemon's exports
+            # until this peer explicitly pulls from the confined listener.
+            try:
+                await link_transport.pull(store, own_id, '127.0.0.1', port, peer_client)
+            except ConnectionRefusedError:
+                await asyncio.sleep(.2)
+                continue
             result = await bridge.command('READ 2')
-            if 'Signed incoming body' in result['text'] and store.db.execute('SELECT COUNT(*) FROM events').fetchone()[0] >= 2:
+            exports = store.db.execute('SELECT envelope FROM events WHERE origin=?', (own_id,)).fetchall()
+            if ('Signed incoming body' in result['text'] and
+                    any('Persisted under Enforcing' in json.loads(row[0])['event'].get('body', '') for row in exports)):
                 break
             await asyncio.sleep(.2)
         else:
@@ -382,7 +393,9 @@ port = {peer_port}
         fixture.results.append({'link':'signed TLS import/export, dedicated domain, TLS rotation'})
     finally:
         if unit:
-            fixture.stop(unit)
+            # Keep servicing the peer while the daemon finishes an in-flight
+            # pull during orderly shutdown; blocking this loop can deadlock it.
+            await asyncio.to_thread(fixture.stop, unit)
         await bridge.close()
         server.close()
         await server.wait_closed()
