@@ -179,6 +179,8 @@ async def bbs_probe(port, create):
             async with a.lock:
                 await a.literal('Private mail under Enforcing')
             assert 'MAIL SENT' in (await a.command('.'))['text']
+            # READ is contextual while the mail menu remains active.
+            await a.command('MAIL EXIT')
         article = response_data((await a.command('READ 1'))['text'])['article']
         assert 'Persisted under Enforcing' in article['body']
         assert 'Private mail under Enforcing' in (await b.command('MAIL READ 1'))['text']
