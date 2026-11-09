@@ -38,10 +38,28 @@ def public_failure(error, phase, child=None):
     known = {"ValueError", "AssertionError", "OSError", "FileNotFoundError", "PermissionError", "TimeoutExpired", "CalledProcessError", "HTTPError", "URLError", "JSONDecodeError"}
     kind = type(error).__name__
     code = error.returncode if isinstance(error, subprocess.CalledProcessError) else None
+    reason = 'acceptance-rejected'
+    if isinstance(error, subprocess.TimeoutExpired):
+        reason = 'timeout'
+    elif isinstance(error, subprocess.CalledProcessError):
+        reason = 'command-failed'
+    elif isinstance(error, FileNotFoundError):
+        reason = 'missing-prerequisite'
+    elif isinstance(error, PermissionError):
+        reason = 'permission-denied'
+    elif type(error) is ValueError:
+        # Only exact literals from this reviewed helper can become public codes.
+        reason = {'Missing installed prerequisite': 'missing-prerequisite',
+                  'Main advanced before jail execution': 'main-advanced',
+                  'VNET kernel required': 'vnet-unavailable',
+                  'Actions archive digest absent or mismatched': 'artifact-integrity',
+                  'Same-SHA package artifact required': 'package-evidence-missing',
+                  'Latest package attempt did not succeed': 'package-ci-not-successful',
+                  'Insufficient space for isolated jail and recovery copies': 'insufficient-space'}.get(str(error), reason)
     result = {"result": "failed", "phase": phase if isinstance(phase, str) and phase in PHASES else "admission",
               "type": kind if kind in known else "Error",
               "exit_code": code if type(code) is int and -255 <= code <= 255 else None,
-              "reason": "timeout" if isinstance(error, subprocess.TimeoutExpired) else "acceptance-rejected"}
+              "reason": reason}
     if isinstance(child, dict) and isinstance(child.get("phase"), str) and child["phase"] in JAIL_PHASES:
         result["jail_phase"] = child["phase"]
         result["jail_type"] = child.get("type") if isinstance(child.get("type"), str) and child["type"] in known else "Error"
