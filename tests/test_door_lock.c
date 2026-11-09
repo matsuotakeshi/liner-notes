@@ -11,6 +11,11 @@
 #include <time.h>
 #include <unistd.h>
 
+#ifdef LINER_TEST_LARGE_OWNER
+/* Deliberately model runtime's huge zero-filled static reservations. */
+static volatile unsigned char reservation[1024U * 1024U * 1024U];
+#endif
+
 static void pause_short(void) { struct timespec t = {0, 10000000}; nanosleep(&t, NULL); }
 static int acquire(const char *path) {
     int fd = open(path, O_RDWR | O_CREAT, 0600);
@@ -35,6 +40,27 @@ static int eventual(const char *path) {
     return -1;
 }
 int main(int argc, char **argv) {
+    if (!door_lock_init(argv[0])) { perror("door_lock_init"); return 2; }
+#ifdef LINER_TEST_LARGE_OWNER
+    if (argc == 4 && !strcmp(argv[1], "exec-fail")) {
+        assert(!unlink(argv[2]));
+        assert(acquire(argv[3]) < 0);
+        for (int i = 0; i < 100; ++i) { door_lock_reap(); pause_short(); }
+        int status;
+        assert(waitpid(-1, &status, WNOHANG) == -1 && errno == ECHILD);
+        puts("EXEC FAILURE REAPED");
+        return 0;
+    }
+    if (argc == 3 && !strcmp(argv[1], "large-owner")) {
+        reservation[0] = 1; reservation[sizeof(reservation) - 1] = 1;
+        int lease = acquire(argv[2]); assert(lease >= 0);
+        puts("READY"); fflush(stdout);
+        while (getchar() != EOF) {}
+        door_lock_release(lease);
+        for (int i = 0; i < 100; ++i) { door_lock_reap(); pause_short(); }
+        return 0;
+    }
+#endif
     if (argc == 5 && !strcmp(argv[1], "hold")) {
         int lease = atoi(argv[2]), control = atoi(argv[3]), ready = atoi(argv[4]);
         char c = 'R';

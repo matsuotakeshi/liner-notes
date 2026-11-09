@@ -37,7 +37,7 @@ def install(destdir,prefix,python,unitdir='/usr/local/lib/systemd/system'):
             os.replace(name,out)
         finally:
             if os.path.exists(name):os.unlink(name)
-    for source,installed in [('runtime','sbin/liner-notes'),('memberctl','bin/liner-notes-memberctl'),('vaultctl','bin/liner-notes-vaultctl'),('dbconvert','bin/liner-notes-dbconvert')]:
+    for source,installed in [('liner-notes-door-lock','libexec/liner-notes-door-lock'),('runtime','sbin/liner-notes'),('memberctl','bin/liner-notes-memberctl'),('vaultctl','bin/liner-notes-vaultctl'),('dbconvert','bin/liner-notes-dbconvert')]:
         put(prefix+'/'+installed,(ROOT/source).read_bytes(),0o755)
     for p in (ROOT/'scripts').glob('*.py'):
         put(share+'/scripts/'+p.name,p.read_bytes(),0o755 if p.name=='door_guess.py' else 0o644)

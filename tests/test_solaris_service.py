@@ -80,11 +80,13 @@ class ServiceTests(unittest.TestCase):
             stage = Path(tmp) / "stage"
             original = Path.read_bytes
             def binary(path):
-                if path.parent == ROOT and path.name in ("runtime", "memberctl", "vaultctl", "dbconvert"):
+                if path.parent == ROOT and path.name in ("runtime", "memberctl", "vaultctl", "dbconvert", "liner-notes-door-lock"):
                     return b"test executable\n"
                 return original(path)
             with patch.object(Path, "read_bytes", binary), patch.object(subprocess, "run", side_effect=AssertionError("no host commands")):
                 installer.install(str(stage))
+                helper = stage / "opt/liner-notes/libexec/liner-notes-door-lock"
+                self.assertEqual(helper.read_bytes(), b"test executable\n")
                 config = stage / "etc/liner-notes/solaris.json"
                 sample = config.with_name("solaris.json.sample")
                 self.assertEqual(json.loads(sample.read_text())["program"], "/opt/liner-notes/sbin/liner-notes")

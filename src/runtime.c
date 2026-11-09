@@ -15,6 +15,7 @@
 #include "ui.h"
 #include "session.h"
 #include "doors.h"
+#include "door_lock.h"
 #include "store_limits.h"
 #include "chat.h"
 #include "menu.h"
@@ -334,6 +335,7 @@ static void advance(Connection *c,uint64_t now) {
     if(!s->active) drop(c);
 }
 int main(int argc,char **argv) {
+    const char *program=argv[0];
     const char *doors_path=NULL;
     const char *help_directory="help";int help_required=0;
     const char *user_log=NULL;
@@ -413,6 +415,7 @@ int main(int argc,char **argv) {
         else { fprintf(stderr,"invalid option; use --zmodem-helper FILE, --vault-dir DIR, --bind IPv4, --menu-dir DIR, --menu, --telnet, --lang ja|en and/or --admins FILE\n"); return 2; }
     }
     char *end=NULL;
+    if(doors_path && !door_lock_init(program)) { fprintf(stderr,"Door lock helper missing or unsafe\n");return 2; }
     if(!doors_config(doors_path)) { fprintf(stderr,"invalid doors configuration\n");return 2; }
     long port=(argc>=2 && argc<=5) ? strtol(argv[1],&end,10) : -1;
     if(port<0 || port>65535 || !end || end==argv[1] || *end) {

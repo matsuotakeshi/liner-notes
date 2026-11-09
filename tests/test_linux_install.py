@@ -25,6 +25,9 @@ with tempfile.TemporaryDirectory(prefix='install-linux-') as tmp:
     assert not list(docs.glob('STAGE*.md')) and not (docs/'development').exists()
     assert not (stage/'var').exists(),'Installer must not create or alter instance data'
     assert (stage/'usr/local/sbin/liner-notes').read_bytes()==(ROOT/'runtime').read_bytes()
+    helper=stage/'usr/local/libexec/liner-notes-door-lock'
+    assert helper.read_bytes()==(ROOT/'liner-notes-door-lock').read_bytes()
+    assert helper.stat().st_mode&0o777==0o755
     assert os.access(stage/'usr/local/share/liner-notes/scripts/door_guess.py',os.X_OK)
     assert os.access(stage/'usr/local/share/liner-notes/scripts/door_clans.sh',os.X_OK)
     wrapper=stage/'usr/local/bin/liner-notes-doctor'

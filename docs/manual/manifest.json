@@ -81,7 +81,10 @@
         "solaris/liner-notes.xml",
         "src/door_lock.c",
         "scripts/posix_locks.py",
-        "scripts/build-lrzsz.py"
+        "scripts/build-lrzsz.py",
+        "src/door_lock.h",
+        "src/door_lock_helper.c",
+        "tests/test_door_lock.py"
       ]
     },
     {
@@ -365,7 +368,10 @@
         "src/doors.c",
         "src/runtime.c",
         "scripts/door_clans.sh",
-        "src/door_lock.c"
+        "src/door_lock.c",
+        "src/door_lock.h",
+        "src/door_lock_helper.c",
+        "tests/test_door_lock.py"
       ]
     },
     {

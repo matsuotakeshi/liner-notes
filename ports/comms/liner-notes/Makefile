@@ -57,9 +57,10 @@ do-install:
 	${MKDIR} ${STAGEDIR}${DATADIR}
 	${INSTALL_DATA} ${WRKSRC}/LICENSE ${STAGEDIR}${DATADIR}/LICENSE
 	${INSTALL_DATA} ${WRKSRC}/THIRD_PARTY.md ${STAGEDIR}${DATADIR}/THIRD_PARTY.md
-	${MKDIR} ${STAGEDIR}${PREFIX}/bin ${STAGEDIR}${PREFIX}/sbin
+	${MKDIR} ${STAGEDIR}${PREFIX}/bin ${STAGEDIR}${PREFIX}/sbin ${STAGEDIR}${PREFIX}/libexec
 	${MKDIR} ${STAGEDIR}${DATADIR}/scripts
 	${INSTALL_PROGRAM} ${WRKSRC}/runtime ${STAGEDIR}${PREFIX}/sbin/liner-notes
+	${INSTALL_PROGRAM} ${WRKSRC}/liner-notes-door-lock ${STAGEDIR}${PREFIX}/libexec/liner-notes-door-lock
 .for binary in vaultctl memberctl dbconvert
 	${INSTALL_PROGRAM} ${WRKSRC}/${binary} ${STAGEDIR}${PREFIX}/bin/liner-notes-${binary}
 .endfor
