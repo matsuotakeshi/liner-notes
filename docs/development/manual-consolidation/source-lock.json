@@ -1,6 +1,6 @@
 {
   "LICENSE": "fb981668c18a279e285fc4d83fba1e836cc84dd4daa73c9697d3cfd2d8aca6e0",
-  "Makefile": "776d92134c2603d883288e858b9161803707b531dce678189abbc853ddaba12a",
+  "Makefile": "55564a9b51138932fbc9e9cb65f539455366a52152e44f68981a1f70bbc84df4",
   "boards.example.conf": "4bd1a17ecf3966d3829510e8495a1362fb8b922cd754badccc739f5e5ab0bde8",
   "ci/build-freebsd-package.sh": "4e62899471d1f1a6c44e00a783c1aff771332140704ae778da95a95048474108",
   "debian/changelog": "8f3574a094f5a3677a9a7188e530ecdbdc006138b082b57243ca8441c644114d",
@@ -94,7 +94,7 @@
   "linux/selinux/selinux_labels.py": "b510853830441309bd9c4253de0ae83a10e9edc75ccb5c83fdb7c61cc844dd6c",
   "ci/selinux_root.py": "09b84e1b13219228f983392142c8f15595a0582ae1fb824d8b7a85fb2d9078c5",
   "ci/selinux_native.py": "a039ada55051b2e59e7eb0fb4d00c070d2d0b2726536f3933a62d2d37dec45a6",
-  "ci/solaris_ci.py": "df046332f8371ac6df33d5f8bf664a66fd02f41147fbc5c8701d613d7a1173f6",
+  "ci/solaris_ci.py": "062ed52589b68ed4d1866f6538e0cd13250af4543d51040abb8402be3d561cf2",
   "scripts/install-solaris.py": "f440934a9889f7282fc6ab5eb4b9f63f7ed79153ef4a72c9e170ea8da5b3d2bc",
   "scripts/link_maintenance.py": "ee76d893e80f536f65bcf869348d7a083eafc3f0d5280dcd35de431dbfc16c30",
   "src/door_lock.c": "6e6e2798a5c626767a89f2cb1ef8f8cc79f13caaba879e45155f13c6bc421e34",
@@ -116,7 +116,7 @@
   "ci/freebsd_package_lease.py": "3e9c9cd0ba429b1a16c84a415a74fec57d6573e9c536e4e2a352e84985843712",
   ".github/workflows/freebsd-package.yml": "c6e74f7f1d7b6f21591fc27087ba920055a813dba8d609199b75d3bd0cf2d277",
   "CI_CD.md": "a62c1849bad237d013546205b72fe168e0d1b50f41d79e156c3e4ead2e0d92d2",
-  ".github/workflows/native-ci-lint.yml": "c76ef932467561c0263d8abd40202e1a45268e7129c9d08a9e5da0d10cd0a3ae",
+  ".github/workflows/native-ci-lint.yml": "790eb6d0389145915fb32cee7867a64225431a8e4d81a202ee96a81fcf43d439",
   "scripts/release_manifest.py": "35ea4b812c9ef6a69b09db52ff08dce61e9433d2ffe8b971c97b230f4635c970",
   "scripts/verify_release_set.py": "4322ffce4f92a9625b076435b2d0029d48c68319943fef7b46d5f7ce30d8b890",
   "tests/test_release_manifest.py": "08b5c8cab61c4556d1ac5e6137e252e195c76c0572fd72577bce92a1529b3791",
@@ -134,5 +134,8 @@
   "tests/test_resume_receipt.py": "9f76a68eb59728f34523aa5b061a631ec561cd6aff60a12004b85ca84cf61c3c",
   "tests/package_menu_flow.py": "e2995f40f2cf1d33cac6d43d67ea23d18ea799e1c79e670c57be2b47cdb1c76b",
   "tests/test_package_menu_flow.py": "9e2274f9869e46503e88cc92e23e2136eb7cf7c4534b3236af4ad430e0970580",
-  "tests/test_freebsd_jail_import.py": "388bf96302bc2af9cf1204596f25f77851bf45f92504ea574dc45903b3d1f47a"
+  "tests/test_freebsd_jail_import.py": "388bf96302bc2af9cf1204596f25f77851bf45f92504ea574dc45903b3d1f47a",
+  "tests/test_zmodem.py": "a1eeeeacfbd76d8b54a9755c32052be3d03f993c04db62e185123ad6f9a3b167",
+  "tests/transfer_terminal_fixture.py": "6935ef9fdaa7c3538d45bac078cc9c634c7562f9a829bad1edc4d2f8564c562e",
+  "tests/test_transfer_terminal.py": "04f0f7d5e62e0a899a171929cb42d88f4237b29d4df4579b882c4f7331a44e37"
 }

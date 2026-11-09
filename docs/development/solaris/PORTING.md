@@ -225,3 +225,39 @@ core incomplete; WebUI/link/ZMODEM not tested; SMF lifecycle unverified (no SMF
 management authorization). This remains a failed native run, not full Solaris
 acceptance. Receipt regression is added to hosted checks and runs early in the
 next trusted-main Solaris CI as well as the full core suite.
+
+## Full core, WebUI and link acceptance; initial PTY speed normalization
+
+Main `55909824b5ebc8c7468660e6a91a10cbaa2ee2e9`, run
+https://github.com/matsuotakeshi/liner-notes/actions/runs/42575641392,
+job `129023125742`, artifact `13656310006` (verified SHA-256
+`82ef8306532c0d8366992f0f9fd46edc09ae45092f6a4c23e3cc69e873a0fbd4`)
+passed build, full `make check`, structured copy/restore, all Door, all WebUI
+and all link suites. Doctor 33 cases and both source-nonmutation database probes
+passed. A private venv installed aiohttp 3.14.5 with system cryptography 46.0.3.
+The official lrzsz 0.13.1 source built successfully in the private workspace.
+ZMODEM child concurrency/control and the first actual transfer paths passed;
+the run failed after 718.731 seconds at `test_zmodem.py`'s timeout cleanup
+assertion. The full ZMODEM suite is not passed and SMF lifecycle remains untested.
+
+The compound assertion was separated with supplemental diagnostics using only
+the hash-verified existing main source and runtime, synthetic PTYs/directories,
+the existing CI account and `~/ci/.liner-notes-native.lock`. A whole-suite trace
+hit its external 90-second diagnostic limit before reaching the assertion and
+was not used as cause evidence; its owned group was recovered. Subsequent
+process inspection showed only the read-only diagnostic SSH/Python/ps.
+
+Minimal calls to the unchanged `raw_terminal` reproduced the same attribute
+difference without any lrz child. Even a no-op `tcsetattr(TCSANOW, tcgetattr())`
+changed initial `c_cflag` 189 to 852157 and input speed 0 to 13; output speed,
+all other flags and control characters stayed identical. With a baseline read
+after this setup, normal raw-mode exit and actual lrz timeout preserved every
+attribute exactly; the latter took 1.019 seconds (the limit remains 4 seconds).
+
+This matches the documented input-speed-zero semantics and actual-state readback
+in [Oracle tcsetattr(3C)](https://docs.oracle.com/cd/E88353_01/html/E37843/tcsetattr-3c.html).
+The fix configures only the newly allocated test PTY before recording its state.
+There is no product terminal change, masked comparison or timeout relaxation.
+Hosted/native regression rejects changed local flags, control characters,
+speeds and an elapsed value exactly at the four-second boundary. The final
+post-fix full native run is still required.

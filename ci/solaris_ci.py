@@ -101,6 +101,7 @@ def test():
         run([sys.executable, "tests/test_door_lock.py"])
         run([sys.executable, "tests/test_posix_locks.py"])
         run([sys.executable, "tests/test_resume_receipt.py"])
+        run([sys.executable, "tests/test_transfer_terminal.py"])
         capabilities["lock_lifetime"] = "passed"
         run([sys.executable, "tests/test_solaris_service.py"])
         run([sys.executable, "scripts/install-solaris.py", "--destdir", "build/solaris-stage", "--python", sys.executable])
@@ -146,6 +147,7 @@ def test():
                     print(log.read_text(errors="replace"), flush=True)
                 raise
             lrz, lsz = str(engine / "local/bin/lrz"), str(engine / "local/bin/lsz")
+        capabilities["zmodem"] = "incomplete"
         run(flags + ["test-zmodem", "LRZ=" + lrz, "LSZ=" + lsz])
         capabilities["zmodem"] = "passed"
     finally:
