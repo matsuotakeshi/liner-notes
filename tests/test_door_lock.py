@@ -9,13 +9,13 @@ ROOT = Path(__file__).resolve().parents[1]
 if os.name != "posix":
     raise SystemExit("This native lease test requires a POSIX host")
 with tempfile.TemporaryDirectory(prefix="door-lock-") as tmp:
-    command = shlex.split(os.environ.get("CC", "cc")) + shlex.split(os.environ.get("CFLAGS", ""))
+    command = shlex.split(os.environ.get("CC", "cc")) + ["-O2"] + shlex.split(os.environ.get("CFLAGS", ""))
     helper = Path(tmp) / "liner-notes-door-lock"
     subprocess.run(command + ["-std=c11", "-Wall", "-Wextra", "-Werror",
                               str(ROOT / "src/door_lock_helper.c"), "-o", str(helper)], check=True)
     for mode in ([], ["-DLINER_TEST_POSIX_DOOR_LOCK=1"]):
         executable = Path(tmp) / ("record" if mode else "native")
-        command = shlex.split(os.environ.get("CC", "cc")) + shlex.split(os.environ.get("CFLAGS", ""))
+        command = shlex.split(os.environ.get("CC", "cc")) + ["-O2"] + shlex.split(os.environ.get("CFLAGS", ""))
         subprocess.run(command + ["-std=c11", "-Wall", "-Wextra", "-Werror", *mode,
                                   "-I" + str(ROOT / "src"), str(ROOT / "tests/test_door_lock.c"),
                                   str(ROOT / "src/door_lock.c"), "-o", str(executable)], check=True)
@@ -28,7 +28,7 @@ if os.path.isdir("/proc/self/task"):
     with tempfile.TemporaryDirectory(prefix="door-large-owner-") as tmp:
         directory = Path(tmp)
         helper = directory / "liner-notes-door-lock"
-        command = shlex.split(os.environ.get("CC", "cc")) + shlex.split(os.environ.get("CFLAGS", ""))
+        command = shlex.split(os.environ.get("CC", "cc")) + ["-O2"] + shlex.split(os.environ.get("CFLAGS", ""))
         subprocess.run(command + ["-std=c11", "-Wall", "-Wextra", "-Werror",
                                   str(ROOT / "src/door_lock_helper.c"), "-o", str(helper)], check=True)
         owner = directory / "owner"

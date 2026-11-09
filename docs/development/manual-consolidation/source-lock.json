@@ -97,7 +97,7 @@
   "ci/solaris_ci.py": "bc63f65a2c4cc9066b0beb1da1a17d243c69dae640895d9c62e26912cef77cc0",
   "scripts/install-solaris.py": "f440934a9889f7282fc6ab5eb4b9f63f7ed79153ef4a72c9e170ea8da5b3d2bc",
   "scripts/link_maintenance.py": "ee76d893e80f536f65bcf869348d7a083eafc3f0d5280dcd35de431dbfc16c30",
-  "src/door_lock.c": "dd4fe6e09ab9244e3ec31a3fdc3fc77f4aadee9f86e4d982a7aaeacd34cca8c1",
+  "src/door_lock.c": "6e6e2798a5c626767a89f2cb1ef8f8cc79f13caaba879e45155f13c6bc421e34",
   "scripts/posix_locks.py": "657d3bbe77a63e9ee0a2e586f2aa8528ba1401cbbc9f879a0302ab81b1fbcfca",
   "scripts/build-lrzsz.py": "6cd25f538e9b3320ba199aef5285156e973be999243bff972eba3482a37357de",
   "ci/native_ci.py": "65cb55363b95d3b3ead8113733e0fa16213f08e2c615479cfb69886f4be71c53",
@@ -126,6 +126,6 @@
   ".github/workflows/freebsd-package-lint.yml": "ebcbe519e49ddb0d4ba19821c77b0c5c05e1bcf091db49bc3e50fbbc63c2bd48",
   "src/door_lock.h": "6e9e85076288e0478e0b07ec107cac96995bb12909a9fb34ef53b45355b0873c",
   "src/door_lock_helper.c": "b23a3f65efa4e8ed2504734412cc2a6c7e2e7b7b36d8d10959e385ab060dd274",
-  "tests/test_door_lock.py": "7c3198fb91bdff92c4856f76df3441f2d3baa563676532de46dca6f3393af5a2",
+  "tests/test_door_lock.py": "bfb0422dde40d0c4950426ac077bf655a08e3720d4d1be633daac6fcf0334f2a",
   "ci/freebsd_fixture_config.py": "cc02dfa2642271aa64b05fdeb0b82a2ce969ed45fd4ebcf52331bd21942caa01"
 }

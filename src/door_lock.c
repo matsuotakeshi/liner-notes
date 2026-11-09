@@ -153,8 +153,9 @@ static void hold_lock(int fd, int watch, int ack, long maxfd) {
     char *env[] = {"PATH=/usr/bin:/bin", "LANG=C", NULL};
     execve(helper_path, argv, env);
     int error = errno;
-    (void)write(5, &error, sizeof(error));
-    _exit(1);
+    ssize_t sent;
+    do { sent = write(5, &error, sizeof(error)); } while (sent < 0 && errno == EINTR);
+    _exit(sent == (ssize_t)sizeof(error) ? 1 : 2);
 }
 
 int door_lock_acquire(int fd) {
