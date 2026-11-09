@@ -29,7 +29,10 @@ permissions:
   contents: read
 
 jobs:
+  changes:
+    uses: ./.github/workflows/change-scope.yml
   source-check:
+    needs: changes
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     steps:
@@ -52,6 +55,7 @@ jobs:
             grep -Fx ports/comms/liner-notes/Makefile > /dev/null
           echo "PASS: PR-safe FreeBSD packaging checks."
       - name: Verify real installed-menu package readback
+        if: ${{ needs.changes.outputs.build == 'true' }}
         shell: bash
         run: |
           set -euo pipefail

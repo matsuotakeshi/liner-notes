@@ -66,6 +66,17 @@ class HistoryTests(unittest.TestCase):
         self.commit()
         self.assertTrue(self.push()['build'])
 
+    def test_package_readback_scope_docs_then_ci_or_runtime(self):
+        self.write('CHANGELOG.md', 'documentation-only package notes')
+        docs_head = self.commit()
+        self.assertFalse(self.push()['build'])
+        for path in ['.github/workflows/freebsd-package-lint.yml', 'src/test.c']:
+            with self.subTest(path=path):
+                self.git('reset', '--hard', docs_head)
+                self.write(path, 'requires real package-menu build and test')
+                self.commit()
+                self.assertTrue(self.push()['build'])
+
     def test_more_than_api_path_limit(self):
         for n in range(310):
             self.write(f'docs/{n:04}.md', 'documentation')
@@ -137,6 +148,19 @@ def workflow(name):
 
 
 class WorkflowTests(unittest.TestCase):
+    def test_package_source_checks_keep_lightweight_and_gate_real_build(self):
+        doc = workflow('freebsd-package-lint.yml')
+        self.assertEqual(doc['jobs']['changes']['uses'], './.github/workflows/change-scope.yml')
+        job = doc['jobs']['source-check']
+        self.assertEqual(job['needs'], 'changes')
+        self.assertNotIn('if', job)  # Documentation still receives source checks.
+        steps = {step.get('name'): step for step in job['steps']}
+        self.assertNotIn('if', steps['Validate packaging script and artifact manifest'])
+        readback = steps['Verify real installed-menu package readback']
+        self.assertEqual(readback['if'], "${{ needs.changes.outputs.build == 'true' }}")
+        self.assertIn('runtime dbconvert', readback['run'])
+        self.assertIn('python3 tests/test_package_menu_flow.py ./runtime ./dbconvert', readback['run'])
+
     @unittest.skipUnless(os.name == 'posix', 'Workflow gates use bash on GitHub-hosted Linux')
     def test_required_gates_execute_fail_closed(self):
         scripts = {
