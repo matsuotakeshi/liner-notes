@@ -9,7 +9,6 @@ import asyncio
 import json
 import os
 from pathlib import Path
-import pwd
 import re
 import shutil
 import socket
@@ -29,8 +28,17 @@ def run(*args, check=True):
     return result
 
 
+def fixture_denials(text):
+    """Export only AVC records for the dedicated fixture, never other audit data."""
+    domain = re.compile(r'\bscontext=[^\s:]+:[^\s:]+:liner_notes(?:_(?:web|link|admin|door|transfer))?_t:')
+    for line in text.splitlines():
+        if 'type=AVC ' in line and re.search(r'\bavc:\s+denied\s', line) and domain.search(line):
+            yield line[:4096]
+
+
 class Fixture:
     def __init__(self):
+        import pwd
         if os.geteuid() != 0 or run('getenforce').stdout.strip() != 'Enforcing':
             raise ValueError('This acceptance requires root and Enforcing, never changes either')
         if '10.0.0.51' not in run('hostname', '-I').stdout.split():
@@ -134,6 +142,17 @@ class Fixture:
             log = run('journalctl', '--no-pager', '-u', unit, '-n', '150', check=False)
             print(log.stdout)
             run('systemctl', 'reset-failed', unit, check=False)
+        # The root orchestrator already refuses any pre-existing Liner Notes
+        # policy. These domains therefore belong to this isolated acceptance.
+        # Do not copy PATH/SYSCALL/EXECVE records or unrelated system denials.
+        if shutil.which('ausearch'):
+            try:
+                audit = subprocess.run(['ausearch', '-m', 'AVC', '-ts', 'recent', '--raw'],
+                                       capture_output=True, text=True, timeout=10, check=False)
+                for denial in fixture_denials(audit.stdout):
+                    print('SELINUX_DENIAL ' + denial)
+            except (OSError, subprocess.TimeoutExpired):
+                print('SELINUX_DIAGNOSTIC unavailable; original acceptance result retained')
         for port in reversed(self.ports):
             run('semanage', 'port', '-d', '-p', 'tcp', port)
         # Keep the private fixture for diagnosis; never erase original BBS data.

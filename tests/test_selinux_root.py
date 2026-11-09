@@ -12,6 +12,9 @@ ROOT = Path(__file__).resolve().parents[1]
 SPEC = importlib.util.spec_from_file_location('selinux_root', ROOT/'ci/selinux_root.py')
 helper = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(helper)
+NATIVE_SPEC = importlib.util.spec_from_file_location('selinux_native', ROOT/'ci/selinux_native.py')
+native = importlib.util.module_from_spec(NATIVE_SPEC)
+NATIVE_SPEC.loader.exec_module(native)
 SHA = 'a' * 40
 
 
@@ -32,6 +35,17 @@ def archive(entries):
 
 
 class RootBoundaryTests(unittest.TestCase):
+    def test_only_fixture_avc_denials_leave_private_audit_log(self):
+        allowed = 'type=AVC msg=audit(1:1): avc:  denied { read } scontext=system_u:system_r:liner_notes_web_t:s0 tcontext=system_u:object_r:liner_notes_data_t:s0'
+        unrelated = allowed.replace('liner_notes_web_t', 'httpd_t')
+        argument = 'type=EXECVE msg=audit(1:1): a0="private-argument"'
+        path = 'type=PATH msg=audit(1:1): name="private-path"'
+        impersonation = 'type=AVC msg=audit(1:1): avc: denied { read } name="liner_notes_web_t" scontext=system_u:system_r:httpd_t:s0'
+        permitted = allowed.replace('denied', 'granted')
+        self.assertEqual(list(native.fixture_denials('\n'.join(
+            [allowed, unrelated, argument, path, impersonation, permitted]))), [allowed])
+        self.assertEqual(list(native.fixture_denials(allowed + 'x' * 5000)), [(allowed + 'x' * 5000)[:4096]])
+
     def test_fixture_uid_is_not_the_ssh_callers_writable_identity(self):
         caller = SimpleNamespace(pw_uid=1002)
         valid = dict(pw_uid=990, pw_gid=990, pw_shell='/sbin/nologin')
