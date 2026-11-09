@@ -13,11 +13,61 @@ import zipfile
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT/'ci'))
-from freebsd_upgrade_root import select_package_run, unpack_package, validate_jail_paths, public_failure
+from freebsd_upgrade_root import (select_package_run, unpack_package, validate_jail_paths,
+                                  public_failure, make_jail_root_searchable, write_door_fixture)
 import install_freebsd_upgrade_helper as installer
 
 
 class Boundary(unittest.TestCase):
+    @unittest.skipUnless(os.name == 'posix', 'UNIX access modes run on hosted Linux')
+    def test_new_public_fixture_modes_ignore_private_umask_without_exposing_data(self):
+        previous = os.umask(0o077)
+        try:
+            with tempfile.TemporaryDirectory() as temporary:
+                private = Path(temporary)
+                secret = private/'secret'
+                secret.write_text('private fixture data')
+                jail = private/'jail'
+                jail.mkdir(mode=0o755)
+                self.assertEqual(jail.stat().st_mode & 0o777, 0o700)
+                make_jail_root_searchable(jail)
+                doors = jail/'doors.conf'
+                write_door_fixture(doors)
+                self.assertEqual(jail.stat().st_mode & 0o777, 0o755)
+                self.assertEqual(doors.stat().st_mode & 0o777, 0o644)
+                self.assertIn('/usr/bin/true', doors.read_text())
+                self.assertEqual(private.stat().st_mode & 0o777, 0o700)
+                self.assertEqual(secret.stat().st_mode & 0o777, 0o600)
+                with self.assertRaises(FileExistsError):
+                    write_door_fixture(doors)
+                # The process default remains private for subsequent files.
+                later = private/'later'
+                later.write_text('still private')
+                self.assertEqual(later.stat().st_mode & 0o777, 0o600)
+        finally:
+            os.umask(previous)
+
+    @unittest.skipUnless(os.name == 'posix', 'UNIX symlink guards run on hosted Linux')
+    def test_public_fixture_helpers_refuse_symlinks_and_existing_private_files(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            private = Path(temporary)
+            target = private/'private'
+            target.mkdir(mode=0o700)
+            alias = private/'alias'
+            alias.symlink_to(target, target_is_directory=True)
+            with self.assertRaises(ValueError):
+                make_jail_root_searchable(alias)
+            secret = target/'secret'
+            secret.write_text('preserve')
+            secret.chmod(0o600)
+            link = private/'doors.conf'
+            link.symlink_to(secret)
+            with self.assertRaises(FileExistsError):
+                write_door_fixture(link)
+            self.assertEqual(target.stat().st_mode & 0o777, 0o700)
+            self.assertEqual(secret.stat().st_mode & 0o777, 0o600)
+            self.assertEqual(secret.read_text(), 'preserve')
+
     def test_public_failure_never_exposes_untrusted_exception_data(self):
         secret = 'private-password-and-key'
         errors = [ValueError(secret), subprocess.CalledProcessError(23, [secret], secret, secret),

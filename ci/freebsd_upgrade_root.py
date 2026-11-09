@@ -145,6 +145,19 @@ def validate_jail_paths(root):
             and (root / 'dev').resolve() == root.resolve() / 'dev', 'Unsafe jail devfs mountpoint')
 
 
+def make_jail_root_searchable(root):
+    """Only the new jail's filesystem root is public, never its host ancestors."""
+    require(root.is_dir() and not root.is_symlink(), 'Unsafe jail filesystem root')
+    root.chmod(0o755)
+
+
+def write_door_fixture(path):
+    """Publish this synthetic config to the unprivileged fixture runtime."""
+    with path.open('x', encoding='utf8') as stream:
+        stream.write('1|0|10|/usr/bin/true|/var/db/liner-notes|Fixture Door\n')
+    path.chmod(0o644)
+
+
 def unpack_package(content, artifact, sha, destination):
     require(artifact.get('digest') == 'sha256:' + hashlib.sha256(content).hexdigest(),
             'Actions archive digest absent or mismatched')
@@ -257,6 +270,7 @@ def main():
         command('/usr/bin/tar', '-cf', template_tar, '-C', TEMPLATE / 'root', '.', timeout=600)
         command('/usr/bin/tar', '-xpf', template_tar, '-C', root, timeout=600)
         validate_jail_paths(root)
+        make_jail_root_searchable(root)
         shutil.copytree(source, root / 'ci/source', symlinks=False)
         shutil.copytree(packages, root / 'ci/packages')
         shutil.copyfile(TEMPLATE / 'old.pkg', root / 'ci/old.pkg')

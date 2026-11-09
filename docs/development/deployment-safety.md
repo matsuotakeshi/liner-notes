@@ -139,3 +139,11 @@ Approved initial root setup may acquire this existing lock through a read-only,
 no-follow fd after checking owner, regular-file type, link count and inode; it
 does not execute or write any CI-account-owned file. Drain older package runs
 which predate the wrapper before that one-time setup.
+
+The private umask remains 077 during jail preparation and execution. Only the
+new jail filesystem root is explicitly mode 0755 after archive extraction; its
+host-side work/template ancestors remain mode 0700. The synthetic Door config
+is created exclusively and made 0644 for the fixture service UID. This does not
+change production configuration or expose private test data. Hosted filesystem
+tests exercise both helpers under umask 077, including symlink/existing-file
+refusal and preservation of private ancestor/data permissions.
