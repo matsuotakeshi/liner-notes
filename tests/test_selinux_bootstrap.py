@@ -4,6 +4,7 @@ This validates CLI, connector, membership and persistence contracts only.
 It does not claim SELinux Enforcing acceptance.
 """
 import asyncio
+import hashlib
 import os
 from pathlib import Path
 import socket
@@ -15,7 +16,8 @@ from types import SimpleNamespace
 ROOT = Path(__file__).resolve().parents[1]
 sys.path[:0] = [str(ROOT), str(ROOT / 'ci'), str(ROOT / 'scripts')]
 from test_board import Server
-from selinux_native import bbs_probe, core_arguments, link_probe, stage_web_source, transfer_probe
+from selinux_native import (bbs_probe, core_arguments, link_probe, stage_web_source,
+                            transfer_probe, maintenance_probe, copy_public_code)
 from link_bbs import Core
 
 
@@ -92,11 +94,24 @@ def live_hosted_transfer(pid):
     os.kill(pid, 0)
 
 
+def unconfined_hosted_admin(fixture, command):
+    # No setuid/setgroups/chcon/systemd: use the hosted job's current identity.
+    return subprocess.Popen([sys.executable, '-B', *command], cwd=fixture.path,
+                            stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+
+
+def source_snapshot(root):
+    return {str(path.relative_to(root)):(hashlib.sha256(path.read_bytes()).hexdigest(),
+            path.stat().st_mode,path.stat().st_mtime_ns)
+            for path in root.rglob('*') if path.is_file()}
+
+
 def verify_transfer(binary, directory, receiver, sender):
-    fixture = SimpleNamespace(path=directory, results=[])
-    directory.mkdir()
-    spool, vault = directory/'spool', directory/'vault'
+    fixture = UnconfinedLinkFixture(directory)
+    core = fixture.directory('core', 'liner_notes_data_t')
+    spool, vault = directory/'spool', core/'vault'
     spool.mkdir()
+    copy_public_code(ROOT/'scripts', directory/'transfer-scripts')
     marker = spool/'mac-probe'
     subprocess.run([str(Path(binary).parent/'vaultctl'), 'init', str(vault)],
                    check=True, capture_output=True, timeout=15)
@@ -113,8 +128,9 @@ def verify_transfer(binary, directory, receiver, sender):
         f'sys.argv=[{str(script)!r}]+{options!r}+sys.argv[1:]\n'
         f'runpy.run_path({str(script)!r},run_name="__main__")\n', encoding='utf8')
     helper.chmod(0o700)
-    server = Server(binary, directory/'notes', members=directory/'members',
-                    telnet=True, menu=True, language='en', vault=vault, zhelper=helper)
+    server = Server(binary, core/'notes', members=core/'members',
+                    telnet=True, menu=True, language='en', vault=vault, zhelper=helper,
+                    options=['--database-structured',str(core/'notes.sqlite')])
     try:
         asyncio.run(bbs_probe(server.port, create=True))
         transfer_probe(fixture, server.port, marker, (Path(receiver), Path(sender)),
@@ -122,6 +138,27 @@ def verify_transfer(binary, directory, receiver, sender):
     finally:
         server.close()
     print('PASS: native acceptance ZMODEM wire sequence with real lrzsz; no MAC/domain claim')
+    # Reproduce the failed native fixture: an ordinary vaultctl cannot see the
+    # authoritative SQL stream and successfully lists the original empty index.
+    legacy = subprocess.run([str(Path(binary).parent/'vaultctl'),'list',str(vault)],
+                            capture_output=True, timeout=15)
+    assert legacy.returncode == 0 and legacy.stdout == b'', legacy
+    before = source_snapshot(core)
+    restored = maintenance_probe(fixture, core, observe=live_hosted_transfer,
+                                 launch=unconfined_hosted_admin)
+    assert source_snapshot(core) == before, 'Offline inspection changed original data'
+    recovered = directory/'recovered'
+    restored.rename(recovered)
+    server = Server(binary, recovered/'notes', members=recovered/'members',
+                    telnet=True, menu=True, language='en', vault=recovered/'vault',
+                    options=['--database-structured',str(recovered/'notes.sqlite')])
+    try:
+        asyncio.run(bbs_probe(server.port, create=False))
+    finally:
+        server.close()
+    assert source_snapshot(core) == before, 'Restored runtime changed original data'
+    assert len(fixture.results)==3, fixture.results
+    print('PASS: shared SQL export/vault list, backup/verify/restore and recovered BBS; original files unchanged; no MAC/domain claim')
 
 
 def run(binary, directory):
