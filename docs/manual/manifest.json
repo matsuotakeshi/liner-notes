@@ -78,7 +78,10 @@
         "Makefile",
         "scripts/install-solaris.py",
         "scripts/solaris_service.py",
-        "solaris/liner-notes.xml"
+        "solaris/liner-notes.xml",
+        "src/door_lock.c",
+        "scripts/posix_locks.py",
+        "scripts/build-lrzsz.py"
       ]
     },
     {
@@ -312,7 +315,8 @@
       "sources": [
         "STAGE70.md",
         "STAGE71.md",
-        "scripts/transfer_spool.py"
+        "scripts/transfer_spool.py",
+        "scripts/posix_locks.py"
       ]
     },
     {
@@ -360,7 +364,8 @@
         "DOOR_OPERATIONS.md",
         "src/doors.c",
         "src/runtime.c",
-        "scripts/door_clans.sh"
+        "scripts/door_clans.sh",
+        "src/door_lock.c"
       ]
     },
     {
@@ -401,7 +406,9 @@
       "sources": [
         "BBS_LINK_OPERATIONS.md",
         "scripts/link_service.py",
-        "webui/app.py"
+        "webui/app.py",
+        "scripts/posix_locks.py",
+        "scripts/link_maintenance.py"
       ]
     },
     {

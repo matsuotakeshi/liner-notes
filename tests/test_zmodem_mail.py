@@ -1,4 +1,5 @@
 """Real private mail attachment ZMODEM with the public vault disabled."""
+from test_zmodem_workflows import spool_contents
 import hashlib,pathlib,shlex,subprocess,sys,tempfile
 from test_board import Server
 from test_runtime import Client
@@ -40,7 +41,7 @@ def run(binary,ctl,receiver,sender):
             a.cmd('ZMAILDOWNLOAD 1',b'1 GiB.\r\n');code,out,err=transfer(a,receiver,['--restricted','--protect'],target)
             assert code==0 and b'sent (' in out,(code,out,err);assert (target/name).read_bytes()==payload
             sysop.cmd('ZMAILDOWNLOAD 1',b'1 GiB.\r\n');assert b'failed or cancelled' in sysop.until()
-            assert not list(spool.iterdir())
+            assert not spool_contents(spool)
             # A board/member epoch change interrupts a private transfer too.
             c.cmd('ZMAILUPLOAD',b'1 GiB.\r\n');sysop.cmd('LEVEL 2 1')
             import time

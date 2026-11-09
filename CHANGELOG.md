@@ -3,6 +3,7 @@
 ## 未リリース（次期版0.75候補）
 
 - 任意SELinux RPMを独立版の配布候補として検証。同じソースSHA・実RPMヘッダー・ハッシュをRelease Setへ記録し、必須指定時の未生成/欠落を拒否。既存3OSの候補構成と本番への自動導入方針は変更しない。
+- SolarisのPython補助ツールに専用ロック保持プロセスと固定spool管理ファイルを追加。転送再開・整理・リンク保守の排他寿命を維持し、FreeBSD/Linuxのflockと保存形式は保持。実機の部分成功と未検証範囲を分離し、ZMODEM依存を作業コピー内だけで構築できるようにした。
 - Solaris移植後のFreeBSDビルド回帰を修正。Door排他モジュールではFreeBSDの既定機能名前空間を維持し、従来のflock宣言とロック定数を利用する。
 
 - Solaris実機CIで検出したGCCの条件文後の表記をトークンを変えずに整理し、厳密な警告を維持。SolarisではPOSIXロック保持プロセスと継承pipeでDoorの排他寿命を維持し、同一BBS/別BBS・fork/exec・BBS終了後の保持をhosted試験へ追加。64bit OpenSSL配置とテスト用コンパイラ選択を修正。

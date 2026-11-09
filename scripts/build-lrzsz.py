@@ -15,10 +15,26 @@ URL = 'https://www.ohse.de/uwe/releases/lrzsz-0.13.1.tar.gz'
 SHA256 = '112f91059fbd118e016d800c1a5c5a1702e965d8b9bfbda6015e44e20bfb93c9'
 
 
+def build_commands(prefix, system, compiler=None, make=None):
+    # Preserve FreeBSD/Linux defaults. Solaris commonly installs gcc/gmake but
+    # not cc; all outputs still go under the caller's new private prefix.
+    solaris = system.startswith('sunos')
+    compiler = compiler or ('gcc' if solaris else 'cc')
+    make = make or ('gmake' if solaris else 'make')
+    cflags = '-O2'
+    if system.startswith('freebsd'): cflags += ' -U_POSIX_C_SOURCE'
+    elif system.startswith('linux'): cflags += ' -D_DEFAULT_SOURCE'
+    elif solaris: cflags += ' -m64 -D__EXTENSIONS__=1'
+    return [['./configure', 'CC=' + compiler, 'CFLAGS=' + cflags, f'--prefix={prefix}'],
+            [make, '-j2'], [make, 'install']]
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('directory', help='New directory for source, build log and local installation')
     parser.add_argument('--archive', help='Optional pre-downloaded official archive; hash is still checked')
+    parser.add_argument('--cc', help='C compiler for this isolated build')
+    parser.add_argument('--make', help='Make implementation for this isolated build')
     args = parser.parse_args()
     if os.name != 'posix': parser.error('Build on FreeBSD or another POSIX host')
     root = pathlib.Path(args.directory).absolute()
@@ -59,13 +75,7 @@ def main():
     source.write_text(changed)
     (root/'liner-notes-crc32.patch').write_text(''.join(difflib.unified_diff(original.splitlines(True),changed.splitlines(True),fromfile='a/src/lrz.c',tofile='b/src/lrz.c')))
     prefix=root/'local' 
-    # FreeBSD needs its default API visibility for S_IFMT. glibc instead needs
-    # POSIX declarations retained under upstream's strict C17 mode.
-    cflags='-O2'
-    if sys.platform.startswith('freebsd'):cflags+=' -U_POSIX_C_SOURCE'
-    elif sys.platform.startswith('linux'):cflags+=' -D_DEFAULT_SOURCE'
-    commands = [['./configure','CC=cc','CFLAGS='+cflags,f'--prefix={prefix}'],
-                ['make','-j2'],['make','install']]
+    commands = build_commands(prefix, sys.platform, args.cc, args.make)
     with (root/'build.txt').open('w') as log:
         log.write(f'Source: {URL}\nSHA256: {SHA256}\n');log.flush()
         for command in commands:
