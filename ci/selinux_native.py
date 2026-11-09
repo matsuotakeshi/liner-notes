@@ -182,6 +182,12 @@ async def bbs_probe(port, create):
         article = response_data((await a.command('READ 1'))['text'])['article']
         assert 'Persisted under Enforcing' in article['body']
         assert 'Private mail under Enforcing' in (await b.command('MAIL READ 1'))['text']
+        if create:
+            link = await Bridge('127.0.0.1', port, timeout=10).open()
+            bridges.append(link)
+            await link.command('REGISTER link')
+            await link.command('selinux-only-fixture-password')
+            assert link.state['user'] == 3, link.state
     finally:
         for b in bridges:
             await b.close()
@@ -307,7 +313,7 @@ async def link_probe(fixture, core_port):
     bridge = await Bridge('127.0.0.1', core_port, timeout=10).open()
     unit = None
     try:
-        await bridge.command('REGISTER link')
+        await bridge.command('LOGIN link')
         await bridge.command('selinux-only-fixture-password')
         assert bridge.state['user'] == 3
         config = fixture.text('link.toml', f'''[node]
@@ -505,6 +511,15 @@ def maintenance_probe(fixture, core):
     return restored
 
 
+def core_arguments(arguments, bootstrap=False):
+    """Enable the link allowlist only after its fixture member exists."""
+    result = list(arguments)
+    if bootstrap:
+        offset = result.index('--link-accounts')
+        del result[offset:offset+2]
+    return result
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--designated-ci-vm', action='store_true', required=True)
@@ -542,12 +557,15 @@ def main():
                 '--link-accounts', str(accounts),
                 '--vault-dir', str(vault), '--zmodem-helper', str(helper),
                 '--database-structured', str(core/'notes.sqlite'), str(port), str(core/'notes'), str(core/'members')]
-        for iteration in range(2):
-            unit = fixture.start('core'+str(iteration), executable, args, core, 'liner_notes_t')
+        for iteration in range(3):
+            # A link allowlist may only reference existing members. Bootstrap
+            # the fresh database first, then enable the fixed test account.
+            current = core_arguments(args, bootstrap=iteration == 0)
+            unit = fixture.start('core'+str(iteration), executable, current, core, 'liner_notes_t')
             # Readiness retries are safe: only connection attempts precede writes.
             fixture.ready(port)
             asyncio.run(bbs_probe(port, iteration == 0))
-            if iteration == 0:
+            if iteration == 1:
                 door_probe(port)
                 web_fixture(fixture, port, secret)
                 asyncio.run(link_probe(fixture, port))

@@ -93,5 +93,5 @@
   "linux/selinux/liner-notes-selinux.spec": "accace08e47c7329448bd9a4dab6eba1c80a402cce0ce475080bdcf6c0c3e7de",
   "linux/selinux/selinux_labels.py": "b510853830441309bd9c4253de0ae83a10e9edc75ccb5c83fdb7c61cc844dd6c",
   "ci/selinux_root.py": "09b84e1b13219228f983392142c8f15595a0582ae1fb824d8b7a85fb2d9078c5",
-  "ci/selinux_native.py": "ead2d3c9a75fa215e760e52ff90a2337bd4e15960b2e9a6b02d2c816376d0092"
+  "ci/selinux_native.py": "f6b8bc918f382120a915d2eb1c90df7456e52035e69b35023b390f3cf1ecfdec"
 }
