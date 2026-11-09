@@ -127,7 +127,8 @@ int main(int argc, char **argv) {
     assert(read(ready[0], &value, 1) == 1); close(ready[0]);
     assert(!kill(-owner, SIGKILL));
     assert(waitpid(owner, &status, 0) == owner && WIFSIGNALED(status) && WTERMSIG(status) == SIGKILL);
-    blocked(path);
+    /* Recheck after other group members have had time to observe SIGKILL. */
+    for (int i = 0; i < 10; ++i) { blocked(path); pause_short(); }
     assert(write(control[1], "X", 1) == 1); close(control[1]);
     lease = eventual(path); door_lock_release(lease);
     for (int i = 0; i < 100; ++i) { door_lock_reap(); pause_short(); }
