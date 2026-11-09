@@ -185,7 +185,10 @@ allow liner_notes_t liner_notes_transfer_t:process2 nnp_transition;
 allow liner_notes_transfer_t liner_notes_transfer_exec_t:file execute_no_trans;
 allow liner_notes_t liner_notes_transfer_t:process { signal sigkill signull };
 allow liner_notes_transfer_t liner_notes_t:fd use;
-allow liner_notes_transfer_t liner_notes_t:unix_stream_socket { read write getattr ioctl };
+# Python socket(fileno=3) inspects the inherited RPC socket with SO_TYPE and
+# SO_PROTOCOL before using it. This permits inspection, not setting options or
+# opening a connection to other BBS sockets.
+allow liner_notes_transfer_t liner_notes_t:unix_stream_socket { read write getattr getopt ioctl };
 allow liner_notes_transfer_t liner_notes_t:tcp_socket { read write getattr ioctl shutdown };
 allow liner_notes_transfer_t liner_notes_data_t:dir search_dir_perms;
 allow { liner_notes_t liner_notes_transfer_t } liner_notes_transfer_receipt_t:file read_file_perms;

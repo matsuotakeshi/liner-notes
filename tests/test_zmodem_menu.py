@@ -10,6 +10,7 @@ from transfer_connectors import LineConnector
 
 
 def transfer(c,executable,args,directory,base_options=None,prompt=b'] > ',deadline_seconds=40,send_rate=None):
+    wire_start=len(c.wire)  # Exclude login traffic from synthetic failure evidence.
     left,right=socket.socketpair()
     proc=subprocess.Popen([executable]+(['--binary','--quiet','--escape','--syslog=off'] if base_options is None else base_options)+args,cwd=directory,stdin=right,stdout=right,stderr=subprocess.PIPE)
     right.close();left.setblocking(False);pending=bytearray(c.buf);c.buf=b'';deadline=time.monotonic()+deadline_seconds
@@ -32,7 +33,14 @@ def transfer(c,executable,args,directory,base_options=None,prompt=b'] > ',deadli
             if not data:break
             c.send(data.replace(b'\xff',b'\xff\xff'))
         c.buf=bytes(pending)+c.buf
-        return proc.returncode,c.until(prompt),proc.stderr.read()
+        error=proc.stderr.read()
+        try:
+            output=c.until(prompt)
+        except (TimeoutError,AssertionError) as failure:
+            raise AssertionError(('BBS response missing after transfer',proc.returncode,
+                                  c.buf[-2048:],error[-2048:],
+                                  c.wire[wire_start:][-2048:])) from failure
+        return proc.returncode,output,error
     finally:
         left.close()
         if proc.poll() is None:proc.kill();proc.wait()

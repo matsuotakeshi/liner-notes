@@ -17,6 +17,11 @@ spec.loader.exec_module(helper)
 assert 'liner_notes' in helper.installed_modules(), 'Native helper cannot list the real policy store'
 unconfined = subprocess.check_output(['seinfo', '-a', 'unconfined_domain_type', '-x'], text=True)
 assert not any('liner_notes' in row for row in unconfined.splitlines()), unconfined
+for permission, expected in [('getopt', True), ('setopt', False), ('connectto', False)]:
+    rules = subprocess.check_output(['sesearch', '--allow', '-s', 'liner_notes_transfer_t',
+                                     '-t', 'liner_notes_t', '-c', 'unix_stream_socket',
+                                     '-p', permission], text=True)
+    assert bool(rules.strip()) == expected, (permission, rules)
 for domain, target in [('liner_notes_web_t', 'liner_notes_data_t'),
                        ('liner_notes_web_t', 'liner_notes_link_secret_t'),
                        ('liner_notes_door_t', 'liner_notes_data_t'),

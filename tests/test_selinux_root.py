@@ -80,6 +80,10 @@ class RootBoundaryTests(unittest.TestCase):
         self.assertEqual(list(native.fixture_denials('\n'.join(
             [allowed, unrelated, argument, path, impersonation, permitted]))), [allowed])
         self.assertEqual(list(native.fixture_denials(allowed + 'x' * 5000)), [(allowed + 'x' * 5000)[:4096]])
+        kernel = allowed.replace('type=AVC msg=', 'audit: type=1400 ')
+        self.assertEqual(list(native.fixture_denials('\n'.join(
+            [kernel, kernel.replace('liner_notes_web_t', 'sshd_t'),
+             kernel.replace('denied', 'granted'), 'kernel: unrelated private text']))), [kernel])
 
     def test_fixture_uid_is_not_the_ssh_callers_writable_identity(self):
         caller = SimpleNamespace(pw_uid=1002)

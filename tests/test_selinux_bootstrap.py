@@ -15,7 +15,7 @@ from types import SimpleNamespace
 ROOT = Path(__file__).resolve().parents[1]
 sys.path[:0] = [str(ROOT), str(ROOT / 'ci'), str(ROOT / 'scripts')]
 from test_board import Server
-from selinux_native import bbs_probe, core_arguments, link_probe, stage_web_source
+from selinux_native import bbs_probe, core_arguments, link_probe, stage_web_source, transfer_probe
 from link_bbs import Core
 
 
@@ -87,6 +87,43 @@ async def verify_link(port, password):
         await client.close()
 
 
+def live_hosted_transfer(pid):
+    # Same wire exchange, explicitly no SELinux-domain/MAC assertion here.
+    os.kill(pid, 0)
+
+
+def verify_transfer(binary, directory, receiver, sender):
+    fixture = SimpleNamespace(path=directory, results=[])
+    directory.mkdir()
+    spool, vault = directory/'spool', directory/'vault'
+    spool.mkdir()
+    marker = spool/'mac-probe'
+    subprocess.run([str(Path(binary).parent/'vaultctl'), 'init', str(vault)],
+                   check=True, capture_output=True, timeout=15)
+    helper = directory/'helper'
+    script = ROOT/'scripts/zmodem_host.py'
+    options = ['--receiver', receiver, '--sender', sender, '--spool-root',
+               str(spool), '--timeout', '15', '--']
+    # Only the native entrypoint tests denied BBS-data reads. This hosted helper
+    # marks its PID and invokes the same real authenticated FD3 connector.
+    helper.write_text('#!' + sys.executable + '\n'
+        'import os,sys,runpy\nfrom pathlib import Path\n'
+        f'Path({str(marker)!r}).write_text(str(os.getpid()))\n'
+        f'sys.path.insert(0,{str(script.parent)!r})\n'
+        f'sys.argv=[{str(script)!r}]+{options!r}+sys.argv[1:]\n'
+        f'runpy.run_path({str(script)!r},run_name="__main__")\n', encoding='utf8')
+    helper.chmod(0o700)
+    server = Server(binary, directory/'notes', members=directory/'members',
+                    telnet=True, menu=True, language='en', vault=vault, zhelper=helper)
+    try:
+        asyncio.run(bbs_probe(server.port, create=True))
+        transfer_probe(fixture, server.port, marker, (Path(receiver), Path(sender)),
+                       observe=live_hosted_transfer)
+    finally:
+        server.close()
+    print('PASS: native acceptance ZMODEM wire sequence with real lrzsz; no MAC/domain claim')
+
+
 def run(binary, directory):
     accounts = directory / 'link-accounts'
     accounts.write_text('1 3\n', encoding='utf-8')
@@ -138,3 +175,6 @@ def run(binary, directory):
 if __name__ == '__main__':
     with tempfile.TemporaryDirectory(prefix='ln-selinux-bootstrap-') as temporary:
         run(str(Path(sys.argv[1]).resolve()), Path(temporary))
+        if len(sys.argv) == 4:
+            verify_transfer(str(Path(sys.argv[1]).resolve()), Path(temporary)/'hosted-transfer',
+                            str(Path(sys.argv[2]).resolve()), str(Path(sys.argv[3]).resolve()))
