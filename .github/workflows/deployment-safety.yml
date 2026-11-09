@@ -50,6 +50,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          mkdir -p build
           sudo install -d -m 755 /usr/local/libexec/liner-notes-deploy-ci
           sudo install -m 755 runtime /usr/local/libexec/liner-notes-deploy-ci/runtime
           sudo env GITHUB_ACTIONS=true /usr/bin/python3 tests/test_deploy_restore_runtime.py 2>&1 | tee build/deployment-runtime-restore.log
