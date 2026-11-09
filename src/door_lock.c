@@ -73,6 +73,9 @@ static void hold_lock(int fd, int watch, int ack, long maxfd) {
     /* Only async-signal-safe operations after a multi-threaded process forks.
      * Move descriptors first, so closing inherited BBS/other-Door descriptors
      * never drops the active lease or accidentally retains another lease. */
+    /* A Door has its own session. Killing the BBS process group must not drop
+     * its lease while that Door survives. SMF contracts still contain both. */
+    if (setpgid(0, 0)) _exit(1);
     int lock = fcntl(fd, F_DUPFD, 6);
     int input = fcntl(watch, F_DUPFD, 6);
     int output = fcntl(ack, F_DUPFD, 6);

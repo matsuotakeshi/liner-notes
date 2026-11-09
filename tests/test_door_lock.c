@@ -3,6 +3,7 @@
 #include <assert.h>
 #include <errno.h>
 #include <fcntl.h>
+#include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -86,6 +87,7 @@ int main(int argc, char **argv) {
         lease = acquire(path); assert(lease >= 0);
         pid_t game = fork(); assert(game >= 0);
         if (!game) {
+            close(control[1]); close(ready[0]);
             char a[32], b[32], c[32];
             snprintf(a, sizeof(a), "%d", lease);
             snprintf(b, sizeof(b), "%d", control[0]);
@@ -103,6 +105,36 @@ int main(int argc, char **argv) {
     lease = eventual(path); close(lease);
     for (int i = 0; i < 100; ++i) { door_lock_reap(); pause_short(); }
     assert(waitpid(-1, &status, WNOHANG) == -1 && errno == ECHILD);
-    puts("PASS Door leases: same-process exclusion, fork/exec, owner death, release and holder reaping");
+    /* The Door uses a separate session, as door_start does. Killing the BBS
+     * process group must not kill the record-lock holder before that Door. */
+    assert(!pipe(control) && !pipe(ready));
+    owner = fork(); assert(owner >= 0);
+    if (!owner) {
+        assert(setsid() >= 0);
+        lease = acquire(path); assert(lease >= 0);
+        pid_t game = fork(); assert(game >= 0);
+        if (!game) {
+            close(control[1]); close(ready[0]);
+            assert(setsid() >= 0);
+            char a[32], b[32], c[32];
+            snprintf(a, sizeof(a), "%d", lease);
+            snprintf(b, sizeof(b), "%d", control[0]);
+            snprintf(c, sizeof(c), "%d", ready[1]);
+            execl(argv[0], argv[0], "hold", a, b, c, (char *)NULL);
+            _exit(2);
+        }
+        for (;;) pause();
+    }
+    close(control[0]); close(ready[1]);
+    assert(read(ready[0], &value, 1) == 1); close(ready[0]);
+    assert(!kill(-owner, SIGKILL));
+    assert(waitpid(owner, &status, 0) == owner && WIFSIGNALED(status) && WTERMSIG(status) == SIGKILL);
+    /* Recheck after other group members have had time to observe SIGKILL. */
+    for (int i = 0; i < 10; ++i) { blocked(path); pause_short(); }
+    assert(write(control[1], "X", 1) == 1); close(control[1]);
+    lease = eventual(path); door_lock_release(lease);
+    for (int i = 0; i < 100; ++i) { door_lock_reap(); pause_short(); }
+    assert(waitpid(-1, &status, WNOHANG) == -1 && errno == ECHILD);
+    puts("PASS Door leases: same-process exclusion, fork/exec, owner/group death, release and holder reaping");
     return 0;
 }
