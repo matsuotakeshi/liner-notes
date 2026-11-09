@@ -8,6 +8,8 @@
 
 - 承認付き3局段階更新の制御・隔離試験を追加。署名済み配布計画、実行済みCI、現run/attemptと対象を明記したEnvironment承認、旧package保管、整合バックアップ・復元照合・ホスト外保管を必須化。既定は計画のみ。本番helper・署名鍵の配備と本番更新は別途承認対象。
 - FreeBSD実pkg更新・回復のVNET jail検査を準備。releaseと配備controllerのSHAを区別し、祖先関係・同一releaseのSolaris/SELinuxを含む実行済みCI・試験済み旧版からの更新だけを許可。jail準備と実機試験は未完了のため適用は拒否状態。
+- Solaris移植後のFreeBSDビルド回帰を修正。Door排他モジュールではFreeBSDの既定機能名前空間を維持し、従来のflock宣言とロック定数を利用する。
+
 - Solaris実機CIで検出したGCCの条件文後の表記をトークンを変えずに整理し、厳密な警告を維持。SolarisではPOSIXロック保持プロセスと継承pipeでDoorの排他寿命を維持し、同一BBS/別BBS・fork/exec・BBS終了後の保持をhosted試験へ追加。64bit OpenSSL配置とテスト用コンパイラ選択を修正。
 
 - Solaris向けの設定保持staging installerと初期disabledのSMF contract定義を追加。JSON引数・非root/basic権限を使用し、サービス有効化とデータ初期化は自動実行しない。実SMFライフサイクル検証は保留。
