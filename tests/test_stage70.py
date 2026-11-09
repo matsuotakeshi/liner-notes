@@ -9,6 +9,7 @@ from test_stage58 import cmd,rows
 from test_telnet import Client as Telnet
 ROOT=Path(__file__).resolve().parents[1]
 sys.path.insert(0,str(ROOT/'scripts'))
+from posix_locks import file_lock
 import transfer_spool
 
 def run(binary):
@@ -85,9 +86,9 @@ def run(binary):
   assert transfer_spool.manage(root,'list')[0]['phase']=='interrupted'
   assert not transfer_spool.manage(root,'restore',name)['applied'] and work.exists()
   transfer_spool.manage(root,'restore',name,True);name='pending-'+key;work=root/name
-  fd=os.open(work/'lock',os.O_RDWR);fcntl.flock(fd,fcntl.LOCK_EX|fcntl.LOCK_NB)
+  lock=file_lock(work/'lock',create=False)
   try:assert transfer_spool.manage(root,'list')[0]['phase']=='active'
-  finally:os.close(fd)
+  finally:lock.close()
   meta=work/'transfer.json';meta.write_text(json.dumps({'identity':identity,'received':True}))
   try:transfer_spool.manage(root,'remove',name,True);raise AssertionError('publication removed')
   except ValueError:pass

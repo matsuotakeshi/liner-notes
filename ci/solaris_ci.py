@@ -91,14 +91,21 @@ def test():
     for assignment in flags[1:]:
         key, value = assignment.split("=", 1)
         os.environ[key] = value
-    capabilities = {"core": "not-tested", "door": "not-tested",
+    capabilities = {"build": "not-tested", "lock_lifetime": "not-tested",
+                    "smf_manifest": "not-tested", "smf_lifecycle": "unverified: no SMF management authorization",
+                    "core": "not-tested", "door": "not-tested",
                     "webui": "not-tested", "link": "not-tested", "zmodem": "not-tested"}
     try:
         run(flags + ["-j2", "all"])
+        capabilities["build"] = "passed"
         run([sys.executable, "tests/test_door_lock.py"])
+        run([sys.executable, "tests/test_posix_locks.py"])
+        capabilities["lock_lifetime"] = "passed"
         run([sys.executable, "tests/test_solaris_service.py"])
         run([sys.executable, "scripts/install-solaris.py", "--destdir", "build/solaris-stage", "--python", sys.executable])
         run(["/usr/sbin/svccfg", "validate", "build/solaris-stage/opt/liner-notes/share/smf/liner-notes.xml"])
+        capabilities["smf_manifest"] = "passed"
+        capabilities["core"] = "incomplete"
         run(flags + ["check"])
         run([sys.executable, "tests/test_stage73_database.py", "./runtime"])
         capabilities["core"] = "passed"
@@ -110,7 +117,7 @@ def test():
             environment = ROOT / "build/solaris-python"
             run([sys.executable, "-m", "venv", "--system-site-packages", str(environment)])
             python = str(environment / "bin/python")
-            run([python, "-m", "pip", "install", "--disable-pip-version-check", "--no-input",
+            run([python, "-m", "pip", "install", "--disable-pip-version-check", "--no-input", "--no-cache-dir",
                  "-r", "webui/requirements.txt", "-r", "link-requirements.txt"])
             run([python, "-c", "import aiohttp,cryptography;print('aiohttp',aiohttp.__version__,'cryptography',cryptography.__version__)"])
             web_flags = ["PYTHON=" + python if item.startswith("PYTHON=") else item for item in flags]
@@ -127,11 +134,19 @@ def test():
             capabilities["webui"] = "unverified: requires Python >=3.11"
             capabilities["link"] = "unverified: requires Python >=3.11"
         lrz, lsz = shutil.which("lrz"), shutil.which("lsz")
-        if lrz and lsz:
-            run(flags + ["test-zmodem", "LRZ=" + lrz, "LSZ=" + lsz])
-            capabilities["zmodem"] = "passed"
-        else:
-            capabilities["zmodem"] = "unverified: lrz/lsz not installed"
+        if not (lrz and lsz):
+            engine = ROOT / "build/solaris-lrzsz"
+            try:
+                run([sys.executable, "scripts/build-lrzsz.py", str(engine),
+                     "--cc", os.environ["CC"], "--make", flags[0]])
+            except subprocess.CalledProcessError:
+                log = engine / "build.txt"
+                if log.is_file():
+                    print(log.read_text(errors="replace"), flush=True)
+                raise
+            lrz, lsz = str(engine / "local/bin/lrz"), str(engine / "local/bin/lsz")
+        run(flags + ["test-zmodem", "LRZ=" + lrz, "LSZ=" + lsz])
+        capabilities["zmodem"] = "passed"
     finally:
         # Included in the native log artifact even when a suite fails.
         print("SOLARIS_CAPABILITIES " + json.dumps(capabilities, sort_keys=True), flush=True)
