@@ -102,6 +102,43 @@ def trusted_release_ancestor(release_sha, controller_sha):
                 'Release is not an ancestor of the reviewed main controller')
 
 
+def select_artifact(document, name, run_id, sha):
+    require(document.get('total_count', 0) <= 100, 'Incomplete artifact evidence')
+    matches = [a for a in document.get('artifacts', []) if a.get('name') == name and a.get('expired') is False
+               and a.get('workflow_run', {}).get('head_sha') == sha and a.get('workflow_run', {}).get('id') == run_id]
+    require(len(matches) == 1, 'Required CI artifact is absent/expired')
+    return matches[0]
+
+
+def package_evidence(release, receipt, manifests, policy_manifest=None):
+    """Bind optional independent-version policy to its own CI component."""
+    sha = release['source_sha']
+    require(receipt.get('source_sha') == sha and receipt.get('version') == release['version'], 'Release-set receipt differs')
+    for platform in ('freebsd15', 'rocky10', 'debian13'):
+        manifest = manifests[platform]
+        require(manifest.get('source_sha') == sha and manifest.get('platform') == platform, 'Package provenance differs')
+        for name, package in release['platforms'][platform].items():
+            if name == 'liner-notes-selinux':
+                continue
+            expected = {k: v for k, v in package.items() if k != 'version'}
+            require(manifest.get('version') == package['version'] and manifest['packages'].get(name) == expected,
+                    'Signed package differs from CI-generated package')
+            require(receipt['platforms'][platform]['version'] == package['version'] and
+                    receipt['platforms'][platform]['packages'].get(name) ==
+                    {'filename': package['filename'], 'sha256': package['sha256']}, 'Package is absent from verified release set')
+    package = release['platforms']['rocky10'].get('liner-notes-selinux')
+    if package is not None:
+        component = receipt.get('components', {}).get('rocky10-selinux', {})
+        expected = {k: v for k, v in package.items() if k != 'version'}
+        require(policy_manifest is not None and policy_manifest.get('platform') == 'rocky10-selinux' and
+                policy_manifest.get('source_sha') == sha and policy_manifest.get('version') == package['version'] and
+                policy_manifest.get('packages') == {'liner-notes-selinux': expected},
+                'Selected policy differs from exact-SHA policy CI')
+        require(component.get('source_sha') == sha and component.get('version') == package['version'] and
+                component.get('packages') == {'liner-notes-selinux': expected},
+                'Selected policy is absent from verified release components')
+
+
 def fresh_evidence(release):
     sha = release['source_sha']
     trusted_release_ancestor(sha, os.environ['GITHUB_SHA'])
@@ -129,11 +166,9 @@ def fresh_evidence(release):
         evidence[label] = run_id
         if artifact_name:
             document = api(f'repos/{REPO}/actions/runs/{run_id}/artifacts?per_page=100')
-            require(document.get('total_count', 0) <= 100, 'Incomplete artifact evidence')
-            matches = [a for a in document['artifacts'] if a.get('name') == artifact_name and a.get('expired') is False
-                       and a.get('workflow_run', {}).get('head_sha') == sha and a.get('workflow_run', {}).get('id') == run_id]
-            require(len(matches) == 1, 'Required CI artifact is absent/expired')
-            artifacts[label] = matches[0]
+            artifacts[label] = select_artifact(document, artifact_name, run_id, sha)
+            if label == 'selinux' and 'liner-notes-selinux' in release['platforms']['rocky10']:
+                artifacts['selinux_policy'] = select_artifact(document, 'liner-notes-selinux-policy', run_id, sha)
             if label == 'release_set':
                 verify_receipt(document, run_id, sha)
     native = artifact_json(artifacts['native'], 'results.json')
@@ -149,18 +184,10 @@ def fresh_evidence(release):
     require(selinux.get('source_sha') == sha and selinux.get('enforcing') is True and
             selinux.get('acceptance') == 'success', 'Dedicated-domain Enforcing acceptance evidence is missing')
     receipt = artifact_json(artifacts['release_set'], 'RELEASE-SET.json')
-    require(receipt.get('source_sha') == sha and receipt.get('version') == release['version'], 'Release-set receipt differs')
-    for label, platform in (('freebsd', 'freebsd15'), ('rocky', 'rocky10'), ('debian', 'debian13')):
-        manifest = artifact_json(artifacts[label], 'RELEASE-MANIFEST.json')
-        require(manifest.get('source_sha') == sha and manifest.get('platform') == platform, 'Package provenance differs')
-        for name, package in release['platforms'][platform].items():
-            # Optional SELinux policy needs its own exact-SHA CI provenance;
-            # until its manifest is in the release-set receipt, reject it.
-            expected = dict(package)
-            expected.pop('version')
-            require(manifest['packages'].get(name) == expected, 'Signed package differs from CI-generated package')
-            require(receipt['platforms'][platform]['packages'].get(name) ==
-                    {'filename': package['filename'], 'sha256': package['sha256']}, 'Package is absent from verified release set')
+    manifests = {platform: artifact_json(artifacts[label], 'RELEASE-MANIFEST.json') for label, platform in
+                 (('freebsd', 'freebsd15'), ('rocky', 'rocky10'), ('debian', 'debian13'))}
+    policy_manifest = artifact_json(artifacts['selinux_policy'], 'RELEASE-MANIFEST.json') if 'selinux_policy' in artifacts else None
+    package_evidence(release, receipt, manifests, policy_manifest)
     # A resolver fixture is deliberately not a substitute for the actual
     # package/scripts/services/restore acceptance required for srv.ysni.org.
     full = artifact_json(artifacts['freebsd_upgrade'], 'FREEBSD-SERVICE-UPGRADE.json')

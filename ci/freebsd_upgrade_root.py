@@ -28,6 +28,24 @@ SOURCE_HELPER = Path('/usr/local/libexec/liner-notes-ci/selinux_root.py')
 ENV = {'PATH': '/sbin:/bin:/usr/sbin:/usr/bin:/usr/local/sbin:/usr/local/bin',
        'HOME': '/root', 'LC_ALL': 'C', 'PYTHONNOUSERSITE': '1'}
 DIAGNOSTIC = None
+PHASE = "admission"
+JAIL_FAILURE = None
+PHASES = {"admission", "source", "artifact", "clone", "jail-create", "jail-execute", "cleanup", "host-inventory"}
+JAIL_PHASES = {"admission", "seed-data", "old-services", "backup-restore", "package-update", "new-services", "link", "old-recovery", "final-inventory"}
+
+
+def public_failure(error, phase, child=None):
+    known = {"ValueError", "AssertionError", "OSError", "FileNotFoundError", "PermissionError", "TimeoutExpired", "CalledProcessError", "HTTPError", "URLError", "JSONDecodeError"}
+    kind = type(error).__name__
+    code = error.returncode if isinstance(error, subprocess.CalledProcessError) else None
+    result = {"result": "failed", "phase": phase if phase in PHASES else "admission",
+              "type": kind if kind in known else "Error",
+              "exit_code": code if type(code) is int and -255 <= code <= 255 else None,
+              "reason": "timeout" if isinstance(error, subprocess.TimeoutExpired) else "acceptance-rejected"}
+    if isinstance(child, dict) and child.get("phase") in JAIL_PHASES:
+        result["jail_phase"] = child["phase"]
+        result["jail_type"] = child.get("type") if child.get("type") in known else "Error"
+    return result
 
 
 def require(condition, message):
@@ -141,7 +159,7 @@ def unpack_package(content, artifact, sha, destination):
 
 
 def main():
-    global DIAGNOSTIC
+    global DIAGNOSTIC, PHASE, JAIL_FAILURE
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('sha')
     args = parser.parse_args()
@@ -197,8 +215,10 @@ def main():
         source, packages = work / 'source', work / 'packages'
         source.mkdir(mode=0o755)
         packages.mkdir(mode=0o755)
+        PHASE = 'source'
         archive = source_api.get('https://codeload.github.com/' + REPO + '/tar.gz/' + args.sha, 128 * 1024 ** 2)
         source_api.extract(archive, source, args.sha)
+        PHASE = 'artifact'
         run = select_package_run(fetch(f'repos/{REPO}/actions/workflows/freebsd-package.yml/runs?head_sha={args.sha}&per_page=100', token), args.sha)
         jobs = fetch(f'repos/{REPO}/actions/runs/{run["id"]}/jobs?filter=latest&per_page=100', token)
         require(jobs.get('total_count', 0) <= 100 and any(j.get('conclusion') == 'success' and any(
@@ -212,6 +232,7 @@ def main():
         artifact = candidates[0]
         package = unpack_package(fetch(f'repos/{REPO}/actions/artifacts/{artifact["id"]}/zip', token, 1024 ** 3, True), artifact, args.sha, packages)
         del request, token
+        PHASE = 'clone'
         root = work / 'jail'
         root.mkdir(mode=0o755)
         template_tar = work / 'template.tar'
@@ -228,26 +249,42 @@ def main():
         jail = 'liner-ci-' + work.name
         mounted, created = False, False
         try:
+            PHASE = 'jail-create'
             command('/sbin/mount', '-t', 'devfs', '-o', 'ruleset=4', 'devfs', root / 'dev')
             mounted = True
             command('/usr/sbin/jail', '-c', 'name=' + jail, 'path=' + str(root), 'host.hostname=liner-ci.invalid',
                     'vnet', 'persist', 'allow.raw_sockets=0', 'allow.mount=0', 'enforce_statfs=2')
             created = True
             command('/usr/sbin/jexec', jail, '/sbin/ifconfig', 'lo0', 'inet', '127.0.0.1', 'up')
-            output = command('/usr/sbin/jexec', jail, '/usr/local/bin/python3.12', '-I',
-                             '/ci/source/ci/freebsd_upgrade_jail.py', args.sha, timeout=1500)
+            PHASE = 'jail-execute'
+            try:
+                output = command('/usr/sbin/jexec', jail, '/usr/local/bin/python3.12', '-I',
+                                 '/ci/source/ci/freebsd_upgrade_jail.py', args.sha, timeout=1500)
+            except Exception:
+                try:
+                    failure_path = root / 'ci/failure.json'
+                    if failure_path.is_file() and not failure_path.is_symlink() and failure_path.stat().st_size <= 1024:
+                        JAIL_FAILURE = json.loads(failure_path.read_text())
+                except (OSError, ValueError):
+                    pass
+                raise
             (work / 'acceptance.log').write_text(output)
             report = json.loads((root / 'ci/result.json').read_text())
             require(report.get('source_sha') == args.sha, 'Jail receipt source mismatch')
             report.update(package_artifact_id=artifact['id'], package_workflow_run_id=run['id'],
                           candidate_package_sha256=package['sha256'], source_archive_sha256=hashlib.sha256(archive).hexdigest())
         finally:
-            if created:
-                command('/usr/sbin/jail', '-r', jail)
-            if mounted:
-                command('/sbin/umount', root / 'dev')
+            try:
+                if created:
+                    command('/usr/sbin/jail', '-r', jail)
+                if mounted:
+                    command('/sbin/umount', root / 'dev')
+            except Exception:
+                PHASE = 'cleanup'
+                raise
             # Keep the private fixture for diagnosis; never recursively delete a
             # tree that may still have a jail or mounted devfs after a failure.
+        PHASE = 'host-inventory'
         require(command('/usr/local/sbin/pkg', 'query', '%n %v %o') == host_packages, 'Host package inventory changed')
         report['host_packages_unchanged'] = True
         (work / 'FREEBSD-SERVICE-UPGRADE.json').write_text(json.dumps(report, indent=2) + '\n')
@@ -258,6 +295,9 @@ if __name__ == '__main__':
     try:
         main()
     except Exception as error:
-        diagnostic({'result': 'failed', 'type': type(error).__name__, 'detail': str(error)})
-        print('FreeBSD jail acceptance failed; private evidence retained; no deployment authorized', file=sys.stderr)
+        try:
+            diagnostic({'result': 'failed', 'type': type(error).__name__, 'detail': str(error)})
+        except Exception:
+            pass
+        print(json.dumps(public_failure(error, PHASE, JAIL_FAILURE)), file=sys.stderr)
         raise SystemExit(1)

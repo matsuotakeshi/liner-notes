@@ -2,6 +2,8 @@
 
 ## 未リリース（次期版0.75候補）
 
+- 段階更新の任意SELinux RPMを専用component証跡へ接続。本体と同じSHA、独立したpolicy版・hash・サイズ、Enforcing CI由来を必須化。FreeBSD隔離検査の失敗は秘密を含まない固定phase・例外分類でCIから識別可能に。
+
 - PRの旧head CIを新headで取消可能にし、Linux必須gateはscope失敗を拒否しつつworkflow取消を妨げない条件へ変更。mainのCIは取消対象にしない。
 
 - 承認付き3局段階更新の制御・隔離試験を追加。署名済み配布計画、実行済みCI、現run/attemptと対象を明記したEnvironment承認、旧package保管、整合バックアップ・復元照合・ホスト外保管を必須化。既定は計画のみ。本番helper・署名鍵の配備と本番更新は別途承認対象。

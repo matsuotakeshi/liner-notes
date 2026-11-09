@@ -22,6 +22,11 @@
 
 配布計画の署名鍵と実行承認の署名鍵は分離します。`scripts/deploy_manifest.py` は既存の
 `verify_release_set.py` で確認済みのCI成果物だけから署名計画を作成します。
+任意のRocky SELinux RPMも更新する場合は、候補の `rocky10-selinux/` を用意し、
+`deploy_manifest.py --with-selinux` を指定します。ポリシー独自の版番号を保持しつつ、
+本体と同じsource SHA、専用policy CI成果物、Release Setのcomponents、サイズとhashを
+照合します。本体3パッケージの検証で代用できません。既に導入済みのpolicyを更新計画から
+省略すると、サービス停止前に拒否します。
 リリース公開や本番更新は実行しません。root側helperは公開鍵を固定し、短期の実行承認と
 署名計画の両方を検証します。公開鍵はrepository variable `LN_RELEASE_PUBLIC_KEY`、
 実行承認用秘密鍵は保護Environmentの `LN_DEPLOY_AUTH_KEY`、SSH鍵は既存の

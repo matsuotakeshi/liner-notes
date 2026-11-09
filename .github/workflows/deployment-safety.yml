@@ -22,6 +22,7 @@ jobs:
       - name: Test closed deployment policy and isolated three-node transactions
         run: |
           python3 tests/test_deployment.py
+          python3 tests/test_deploy_components.py
           python3 tests/test_deploy_restore_readonly.py
           python3 tests/test_freebsd_upgrade_boundary.py
           python3 -m py_compile ci/freebsd_upgrade_root.py ci/freebsd_upgrade_jail.py ci/prepare_freebsd_upgrade_template.py ci/install_freebsd_upgrade_helper.py

@@ -107,3 +107,17 @@ checks execute inside it. Root-private failed fixtures/logs remain under
 confirming their jail and devfs mount are gone. Only the secret-free JSON receipt
 is returned to CI. Initial template/bootstrap and acceptance have not been run;
 their absence deliberately prevents production admission.
+
+The failure path returns only allowlisted phase names, exception categories and
+a bounded exit code to CI stderr. It never includes exception messages, command
+arguments, stdout/stderr or private paths. Jail phases distinguish old-service,
+backup/restore, package-update, new-service, link and old-recovery checks. Full
+logs remain root-private; the safe summary does not grant the CI account access
+to them or convert failed acceptance into a success receipt.
+
+For an explicitly selected SELinux component, `deploy_manifest.py --with-selinux`
+requires the verified `rocky10-selinux` component. The controller obtains the
+policy manifest from `liner-notes-selinux-policy` in the exact same-SHA SELinux
+workflow run that passed Enforcing acceptance. Its independent package version,
+size/hash/name and Release Set `components` record must all agree. The normal
+Rocky core/web/link manifest remains a separate, mandatory three-package set.
