@@ -52,6 +52,15 @@ class Components(unittest.TestCase):
             broken['packages']['liner-notes-selinux'][key] = value
             with self.assertRaises(ValueError):
                 package_evidence(self.release, self.receipt, self.manifests, broken)
+            broken_receipt = copy.deepcopy(self.receipt)
+            broken_receipt['components']['rocky10-selinux']['packages']['liner-notes-selinux'][key] = value
+            with self.assertRaises(ValueError):
+                package_evidence(self.release, broken_receipt, self.manifests, self.policy)
+        for key, value in [('source_sha', 'd'*40), ('version', '0.75')]:
+            broken_receipt = copy.deepcopy(self.receipt)
+            broken_receipt['components']['rocky10-selinux'][key] = value
+            with self.assertRaises(ValueError):
+                package_evidence(self.release, broken_receipt, self.manifests, self.policy)
 
     def test_core_package_versions_still_bound(self):
         self.manifests['rocky10']['version'] = '0.74.1'
