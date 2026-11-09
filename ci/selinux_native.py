@@ -440,7 +440,11 @@ def transfer_fixture(fixture, core, secret):
     return entry, vault, marker, copies
 
 
-def transfer_probe(fixture, port, marker, binaries):
+def confined_transfer_process(pid):
+    assert Path(f'/proc/{pid}/attr/current').read_text().split(':')[2] == 'liner_notes_transfer_t'
+
+
+def transfer_probe(fixture, port, marker, binaries, *, observe=confined_transfer_process):
     from test_telnet import Client
     from test_zmodem_menu import transfer
     from test_door_resize import gone
@@ -470,12 +474,16 @@ def transfer_probe(fixture, port, marker, binaries):
                 time.sleep(.02)
             else:
                 raise AssertionError('Confined transfer helper never reached its denial probe')
-            assert Path(f'/proc/{last}/attr/current').read_text().split(':')[2] == 'liner_notes_transfer_t'
-            code, text, error = transfer(c, str(program), arguments, directory)
+            observe(last)
+            try:
+                code, text, error = transfer(c, str(program), arguments, directory)
+            except (AssertionError, TimeoutError) as failure:
+                raise AssertionError('Native acceptance transfer: ' + command) from failure
             assert code == 0 and b'failed or cancelled' not in text, (code, text, error)
             gone(last)
         assert (output/'payload.bin').read_bytes() == payload
-        fixture.results.append({'transfer':'real ZMODEM upload/download byte equality, domain and original-data MAC denial'})
+        fixture.results.append({'transfer':'real ZMODEM upload/download byte equality',
+                                'process_observer': observe.__name__})
     finally:
         c.close()
 

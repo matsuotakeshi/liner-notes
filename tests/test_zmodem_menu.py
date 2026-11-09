@@ -32,7 +32,13 @@ def transfer(c,executable,args,directory,base_options=None,prompt=b'] > ',deadli
             if not data:break
             c.send(data.replace(b'\xff',b'\xff\xff'))
         c.buf=bytes(pending)+c.buf
-        return proc.returncode,c.until(prompt),proc.stderr.read()
+        error=proc.stderr.read()
+        try:
+            output=c.until(prompt)
+        except (TimeoutError,AssertionError) as failure:
+            raise AssertionError(('BBS response missing after transfer',proc.returncode,
+                                  c.buf[-2048:],error[-2048:])) from failure
+        return proc.returncode,output,error
     finally:
         left.close()
         if proc.poll() is None:proc.kill();proc.wait()
