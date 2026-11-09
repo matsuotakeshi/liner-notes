@@ -470,9 +470,9 @@ def transfer_probe(fixture, port, marker, binaries, *, observe=confined_transfer
         c.cmd('LOGIN alice',b'> ')
         c.cmd('selinux-only-fixture-password')
         last = 0
-        for command, program, arguments, directory in (
-            ('ZUPLOAD fixture upload', binaries[1], ['--','payload.bin'], data),
-            ('ZDOWNLOAD 1', binaries[0], ['--restricted'], output)):
+        for command, program, arguments, directory, receipt in (
+            ('ZUPLOAD fixture upload', binaries[1], ['--','payload.bin'], data, b'published'),
+            ('ZDOWNLOAD 1', binaries[0], ['--restricted'], output, b'sent (')):
             c.cmd(command, b'1 GiB.\r\n')
             for _ in range(100):
                 if marker.exists():
@@ -488,7 +488,7 @@ def transfer_probe(fixture, port, marker, binaries, *, observe=confined_transfer
                 code, text, error = transfer(c, str(program), arguments, directory)
             except (AssertionError, TimeoutError) as failure:
                 raise AssertionError('Native acceptance transfer: ' + command) from failure
-            assert code == 0 and b'failed or cancelled' not in text, (code, text, error)
+            assert code == 0 and receipt in text and b'failed or cancelled' not in text, (code, text, error)
             gone(last)
         assert (output/'payload.bin').read_bytes() == payload
         fixture.results.append({'transfer':'real ZMODEM upload/download byte equality',
