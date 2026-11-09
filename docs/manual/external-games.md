@@ -184,3 +184,7 @@ Liner notesはゲームをPTYで起動し、画面・キー入力・端末サイ
 不調時は先に新ゲームの行を外し、既存ゲームの行・保存領域を保持して原因を
 切り分けます。ゲームのリセットコマンドを復旧目的で実行しません。
 DOS実行環境やWindows ConPTYの追加は別案件です。
+
+## Solaris移植での排他
+
+次期版のSolarisでは専用ロック保持プロセスとpipeを使い、BBSが異常終了しても生存するDoorの排他を維持します。FreeBSD/Linuxは従来のflockです。Solarisの実機検証済み範囲とSMFの制約は[Solarisへの導入](install-solaris.md)を確認してください。

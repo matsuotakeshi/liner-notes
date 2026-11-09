@@ -1,6 +1,7 @@
 """Manage private, inactive transfer staging without touching published payloads."""
-import argparse,contextlib,fcntl,hashlib,json,os,re,shutil,stat,time,getpass,sys
+import argparse,contextlib,hashlib,json,os,re,shutil,stat,time,getpass,sys
 from pathlib import Path
+from posix_locks import file_lock, namespace_lock
 
 NAME=re.compile(r"(?:pending-([a-f0-9]{64})|retained-([a-f0-9]{64})-[a-z0-9_]+)")
 LEGACY=re.compile(r'liner-zmodem-[a-zA-Z0-9_-]+')
@@ -13,18 +14,13 @@ def private(path,directory=False):
 @contextlib.contextmanager
 def root_lock(root):
     root=Path(root).absolute();private(root,True)
-    fd=os.open(root,os.O_RDONLY|os.O_DIRECTORY|os.O_NOFOLLOW)
-    try:
-        fcntl.flock(fd,fcntl.LOCK_EX);yield root
-    finally:os.close(fd)
+    with namespace_lock(root):yield root
 @contextlib.contextmanager
 def entry_lock(root,name):
     need(NAME.fullmatch(name) is not None,'Invalid transfer ID')
     work=root/name;private(work,True)
-    fd=os.open(work/'lock',os.O_RDWR|os.O_NOFOLLOW)
-    try:
-        private(work/'lock');fcntl.flock(fd,fcntl.LOCK_EX|fcntl.LOCK_NB);yield work
-    finally:os.close(fd)
+    with file_lock(work/'lock',create=False):
+        private(work/'lock');yield work
 def inspect(work):
     count=0;size=0
     for base,dirs,files in os.walk(work,followlinks=False):
