@@ -15,7 +15,6 @@ import shutil
 import socket
 import subprocess
 import sys
-import tempfile
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path[:0] = [str(ROOT / 'scripts'), str(ROOT / 'tests')]
@@ -23,6 +22,7 @@ from deploy_policy import package_commands
 from deploy_restore import backup_database_snapshot
 from freebsd_fixture_libraries import seed_libraries, verify_libraries
 from freebsd_fixture_config import prepare_assets
+from freebsd_fixture_service import RcFixture, fixture_directory
 from test_board import Server, post
 from test_runtime import Client as RawClient
 from test_members import auth, PASSWORD
@@ -48,8 +48,7 @@ host_before = command([PKG, 'query', '%n %v %o'])
 metadata = json.loads(command(['/usr/bin/tar', '-xOf', package, '+MANIFEST']))
 old_version = metadata['version']
 assert metadata['origin'] == 'comms/liner-notes' and metadata['name'] == 'liner-notes'
-with tempfile.TemporaryDirectory(prefix='actual-upgrade-', dir=work) as temporary:
-    base = Path(temporary)
+with fixture_directory(work) as base:
     root, repo = base / 'root', base / 'repo'
     root.mkdir()
     repo.mkdir()
@@ -103,60 +102,51 @@ with tempfile.TemporaryDirectory(prefix='actual-upgrade-', dir=work) as temporar
     settings.update(prepare_assets(root))
     config.write_text(''.join(k + '=' + shlex.quote(v) + '\n' for k, v in settings.items()))
     rc_env = dict(env, LINER_NOTES_RC_CONF=str(config))
-    running = False
-    def service_check():
-        global running
-        command(['/bin/sh', str(rc), 'start'], env=rc_env)
-        running = True
-        command(['/bin/sh', str(rc), 'status'], env=rc_env)
-        c = TelnetClient(port)
-        try:
-            c.until()
-            c.cmd('LOGIN deployprobe', b'Password (8-128 bytes)> ')
-            assert b'Logged in as deployprobe' in c.cmd(PASSWORD)
-            assert b'package update article body' in c.cmd('READ 1')
-            c.cmd('0')
-            assert b'package update mail body' in c.cmd('MAIL READ 1')
-        finally:
-            c.close()
-            command(['/bin/sh', str(rc), 'stop'], env=rc_env)
-            running = False
-    try:
-        service_check()
-        # Reuse the shipped logical backup/restore implementation.
-        backup = base / 'bbs-backup.tar.gz'
-        admin = [sys.executable, ROOT / 'scripts/maintenance.py']
-        command([*admin, 'db-backup', '--root', data, '--database', data / 'liner.sqlite',
-                 '--board', 'notes.dat', '--members', 'members.dat', backup])
-        restored = base / 'restored'
-        command([*admin, 'db-restore', backup, restored])
-        assert (restored / 'liner.sqlite').is_file()
-        # Change only package revision; source and payload are the same exact
-        # SHA. Maintainer scripts remain preserved in the archive but disabled.
-        metadata['version'] = old_version + '_1'
-        manifest = base / 'new-manifest.json'
-        manifest.write_text(json.dumps(metadata))
-        command([PKG, 'create', '-M', manifest, '-r', stage, '-o', repo])
-        new_package = next(repo.glob('liner-notes-*.pkg'))
-        (repo / 'repos').mkdir()
-        (repo / 'repos/release.conf').write_text('liner_notes_release: { url: "file://' + str(repo) + '", enabled: yes, signature_type: "none" }\n')
-        command([PKG, 'repo', repo])
-        repo_args = ['-o', 'REPOS_DIR=' + str(repo / 'repos'), '-o', 'PKG_CACHEDIR=' + str(repo / 'cache')]
-        command([*common, *repo_args, 'update', '-f', '-r', 'liner_notes_release'])
-        for argv in package_commands('freebsd15', {'liner-notes': {'filename': new_package.name}}, repo):
-            command([*common, *argv[1:]])
-        assert command([*common, 'query', '%v %o', 'liner-notes']) == metadata['version'] + ' comms/liner-notes'
-        assert custom.read_text() == '# retained custom setting\n'
-        assert marker.read_text().startswith('synthetic key fixture')
-        service_check()
-        # Reinstall the exact escrowed old package into this private root only.
-        # This is a recovery test; no delete/add pair or live data restore occurs.
-        command([*common, 'add', '-f', package])
-        assert command([*common, 'query', '%v', 'liner-notes']) == old_version
-        service_check()
-    finally:
-        if running:
-            command(['/bin/sh', str(rc), 'stop'], env=rc_env)
+    lifecycle = RcFixture(rc, rc_env, base, work / 'artifacts', sha)
+    def service_check(phase):
+        with lifecycle.running(phase):
+            c = TelnetClient(port)
+            try:
+                c.until()
+                c.cmd('LOGIN deployprobe', b'Password (8-128 bytes)> ')
+                assert b'Logged in as deployprobe' in c.cmd(PASSWORD)
+                assert b'package update article body' in c.cmd('READ 1')
+                c.cmd('0')
+                assert b'package update mail body' in c.cmd('MAIL READ 1')
+            finally:
+                c.close()
+    service_check('initial')
+    # Reuse the shipped logical backup/restore implementation.
+    backup = base / 'bbs-backup.tar.gz'
+    admin = [sys.executable, ROOT / 'scripts/maintenance.py']
+    command([*admin, 'db-backup', '--root', data, '--database', data / 'liner.sqlite',
+             '--board', 'notes.dat', '--members', 'members.dat', backup])
+    restored = base / 'restored'
+    command([*admin, 'db-restore', backup, restored])
+    assert (restored / 'liner.sqlite').is_file()
+    # Change only package revision; source and payload are the same exact
+    # SHA. Maintainer scripts remain preserved in the archive but disabled.
+    metadata['version'] = old_version + '_1'
+    manifest = base / 'new-manifest.json'
+    manifest.write_text(json.dumps(metadata))
+    command([PKG, 'create', '-M', manifest, '-r', stage, '-o', repo])
+    new_package = next(repo.glob('liner-notes-*.pkg'))
+    (repo / 'repos').mkdir()
+    (repo / 'repos/release.conf').write_text('liner_notes_release: { url: "file://' + str(repo) + '", enabled: yes, signature_type: "none" }\n')
+    command([PKG, 'repo', repo])
+    repo_args = ['-o', 'REPOS_DIR=' + str(repo / 'repos'), '-o', 'PKG_CACHEDIR=' + str(repo / 'cache')]
+    command([*common, *repo_args, 'update', '-f', '-r', 'liner_notes_release'])
+    for argv in package_commands('freebsd15', {'liner-notes': {'filename': new_package.name}}, repo):
+        command([*common, *argv[1:]])
+    assert command([*common, 'query', '%v %o', 'liner-notes']) == metadata['version'] + ' comms/liner-notes'
+    assert custom.read_text() == '# retained custom setting\n'
+    assert marker.read_text().startswith('synthetic key fixture')
+    service_check('updated')
+    # Reinstall the exact escrowed old package into this private root only.
+    # This is a recovery test; no delete/add pair or live data restore occurs.
+    command([*common, 'add', '-f', package])
+    assert command([*common, 'query', '%v', 'liner-notes']) == old_version
+    service_check('recovered')
     verify_libraries(root, libraries)
 assert command([PKG, 'query', '%n %v %o']) == host_before
 (work / 'artifacts/FREEBSD-ACTUAL-UPGRADE.json').write_text(json.dumps({

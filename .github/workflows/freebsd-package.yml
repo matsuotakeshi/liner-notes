@@ -73,11 +73,13 @@ jobs:
             "$src" "takeshi@10.0.0.50:$remote_dir/source.tar.gz"
           # Reuse the native host lock and heartbeat/child cleanup. The root
           # initial-setup driver can hold this same lock through a read-only fd.
-          python3 ci/freebsd_package_lease.py runner "$remote_dir" "$GITHUB_SHA" "$source_hash"
+          package_result=0
+          python3 ci/freebsd_package_lease.py runner "$remote_dir" "$GITHUB_SHA" "$source_hash" || package_result=$?
           mkdir -p "$RUNNER_TEMP/freebsd-pkg-artifacts"
           "${SSH[@]}" takeshi@10.0.0.50 \
             "tar -czf - -C '$remote_dir/artifacts' ." > "$RUNNER_TEMP/freebsd-artifacts.tar.gz"
           tar -xzf "$RUNNER_TEMP/freebsd-artifacts.tar.gz" -C "$RUNNER_TEMP/freebsd-pkg-artifacts"
+          test "$package_result" -eq 0 || exit "$package_result"
           python3 scripts/release_manifest.py verify \
             --platform freebsd15 --source-sha "$GITHUB_SHA" \
             --manifest "$RUNNER_TEMP/freebsd-pkg-artifacts/RELEASE-MANIFEST.json"
@@ -95,4 +97,12 @@ jobs:
             ${{ runner.temp }}/freebsd-pkg-artifacts/FREEBSD-DEPLOY-RESOLVER.json
             ${{ runner.temp }}/freebsd-pkg-artifacts/FREEBSD-ACTUAL-UPGRADE.json
           if-no-files-found: error
+          retention-days: 14
+      - name: Preserve bounded private rc failure diagnostics
+        if: ${{ failure() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: freebsd-private-rc-failure
+          path: ${{ runner.temp }}/freebsd-pkg-artifacts/FREEBSD-RC-FAILURE-*.json
+          if-no-files-found: ignore
           retention-days: 14

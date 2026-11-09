@@ -174,9 +174,32 @@ libraries and exercise transitive dependencies and rejection paths. This
 remains a rootless payload/rc test, not the full privileged jail acceptance.
 
 With package scripts disabled, @sample does not create the default menu files.
-The rootless fixture explicitly copies the two shipped menu samples into its
+The rootless fixture explicitly copies the allowlisted shipped public text samples, including HELP and menus into its
 new private root, refusing symlinks and retaining existing operator edits.
 Optional banner/system/goodbye paths are also private absolute paths; empty rc
 values would select the installed host defaults via shell `:=` expansion.
 This preparation does not claim that package sample/account scripts ran. The
 separate jail gate remains mandatory for a full update acceptance receipt.
+
+
+The rootless rc fixture now stops after unsuccessful start/readiness/readback as
+well as normal completion. Remaining private PID files are checked without
+signalling an unverified/reused PID; incomplete cleanup fails and preserves the
+private directory. Failure receipts contain the exact source SHA, phase, closed
+reason, at most 16 KiB from its own regular non-symlink daemon log, and a
+separate 16 KiB tail of the private rc commands' stdout/stderr. The build
+workflow retrieves these receipts even after a failed package worker and uploads
+`freebsd-private-rc-failure`; candidate verification remains unsuccessful.
+
+An unchanged trusted-main reproduction under the existing native host lock
+confirmed the next missing `@sample` asset: `help/ja/index.txt`. Source SHA was
+`eb704fdb6f75b1d4e4b01888d8ea6ce520118a92`, source archive SHA-256
+`87b309c12a1034f0d8a1779d3cf962959b6a50fa1ad650e852f734b515173d47`, and
+package SHA-256
+`6a3c5317fc0247f0930b2bfa86c5f53c6748416034a786e4b7bb013e72962e8f`.
+The runtime reported `help: cannot read .../help/ja/index.txt`. The diagnostic
+used a new private root and captured the log before automatic cleanup; it did
+not run PR code, install a host package, or touch production. This is failure
+reproduction evidence, not a successful upgrade receipt. New hosted tests cover
+all plist allowlisted public samples, edit preservation, symlink/missing sample
+rejection, partial start/timeout cleanup, and bounded failure logging.
