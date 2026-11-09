@@ -25,3 +25,4 @@
 /var/log/liner-notes-web(/.*)? gen_context(system_u:object_r:liner_notes_web_log_t,s0)
 /var/log/liner-notes-link(/.*)? gen_context(system_u:object_r:liner_notes_link_log_t,s0)
 /var/lib/liner-notes/lrz-resume\.json -- gen_context(system_u:object_r:liner_notes_transfer_receipt_t,s0)
+/var/backups/liner-notes(/.*)? gen_context(system_u:object_r:liner_notes_backup_t,s0)
