@@ -161,8 +161,23 @@ class DoctorTests(unittest.TestCase):
 
     @unittest.skipUnless(os.name=='posix', 'Native helper ownership/modes')
     def test_solaris_door_helper_readonly_trust_and_fallback(self):
+        self.solaris_door_helper_scenario()
+
+    @unittest.skipUnless(os.name=='posix', 'Native helper ownership/modes')
+    def test_solaris_door_helper_with_group_writable_umask(self):
+        previous=os.umask(0o002)
+        try:
+            self.solaris_door_helper_scenario()
+        finally:
+            os.umask(previous)
+
+    def solaris_door_helper_scenario(self):
         self.write('/opt/liner-notes/sbin/liner-notes',b'ELF-fixture',0o755)
         helper=self.write('/opt/liner-notes/libexec/liner-notes-door-lock',b'helper never executed',0o755)
+        # A valid installation has trusted ancestors independently of the
+        # invoking shell's umask. Ubuntu CI uses 0002 (mkdir defaults to 0775).
+        for name in ('opt','opt/liner-notes','opt/liner-notes/sbin','opt/liner-notes/libexec'):
+            (self.root/name).chmod(0o700)
         self.write('/etc/liner-notes/doors.conf','# no enabled games yet\n')
         self.write('/etc/liner-notes/solaris.json',json.dumps(dict(
             program='/opt/liner-notes/sbin/liner-notes',working_directory='/var/opt/liner-notes',
@@ -173,7 +188,8 @@ class DoctorTests(unittest.TestCase):
                 result=self.instance('--os','SunOS','--check-doors').run()
             self.assertEqual(before,self.state())
             return result
-        self.assertEqual(report()['exit_code'],0)
+        result=report()
+        self.assertEqual(result['exit_code'],0,result)
         sibling=self.write('/opt/liner-notes/sbin/liner-notes-door-lock',b'unsafe',0o777)
         self.assertEqual(report()['exit_code'],0) # unsafe first candidate, valid fallback
         helper.unlink()
@@ -185,8 +201,9 @@ class DoctorTests(unittest.TestCase):
             helper.chmod(mode)
             self.assertEqual(report()['exit_code'],2)
         helper.chmod(0o755)
-        helper.parent.chmod(0o777)
-        self.assertEqual(report()['exit_code'],2)
+        for mode in (0o775,0o777):
+            helper.parent.chmod(mode)
+            self.assertEqual(report()['exit_code'],2)
         helper.parent.chmod(0o755)
         self.assertEqual(report()['exit_code'],0)
         # Optional Doors disabled: no helper is needed or diagnosed.
