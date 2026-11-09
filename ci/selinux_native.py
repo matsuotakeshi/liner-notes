@@ -551,15 +551,24 @@ def maintenance_probe(fixture, core, *, observe=confined_admin_process, launch=c
         'import os,sys,time,runpy\n'
         'print(os.getpid(),flush=True)\ntime.sleep(1)\n'
         f'sys.path.insert(0,{str(scripts)!r})\n'
+        'if sys.argv[1:2]==["fixture-copy"]:\n'
+        '    from database_tools import copy_instance\n'
+        '    copy_instance(sys.argv[2],sys.argv[3])\n'
+        '    raise SystemExit(0)\n'
         f'runpy.run_path({str(scripts / "maintenance.py")!r},run_name="__main__")\n',
         'liner_notes_admin_exec_t', True)
     archive, restored, exported = backup/'instance.tar.gz', backup/'restored', backup/'exported'
+    # Even SQLite mode=ro may create WAL/SHM. Copy the stopped instance using
+    # file reads inside the confined admin domain before opening any SQL DB.
+    working = backup/'source'
+    admin_command(fixture, [entry, 'fixture-copy', core, working],
+                  observe=observe, launch=launch, timeout=60)
     for arguments in (
-        ['db-backup', '--root', core, '--database', core/'notes.sqlite',
+        ['db-backup', '--root', working, '--database', working/'notes.sqlite',
          '--board', 'notes', '--members', 'members', archive],
         ['verify', archive],
         ['db-restore', archive, restored, '--database', 'notes.sqlite', '--tools-dir', fixture.path],
-        ['db-export', '--root', core, '--database', core/'notes.sqlite', '--board', 'notes', exported],
+        ['db-export', '--root', working, '--database', working/'notes.sqlite', '--board', 'notes', exported],
     ):
         admin_command(fixture, [entry, *arguments], observe=observe, launch=launch, timeout=60)
     # vaultctl reads portable index.dat, not the runtime's authoritative SQL
