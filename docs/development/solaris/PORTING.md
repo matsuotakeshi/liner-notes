@@ -121,3 +121,25 @@ option. Read-only inventory confirmed installed /usr/gnu/bin/stty. The fixture
 selects that implementation only on Solaris and retains the exact 35x104
 assertion; no runtime behavior or assertion is bypassed. Core as a whole,
 remaining Door integration, WebUI, link and real ZMODEM remain pending.
+
+
+## Final-main Door progress and next diagnostic
+
+Trusted main `fc86d253755c06d3eda7da2351f799f7e4c65634`, Actions run
+https://github.com/matsuotakeshi/liner-notes/actions/runs/42562818879 ran for
+397.523 seconds. Artifact `13650652029` was downloaded and verified as SHA-256
+`414fd990f4cd1c26581c5f721d5835d00783e2dc34fee9cf4933483c1d4ac925`.
+The full NAWS/PTY test, including the exact independent GNU stty 35x104
+assertion, passed. Doctor's 31 tests and actual blocks/structured DB diagnostics
+both passed without changing source data, metadata or file inventory.
+
+The next failure is `tests/test_doors_generic.py`: after single-slot exclusion
+across two runtimes succeeds, starting the two-slot game waits for `KEY> ` and
+times out. The existing exception omitted the received response, so its cause
+is not yet established. The fixture now reports the test identity, game number,
+buffered reply and runtime process state while retaining the same timeout and
+assertions. Hosted CI additionally builds the full runtime with the Solaris
+record-lock backend, and the lease unit test covers concurrent distinct slot
+files and acquisition after a busy slot. No runtime behavior is changed on the
+basis of an unconfirmed cause. Core as a whole, generic Door completion,
+WebUI, link, real ZMODEM and SMF lifecycle remain unverified.

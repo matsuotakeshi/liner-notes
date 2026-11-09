@@ -55,6 +55,20 @@ int main(int argc, char **argv) {
         assert(lease >= 0);
     }
     blocked(path); /* Different open in the same BBS must conflict. */
+    /* A failed first-slot attempt must not block a distinct working directory
+     * or another slot. Multiple record holders must retain only their lease. */
+    char second[4096], third[4096];
+    assert(snprintf(second, sizeof(second), "%s.second", path) < (int)sizeof(second));
+    assert(snprintf(third, sizeof(third), "%s.third", path) < (int)sizeof(third));
+    int second_lease = acquire(second); assert(second_lease >= 0);
+    blocked(path); blocked(second);
+    int third_lease = acquire(third); assert(third_lease >= 0);
+    blocked(third); blocked(second); blocked(path);
+    door_lock_release(second_lease);
+    second_lease = acquire(second); assert(second_lease >= 0);
+    blocked(third); blocked(path);
+    door_lock_release(second_lease); door_lock_release(third_lease);
+    assert(!unlink(second) && !unlink(third));
     int control[2], ready[2];
     assert(!pipe(control) && !pipe(ready));
     pid_t child = fork();
