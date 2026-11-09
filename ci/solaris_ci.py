@@ -35,7 +35,7 @@ def inventory():
     if Path("/usr/bin/auths").is_file():
         run(["/usr/bin/auths"])
     print(Path("/etc/release").read_text(), flush=True)
-    for name in ("gmake", "clang", "gcc", "pkg-config", "openssl", "lrz", "lsz"):
+    for name in ("gmake", "clang", "gcc", "pkg-config", "openssl", "lrz", "lsz", "/usr/gnu/bin/stty"):
         print(name + ": " + str(shutil.which(name)), flush=True)
     for directory in ("/usr/gcc", "/usr/openssl", "/usr/include", "/usr/lib/amd64"):
         path = Path(directory)

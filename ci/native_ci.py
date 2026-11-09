@@ -103,6 +103,18 @@ def parse_result(log_path, target, sha):
         raise RuntimeError(records[0].get("error", "Native suite failed"))
 
 
+def validate_remote_directory(target, directory):
+    # Solaris mktemp uses underscores in its random suffix. Keep the fixed
+    # CI parent/prefix and reject shell syntax, extra output and traversal.
+    if target not in TARGETS:
+        raise ValueError("Unknown native target")
+    suffix = r"[A-Za-z0-9_]+" if target == "solaris" else r"[A-Za-z0-9]+"
+    if (not re.fullmatch(r"/[A-Za-z0-9_./-]+/ci/native-" + target + "-" + suffix, directory)
+            or ".." in directory.split("/")):
+        raise ValueError("Unexpected remote directory")
+    return directory
+
+
 def execute_target(target, archive, digest, sha, output, cancelled):
     started = time.monotonic()
     result = {"target": target, "source_sha": sha, "archive_sha256": digest,
@@ -128,8 +140,7 @@ def execute_target(target, archive, digest, sha, output, cancelled):
             directory = run_setup(ssh + [
                 'umask 077; mkdir -p "$HOME/ci" && mktemp -d "$HOME/ci/native-' + target + '-XXXXXXXX"'
             ], log, cancelled, capture=True)
-            if not re.fullmatch(r"/[A-Za-z0-9_./-]+/ci/native-" + target + r"-[A-Za-z0-9]+", directory) or ".." in directory.split("/"):
-                raise ValueError("Unexpected remote directory")
+            validate_remote_directory(target, directory)
             result["remote_directory"] = directory
             run_setup(["scp", *ssh_options(key), str(archive), host + ":" + directory + "/source.tar.gz"], log, cancelled)
             bootstrap = (ROOT / "ci/native_remote.py").read_text(encoding="utf8")

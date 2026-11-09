@@ -2,6 +2,7 @@
 from pathlib import Path
 import os
 import re
+import shlex
 import struct
 import sys
 import tempfile
@@ -58,7 +59,12 @@ for line in sys.stdin:
     print('DOOR> ',end='',flush=True)
 ''');game.chmod(0o700)
         shell=root/'stty-door'
-        shell.write_text('#!/bin/sh\nprintf "STTY> "\nwhile IFS= read -r line; do\n [ "$line" = quit ] && exit 0\n printf "STTY_SIZE "\n stty size\n printf "STTY> "\ndone\n');shell.chmod(0o700)
+        # Solaris /usr/bin/stty lacks 'size'; use its installed GNU implementation.
+        stty='/usr/gnu/bin/stty' if sys.platform.startswith('sunos') else 'stty'
+        if sys.platform.startswith('sunos') and not os.access(stty,os.X_OK):
+            raise RuntimeError('Solaris PTY fixture requires executable /usr/gnu/bin/stty')
+        stty=shlex.quote(stty)
+        shell.write_text('#!/bin/sh\nprintf "STTY> "\nwhile IFS= read -r line; do\n [ "$line" = quit ] && exit 0\n printf "STTY_SIZE "\n '+stty+' size\n printf "STTY> "\ndone\n');shell.chmod(0o700)
         config=root/'doors.conf';config.write_text(f'1|0|30|{game}|{root}|Resize probe\n2|0|30|{shell}|{root}|Independent stty\n3|0|1|{game}|{root}|Timeout probe\n')
         server=Server(binary,root/'notes',members=root/'members',telnet=True,menu=True,language='en',options=['--doors',str(config)])
         clients=[]

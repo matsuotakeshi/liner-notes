@@ -8,7 +8,7 @@
 
 `Solaris Native CI`は信頼済みmainの正確なコミットだけを、既存のCIアカウントと固定ホスト鍵で取得します。独立した作業ディレクトリでビルドし、OSのパッケージ導入やサービス変更を行いません。PRでは接続を伴わないCI制御のテストを実行します。従来のFreeBSD・Rocky Linux・Ubuntuの3環境の検証は維持しています。
 
-必要な構築環境はGNU make、64ビットC11コンパイラ（ClangまたはGCC）、SQLiteとOpenSSLの開発用ヘッダー・ライブラリ、Python 3.11以上です。読み取り専用診断ツールdoctorも含めて検証します。WebUIとBBS間リンクは、それぞれaiohttp、cryptographyを必要とします。ZMODEM相互運用試験はlrz/lszを使います。未導入の場合、既存の公式ソース取得・SHA-256検証helperで作業コピー内だけにビルドします。Solarisではgcc/gmakeと64ビット指定を使用し、OSのパッケージは変更しません。
+必要な構築環境はGNU make、64ビットC11コンパイラ（ClangまたはGCC）、SQLiteとOpenSSLの開発用ヘッダー・ライブラリ、Python 3.11以上です。読み取り専用診断ツールdoctorも含めて検証します。WebUIとBBS間リンクは、それぞれaiohttp、cryptographyを必要とします。独立したPTYアプリのサイズ検査は`/usr/gnu/bin/stty`を使用します。Solaris標準sttyには`size`オプションがないためです。ZMODEM相互運用試験はlrz/lszを使います。未導入の場合、既存の公式ソース取得・SHA-256検証helperで作業コピー内だけにビルドします。Solarisではgcc/gmakeと64ビット指定を使用し、OSのパッケージは変更しません。
 
 CIログにはOS、コンパイラ候補、ライブラリ配置、Python、正確なソースSHAを記録します。OSパッケージは自動導入しません。WebUI・リンクのPython依存は作業コピー内の専用venvにrequirementsから導入し、既存のsystem Pythonを変更しません。インストール失敗もCI失敗として記録します。ビルド、排他寿命、SMF定義検証、基本BBS、Door、WebUI、リンク、ZMODEMの検証状態は`SOLARIS_CAPABILITIES`行で区別します。追加依存がなく実行できなかった機能を成功扱いしません。
 
@@ -59,7 +59,7 @@ SMFのcontractモデルで子プロセスを追跡し、停止は`:kill`で当�
 
 ## 現在の制約
 
-- GCC15で本体・管理コマンドのビルド、Door排他単体試験、doctorの31項目と実DBの非変更診断、SMF staging・定義検証が成功しました。基本回帰は転送spoolのロックで停止しており、基本BBS全体・DB復旧・Door PTY統合・WebUI・リンク・実ZMODEMの成功はまだ確認できていません。
+- GCC15で本体・管理コマンドのビルド、C/Python排他寿命、doctorと実DBの非変更診断、SMF staging・定義検証、spool復旧、バックアップ・復元とデータ整理、12,000件の記事・メール、権限・階層・下書き・未読の回帰が成功しました。DoorのNAWS・終了処理は進みましたが、独立sttyアプリのオプション差で試験が停止しています。基本回帰全体・Door統合全体・WebUI・リンク・実ZMODEMはまだ成功確認前です。
 - 検証機にはPython3.11/3.13、cryptography、OpenSSL3、SQLite3.51がありますが、aiohttpはありません。CIでは作業コピー内の専用venvへrequirementsからaiohttpを導入してからWebUIを検証します。依存導入・機能試験の成否は次の実機CIで確認します。
 - CIアカウントにはSMF管理権限がありません。既存OS設定や権限を自動変更せず、実サービス登録・稼働は未検証とします。
 - SMFマニフェストと設定保持を行うstaging installerを用意しています。実SMFでの登録・起動・停止・自動起動、および本番用の導入・更新手順は未検証です。FreeBSDのrc.dやLinuxのsystemdの手順をそのまま使用しないでください。

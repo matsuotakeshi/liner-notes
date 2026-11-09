@@ -18,7 +18,7 @@ import yaml
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "ci"))
-from native_ci import all_passed, parse_result, require_trusted_main, run_parallel, ssh_options, supervise
+from native_ci import all_passed, parse_result, require_trusted_main, run_parallel, ssh_options, supervise, validate_remote_directory
 from native_remote import RESULT, commands_for, host_lock, unpack
 
 SHA = "a" * 40
@@ -39,6 +39,24 @@ class PolicyTests(unittest.TestCase):
                 require_trusted_main(dict(env, **{key: bad}), SHA, SHA)
         with self.assertRaises(ValueError):
             require_trusted_main(env, SHA, "b" * 40)
+
+    def test_native_directory_accepts_solaris_mktemp_underscore_only(self):
+        good = "/export/home/ci-test/ci/native-solaris-XX1U_6Wa"
+        self.assertEqual(validate_remote_directory("solaris", good), good)
+        for target in ("freebsd", "rocky", "ubuntu"):
+            path = "/home/ci/ci/native-" + target + "-AbC01234"
+            self.assertEqual(validate_remote_directory(target, path), path)
+            with self.assertRaises(ValueError):
+                validate_remote_directory(target, path + "_")
+        for path in (good + "/child", good + ";id", good + "\nextra",
+                     good + "\n", good.replace("ci-test", ".."),
+                     good.replace("native-solaris", "native-rocky"),
+                     good + "$(id)", good + " `id`", "relative/" + good,
+                     "/export/home/ci-test/ci/native-solaris-", good + "."):
+            with self.subTest(path=path), self.assertRaises(ValueError):
+                validate_remote_directory("solaris", path)
+        with self.assertRaises(ValueError):
+            validate_remote_directory("../solaris", good)
 
     def test_host_keys_and_dedicated_keys_are_mandatory(self):
         options = ssh_options("/known/key")
