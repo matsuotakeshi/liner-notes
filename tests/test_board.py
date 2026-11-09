@@ -21,8 +21,16 @@ class Server:
         t = threading.Thread(target=lambda: result.append(self.proc.stdout.readline()), daemon=True)
         t.start(); t.join(float(os.environ.get("LINER_TEST_START_TIMEOUT","5")))
         if not result or not result[0].startswith('LISTEN '):
-            self.proc.kill(); self.proc.wait()
-            raise AssertionError(('startup', result, self.proc.stderr.read()))
+            # An empty readline() is often EOF from a crashed child, not a
+            # startup timeout. Preserve the original exit status for CI.
+            exit_before_cleanup = self.proc.poll()
+            if exit_before_cleanup is None:
+                self.proc.kill()
+            self.proc.wait()
+            raise AssertionError(('startup', result,
+                                  'exit_before_cleanup', exit_before_cleanup,
+                                  'exit_after_cleanup', self.proc.returncode,
+                                  'stderr', self.proc.stderr.read()))
         self.port = int(result[0].split()[-1])
         self.expected_errors = []
 
@@ -33,8 +41,23 @@ class Server:
             self.proc.terminate()
         try:
             self.proc.wait(timeout=5)
-        except subprocess.TimeoutExpired:
-            self.proc.kill(); self.proc.wait(); raise
+        except subprocess.TimeoutExpired as error:
+            # Keep the five-second watchdog; collect a bounded process-state
+            # snapshot before killing the slow child for diagnostics.
+            try:
+                state = subprocess.run(
+                    ['ps', '-o', 'stat=,rss=,etime=', '-p', str(self.proc.pid)],
+                    capture_output=True, text=True, timeout=2,
+                    check=False,
+                ).stdout.strip()
+            except (OSError, subprocess.SubprocessError):
+                state = 'unavailable'
+            self.proc.kill()
+            self.proc.wait()
+            raise AssertionError(('shutdown exceeded 5 seconds after SIGTERM',
+                                  'ps', state,
+                                  'exit_after_kill', self.proc.returncode,
+                                  'stderr', self.proc.stderr.read())) from error
         errors = self.proc.stderr.read()
         assert errors.splitlines() == self.expected_errors, errors
 
