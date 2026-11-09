@@ -146,7 +146,10 @@ def verify_transfer(binary, directory, receiver, sender):
     before = source_snapshot(core)
     restored = maintenance_probe(fixture, core, observe=live_hosted_transfer,
                                  launch=unconfined_hosted_admin)
-    assert source_snapshot(core) == before, 'Offline inspection changed original data'
+    after = source_snapshot(core)
+    assert after == before, ('Offline inspection changed original data',
+        {name:(before.get(name),after.get(name)) for name in before.keys()|after.keys()
+         if before.get(name)!=after.get(name)})
     recovered = directory/'recovered'
     restored.rename(recovered)
     server = Server(binary, recovered/'notes', members=recovered/'members',
