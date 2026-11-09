@@ -25,7 +25,10 @@ check: test-doctor
 test-doctor-runtime: runtime
 	$(PYTHON) tests/test_doctor_runtime.py ./runtime
 
-check: test-doctor-runtime
+check: test-doctor-runtime test-package-menu
+
+test-package-menu: runtime dbconvert
+	$(PYTHON) tests/test_package_menu_flow.py ./runtime ./dbconvert
 
 runtime test-adapters: src/board_link.inc src/link_schema.h
 

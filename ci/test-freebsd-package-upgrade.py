@@ -27,7 +27,7 @@ from test_board import Server, post
 from test_runtime import Client as RawClient
 from test_members import auth, PASSWORD
 from test_mail import send
-from test_telnet import Client as TelnetClient
+from package_menu_flow import readback, restore_command
 
 assert sys.platform.startswith('freebsd') and os.geteuid() != 0
 assert os.environ.get('LINER_FREEBSD_PACKAGE_CI') == '1'
@@ -105,16 +105,7 @@ with fixture_directory(work) as base:
     lifecycle = RcFixture(rc, rc_env, base, work / 'artifacts', sha)
     def service_check(phase):
         with lifecycle.running(phase):
-            c = TelnetClient(port)
-            try:
-                c.until()
-                c.cmd('LOGIN deployprobe', b'Password (8-128 bytes)> ')
-                assert b'Logged in as deployprobe' in c.cmd(PASSWORD)
-                assert b'package update article body' in c.cmd('READ 1')
-                c.cmd('0')
-                assert b'package update mail body' in c.cmd('MAIL READ 1')
-            finally:
-                c.close()
+            readback(port)
     service_check('initial')
     # Reuse the shipped logical backup/restore implementation.
     backup = base / 'bbs-backup.tar.gz'
@@ -122,7 +113,7 @@ with fixture_directory(work) as base:
     command([*admin, 'db-backup', '--root', data, '--database', data / 'liner.sqlite',
              '--board', 'notes.dat', '--members', 'members.dat', backup])
     restored = base / 'restored'
-    command([*admin, 'db-restore', backup, restored])
+    command(restore_command(backup, restored, root / 'usr/local/bin'))
     assert (restored / 'liner.sqlite').is_file()
     # Change only package revision; source and payload are the same exact
     # SHA. Maintainer scripts remain preserved in the archive but disabled.

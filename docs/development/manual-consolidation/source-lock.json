@@ -1,6 +1,6 @@
 {
   "LICENSE": "fb981668c18a279e285fc4d83fba1e836cc84dd4daa73c9697d3cfd2d8aca6e0",
-  "Makefile": "a331430599f9ecf06b1b4a7354c52b41a78f3070592a4fa832f4fb77eda8a20b",
+  "Makefile": "776d92134c2603d883288e858b9161803707b531dce678189abbc853ddaba12a",
   "boards.example.conf": "4bd1a17ecf3966d3829510e8495a1362fb8b922cd754badccc739f5e5ab0bde8",
   "ci/build-freebsd-package.sh": "4e62899471d1f1a6c44e00a783c1aff771332140704ae778da95a95048474108",
   "debian/changelog": "8f3574a094f5a3677a9a7188e530ecdbdc006138b082b57243ca8441c644114d",
@@ -109,7 +109,7 @@
   "scripts/deploy_backup_store.py": "ff1a26a98e9a2ba20dae1e31789e8dc4bbb74edc8ac3e9893f271ede716b2d5d",
   "scripts/deploy_manifest.py": "f887023c1ba391904fbebe872928ed4dffcf92515c9fc110b4026fee19fc66bf",
   "ci/freebsd_upgrade_root.py": "494841eba106e4432bcb647cbf2291dddb2f02418c1d8c7dceac6176e9bc13ea",
-  "ci/freebsd_upgrade_jail.py": "16c6e6a7e7bb2b147ec41927afd30c11f574ffdc7c647f99ef2ec94ebf5dd598",
+  "ci/freebsd_upgrade_jail.py": "4988707680960e49f73f1a05443d70adec4db419a2c897195b53bdec4874ef0f",
   "ci/prepare_freebsd_upgrade_template.py": "5eac9dec0e401223e5f0e67a4d0eda59605f0187bb67f15f3c45ed50a78f0cc0",
   "ci/install_freebsd_upgrade_helper.py": "b0b91cdbae13e4c2a0f66a367976d38318c903ff7285ed616e3b445d4eddb038",
   "ci/install-freebsd-upgrade-helper.sh": "b9c0625003843c1f5fe07e7b7a9ad93284480d8e2721593c5f599ffa7a0a6513",
@@ -122,8 +122,8 @@
   "tests/test_release_manifest.py": "08b5c8cab61c4556d1ac5e6137e252e195c76c0572fd72577bce92a1529b3791",
   "tests/test_verify_release_set.py": "0cd280b9bcee29864ec41d7787f6eb2148ede7d361ff0ba464a1f744249d6997",
   "ci/freebsd_fixture_libraries.py": "a70991ba8ba616012bd2e1e1d6ecfa2dc5133ce5814a8274adb4bc8513d38dcf",
-  "ci/test-freebsd-package-upgrade.py": "8770221c53088893126129a5a7b7041ebcf0c4e45b395da65b2cf9911a3be4bb",
-  ".github/workflows/freebsd-package-lint.yml": "2737c1a1fd395a81512f7839d2edfab55c050e2a24da310702c48f40ee46300b",
+  "ci/test-freebsd-package-upgrade.py": "0a2e17cca17ed7a357082f93db29dc5c83d1c6f63d445058a4bd1f52d2219ed7",
+  ".github/workflows/freebsd-package-lint.yml": "29cb2327588196396b3c3746613f7b17ec0213856f1267efc5a1a60c0090eee3",
   "src/door_lock.h": "6e9e85076288e0478e0b07ec107cac96995bb12909a9fb34ef53b45355b0873c",
   "src/door_lock_helper.c": "b23a3f65efa4e8ed2504734412cc2a6c7e2e7b7b36d8d10959e385ab060dd274",
   "tests/test_door_lock.py": "bfb0422dde40d0c4950426ac077bf655a08e3720d4d1be633daac6fcf0334f2a",
@@ -131,5 +131,7 @@
   "ci/freebsd_fixture_service.py": "04e7261c9155db94dc16d92e8a03a8b6864890d8f48f3d32697b723aa85643fe",
   "tests/test_freebsd_fixture_service.py": "0a5d0a5e06b9b982459caa5b6c78ed8feea6554e8472dc4dfe1591b446f779ab",
   "ports/test-resume.py": "a2e8902a6dc7b879d624d4e6f267ea301a01f1e8e9c94d1a68c58d1feebbde72",
-  "tests/test_resume_receipt.py": "9f76a68eb59728f34523aa5b061a631ec561cd6aff60a12004b85ca84cf61c3c"
+  "tests/test_resume_receipt.py": "9f76a68eb59728f34523aa5b061a631ec561cd6aff60a12004b85ca84cf61c3c",
+  "tests/package_menu_flow.py": "e2995f40f2cf1d33cac6d43d67ea23d18ea799e1c79e670c57be2b47cdb1c76b",
+  "tests/test_package_menu_flow.py": "9e2274f9869e46503e88cc92e23e2136eb7cf7c4534b3236af4ad430e0970580"
 }

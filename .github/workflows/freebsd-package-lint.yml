@@ -8,6 +8,9 @@ on:
       - "ci/test-freebsd-package-upgrade.py"
       - "ci/freebsd_fixture_libraries.py"
       - "ci/freebsd_fixture_config.py"
+      - "tests/package_menu_flow.py"
+      - "tests/test_package_menu_flow.py"
+      - "Makefile"
       - "ci/freebsd_fixture_service.py"
       - "tests/test_freebsd_fixture_service.py"
       - "tests/test_freebsd_fixture_config.py"
@@ -48,3 +51,11 @@ jobs:
           git archive --format=tar HEAD | tar -tf - |
             grep -Fx ports/comms/liner-notes/Makefile > /dev/null
           echo "PASS: PR-safe FreeBSD packaging checks."
+      - name: Verify real installed-menu package readback
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y clang libsqlite3-dev libssl-dev
+          make -j2 CC=clang PYTHON=python3 SQLITE_CFLAGS= SQLITE_LIBS=-lsqlite3 runtime dbconvert
+          python3 tests/test_package_menu_flow.py ./runtime ./dbconvert

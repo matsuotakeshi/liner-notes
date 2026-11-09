@@ -203,3 +203,22 @@ not run PR code, install a host package, or touch production. This is failure
 reproduction evidence, not a successful upgrade receipt. New hosted tests cover
 all plist allowlisted public samples, edit preservation, symlink/missing sample
 rejection, partial start/timeout cleanup, and bounded failure logging.
+
+
+Both rootless and privileged jail service checks share the real menu protocol
+contract in `tests/package_menu_flow.py`: login, article read/exit, mail read
+with its `0 exit)> ` prompt, mail exit to the main prompt, then PING. The existing
+ten-second socket timeout is unchanged. A hosted test stages the exact public
+package text samples and runs this flow across three restarts before native
+package acceptance. Wrong protocol-state assumptions therefore fail on hosted
+CI instead of waiting for a full FreeBSD package build. Readback errors include
+the phase and a bounded synthetic receive-buffer tail.
+
+Structured backup restoration explicitly uses the installed package's
+`usr/local/bin/liner-notes-dbconvert` in the private root, or `/usr/local/bin`
+inside the jail. The hosted contract copies the converter to a separate
+installed-style directory, rejects a missing explicit tools directory even
+when a source converter exists, then restores and boots the backup to re-read
+login/article/mail. It includes user/chat log paths outside the DB data root,
+as used by the rc fixture. This tests lookup and behavior; it does not replace
+native package or privileged maintainer-script verification.
