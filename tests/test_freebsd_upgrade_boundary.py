@@ -29,6 +29,8 @@ class Boundary(unittest.TestCase):
         result = public_failure(ValueError(secret), secret, {'phase': secret, 'type': secret})
         self.assertEqual(result['phase'], 'admission')
         self.assertNotIn(secret, json.dumps(result))
+        self.assertEqual(public_failure(ValueError(), [], {'phase': []})['phase'], 'admission')
+        self.assertEqual(public_failure(ValueError(), 'jail-execute', {'phase': 'link', 'type': []})['jail_type'], 'Error')
 
     def test_latest_failed_or_pr_build_never_accepted(self):
         sha = 'a'*40

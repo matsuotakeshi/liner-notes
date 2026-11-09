@@ -92,7 +92,7 @@
   "scripts/deploy_transaction.py": "7487299f4f706650425811d7f3160dd39880cca1027863b0bde2b6a495c34367",
   "scripts/deploy_backup_store.py": "ff1a26a98e9a2ba20dae1e31789e8dc4bbb74edc8ac3e9893f271ede716b2d5d",
   "scripts/deploy_manifest.py": "f887023c1ba391904fbebe872928ed4dffcf92515c9fc110b4026fee19fc66bf",
-  "ci/freebsd_upgrade_root.py": "aa288f0067aa8d808ebcbf5f302e90a7a6610eebc1bbd4bd1470740325925347",
+  "ci/freebsd_upgrade_root.py": "8519969bf9a535b736dabb9ddd542bad1c5524580d454c2232bcc0b139fedb99",
   "ci/freebsd_upgrade_jail.py": "e4a5ba3089fe811c9c8716cb755d35b861236693358566fb21f14f2fde01fded",
   "ci/prepare_freebsd_upgrade_template.py": "9dd07a0ee626976c9a81009c3252b2d78d606392315257255212ed0e2ddb8f0d",
   "ci/install_freebsd_upgrade_helper.py": "b0b91cdbae13e4c2a0f66a367976d38318c903ff7285ed616e3b445d4eddb038",

@@ -38,13 +38,13 @@ def public_failure(error, phase, child=None):
     known = {"ValueError", "AssertionError", "OSError", "FileNotFoundError", "PermissionError", "TimeoutExpired", "CalledProcessError", "HTTPError", "URLError", "JSONDecodeError"}
     kind = type(error).__name__
     code = error.returncode if isinstance(error, subprocess.CalledProcessError) else None
-    result = {"result": "failed", "phase": phase if phase in PHASES else "admission",
+    result = {"result": "failed", "phase": phase if isinstance(phase, str) and phase in PHASES else "admission",
               "type": kind if kind in known else "Error",
               "exit_code": code if type(code) is int and -255 <= code <= 255 else None,
               "reason": "timeout" if isinstance(error, subprocess.TimeoutExpired) else "acceptance-rejected"}
-    if isinstance(child, dict) and child.get("phase") in JAIL_PHASES:
+    if isinstance(child, dict) and isinstance(child.get("phase"), str) and child["phase"] in JAIL_PHASES:
         result["jail_phase"] = child["phase"]
-        result["jail_type"] = child.get("type") if child.get("type") in known else "Error"
+        result["jail_type"] = child.get("type") if isinstance(child.get("type"), str) and child["type"] in known else "Error"
     return result
 
 
