@@ -2,6 +2,8 @@
 """Hosted-only Solaris build/CI contracts. Does not contact a VM."""
 from pathlib import Path
 import importlib.util
+import shutil
+import subprocess
 import sys
 import unittest
 from unittest.mock import patch
@@ -19,6 +21,25 @@ spec.loader.exec_module(build_lrzsz)
 
 
 class SolarisContracts(unittest.TestCase):
+    @unittest.skipUnless(shutil.which("cc") or shutil.which("gcc"), "host C preprocessor required")
+    def test_door_lock_feature_namespaces(self):
+        # Exercise the actual source preamble, not a duplicated macro model.
+        # FreeBSD's fcntl.h requires the default BSD-visible namespace for flock.
+        preamble = (ROOT / "src/door_lock.c").read_text().split('#include "door_lock.h"', 1)[0]
+        compiler = shutil.which("cc") or shutil.which("gcc")
+        for platform, flags in (("FreeBSD", ["-D__FreeBSD__=1"]),
+                                ("Linux", []), ("Solaris", ["-D__sun=1"])):
+            with self.subTest(platform=platform):
+                macros = subprocess.check_output([compiler, "-E", "-dM", "-x", "c", "-U__FreeBSD__", "-U__sun", *flags, "-"],
+                                                 input=preamble, text=True)
+                if platform == "FreeBSD":
+                    self.assertNotIn("#define _XOPEN_SOURCE", macros)
+                    self.assertNotIn("#define _POSIX_C_SOURCE", macros)
+                else:
+                    self.assertIn("#define _XOPEN_SOURCE 700", macros)
+                if platform == "Solaris":
+                    self.assertIn("#define __EXTENSIONS__ 1", macros)
+
     def test_separate_target_preserves_three_os_default(self):
         self.assertEqual(native_ci.DEFAULT_TARGETS, ("freebsd", "rocky", "ubuntu"))
         self.assertEqual(native_ci.TARGETS["solaris"],

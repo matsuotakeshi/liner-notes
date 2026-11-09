@@ -91,7 +91,7 @@
   "ci/solaris_ci.py": "20cfdcef5a54345ca00fe3c5a3e5af0ca44560bd1b89a794f6139268ddf6d6ae",
   "scripts/install-solaris.py": "d831cd8e8f0c674c2c78bcfba29708efe76c51401f554ad5e2febe2f71b66a53",
   "scripts/link_maintenance.py": "ee76d893e80f536f65bcf869348d7a083eafc3f0d5280dcd35de431dbfc16c30",
-  "src/door_lock.c": "575ca99f9e74b75b35643edd38c8ef2e47938f3351b38114b3e1ef090a404b41",
+  "src/door_lock.c": "5df88271a138da23c6568a3399afd78b894f9948549e219465bd888d35698374",
   "scripts/posix_locks.py": "657d3bbe77a63e9ee0a2e586f2aa8528ba1401cbbc9f879a0302ab81b1fbcfca",
   "scripts/build-lrzsz.py": "6cd25f538e9b3320ba199aef5285156e973be999243bff972eba3482a37357de"
 }
