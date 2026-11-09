@@ -129,3 +129,13 @@ and data directories in the `doors` roots, and a Door startup/return probe. The
 helper trusts this administrator-maintained declaration; it does not infer
 external save paths from arbitrary wrapper scripts. An empty roots list or
 false declaration is not valid merely because a game has not been played yet.
+
+FreeBSD package generation and native suites share the existing CI-account
+`~/ci/.liner-notes-native.lock`. The package wrapper reuses `host_lock`,
+`run_commands` and `supervise`: a maximum 20-minute lock wait remains inside the
+existing 3,300-second worker budget, with runner heartbeats, EOF/lease expiry and
+signal-driven process-group cleanup. Different OS hosts remain parallel.
+Approved initial root setup may acquire this existing lock through a read-only,
+no-follow fd after checking owner, regular-file type, link count and inode; it
+does not execute or write any CI-account-owned file. Drain older package runs
+which predate the wrapper before that one-time setup.

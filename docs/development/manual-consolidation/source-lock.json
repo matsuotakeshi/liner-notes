@@ -99,5 +99,8 @@
   "ci/install-freebsd-upgrade-helper.sh": "b9c0625003843c1f5fe07e7b7a9ad93284480d8e2721593c5f599ffa7a0a6513",
   "scripts/doctor.py": "9a808233ca27a0718d175d6adeb461a35f532e6a5a9239d89227f1fb0276ef6a",
   "tests/test_doctor.py": "ab12b80d1fe3590e16c3653053553bb73fe3db46ae1599a672f9cb902f016fee",
-  "tests/test_doctor_runtime.py": "2f49786b53071f4a684a21bf08b67b55319e230d61f1a2d963c35a41050da4a4"
+  "tests/test_doctor_runtime.py": "2f49786b53071f4a684a21bf08b67b55319e230d61f1a2d963c35a41050da4a4",
+  "ci/freebsd_package_lease.py": "76c682196960d37983cce90c666d79c7bf68305c11f298a91d63a4c5bb5514e1",
+  ".github/workflows/freebsd-package.yml": "70a24a35f10e3672189f2cac0fa889d4ec87e13b51828a6cb02623aca9d31cd3",
+  "CI_CD.md": "a62c1849bad237d013546205b72fe168e0d1b50f41d79e156c3e4ead2e0d92d2"
 }
