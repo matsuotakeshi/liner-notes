@@ -74,4 +74,6 @@ Self-hosted Runnerと自宅検証VMには、レビュー済みでmainへ統合�
 
 手動の各OSワークフローも同じ実行処理を使い、全入口でmain限定・共通の同時実行制御を適用します。各ホストでは実行ごとに専用作業ディレクトリを作り、ホスト単位のロックも取得します。接続断・タイムアウト・中止を監視し、ビルドのプロセスグループを停止します。
 
+FreeBSD pkg生成もCIアカウントの `~/ci/.liner-notes-native.lock` を共有し、native試験と同時に実行しません。`freebsd_package_lease.py` は既存のheartbeat・切断監視・子プロセス回収を再利用します。別途承認されたroot初回準備が同じロックを使う場合は、既存のregular fileを所有者・link数・inode確認のうえ読み取り専用fdで排他取得し、CI所有ファイルを書き換えたりソースとして実行したりしません。
+
 OS別ログ、ソースSHA、アーカイブSHA-256、開始/終了日時、所要時間を `native-ci-results` Artifactへ保存します。実行手順と検証方法は [ネイティブCI並列実行](docs/development/release-ci/NATIVE_PARALLEL.md)を参照してください。文書のみの変更では上記の対象外判定を適用し、それ以外は従来の全試験を維持します。

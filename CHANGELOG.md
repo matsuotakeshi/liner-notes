@@ -2,6 +2,8 @@
 
 ## 未リリース（次期版0.75候補）
 
+- 段階更新の任意SELinux RPMを専用component証跡へ接続。本体と同じSHA、独立したpolicy版・hash・サイズ、Enforcing CI由来を必須化。FreeBSD隔離検査の失敗は秘密を含まない固定phase・例外分類でCIから識別可能に。
+
 - 任意SELinux RPMを独立版の配布候補として検証。同じソースSHA・実RPMヘッダー・ハッシュをRelease Setへ記録し、必須指定時の未生成/欠落を拒否。既存3OSの候補構成と本番への自動導入方針は変更しない。
 - PRの旧head CIを新headで取消可能にし、Linux必須gateはscope失敗を拒否しつつworkflow取消を妨げない条件へ変更。mainのCIは取消対象にしない。
 

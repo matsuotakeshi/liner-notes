@@ -107,3 +107,35 @@ checks execute inside it. Root-private failed fixtures/logs remain under
 confirming their jail and devfs mount are gone. Only the secret-free JSON receipt
 is returned to CI. Initial template/bootstrap and acceptance have not been run;
 their absence deliberately prevents production admission.
+
+The failure path returns only allowlisted phase names, exception categories and
+a bounded exit code to CI stderr. It never includes exception messages, command
+arguments, stdout/stderr or private paths. Jail phases distinguish old-service,
+backup/restore, package-update, new-service, link and old-recovery checks. Full
+logs remain root-private; the safe summary does not grant the CI account access
+to them or convert failed acceptance into a success receipt.
+
+For an explicitly selected SELinux component, `deploy_manifest.py --with-selinux`
+requires the verified `rocky10-selinux` component. The controller obtains the
+policy manifest from `liner-notes-selinux-policy` in the exact same-SHA SELinux
+workflow run that passed Enforcing acceptance. Its independent package version,
+size/hash/name and Release Set `components` record must all agree. The normal
+Rocky core/web/link manifest remains a separate, mandatory three-package set.
+
+Before production helper provisioning, reconcile the root-owned backup profile
+with the actual runtime Door configuration and wrapper-specific save paths.
+Every registered Door requires `backup_features.doors=true`, all game working
+and data directories in the `doors` roots, and a Door startup/return probe. The
+helper trusts this administrator-maintained declaration; it does not infer
+external save paths from arbitrary wrapper scripts. An empty roots list or
+false declaration is not valid merely because a game has not been played yet.
+
+FreeBSD package generation and native suites share the existing CI-account
+`~/ci/.liner-notes-native.lock`. The package wrapper reuses `host_lock`,
+`run_commands` and `supervise`: a maximum 20-minute lock wait remains inside the
+existing 3,300-second worker budget, with runner heartbeats, EOF/lease expiry and
+signal-driven process-group cleanup. Different OS hosts remain parallel.
+Approved initial root setup may acquire this existing lock through a read-only,
+no-follow fd after checking owner, regular-file type, link count and inode; it
+does not execute or write any CI-account-owned file. Drain older package runs
+which predate the wrapper before that one-time setup.
