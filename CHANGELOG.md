@@ -2,6 +2,10 @@
 
 ## 未リリース（次期版0.75候補）
 
+- PRの旧head CIを新headで取消可能にし、Linux必須gateはscope失敗を拒否しつつworkflow取消を妨げない条件へ変更。mainのCIは取消対象にしない。
+
+- 承認付き3局段階更新の制御・隔離試験を追加。署名済み配布計画、実行済みCI、現run/attemptと対象を明記したEnvironment承認、旧package保管、整合バックアップ・復元照合・ホスト外保管を必須化。既定は計画のみ。本番helper・署名鍵の配備と本番更新は別途承認対象。
+- FreeBSD実pkg更新・回復のVNET jail検査を準備。releaseと配備controllerのSHAを区別し、祖先関係・同一releaseのSolaris/SELinuxを含む実行済みCI・試験済み旧版からの更新だけを許可。jail準備と実機試験は未完了のため適用は拒否状態。
 - SELinux実機CIのモジュール一覧取得を修正し、同じヘルパー処理を実ポリシーストアで回帰確認。試験用ドメインのAVC拒否だけを記録し、無関係な監査情報の公開を防止。新規試験DBではリンク専用会員を作成してからallowlistを有効化し、再起動後も記事・メールを確認。
 - SolarisのPython補助ツールに専用ロック保持プロセスと固定spool管理ファイルを追加。転送再開・整理・リンク保守の排他寿命を維持し、FreeBSD/Linuxのflockと保存形式は保持。実機の部分成功と未検証範囲を分離し、ZMODEM依存を作業コピー内だけで構築できるようにした。
 - Solaris移植後のFreeBSDビルド回帰を修正。Door排他モジュールではFreeBSDの既定機能名前空間を維持し、従来のflock宣言とロック定数を利用する。

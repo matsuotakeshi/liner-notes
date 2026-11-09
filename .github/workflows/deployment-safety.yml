@@ -1,0 +1,43 @@
+name: Deployment safety
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+jobs:
+  changes:
+    uses: ./.github/workflows/change-scope.yml
+  isolation:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - run: python3 -m pip install cryptography
+      - name: Test closed deployment policy and isolated three-node transactions
+        run: |
+          python3 tests/test_deployment.py
+          python3 tests/test_deploy_restore_readonly.py
+          python3 tests/test_freebsd_upgrade_boundary.py
+          python3 -m py_compile ci/freebsd_upgrade_root.py ci/freebsd_upgrade_jail.py ci/prepare_freebsd_upgrade_template.py ci/install_freebsd_upgrade_helper.py
+  restored-runtime:
+    needs: changes
+    if: ${{ needs.changes.outputs.build == 'true' }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - run: sudo apt-get update && sudo apt-get install -y clang libssl-dev libsqlite3-dev python3-cryptography
+      - run: make -j2 CC=clang SQLITE_CFLAGS= SQLITE_LIBS=-lsqlite3
+      - name: Restore and boot the actual BBS using a disposable unprivileged account
+        run: |
+          sudo install -d -m 755 /usr/local/libexec/liner-notes-deploy-ci
+          sudo install -m 755 runtime /usr/local/libexec/liner-notes-deploy-ci/runtime
+          sudo env GITHUB_ACTIONS=true /usr/bin/python3 tests/test_deploy_restore_runtime.py

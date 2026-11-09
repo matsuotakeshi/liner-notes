@@ -430,3 +430,9 @@ bin/liner-notes-serial
 %%PORTDOCS%%%%DOCSDIR%%/manual/ZUPLOAD_FIX.md
 %%DATADIR%%/scripts/release_manifest.py
 %%DATADIR%%/scripts/verify_release_set.py
+%%DATADIR%%/scripts/deploy_backup_store.py
+%%DATADIR%%/scripts/deploy_host.py
+%%DATADIR%%/scripts/deploy_manifest.py
+%%DATADIR%%/scripts/deploy_policy.py
+%%DATADIR%%/scripts/deploy_restore.py
+%%DATADIR%%/scripts/deploy_transaction.py

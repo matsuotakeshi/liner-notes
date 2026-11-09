@@ -2,6 +2,9 @@ name: Canonical manual
 on:
   push:
   pull_request:
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 jobs:
   manual:
     runs-on: ubuntu-latest
