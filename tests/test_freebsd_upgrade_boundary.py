@@ -5,6 +5,7 @@ import json
 import os
 from pathlib import Path
 import sys
+import subprocess
 import tempfile
 import unittest
 from unittest.mock import patch
@@ -12,11 +13,25 @@ import zipfile
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT/'ci'))
-from freebsd_upgrade_root import select_package_run, unpack_package, validate_jail_paths
+from freebsd_upgrade_root import select_package_run, unpack_package, validate_jail_paths, public_failure
 import install_freebsd_upgrade_helper as installer
 
 
 class Boundary(unittest.TestCase):
+    def test_public_failure_never_exposes_untrusted_exception_data(self):
+        secret = 'private-password-and-key'
+        errors = [ValueError(secret), subprocess.CalledProcessError(23, [secret], secret, secret),
+                  subprocess.TimeoutExpired([secret], 1, secret, secret)]
+        for error in errors:
+            result = public_failure(error, 'jail-execute', {'phase': 'package-update', 'type': 'AssertionError', 'detail': secret})
+            self.assertNotIn(secret, json.dumps(result))
+            self.assertEqual(result['jail_phase'], 'package-update')
+        result = public_failure(ValueError(secret), secret, {'phase': secret, 'type': secret})
+        self.assertEqual(result['phase'], 'admission')
+        self.assertNotIn(secret, json.dumps(result))
+        self.assertEqual(public_failure(ValueError(), [], {'phase': []})['phase'], 'admission')
+        self.assertEqual(public_failure(ValueError(), 'jail-execute', {'phase': 'link', 'type': []})['jail_type'], 'Error')
+
     def test_latest_failed_or_pr_build_never_accepted(self):
         sha = 'a'*40
         run = dict(id=10, head_sha=sha, head_branch='main', event='push',

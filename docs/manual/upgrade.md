@@ -10,18 +10,26 @@
 `production-staged-update.yml` は既定で `plan` を実行し、本番へSSH接続しません。
 本番へのhelper・鍵・sudo設定の設置、および実際の更新は、それぞれ明示的な承認後に行います。
 本番機を検証先には使いません。
+FreeBSDの候補pkg生成とnative試験は、既存検証機内の共通ロックで直列化します。
+他OSの検証は並列のままです。CIの接続断・取消・時間切れでは検証プロセスを回収し、
+ロック待ちや中断を成功済み試験として扱いません。
 
 更新順序はRocky Linux → Debian → FreeBSDです。各局のヘルスチェックが成功してから
 次局へ進みます。必要な条件は次のとおりです。
 
 1. 公開済み安定リリースのtagと署名付き `DEPLOYMENT-MANIFEST.json` が同じ完全SHAであること。配備controllerは実行時の最新mainに固定し、release SHAがその祖先であることを確認します。リリース後の文書更新だけで既存リリースを作り直す必要はありません。ただし承認待ち中にmainが進んだ場合は新しいrunと承認が必要です。
-2. native/Linux/pkg/RPM/DEB/Release Set/manual/deployment安全性、Solaris native、Rocky SELinux Enforcing、FreeBSD jail更新CIがreleaseと同一SHAで成功していること。本番SSH事前検査は現在のcontroller SHAで実行し、実際の検査step完了から1時間以内であること。文書変更によるskipは実行済み試験として認めません。controllerだけが新しいSHAであることを理由に過去のrelease検証を他のreleaseへ流用しません。
+2. native/Linux/pkg/RPM/DEB/Release Set/manual/deployment安全性、doctorの原本非変更試験、Solaris native、Rocky SELinux Enforcing、FreeBSD jail更新CIがreleaseと同一SHAで成功していること。本番SSH事前検査は現在のcontroller SHAで実行し、実際の検査step完了から1時間以内であること。文書変更によるskipは実行済み試験として認めません。controllerだけが新しいSHAであることを理由に過去のrelease検証を他のreleaseへ流用しません。
 3. CI由来manifest・Release Set receiptと、ダウンロードしたpackageの名前・版・サイズ・SHA-256が一致すること。
 4. `production-release` Environmentにmain専用のブランチ制限とオーナーのrequired reviewerが実在すること。
 5. 今回のrun summaryに示す `DEPLOY v版 SHA rocky.ysni.org,debian.ysni.org,srv.ysni.org RUN run番号/attempt` を、承認コメントへそのまま記載すること。古いrun/attemptの承認は再利用できません。
 
 配布計画の署名鍵と実行承認の署名鍵は分離します。`scripts/deploy_manifest.py` は既存の
 `verify_release_set.py` で確認済みのCI成果物だけから署名計画を作成します。
+任意のRocky SELinux RPMも更新する場合は、候補の `rocky10-selinux/` を用意し、
+`deploy_manifest.py --with-selinux` を指定します。ポリシー独自の版番号を保持しつつ、
+本体と同じsource SHA、専用policy CI成果物、Release Setのcomponents、サイズとhashを
+照合します。本体3パッケージの検証で代用できません。既に導入済みのpolicyを更新計画から
+省略すると、サービス停止前に拒否します。
 リリース公開や本番更新は実行しません。root側helperは公開鍵を固定し、短期の実行承認と
 署名計画の両方を検証します。公開鍵はrepository variable `LN_RELEASE_PUBLIC_KEY`、
 実行承認用秘密鍵は保護Environmentの `LN_DEPLOY_AUTH_KEY`、SSH鍵は既存の
@@ -48,6 +56,11 @@ worker確認で非稼働を確かめます。稼働サービスの漏れや、�
 バックアップ対象はdata/config/attachments/vault/spool/link/web/doors/binaries/old-packages
 の10区分すべてを明記します。data/config/binaries/old-packagesは空にできません。
 他の区分は `backup_features` で使用/未使用を明記し、未使用は空配列、使用中は実パスを列挙します。
+Doorが1件でも登録されている場合は `backup_features.doors=true` が必須です。
+導入前に実際に使用する `doors.conf` と各ラッパーの設定を確認し、全登録ゲームの作業領域・
+保存先（BBSのdataディレクトリ外も含む）をdoorsのバックアップ一覧へ列挙してください。
+ゲーム側の保存先は自動推測しません。この宣言をfalseにして登録済みゲームのデータや
+必要なDoor起動・復帰probeを省略してはいけません。
 Web/linkサービスを有効にして対応する保存先を空にする設定は拒否します。data配下にまとめて
 保存している機能は同じdataパスを指定して構いません。外部保存先・Doorデータは個別に含めます。
 停止後に専用サービスアカウントのworkerが残っていないことを確認し、ACL・拡張属性を含むarchiveを作成します。

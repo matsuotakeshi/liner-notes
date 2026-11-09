@@ -66,8 +66,9 @@ jobs:
             -o IdentitiesOnly=yes -o BatchMode=yes \
             -o PasswordAuthentication=no -o StrictHostKeyChecking=yes \
             "$src" "takeshi@10.0.0.50:$remote_dir/source.tar.gz"
-          "${SSH[@]}" takeshi@10.0.0.50 \
-            "sh -s -- '$remote_dir' '$GITHUB_SHA' '$source_hash'" < ci/build-freebsd-package.sh
+          # Reuse the native host lock and heartbeat/child cleanup. The root
+          # initial-setup driver can hold this same lock through a read-only fd.
+          python3 ci/freebsd_package_lease.py runner "$remote_dir" "$GITHUB_SHA" "$source_hash"
           mkdir -p "$RUNNER_TEMP/freebsd-pkg-artifacts"
           "${SSH[@]}" takeshi@10.0.0.50 \
             "tar -czf - -C '$remote_dir/artifacts' ." > "$RUNNER_TEMP/freebsd-artifacts.tar.gz"
