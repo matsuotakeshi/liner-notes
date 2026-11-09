@@ -9,6 +9,29 @@ permissions:
 jobs:
   changes:
     uses: ./.github/workflows/change-scope.yml
+  python314-doctor:
+    needs: changes
+    if: ${{ needs.changes.outputs.build == 'true' }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.14'
+      - run: python -m pip install -r link-requirements.txt
+      - name: Diagnose fixtures with the native Ubuntu CI umask
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p build
+          umask 0002
+          python -B tests/test_doctor.py -v 2>&1 | tee build/doctor-python314.log
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: doctor-python314-evidence
+          path: build/doctor-python314.log
   doctor:
     needs: changes
     if: ${{ needs.changes.outputs.build == 'true' }}
