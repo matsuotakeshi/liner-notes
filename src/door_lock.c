@@ -1,5 +1,9 @@
 #define _DEFAULT_SOURCE
+#ifndef __FreeBSD__
+/* FreeBSD hides native flock when a strict POSIX/XSI namespace is requested.
+ * Keep its default namespace; glibc uses _DEFAULT_SOURCE alongside XSI. */
 #define _XOPEN_SOURCE 700
+#endif
 #ifdef __sun
 #define __EXTENSIONS__ 1
 #endif
