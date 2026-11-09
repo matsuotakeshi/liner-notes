@@ -39,16 +39,32 @@ class RootBoundaryTests(unittest.TestCase):
     def test_web_source_is_public_code_under_private_root_umask(self):
         with tempfile.TemporaryDirectory() as directory:
             target = Path(directory) / 'source'
+            original = Path(directory) / 'private-checkout'
+            package = original / 'webui'
+            templates = package / 'templates'
+            templates.mkdir(parents=True)
+            (package / '__main__.py').write_text('pass\n')
+            (templates / 'index.html').write_text('fixture')
+            for path in (original, package, templates):
+                path.chmod(0o700)
+            for path in (package / '__main__.py', templates / 'index.html'):
+                path.chmod(0o600)
             previous = native.os.umask(0o077)
             try:
-                native.stage_web_source(target)
+                with patch.object(native, 'ROOT', original):
+                    native.stage_web_source(target)
             finally:
                 native.os.umask(previous)
             # A separate service uid needs search/read access to code; the
             # surrounding fixture data and root work tree remain private.
             self.assertEqual(target.stat().st_mode & 0o777, 0o755)
             self.assertTrue((target / 'webui' / '__main__.py').is_file())
-            self.assertEqual((target / 'webui').stat().st_mode & 0o005, 0o005)
+            for path in (target / 'webui', target / 'webui/templates'):
+                self.assertEqual(path.stat().st_mode & 0o777, 0o755)
+            for path in (target / 'webui/__main__.py', target / 'webui/templates/index.html'):
+                self.assertEqual(path.stat().st_mode & 0o777, 0o644)
+            self.assertEqual(package.stat().st_mode & 0o777, 0o700)
+            self.assertEqual((package / '__main__.py').stat().st_mode & 0o777, 0o600)
             target.chmod(0o700)
             with self.assertRaises(FileExistsError):
                 native.stage_web_source(target)

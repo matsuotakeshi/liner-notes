@@ -4,6 +4,103 @@
 
 [詳細導入マニュアル](install-freebsd.md)と併せて使用します。
 
+## 承認付き段階更新（次期版候補・本番未導入）
+
+この節は開発中の更新機構です。0.74.1の配布物には含まれません。ソースの
+`production-staged-update.yml` は既定で `plan` を実行し、本番へSSH接続しません。
+本番へのhelper・鍵・sudo設定の設置、および実際の更新は、それぞれ明示的な承認後に行います。
+本番機を検証先には使いません。
+
+更新順序はRocky Linux → Debian → FreeBSDです。各局のヘルスチェックが成功してから
+次局へ進みます。必要な条件は次のとおりです。
+
+1. 公開済み安定リリースのtagと署名付き `DEPLOYMENT-MANIFEST.json` が同じ完全SHAであること。配備controllerは実行時の最新mainに固定し、release SHAがその祖先であることを確認します。リリース後の文書更新だけで既存リリースを作り直す必要はありません。ただし承認待ち中にmainが進んだ場合は新しいrunと承認が必要です。
+2. native/Linux/pkg/RPM/DEB/Release Set/manual/deployment安全性、Solaris native、Rocky SELinux Enforcing、FreeBSD jail更新CIがreleaseと同一SHAで成功していること。本番SSH事前検査は現在のcontroller SHAで実行し、実際の検査step完了から1時間以内であること。文書変更によるskipは実行済み試験として認めません。controllerだけが新しいSHAであることを理由に過去のrelease検証を他のreleaseへ流用しません。
+3. CI由来manifest・Release Set receiptと、ダウンロードしたpackageの名前・版・サイズ・SHA-256が一致すること。
+4. `production-release` Environmentにmain専用のブランチ制限とオーナーのrequired reviewerが実在すること。
+5. 今回のrun summaryに示す `DEPLOY v版 SHA rocky.ysni.org,debian.ysni.org,srv.ysni.org RUN run番号/attempt` を、承認コメントへそのまま記載すること。古いrun/attemptの承認は再利用できません。
+
+配布計画の署名鍵と実行承認の署名鍵は分離します。`scripts/deploy_manifest.py` は既存の
+`verify_release_set.py` で確認済みのCI成果物だけから署名計画を作成します。
+リリース公開や本番更新は実行しません。root側helperは公開鍵を固定し、短期の実行承認と
+署名計画の両方を検証します。公開鍵はrepository variable `LN_RELEASE_PUBLIC_KEY`、
+実行承認用秘密鍵は保護Environmentの `LN_DEPLOY_AUTH_KEY`、SSH鍵は既存の
+`ID_ED25519_LN_DEPLOY` を使います。秘密鍵を原稿・issue・Artifactへ貼らないでください。
+
+host側は `/etc/liner-notes-deploy/host.json` と公開鍵をroot専用で設置します。
+導入補助 `ci/install-deploy-helper.sh OS名` はhelperの配置だけを行い、sudo権限・鍵・
+サービスの変更は行いません。OS名は `rocky10`、`debian13`、`freebsd15` です。
+sudoは `ln-deploy` に対し引数なしの `/usr/local/libexec/liner-notes-deploy-host` だけを
+許可します。一般的な `sh`、`systemctl`、`pkg` のsudo許可を与えないでください。
+
+root管理profileにはtarget、private state directory、incoming directory、公開鍵、
+導入済みサービス、旧package manifest、停止確認用PID一覧、バックアップ対象、
+復元照合用SELECT、別コピーのBBS起動設定 `restore_application`、ローカルのlogin/article/mailヘルスチェックを設定します。
+有効なWeb/link/登録Doorには追加のprobeが必須です。profileのprobeには検証会員の
+秘密情報が入り得るためrootのみが読み書きできるようにし、GitHubへアップロードしません。
+probeはlocalhostへの送受信で、任意のroot shellコマンドではありません。
+profileから省略した既知のBBS/Web/linkサービスは、read-only statusと専用アカウントの
+worker確認で非稼働を確かめます。稼働サービスの漏れや、停止確認対象から外れた所有者を
+検出した場合は、BBSを止める前に拒否します。FreeBSDの標準配布には現時点でlink専用rcが
+含まれません。手動起動したlink daemonをこのCDで扱うには、別途承認した専用rc/PID・
+専用アカウント管理を先に整える必要があります。未管理daemonを任意のpkillで停止しません。
+
+バックアップ対象はdata/config/attachments/vault/spool/link/web/doors/binaries/old-packages
+の10区分すべてを明記します。data/config/binaries/old-packagesは空にできません。
+他の区分は `backup_features` で使用/未使用を明記し、未使用は空配列、使用中は実パスを列挙します。
+Web/linkサービスを有効にして対応する保存先を空にする設定は拒否します。data配下にまとめて
+保存している機能は同じdataパスを指定して構いません。外部保存先・Doorデータは個別に含めます。
+停止後に専用サービスアカウントのworkerが残っていないことを確認し、ACL・拡張属性を含むarchiveを作成します。
+別コピーへ復元して全file hash、SQLite integrity、指定の会員・記事・メール等のSELECT結果を照合し、
+SQLiteの照合はDB/WALのさらに別コピーで行います。原本DBへSQLite接続せず、原本側にSHMを
+作成することも避けます。コピー中の変化・未回復のrollback journalは更新を拒否する理由です。
+さらに使い捨てコピー上のBBSを非root・loopbackで起動してlogin/article/mailを確認します。外部のゲームdaemon等が
+まだデータを書いている場合は停止し、ゲーム側の整合バックアップ手順を先に設計します。別ホストの専用backup
+receiverへ転送し、保管後hashが一致するまでpackage更新を開始しません。
+backup識別子は局名・release ID・SHAで区別します。転送先SSH host keyに加え、OS machine IDの
+SHA-256も固定して照合し、同じ局への「ホスト外バックアップ」を拒否します。
+backup receiverはprivate directory `/var/lib/liner-notes-release-backups` を使い、
+専用SSHアカウントには `deploy_backup_store.py` のみを実行可能にします。
+ゲーム外部データ、秘密鍵、証明書を含むバックアップをActions Artifactに保管しないでください。
+
+Linux更新はローカルpackageだけのRPM/dpkgで行い、依存解決のための一括OS更新はしません。
+Debianの既存conffileは保持します。FreeBSDはOrigin `comms/liner-notes` を確認した
+単一packageのprivate repositoryから `pkg upgrade` を実行し、New/削除を含むplanを拒否します。
+`pkg delete` → `pkg add` はこのCD機構では使用しません。Apache・SofChat・OS操作を
+helperのサービス許可一覧に追加しないでください。更新前後で無関係packageが変わっていないことも確認します。
+
+成功済みの同一計画を新しい承認で再実行すると、healthのみを確認し再インストールしません。
+その再検査が失敗した場合は `health-recheck-failed` として今回の承認と時刻を保存し、旧成功結果を
+再利用しません。サービス停止前の拒否は `preflight-failed`、停止開始後の中断・失敗は
+`planned-restore-required` として保持し、いずれも後続局への更新を止めます。
+DB互換性の推測による自動バイナリ切り戻しは行いません。private host state、
+off-host backupと旧packageを確認して[計画的な復元](backup-recovery.md)を実施し、
+整合性を確認した後に新しいrun/承認で再開します。状態fileを消すだけの再実行は禁止です。
+失敗状態が一つでも残る局は別releaseへの更新も拒否します。計画復元の完了を管理者が確認してから、
+失敗stateを復元証跡と一緒にroot専用の履歴directoryへ移して保持し、新しい承認で再検査します。
+監査出力はSHA、版、対象、承認run/attempt、更新前後、backup識別子・hash、結果・停止理由です。
+release SHAとcontroller SHAは別々に記録します。制限付きOSコマンドの詳細stdout/stderrは
+private state directoryのroot専用 `commands.log`（0600）へ記録します。このログは秘密を含む
+可能性があるため、SSH応答やActions Artifactには含めません。コマンドの標準入力は記録しません。
+
+**検証上の区別:** hostedの3局試験はfile/SQLite/subprocessの隔離fixtureです。
+RPM/DEBの既存disposable更新CIでは実package操作も検証します。
+FreeBSDのrootdir合成package試験は実pkg resolverを使用しますが、service/maintainer script試験ではありません。
+同じCIに実Liner Notes packageのrevision更新と `LINER_NOTES_RC_CONF` による独立rc起動・
+login/article/mail・論理backup/restore・旧package回復の試験も用意しています。
+こちらも非rootのrootdir内でmaintainer scriptsを無効化して実行するため、アカウント作成・
+所有権設定を含む完全なOS更新試験の代わりにはなりません。
+適用controllerは `FREEBSD-SERVICE-UPGRADE.json` に同一SHAの完全なpackage/service更新・復元証跡がない限りapplyを拒否します。
+専用の `FreeBSD isolated upgrade acceptance` は、10.0.0.50上のroot所有テンプレートを
+VNET jailへ複製し、maintainer script・会員/データ所有権、実rc起動、記事/メール、Web、link、
+Door、バックアップからの復元と旧package回復を検査する候補実装です。宿主のサービスや
+packageを更新しません。テンプレート・固定sudo entryの初期準備とネイティブ実行は別途必要です。
+同一バージョンの開発候補はrevisionだけを上げて更新経路を試験できますが、その証跡だけでは
+本番applyを許可しません。実release packageのhash/版と試験結果を照合し、試験開始時の旧版を
+短期署名承認へ含め、本番局の旧版が異なる場合も停止します。
+FreeBSDの実Liner Notes package・サービスを含む完全な隔離更新、全保存領域のsite profile、
+本番用root helper/鍵/backup先の設置が確認できるまでは、本番更新可能と扱いません。
+
 ## 0.74から0.74.1への更新
 
 HELPとマニュアルを訂正した修正版です。既存DBの変換、ボードやゲームの作り直しは不要です。本体の版表示は0.74.1になります。

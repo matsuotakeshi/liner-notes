@@ -12,6 +12,7 @@ from pathlib import Path
 import re
 import shutil
 import socket
+import stat
 import subprocess
 import sys
 import tempfile
@@ -245,11 +246,25 @@ async def web_probe(port):
             assert response.status == 200 and 'Persisted under Enforcing' in data['data']['article']['body'], data
 
 
+def copy_public_code(source, destination):
+    """Copy fresh code without inheriting the root source tree's private DAC."""
+    shutil.copytree(source, destination, symlinks=True,
+                    ignore=shutil.ignore_patterns('__pycache__'))
+    for path in (destination, *destination.rglob('*')):
+        mode = path.lstat().st_mode
+        if stat.S_ISDIR(mode):
+            path.chmod(0o755)
+        elif stat.S_ISREG(mode):
+            path.chmod(0o755 if mode & 0o111 else 0o644)
+        else:
+            raise ValueError('Unexpected object in fresh public fixture code')
+
+
 def stage_web_source(source):
     """Publish only fresh fixture code despite the root helper's private umask."""
     source.mkdir(mode=0o755)
     source.chmod(0o755)
-    shutil.copytree(ROOT / 'webui', source / 'webui', ignore=shutil.ignore_patterns('__pycache__'))
+    copy_public_code(ROOT / 'webui', source / 'webui')
 
 
 def web_fixture(fixture, core_port, secret):
@@ -349,7 +364,7 @@ host = "127.0.0.1"
 port = {peer_port}
 ''', 'liner_notes_link_etc_t')
         scripts = fixture.path / 'source/scripts'
-        shutil.copytree(ROOT/'scripts', scripts, ignore=shutil.ignore_patterns('__pycache__'))
+        copy_public_code(ROOT/'scripts', scripts)
         fixture.label(scripts, 'liner_notes_ro_t', True)
         entry = fixture.text('link-entry', '#!/usr/bin/python3 -B\nimport sys,runpy\n'
             f'sys.path.insert(0,{str(scripts)!r})\n'
@@ -389,7 +404,7 @@ def transfer_fixture(fixture, core, secret):
     spool = fixture.directory('spool', 'liner_notes_spool_t')
     marker = spool / 'mac-probe'
     scripts = fixture.path / 'transfer-scripts'
-    shutil.copytree(ROOT/'scripts', scripts, ignore=shutil.ignore_patterns('__pycache__'))
+    copy_public_code(ROOT/'scripts', scripts)
     fixture.label(scripts, 'liner_notes_ro_t', True)
     arguments = ['--receiver',str(copies[0]),'--sender',str(copies[1]),'--spool-root',str(spool),'--timeout','15','--']
     entry = fixture.text('transfer-entry', '#!/usr/bin/python3 -B\n'
