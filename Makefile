@@ -280,6 +280,7 @@ test-stage70-scale: all
 
 .PHONY: test-stage71
 test-stage71: all
+	$(PYTHON) tests/test_resume_receipt.py
 	$(PYTHON) tests/test_stage71.py ./runtime
 	$(PYTHON) tests/test_stage71_reconcile.py ./runtime ./vaultctl
 check: test-stage71

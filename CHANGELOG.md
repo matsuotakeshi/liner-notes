@@ -4,6 +4,8 @@
 
 ## 未リリース（次期版0.75候補）
 
+- Solarisの再開検査記録の保存を共通のnamespace排他へ変更。既存記録の再利用・原子的更新・退避を維持し、競合保存・予約名・不正なロックの拒否と導入後の独立したimportを回帰検査。FreeBSD/Linuxのflockは変更しない。
+
 - SELinux管理受入試験でSQL保存の保管庫を私有コピーへ論理書き出ししてから一覧検証するよう修正。既存の書き出し・バックアップ・復元を実runtimeのhosted回帰にも追加し、原本とポリシー権限は変更しない。
 
 - SolarisのDoor排他holderをBBSから独立した小さい実行ファイルへexecし、長寿命のforkが約1GiBずつswapを予約して次のゲーム起動がENOMEMになる問題へ対応。既存のpipe寿命・排他・子回収を維持し、全installer/packageへ非特権helperを同梱。実機の最終回帰は継続中。

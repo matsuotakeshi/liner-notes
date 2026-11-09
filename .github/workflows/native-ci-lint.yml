@@ -18,6 +18,8 @@ on:
       - "tests/test_door_lock.*"
       - "scripts/posix_locks.py"
       - "tests/test_posix_locks.py"
+      - "ports/test-resume.py"
+      - "tests/test_resume_receipt.py"
       - "tests/test_solaris_port.py"
       - ".github/workflows/solaris-ssh-test.yml"
       - "ci/native-test-requirements.txt"
@@ -43,6 +45,8 @@ on:
       - "tests/test_door_lock.*"
       - "scripts/posix_locks.py"
       - "tests/test_posix_locks.py"
+      - "ports/test-resume.py"
+      - "tests/test_resume_receipt.py"
       - "tests/test_solaris_port.py"
       - ".github/workflows/solaris-ssh-test.yml"
       - "ci/native-test-requirements.txt"
@@ -73,6 +77,7 @@ jobs:
       - run: python tests/test_solaris_service.py
       - run: python tests/test_door_lock.py
       - run: python tests/test_posix_locks.py
+      - run: python tests/test_resume_receipt.py
       - name: Preserve strict GCC diagnostics and exercise Door integration
         run: |
           sudo apt-get update -qq

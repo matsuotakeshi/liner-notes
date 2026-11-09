@@ -84,7 +84,9 @@
         "scripts/build-lrzsz.py",
         "src/door_lock.h",
         "src/door_lock_helper.c",
-        "tests/test_door_lock.py"
+        "tests/test_door_lock.py",
+        "ports/test-resume.py",
+        "tests/test_resume_receipt.py"
       ]
     },
     {
@@ -355,7 +357,10 @@
         "ZRESUME_FIX.md",
         "STAGE70.md",
         "scripts/vault_zmodem.py",
-        "webui/bridge.py"
+        "webui/bridge.py",
+        "ports/test-resume.py",
+        "scripts/posix_locks.py",
+        "tests/test_resume_receipt.py"
       ]
     },
     {

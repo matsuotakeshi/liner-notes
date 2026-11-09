@@ -100,6 +100,7 @@ def test():
         capabilities["build"] = "passed"
         run([sys.executable, "tests/test_door_lock.py"])
         run([sys.executable, "tests/test_posix_locks.py"])
+        run([sys.executable, "tests/test_resume_receipt.py"])
         capabilities["lock_lifetime"] = "passed"
         run([sys.executable, "tests/test_solaris_service.py"])
         run([sys.executable, "scripts/install-solaris.py", "--destdir", "build/solaris-stage", "--python", sys.executable])

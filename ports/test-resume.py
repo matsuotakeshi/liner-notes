@@ -1,15 +1,23 @@
 #!/usr/bin/env python3
 """Prove actual ZCRC resume on a partial file, optionally write a private receipt."""
-import argparse,hashlib,json,pathlib,select,socket,subprocess,tempfile,time,os,stat,fcntl,uuid
+import argparse,hashlib,json,pathlib,select,socket,subprocess,tempfile,time,os,stat,uuid,sys
+
+# Source: ports/ beside scripts/. Installed: scripts/check-resume.py beside
+# posix_locks.py. Resolve only this trusted installation, never the caller's cwd.
+sys.path.insert(0,str(pathlib.Path(__file__).resolve().parents[1]/'scripts'))
+import posix_locks
 
 def save_receipt(path,receipt):
  """Publish only verified results; preserve a previous receipt before replacement."""
  path=pathlib.Path(path).absolute()
+ if posix_locks.RECORD_LOCKS and path.name==posix_locks.NAMESPACE_FILE:
+  raise ValueError('Reserved namespace lock name')
  directory=os.open(path.parent,os.O_RDONLY|os.O_DIRECTORY|os.O_NOFOLLOW)
+ lease=None
  temporary='.resume-'+uuid.uuid4().hex
  data=(json.dumps(receipt,sort_keys=True)+'\n').encode()
  try:
-  fcntl.flock(directory,fcntl.LOCK_EX)
+  lease=posix_locks.namespace_lock(path.parent)
   previous=None;owner=None
   try:
    fd=os.open(path.name,os.O_RDONLY|os.O_NOFOLLOW,dir_fd=directory)
@@ -35,9 +43,12 @@ def save_receipt(path,receipt):
   os.fsync(directory)
   return 'updated' if previous is not None else 'created'
  finally:
-  try:os.unlink(temporary,dir_fd=directory)
-  except FileNotFoundError:pass
-  os.close(directory)
+  try:
+   try:os.unlink(temporary,dir_fd=directory)
+   except FileNotFoundError:pass
+  finally:
+   os.close(directory)
+   if lease is not None:lease.close()
 
 def check(receiver,sender):
  receiver=str(pathlib.Path(receiver).resolve());sender=str(pathlib.Path(sender).resolve())
