@@ -24,6 +24,8 @@ dnf install -y --setopt=install_weak_deps=False \
 for package in "${packages[@]}"; do
   rpm -q --qf '%{VERSION}-%{RELEASE}\n' "$package" | grep -Eq '^0\.74\.1-1(\.|$)'
 done
+/usr/bin/liner-notes-doctor --check-doors --lang en --json > /tmp/liner-notes-doctor.json
+python3 -c 'import json; r=json.load(open("/tmp/liner-notes-doctor.json")); assert r["read_only"] and r["exit_code"] == 0'
 
 # The RPM %config(noreplace) entries must preserve local modifications.
 config_hashes=/tmp/liner-notes-rpm-config-hashes

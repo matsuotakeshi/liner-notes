@@ -19,6 +19,7 @@ python3.11 scripts/install-linux.py --python /usr/bin/python3.11
 useradd --system --home-dir /var/lib/liner-notes --shell /sbin/nologin liner_notes
 systemd-analyze verify /usr/local/lib/systemd/system/liner-notes.service
 /usr/local/bin/liner-notes-admin --help
+/usr/local/bin/liner-notes-doctor --help
 /usr/local/bin/liner-notes-check-resume --help
 python3.11 tests/test_linux_service.py
 runuser -u bbstest -- bash -c '
@@ -28,6 +29,7 @@ runuser -u bbstest -- bash -c '
   export LINER_TEST_START_TIMEOUT=180
   python3.11 -m venv .web-venv
   .web-venv/bin/pip install -r webui/requirements.txt -r link-requirements.txt
+  make PYTHON="$PWD/.web-venv/bin/python" test-doctor
   make CC=clang PYTHON="$PWD/.web-venv/bin/python" SQLITE_CFLAGS= SQLITE_LIBS=-lsqlite3 test-stage73 test-stage74
   if ! python3.11 scripts/build-lrzsz.py /home/bbstest/lrzsz-check; then
     cat /home/bbstest/lrzsz-check/build.txt

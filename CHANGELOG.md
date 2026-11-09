@@ -6,6 +6,7 @@
 
 - 承認付き3局段階更新の制御・隔離試験を追加。署名済み配布計画、実行済みCI、現run/attemptと対象を明記したEnvironment承認、旧package保管、整合バックアップ・復元照合・ホスト外保管を必須化。既定は計画のみ。本番helper・署名鍵の配備と本番更新は別途承認対象。
 - FreeBSD実pkg更新・回復のVNET jail検査を準備。releaseと配備controllerのSHAを区別し、祖先関係・同一releaseのSolaris/SELinuxを含む実行済みCI・試験済み旧版からの更新だけを許可。jail準備と実機試験は未完了のため適用は拒否状態。
+- 読み取り専用の`liner-notes-doctor`を追加。設定・DBの私有コピー・リンク鍵/証明書・Door・転送・権限・SELinuxを診断し、日本語/英語、JSON、終了コードを提供。設定の実行、原本DB接続、ネットワーク接続、サービス操作をせず、未使用機能と判定保留を区別。FreeBSD ports・Linux coreパッケージに同梱。
 - Rocky Linux 10向けの任意導入SELinuxポリシーRPMを追加。BBS・Web・リンク・管理・Door・転送の型を分離し、ローカル設定を保持する明示ラベル復旧を用意。専用ドメインでのEnforcing機能・拒否試験は検証中。
 - Solaris 11.4 x86-64向けのmain限定ネイティブCIと既存環境の依存調査を追加。libcのPTY APIとsocketライブラリを選択できるビルド設定を準備。移植検証中であり、Solarisの正式動作確認・SMF導入は未完了。
 

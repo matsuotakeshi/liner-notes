@@ -15,6 +15,8 @@ if [[ "$ID" != debian || "$VERSION_ID" != 13 || -d /run/systemd/system ]]; then
 fi
 
 packages=(liner-notes liner-notes-web liner-notes-link)
+/usr/bin/liner-notes-doctor --check-doors --lang en --json > /tmp/liner-notes-doctor.json
+python3 -c 'import json; r=json.load(open("/tmp/liner-notes-doctor.json")); assert r["read_only"] and r["exit_code"] == 0'
 for package in "${packages[@]}"; do
   test "$(dpkg-query -W -f='${Version}' "$package")" = 0.74.1-1
 done
