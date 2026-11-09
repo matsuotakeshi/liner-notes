@@ -44,7 +44,7 @@
   "ports/comms/liner-notes/files/liner_notes.in": "e42460c324202635956856b6bc605f38dd004de3c3c67fe14396a08fdec500e2",
   "ports/comms/liner-notes/pkg-plist": "b93d97737db0a1c7d671c3f83bba4008854ef9358b2fbca95e796051d3576b0e",
   "scripts/configure-zmodem.py": "2abc3c427aa5f93a8920cfce7a390bc8624b5958d72ddd3f8b4df4244c7dc838",
-  "scripts/doctor.py": "9a808233ca27a0718d175d6adeb461a35f532e6a5a9239d89227f1fb0276ef6a",
+  "scripts/doctor.py": "839597afd93608bdbbe6ced1cd6d4ecd0a251088fdca9f977744b9fe2f760e1b",
   "scripts/door_clans.sh": "42d098ab56618024c6fa89a86c7f575a41a18082cf0ef1e71797b83675026fc5",
   "scripts/install-linux.py": "3f48877c54a1f62727136647278968884001277ec03595236c2237b24f3c1473",
   "scripts/liner-notes-ssh": "f73b5ebd8e24bff366c93fdf3f518a87feefb226e0b809df67eed04f190a8969",
@@ -61,7 +61,7 @@
   "src/doors.c": "560f9380f2623d8085e8e6edf8319a738e2aeaeff9461336760f56527c66bb04",
   "src/members.c": "ede8f3eede2bd71ded85d02fc7aa05a0f77fab30c66596ef1b724d60f82f288f",
   "src/profile_store.c": "9bd14cb1a44b9e117fb9465d036f2d5417bca8188a136a9162f91f8b46f33e2a",
-  "src/runtime.c": "e01b5d345e86a614ab92a99b7eef0af0f45b2ef1893e291d4aab14370dfc65d7",
+  "src/runtime.c": "826887e0c17a1733b43d938c1469d28023417ead325c0ef819eaec1a6d9a375e",
   "src/runtime_limits.h": "82de34913914d0f81874789d473928e044225772c4db9d656bceac03920219a8",
   "src/session.c": "f6f5300e5f9116e81d48319bc0dc0deac7522cd2cddf095e663aeec4d7bf1dd8",
   "src/storage_sqlite.c": "aa8971c445e2a23ae21548fc706e318e40238f8318c2f717490b867067ab3055",
@@ -71,7 +71,7 @@
   "src/userlog.c": "989a93c9993e7b93aba2815214a1075b3cd37ddfa0712803eab4d9f940f6e58e",
   "src/vault.c": "797c144ebaca5938ba0c523227b654c41e3d6c83aa5042e756dc60d479ad6340",
   "src/vault.h": "9c8e22630fe3bc38aba5736455b067d272654b6c3f5884676f09283da591121e",
-  "tests/test_doctor.py": "ab12b80d1fe3590e16c3653053553bb73fe3db46ae1599a672f9cb902f016fee",
+  "tests/test_doctor.py": "c90be41b2982b50af02134df4c4875e9cc9223071ab0deed98fad3150acd0ef7",
   "tests/test_doctor_runtime.py": "2f49786b53071f4a684a21bf08b67b55319e230d61f1a2d963c35a41050da4a4",
   "tests/test_freebsd_plist.py": "b0d63881c93d6adbfcfa2a77fc80c2cb839ec4ac83604ad0244b03e1b3786ff0",
   "tests/test_help_release.py": "cad9e7d7f46bb4c31a36a867b36afa72bed209cd4d5eed35a35559c29382f61f",
@@ -97,7 +97,7 @@
   "ci/solaris_ci.py": "bc63f65a2c4cc9066b0beb1da1a17d243c69dae640895d9c62e26912cef77cc0",
   "scripts/install-solaris.py": "f440934a9889f7282fc6ab5eb4b9f63f7ed79153ef4a72c9e170ea8da5b3d2bc",
   "scripts/link_maintenance.py": "ee76d893e80f536f65bcf869348d7a083eafc3f0d5280dcd35de431dbfc16c30",
-  "src/door_lock.c": "6ca21dde627e2d77bddd38a9952d065c797a1ec7ff689cd71a4deb10e44f6e60",
+  "src/door_lock.c": "dd4fe6e09ab9244e3ec31a3fdc3fc77f4aadee9f86e4d982a7aaeacd34cca8c1",
   "scripts/posix_locks.py": "657d3bbe77a63e9ee0a2e586f2aa8528ba1401cbbc9f879a0302ab81b1fbcfca",
   "scripts/build-lrzsz.py": "6cd25f538e9b3320ba199aef5285156e973be999243bff972eba3482a37357de",
   "ci/native_ci.py": "65cb55363b95d3b3ead8113733e0fa16213f08e2c615479cfb69886f4be71c53",
@@ -126,5 +126,5 @@
   ".github/workflows/freebsd-package-lint.yml": "a959467043a4a8af16a6c3918197f87127d02c660cc9af4577f7352ed74322e3",
   "src/door_lock.h": "6e9e85076288e0478e0b07ec107cac96995bb12909a9fb34ef53b45355b0873c",
   "src/door_lock_helper.c": "b23a3f65efa4e8ed2504734412cc2a6c7e2e7b7b36d8d10959e385ab060dd274",
-  "tests/test_door_lock.py": "d33dd58779df047ac330acca338a6707134ba7ea2d5c5523a549cfc3bef6860b"
+  "tests/test_door_lock.py": "7c3198fb91bdff92c4856f76df3441f2d3baa563676532de46dca6f3393af5a2"
 }
