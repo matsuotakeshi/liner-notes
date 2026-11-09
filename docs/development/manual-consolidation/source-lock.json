@@ -109,7 +109,7 @@
   "scripts/deploy_backup_store.py": "ff1a26a98e9a2ba20dae1e31789e8dc4bbb74edc8ac3e9893f271ede716b2d5d",
   "scripts/deploy_manifest.py": "f887023c1ba391904fbebe872928ed4dffcf92515c9fc110b4026fee19fc66bf",
   "ci/freebsd_upgrade_root.py": "494841eba106e4432bcb647cbf2291dddb2f02418c1d8c7dceac6176e9bc13ea",
-  "ci/freebsd_upgrade_jail.py": "4988707680960e49f73f1a05443d70adec4db419a2c897195b53bdec4874ef0f",
+  "ci/freebsd_upgrade_jail.py": "d76826c54237b51ce34741ed320b0870831c403da15d809cbb8bd99ed1ef8863",
   "ci/prepare_freebsd_upgrade_template.py": "5eac9dec0e401223e5f0e67a4d0eda59605f0187bb67f15f3c45ed50a78f0cc0",
   "ci/install_freebsd_upgrade_helper.py": "b0b91cdbae13e4c2a0f66a367976d38318c903ff7285ed616e3b445d4eddb038",
   "ci/install-freebsd-upgrade-helper.sh": "b9c0625003843c1f5fe07e7b7a9ad93284480d8e2721593c5f599ffa7a0a6513",
@@ -133,5 +133,6 @@
   "ports/test-resume.py": "a2e8902a6dc7b879d624d4e6f267ea301a01f1e8e9c94d1a68c58d1feebbde72",
   "tests/test_resume_receipt.py": "9f76a68eb59728f34523aa5b061a631ec561cd6aff60a12004b85ca84cf61c3c",
   "tests/package_menu_flow.py": "e2995f40f2cf1d33cac6d43d67ea23d18ea799e1c79e670c57be2b47cdb1c76b",
-  "tests/test_package_menu_flow.py": "9e2274f9869e46503e88cc92e23e2136eb7cf7c4534b3236af4ad430e0970580"
+  "tests/test_package_menu_flow.py": "9e2274f9869e46503e88cc92e23e2136eb7cf7c4534b3236af4ad430e0970580",
+  "tests/test_freebsd_jail_import.py": "388bf96302bc2af9cf1204596f25f77851bf45f92504ea574dc45903b3d1f47a"
 }

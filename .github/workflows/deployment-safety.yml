@@ -29,6 +29,14 @@ jobs:
             python3 "tests/test_${suite}.py" 2>&1 | tee "build/deployment-evidence/${suite}.log"
           done
           python3 -m py_compile ci/freebsd_upgrade_root.py ci/freebsd_upgrade_jail.py ci/prepare_freebsd_upgrade_template.py ci/install_freebsd_upgrade_helper.py
+      - name: Import the real jail entrypoint with isolated Python
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo install -d -m 755 /ci
+          test ! -e /ci/source && test ! -L /ci/source
+          sudo ln -s "$GITHUB_WORKSPACE" /ci/source
+          python3 tests/test_freebsd_jail_import.py 2>&1 | tee build/deployment-evidence/freebsd-jail-import.log
       - uses: actions/upload-artifact@v4
         if: always()
         with:

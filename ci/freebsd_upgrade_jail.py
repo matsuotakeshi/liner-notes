@@ -16,7 +16,7 @@ import time
 import urllib.request
 
 ROOT = Path('/ci/source')
-sys.path[:0] = [str(ROOT / 'scripts'), str(ROOT / 'tests'), str(ROOT)]
+sys.path[:0] = [str(ROOT / 'ci'), str(ROOT / 'scripts'), str(ROOT / 'tests'), str(ROOT)]
 from deploy_policy import package_commands
 from deploy_restore import verify_application
 from deploy_host import trusted
