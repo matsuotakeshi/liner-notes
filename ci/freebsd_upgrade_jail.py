@@ -26,6 +26,8 @@ from test_members import auth, PASSWORD
 from test_mail import send
 from test_telnet import Client as TelnetClient
 
+PHASE = 'admission'
+
 ENV = {'PATH': '/sbin:/bin:/usr/sbin:/usr/bin:/usr/local/sbin:/usr/local/bin', 'LC_ALL': 'C', 'HOME': '/root'}
 
 
@@ -45,6 +47,7 @@ def free_port():
 
 
 def main():
+    global PHASE
     assert os.geteuid() == 0 and sys.platform.startswith('freebsd')
     assert command(['/sbin/sysctl', '-n', 'security.jail.jailed']) == '1'
     assert command(['/bin/hostname']) == 'liner-ci.invalid'
@@ -64,6 +67,7 @@ def main():
     binary = '/usr/local/sbin/liner-notes'
     data = Path('/var/db/liner-notes')
     assert all(p.is_dir() and not p.is_symlink() for p in data.rglob('*'))
+    PHASE = 'seed-data'
     (data / 'catalog.dat').write_text('1|0|all|member|Deployment acceptance\n')
     source = Server(binary, data / 'notes.dat', members=data / 'members.dat', catalog=data / 'catalog.dat',
                     options=['--database-structured', str(data / 'liner.sqlite')])
@@ -126,7 +130,9 @@ def main():
             running = False
 
     try:
+        PHASE = 'old-services'
         service_check()
+        PHASE = 'backup-restore'
         backup = Path('/ci/pre-update.tar.gz')
         command([sys.executable, ROOT/'scripts/maintenance.py', 'db-backup', '--root', data,
                  '--database', data/'liner.sqlite', '--board', 'notes.dat', '--members', 'members.dat', backup])
@@ -145,6 +151,7 @@ def main():
                                'article': {'exchanges': login+[{'send': 'READ 1\n', 'expect': 'package update article body'}]},
                                'mail': {'exchanges': login+[{'send': 'MAIL READ 1\n', 'expect': 'package update mail body'}]}}}
         verify_application(restore_tree, restore_profile, trusted)
+        PHASE = 'package-update'
         candidate = Path('/ci/packages')/manifest['packages']['liner-notes']['filename']
         metadata = json.loads(command(['/usr/bin/tar', '-xOf', candidate, '+MANIFEST']))
         assert metadata['name'] == 'liner-notes' and metadata['origin'] == 'comms/liner-notes'
@@ -179,7 +186,9 @@ def main():
         assert pwd.getpwnam('liner_notes').pw_uid == account.pw_uid
         assert data.stat().st_uid == account.pw_uid
         assert Path('/var/db/liner-notes-web').stat().st_uid == web_account.pw_uid
+        PHASE = 'new-services'
         service_check()
+        PHASE = 'link'
         # Real installed link service against two independent fixture BBSes.
         link_check = Path('/ci/link-check.py')
         link_check.write_text("import sys,asyncio,tempfile\nfrom pathlib import Path\nsys.path[:0]=['/ci/source/tests','/ci/source']\nimport test_link_service as t\nt.ROOT=Path('/usr/local/share/liner-notes')\nwith tempfile.TemporaryDirectory(prefix='jail-link-') as d: asyncio.run(t.exercise('/usr/local/sbin/liner-notes',Path(d)))\n")
@@ -188,6 +197,7 @@ def main():
         # Planned recovery, not automatic rollback: restore the stopped DB copy
         # together with the old package, never run an old binary on an unknown
         # new DB schema. No pkg-delete/pkg-add pair is used.
+        PHASE = 'old-recovery'
         shutil.move(data, '/ci/new-data-retained')
         shutil.copytree(restored, data)
         for item in [data, *data.rglob('*')]:
@@ -195,6 +205,7 @@ def main():
         command([pkg, 'add', '-f', '/ci/old.pkg'])
         assert command([pkg, 'query', '%v', 'liner-notes']) == profile['old_version']
         service_check()
+        PHASE = 'final-inventory'
         after = command([pkg, 'query', '%n %v %o']).splitlines()
         assert sorted(x for x in before if not x.startswith('liner-notes ')) == sorted(x for x in after if not x.startswith('liner-notes '))
         Path('/ci/result.json').write_text(json.dumps({
@@ -255,4 +266,9 @@ telnet=true
 
 
 if __name__ == '__main__':
-    main()
+    try:
+        main()
+    except Exception as error:
+        # Root consumes only an allowlisted phase/type; private trace stays in jail.
+        Path('/ci/failure.json').write_text(json.dumps({'phase': PHASE, 'type': type(error).__name__}))
+        raise
