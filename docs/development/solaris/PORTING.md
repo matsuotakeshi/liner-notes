@@ -263,7 +263,7 @@ speeds and an elapsed value exactly at the four-second boundary. The final
 post-fix full native run is still required.
 
 
-## Final native acceptance: reviewed main bc6fb02a
+## Earlier native acceptance: reviewed main bc6fb02a
 
 - Source: `bc6fb02a67f1a7d668c1423907bac35a91c09fde` (PR #49 + #50).
 - Run: https://github.com/matsuotakeshi/liner-notes/actions/runs/42579830227
@@ -301,3 +301,34 @@ product, tests, settings or CI. Its documentation-only classifier must retain
 Canonical manual/lightweight checks and omit builds/native/package work according
 to CI_CD.md. The code acceptance SHA above remains distinct from the later
 manual revision SHA; a documentation-only gate is not new native-test evidence.
+
+
+## Final code acceptance: reviewed main fc305961
+
+The final integrated code was retested after the documentation-only CI guard and
+package-install umask corrections. This supersedes the earlier bc6fb02a success
+for final-release acceptance; its historical evidence above is retained.
+
+- Source: `fc305961ea0d50aa4f4e9eeadb075f2eea28ec34`.
+- Run: https://github.com/matsuotakeshi/liner-notes/actions/runs/42585588196
+- Job: `129054722902`; result: **success**; elapsed: 1121.508 seconds.
+- Artifact: `native-ci-solaris-results`, ID `13660473770`.
+- Downloaded ZIP SHA-256 verified against GitHub metadata:
+  `060d4cef8027c4b6e23b180e79149df6f94445b24fa958f9d86dc20f43ae08fa`.
+- Exact source archive SHA-256:
+  `6ffd455d041832012932bb09b2b86105a7fe64f0cc09331b94deda808ac5dbfa`.
+- CI time: 2026-11-09 08:42:30–09:01:12 UTC.
+- Private directory: `/export/home/ci-test/ci/native-solaris-XXX0hDmc`.
+
+The same complete selected core, doctor/nonmutation, Door, WebUI, BBS-link and real
+ZMODEM suites all passed. Batch upload retained 1,081,080 bytes after interruption
+and resumed in 1,281,159 wire bytes, below the 2,097,152-byte full payload, with
+matching SHA-256. Default ZRESUME completed in 31.8 seconds with the existing
+three-second idle timeout. The five exact terminal restoration tests passed again;
+no timeout, attribute-comparison or authorization requirement was relaxed.
+
+All reported capabilities remain passed except actual SMF lifecycle, which remains
+unverified due to absent management authorization. Solaris COM/IPS and full-scale
+production performance remain outside the demonstrated scope. This document-only
+PR does not alter the tested code; distinguish the final code SHA above from the
+subsequent document-revision main SHA.
