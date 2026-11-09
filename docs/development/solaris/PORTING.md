@@ -104,3 +104,20 @@ The validator accepted only alphanumeric suffixes. The fix permits underscore
 in the Solaris suffix only, preserving the fixed CI parent/prefix and refusal
 of traversal, extra path components, shell characters and extra output.
 The Python lock changes have still not executed on Solaris at this point.
+
+## Runtime progress and independent stty fixture
+
+Source `e9f38ab59a3661358d8f69fe1ec2deea11f9aec3`, Actions run
+https://github.com/matsuotakeshi/liner-notes/actions/runs/42559332489 ran for
+370.231 seconds. Artifact `13649315958` SHA-256 verified as
+`13a83f4e772fb0a31ef585462e9efea2e72e29bc1231450d8b14a1b94fb7deee`.
+C/Python lease lifetime (seven Python tests), spool retry/retention, maintenance
+backup/restore/compact, 12,000 article/mail RSS regression, permissions,
+hierarchy, 256 KiB bodies, drafts and unread navigation passed.
+The Door test passed NAWS/PTY size, SIGWINCH, invalid/duplicate/refused updates,
+multiple sessions, crash/reentry/escape/disconnect/timeout assertions before
+failing the final independent stty app: Solaris /usr/bin/stty has no `size`
+option. Read-only inventory confirmed installed /usr/gnu/bin/stty. The fixture
+selects that implementation only on Solaris and retains the exact 35x104
+assertion; no runtime behavior or assertion is bypassed. Core as a whole,
+remaining Door integration, WebUI, link and real ZMODEM remain pending.
