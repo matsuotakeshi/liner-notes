@@ -123,7 +123,7 @@
   "tests/test_verify_release_set.py": "0cd280b9bcee29864ec41d7787f6eb2148ede7d361ff0ba464a1f744249d6997",
   "ci/freebsd_fixture_libraries.py": "a70991ba8ba616012bd2e1e1d6ecfa2dc5133ce5814a8274adb4bc8513d38dcf",
   "ci/test-freebsd-package-upgrade.py": "01e82ec0a53176ed211d01f17effb29b28d162693a6787c17046b95489470007",
-  ".github/workflows/freebsd-package-lint.yml": "55f31e9c01e06b434d8e0bb9a7814dc84e569939c716ed34a253510521c1764e",
+  ".github/workflows/freebsd-package-lint.yml": "ebcbe519e49ddb0d4ba19821c77b0c5c05e1bcf091db49bc3e50fbbc63c2bd48",
   "src/door_lock.h": "6e9e85076288e0478e0b07ec107cac96995bb12909a9fb34ef53b45355b0873c",
   "src/door_lock_helper.c": "b23a3f65efa4e8ed2504734412cc2a6c7e2e7b7b36d8d10959e385ab060dd274",
   "tests/test_door_lock.py": "7c3198fb91bdff92c4856f76df3441f2d3baa563676532de46dca6f3393af5a2",
