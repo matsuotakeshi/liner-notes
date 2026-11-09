@@ -111,5 +111,9 @@
   "linux/selinux/liner-notes-selinux.spec": "accace08e47c7329448bd9a4dab6eba1c80a402cce0ce475080bdcf6c0c3e7de",
   "linux/selinux/selinux_labels.py": "b510853830441309bd9c4253de0ae83a10e9edc75ccb5c83fdb7c61cc844dd6c",
   "ci/selinux_root.py": "09b84e1b13219228f983392142c8f15595a0582ae1fb824d8b7a85fb2d9078c5",
-  "ci/selinux_native.py": "b8a4fb37a7f5d056c24e3e88e78a323fbd762f123228d8ed4087b4e4571857eb"
+  "ci/selinux_native.py": "b8a4fb37a7f5d056c24e3e88e78a323fbd762f123228d8ed4087b4e4571857eb",
+  "scripts/release_manifest.py": "35ea4b812c9ef6a69b09db52ff08dce61e9433d2ffe8b971c97b230f4635c970",
+  "scripts/verify_release_set.py": "4322ffce4f92a9625b076435b2d0029d48c68319943fef7b46d5f7ce30d8b890",
+  "tests/test_release_manifest.py": "08b5c8cab61c4556d1ac5e6137e252e195c76c0572fd72577bce92a1529b3791",
+  "tests/test_verify_release_set.py": "0cd280b9bcee29864ec41d7787f6eb2148ede7d361ff0ba464a1f744249d6997"
 }

@@ -62,6 +62,37 @@ journalctl -u liner-notes-web -n 50
 SELinuxを無効にして解決する手順は採用しません。なお本体サービスは検証環境で
 `unconfined_service_t`として動作しました。専用のSELinux制約ポリシーを追加したという意味ではありません。
 
+### 次期版の任意SELinux RPMと配布候補の確認
+
+次期版の `liner-notes-selinux` は本体とは別に導入する任意RPMです。本体の版と
+ポリシーの版は独立しており、たとえば本体0.75とポリシー0.1.0が同じソースコミットから
+作られます。同じ版番号であることではなく、40桁のソースSHAが一致することを確認します。
+専用ドメインの動作検証とラベルの扱いは[SELinuxの運用](security.md)を参照してください。
+
+Release Setの通常の `freebsd15`・`rocky10`・`debian13` 候補は従来どおりです。
+任意RPMは `rocky10-selinux/` へ分け、独立した `RELEASE-MANIFEST.json`、`SHA256SUMS`、
+`BUILD-INFO.txt`とともに確認します。manifestの版は実RPMのVERSION-RELEASEです。
+検査ではRPMヘッダーの名前・版・noarch属性、ファイルサイズ・SHA-256、全候補の
+ソースSHAを照合します。RPMを実行・導入する検査ではありません。任意RPMを確認する環境には
+`rpm`コマンドが必要です。既存3OSだけの検査には必要ありません。
+
+```sh
+python3 scripts/verify_release_set.py --root candidates \
+  --source-sha "$SOURCE_SHA" --require-selinux --output RELEASE-SET.json
+```
+
+`SOURCE_SHA`には確認対象の正式候補の完全なコミットSHAを指定します。
+`--require-selinux`指定時は、任意RPMが未生成・欠落・不一致なら失敗します。
+省略時も候補ディレクトリが存在すれば検証し、不正な候補を無視しません。
+候補がない場合、結果の`components`は空で「ポリシーRPMを検証していない」と表示します。
+存在しない配布物を、同梱済み・検証済みとして扱わないでください。
+
+GitHub ActionsのRelease Set Verificationは、同じmainコミットで成功したSELinuxワークフローの
+候補がある場合に追加検証します。手動実行の`require_selinux=true`は生成と検証を必須にします。
+未生成の場合は、同じSHAに対してRocky SELinux policyをmainから実行してから再確認します。
+結果の`components.rocky10-selinux`には独立版、ソースSHA、RPMのサイズとハッシュを残します。
+候補の検証・公開は、本番へのポリシー導入や既存ラベル変更を許可するものではありません。
+
 ## 更新
 
 1. 外部管理ツールでデータをバックアップし、現在のRPMと設定を保存します。

@@ -50,7 +50,7 @@ def check_build_info(root, source_sha):
         raise ValueError("Build provenance commit differs from release set")
 
 
-def verify_set(root, source_sha):
+def verify_set(root, source_sha, require_selinux=False):
     if not HEX_SHA.fullmatch(source_sha):
         raise ValueError("A complete lowercase source SHA is required")
     base = Path(root).resolve(strict=True)
@@ -78,6 +78,22 @@ def verify_set(root, source_sha):
     if len(versions) != 1:
         raise ValueError("Incompatible base versions across OS packages")
     summary["version"] = versions.pop()
+    summary["components"] = {}
+    component = base / "rocky10-selinux"
+    if component.exists() or component.is_symlink():
+        if component.is_symlink() or not component.is_dir():
+            raise ValueError("Unsafe SELinux candidate component")
+        metadata = verify(SimpleNamespace(
+            manifest=str(component / "RELEASE-MANIFEST.json"),
+            source_sha=source_sha, platform="rocky10-selinux", version=None))
+        check_sha256sums(component, metadata)
+        check_build_info(component, source_sha)
+        summary["components"]["rocky10-selinux"] = {
+            "source_sha": source_sha, "version": metadata["version"],
+            "packages": metadata["packages"],
+        }
+    elif require_selinux:
+        raise ValueError("Required SELinux candidate component was not generated")
     return summary
 
 
@@ -86,9 +102,11 @@ def main():
     p.add_argument("--root", required=True)
     p.add_argument("--source-sha", required=True)
     p.add_argument("--output")
+    p.add_argument("--require-selinux", action="store_true",
+                   help="Reject a release set without its exact-SHA optional policy RPM")
     args = p.parse_args()
     try:
-        result = verify_set(args.root, args.source_sha)
+        result = verify_set(args.root, args.source_sha, args.require_selinux)
         if args.output:
             dest = Path(args.output)
             if dest.is_symlink() or dest.exists():
@@ -98,6 +116,8 @@ def main():
                 stream.write("\n")
         print("PASS: all three OS release-candidate manifests agree on " +
               result["source_sha"] + " version " + result["version"])
+        print("SELinux component: " + ("verified " + result["components"]["rocky10-selinux"]["version"]
+              if result["components"] else "not included; no policy RPM verified"))
     except (OSError, ValueError, UnicodeError, json.JSONDecodeError) as err:
         p.exit(1, "Release set rejected: " + str(err) + "\n")
 
