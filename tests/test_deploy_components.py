@@ -9,12 +9,19 @@ from unittest.mock import patch
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path[:0] = [str(ROOT / 'ci'), str(ROOT / 'scripts'), str(ROOT / 'tests')]
-from deploy_release import package_evidence, select_artifact
+from deploy_release import package_evidence, select_artifact, GATES, successful_execution
 from deploy_manifest import release_document
 from test_deployment import release
 
 
 class Components(unittest.TestCase):
+    def test_doctor_workflow_must_execute_not_merely_succeed(self):
+        workflow, event, step, artifact = GATES['doctor']
+        self.assertEqual((workflow, event, artifact), ('doctor.yml', 'push', 'doctor-evidence'))
+        with self.assertRaises(ValueError):
+            successful_execution({'jobs': [{'conclusion': 'success', 'steps': []}]}, step)
+        successful_execution({'jobs': [{'conclusion': 'success', 'steps': [{'name': step, 'conclusion': 'success'}]}]}, step)
+
     def setUp(self):
         self.release = release()
         self.manifests, self.receipt = {}, dict(source_sha=self.release['source_sha'], version='0.75', platforms={}, components={})

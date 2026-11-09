@@ -37,6 +37,7 @@ GATES = {
     'freebsd_upgrade': ('freebsd-upgrade-acceptance.yml', 'workflow_run', 'Verify full package upgrade in a disposable VNET jail', 'liner-notes-freebsd-upgrade'),
     'solaris': ('solaris-build-test.yml', 'push', 'Build and test exact main using the existing Solaris CI account', 'native-ci-solaris-results'),
     'selinux': ('selinux.yml', 'push', 'Verify the installed root-owned acceptance helper and run exact main', 'selinux-native-acceptance'),
+    'doctor': ('doctor.yml', 'push', 'Read-only, malformed configuration, WAL and policy tests', 'doctor-evidence'),
 }
 
 
