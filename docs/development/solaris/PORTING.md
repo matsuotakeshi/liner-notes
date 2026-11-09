@@ -66,3 +66,16 @@ context and is not marked successful on the strength of manifest validation.
   EOF cleanup, immediate reacquisition and namespace metadata rejection. An
   explicitly inherited pipe can keep a child lease; ordinary subprocesses do
   not inherit it. No service account privileges are changed.
+
+The same known spool `EBADF` was reproduced after the FreeBSD-only visibility
+fix, source `3bf05d7a0066d9d186b45ec68d352ce7f7cb8401`, Actions run
+https://github.com/matsuotakeshi/liner-notes/actions/runs/42541514663 .
+Artifact `13641109487` was downloaded and verified against SHA-256
+`60af9b7463e8283bd7bf4eae00e6df825d5ef7692f33f14104139084788f7ffa`.
+This is superseded diagnostic evidence, not a successful regression run.
+
+PR #32 hosted Native CI Source Checks (run `42541498904`, head
+`6c56b96e521e50edd33140119b6f695455b2c70e`) passed all seven Python lease tests
+in 2.592 seconds, including the forced Solaris record backend on Linux. Strict
+GCC build and Door integration also passed. This supplements, but does not
+replace, the next Solaris native execution after main integration.
