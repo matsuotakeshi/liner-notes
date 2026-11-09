@@ -2,6 +2,8 @@ name: Rocky SELinux policy
 on:
   pull_request:
     paths:
+      - 'scripts/release_manifest.py'
+      - 'tests/test_release_manifest.py'
       - 'linux/selinux/**'
       - 'ci/selinux*'
       - 'tests/test_selinux*'
@@ -9,6 +11,8 @@ on:
   push:
     branches: [main]
     paths:
+      - 'scripts/release_manifest.py'
+      - 'tests/test_release_manifest.py'
       - 'linux/selinux/**'
       - 'ci/selinux*'
       - 'tests/test_selinux*'
@@ -30,7 +34,7 @@ jobs:
           python3 tests/test_selinux_root.py
           python3 -m py_compile ci/selinux_native.py ci/selinux_root.py
           mkdir -p build/selinux
-          docker run --rm -v "$GITHUB_WORKSPACE:/source:ro" -v "$GITHUB_WORKSPACE/build/selinux:/out" \
+          docker run --rm -e SOURCE_SHA="$GITHUB_SHA" -v "$GITHUB_WORKSPACE:/source:ro" -v "$GITHUB_WORKSPACE/build/selinux:/out" \
             rockylinux/rockylinux:10 bash -euc '
               dnf install -y --setopt=install_weak_deps=False selinux-policy-devel rpm-build make python3 procps-ng setools-console
               mkdir -p /build/{SOURCES,SPECS,BUILD,BUILDROOT,RPMS,SRPMS}
@@ -38,6 +42,15 @@ jobs:
               cp /source/LICENSE /build/SOURCES/
               rpmbuild -ba --define "_topdir /build" /source/linux/selinux/liner-notes-selinux.spec
               cp /build/RPMS/noarch/*.rpm /out/
+              policy_packages=(/out/liner-notes-selinux-*.noarch.rpm)
+              test "${#policy_packages[@]}" -eq 1
+              test -f "${policy_packages[0]}"
+              policy_version=$(rpm -qp --qf "%{VERSION}-%{RELEASE}" "${policy_packages[0]}")
+              python3 /source/scripts/release_manifest.py create --platform rocky10-selinux \
+                --version "$policy_version" --source-sha "$SOURCE_SHA" --directory /out \
+                --package "liner-notes-selinux=$(basename "${policy_packages[0]}")"
+              python3 /source/scripts/release_manifest.py verify --manifest /out/RELEASE-MANIFEST.json \
+                --platform rocky10-selinux --source-sha "$SOURCE_SHA" --version "$policy_version"
               rpmbuild -ba --define "_topdir /build" --define "policy_release 2" /source/linux/selinux/liner-notes-selinux.spec
               CI_SELINUX_DISPOSABLE=1 bash /source/ci/selinux-package-lifecycle.sh /build/RPMS/noarch/*-1.*.rpm /build/RPMS/noarch/*-2.*.rpm
               cd /out

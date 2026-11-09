@@ -60,7 +60,11 @@
         "RPM.md",
         "LINUX.md",
         "linux/rpm/liner-notes.spec",
-        "scripts/install-linux.py"
+        "scripts/install-linux.py",
+        "scripts/release_manifest.py",
+        "scripts/verify_release_set.py",
+        "tests/test_release_manifest.py",
+        "tests/test_verify_release_set.py"
       ]
     },
     {

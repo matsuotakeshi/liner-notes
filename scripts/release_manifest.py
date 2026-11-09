@@ -4,6 +4,7 @@ import argparse
 import hashlib
 import json
 import re
+import subprocess
 from pathlib import Path
 
 SCHEMA = 1
@@ -19,6 +20,8 @@ PLATFORMS = {
         "liner-notes-link": r"liner-notes-link-[0-9][A-Za-z0-9.+~:-]*\.x86_64\.rpm",
     },
     "freebsd15": {"liner-notes": r"liner-notes-[0-9][A-Za-z0-9.+~:-]*\.pkg"},
+    # A separate optional component, not a fourth required operating system.
+    "rocky10-selinux": {"liner-notes-selinux": r"liner-notes-selinux-[0-9][A-Za-z0-9.+~:-]*\.noarch\.rpm"},
 }
 
 
@@ -64,6 +67,23 @@ def schema(doc):
             raise ValueError("Invalid checksum")
 
 
+def verify_component_rpm(doc, root):
+    """Read real RPM headers; policy versions are independent from the BBS."""
+    if doc["platform"] != "rocky10-selinux":
+        return
+    filename = doc["packages"]["liner-notes-selinux"]["filename"]
+    if filename != "liner-notes-selinux-" + doc["version"] + ".noarch.rpm":
+        raise ValueError("Policy RPM filename and version differ")
+    path = artifact(root, filename)
+    try:
+        result = subprocess.run(["rpm", "-qp", "--qf", "%{NAME}|%{VERSION}-%{RELEASE}|%{ARCH}", str(path)],
+                                capture_output=True, text=True, check=False, timeout=30)
+    except (OSError, subprocess.TimeoutExpired) as error:
+        raise ValueError("RPM metadata inspection is unavailable") from error
+    if result.returncode != 0 or result.stdout.strip() != "liner-notes-selinux|" + doc["version"] + "|noarch":
+        raise ValueError("Policy RPM name, version or architecture differs from manifest")
+
+
 def create(args):
     root = Path(args.directory).resolve(strict=True)
     if not root.is_dir():
@@ -83,6 +103,7 @@ def create(args):
     doc = {"schema": SCHEMA, "platform": args.platform, "version": args.version,
            "source_sha": args.source_sha, "packages": packages}
     schema(doc)
+    verify_component_rpm(doc, root)
     output = root / "RELEASE-MANIFEST.json"
     if output.is_symlink() or output.exists():
         raise ValueError("Refusing to overwrite release manifest")
@@ -110,6 +131,7 @@ def verify(args):
         path = artifact(root, info["filename"])
         if path.stat().st_size != info["size"] or sha256(path) != info["sha256"]:
             raise ValueError("Artifact failed checksum: " + name)
+    verify_component_rpm(doc, root)
     return doc
 
 
