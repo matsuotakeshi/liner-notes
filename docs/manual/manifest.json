@@ -450,7 +450,13 @@
         "WEBUI.md",
         "BBS_LINKS.md",
         "RPM.md",
-        "src/members.c"
+        "src/members.c",
+        "linux/selinux/liner_notes.te",
+        "linux/selinux/liner_notes.fc",
+        "linux/selinux/liner-notes-selinux.spec",
+        "linux/selinux/selinux_labels.py",
+        "ci/selinux_root.py",
+        "ci/selinux_native.py"
       ]
     },
     {
