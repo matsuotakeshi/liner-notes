@@ -281,3 +281,7 @@ Linuxの更新は[Linux導入](install-linux.md)のRPM更新、または停止�
 FreeBSDの非root package試験では、宿主のpackage DBをSQLiteで直接開かず、
 DB/WALの安定した私有コピーから依存情報を複製します。原本の回復処理や権限変更は
 行いません。変更中のDBや未回復のrollback journalを検出した場合は試験を停止します。
+
+この非root試験の私有rootには、packageが要求する実ライブラリとその依存先も
+読み取りコピーで用意します。共有ライブラリ検査は無効化せず、ELF情報とハッシュを
+照合します。宿主への依存package追加・更新は行いません。

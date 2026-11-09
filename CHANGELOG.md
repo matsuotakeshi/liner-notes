@@ -2,6 +2,8 @@
 
 ## 未リリース（次期版0.75候補）
 
+- FreeBSD rootless package試験へ実ELFライブラリの依存closureを配置。manifestの要求名・SONAME・実物のバイト一致を検査し、pkgのshlib検査を維持したままbase library不足を解消。宿主のDB・ライブラリは変更しない。
+
 - Solaris向けDoor排他を強制した実runtimeのhosted回帰と、複数slotの排他寿命検査を追加。汎用Door試験の起動失敗時に接続・番号・受信応答を記録し、既存のtimeoutと判定は維持。
 
 - FreeBSD package更新試験の依存DB複製を修正。原本DB/WALの安定したバイトコピーだけを取得し、SQLite backupは私有コピーで実行。SSH先のlogin shellに依存せず準備を/bin/shで実行し、準備失敗を即時検出。
