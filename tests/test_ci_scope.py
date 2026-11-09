@@ -175,12 +175,19 @@ class WorkflowTests(unittest.TestCase):
 
     def test_required_linux_contexts_remain_and_fail_on_scope_failure(self):
         job = workflow('linux.yml')['jobs']['linux']
-        self.assertEqual(job['if'], '${{ always() }}')
+        self.assertEqual(job['if'], '${{ !cancelled() }}')
         self.assertEqual(job['strategy']['matrix']['image'], ['rockylinux/rockylinux:9', 'almalinux:9'])
         guard = job['steps'][0]['run']
         self.assertIn('test "$SCOPE_RESULT" = success', guard)
         self.assertIn('case "$BUILD" in true|false)', guard)
         self.assertIn("needs.changes.outputs.build == 'true'", job['steps'][-1]['if'])
+
+    def test_pr_only_cancellation_preserves_main_evidence(self):
+        for name in ('linux.yml', 'rocky-package.yml', 'debian-package.yml',
+                     'shared-visibility.yml', 'deployment-safety.yml', 'manual.yml'):
+            concurrency = workflow(name)['concurrency']
+            self.assertEqual(concurrency['cancel-in-progress'], "${{ github.event_name == 'pull_request' }}")
+            self.assertEqual(concurrency['group'], '${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}')
 
     def test_manual_still_runs_and_release_set_uses_same_run_receipt(self):
         self.assertIn('manual', workflow('manual.yml')['jobs'])

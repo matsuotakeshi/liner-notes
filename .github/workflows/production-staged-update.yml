@@ -1,0 +1,68 @@
+name: Approved staged production update
+on:
+  workflow_dispatch:
+    inputs:
+      release_id:
+        description: 'Numeric GitHub stable release ID, signed manifest required'
+        type: string
+        required: true
+      mode:
+        description: 'Plan does not contact production. Apply requires a new explicit review.'
+        type: choice
+        options: [plan, apply]
+        default: plan
+permissions:
+  contents: read
+  actions: read
+  deployments: read
+concurrency:
+  group: liner-notes-production-release
+  cancel-in-progress: false
+jobs:
+  plan:
+    if: ${{ github.repository == 'matsuotakeshi/liner-notes' && github.ref == 'refs/heads/main' }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - run: python3 -m pip install cryptography
+      - name: Validate exact release and all executed CI without production access
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_ID: ${{ inputs.release_id }}
+          LN_RELEASE_PUBLIC_KEY: ${{ vars.LN_RELEASE_PUBLIC_KEY }}
+        run: |
+          python3 ci/deploy_release.py --release-id "$RELEASE_ID" --output plan.json
+          cat plan.json >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: production-update-plan
+          path: plan.json
+  apply:
+    needs: plan
+    if: ${{ inputs.mode == 'apply' && github.repository == 'matsuotakeshi/liner-notes' && github.ref == 'refs/heads/main' }}
+    runs-on: ubuntu-24.04
+    environment: production-release
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - run: python3 -m pip install cryptography
+      - name: Revalidate review and update Rocky then Debian then FreeBSD
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_ID: ${{ inputs.release_id }}
+          LN_RELEASE_PUBLIC_KEY: ${{ vars.LN_RELEASE_PUBLIC_KEY }}
+          LN_DEPLOY_AUTH_KEY: ${{ secrets.LN_DEPLOY_AUTH_KEY }}
+          ID_ED25519_LN_DEPLOY: ${{ secrets.ID_ED25519_LN_DEPLOY }}
+        run: python3 ci/deploy_release.py --release-id "$RELEASE_ID" --mode apply --output audit.json
+      - uses: actions/upload-artifact@v4
+        if: ${{ always() }}
+        with:
+          name: production-update-audit
+          path: audit.json
+          if-no-files-found: warn
+          retention-days: 90

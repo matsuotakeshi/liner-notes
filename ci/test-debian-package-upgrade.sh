@@ -56,7 +56,7 @@ EOF
 cat debian/changelog >> /tmp/liner-notes-ci-changelog
 mv /tmp/liner-notes-ci-changelog debian/changelog
 dpkg-buildpackage -b -us -uc
-DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+python3 ci/test-deploy-package-adapter.py debian13 \
   /build/liner-notes_0.74.1-2_amd64.deb \
   /build/liner-notes-web_0.74.1-2_all.deb \
   /build/liner-notes-link_0.74.1-2_all.deb
