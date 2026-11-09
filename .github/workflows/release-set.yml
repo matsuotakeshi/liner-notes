@@ -12,6 +12,10 @@ on:
         description: "Exact 40-character main HEAD commit SHA"
         required: true
         type: string
+      require_selinux:
+        description: "Require the optional SELinux RPM from this exact source commit"
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -75,6 +79,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           SOURCE_SHA: ${{ github.event_name == 'workflow_dispatch' && inputs.source_sha || github.event.workflow_run.head_sha }}
+          REQUIRE_SELINUX: ${{ github.event_name == 'workflow_dispatch' && inputs.require_selinux || false }}
         run: |
           set -euo pipefail
           if [[ ! "$SOURCE_SHA" =~ ^[0-9a-f]{40}$ ]]; then
@@ -133,10 +138,29 @@ jobs:
           fetch_platform "freebsd15" "freebsd-package.yml" "liner-notes-freebsd15-packages"
           fetch_platform "rocky10" "rocky-package.yml" "liner-notes-rocky10-packages"
           fetch_platform "debian13" "debian-package.yml" "liner-notes-debian13-packages"
+          # The optional policy has its own version and artifact. Never borrow
+          # an older green policy build or describe an absent RPM as verified.
+          policy_result="$(gh api "repos/$GITHUB_REPOSITORY/actions/workflows/selinux.yml/runs?head_sha=$SOURCE_SHA&per_page=100" |
+            jq -r --arg sha "$SOURCE_SHA" '
+              [.workflow_runs[] | select(.head_sha == $sha and .head_branch == "main" and
+                (.event == "push" or .event == "workflow_dispatch"))] |
+              sort_by(.run_number, .run_attempt) | last |
+              if . == null then "not-generated" else (.conclusion // .status) end')"
+          optional_args=()
+          if [[ "$REQUIRE_SELINUX" == true || "$policy_result" == success ]]; then
+            fetch_platform "rocky10-selinux" "selinux.yml" "liner-notes-selinux-policy"
+            sudo apt-get update
+            sudo apt-get install -y --no-install-recommends rpm
+            optional_args+=(--require-selinux)
+          else
+            printf 'SELinux component not included: exact-source workflow %s; no policy RPM verified.\n' \
+              "$policy_result" >> "$GITHUB_STEP_SUMMARY"
+            printf 'rocky10-selinux not-included %s\n' "$policy_result" >> RELEASE-SOURCES.txt
+          fi
           # A moving main must never be accepted as the current release set.
           test "$(gh api "repos/$GITHUB_REPOSITORY/git/ref/heads/main" --jq '.object.sha')" = "$SOURCE_SHA"
           python3 scripts/verify_release_set.py --root candidates \
-            --source-sha "$SOURCE_SHA" --output RELEASE-SET.json
+            --source-sha "$SOURCE_SHA" --output RELEASE-SET.json "${optional_args[@]}"
       - name: Save verified release-set receipt (no packages are deployed)
         uses: actions/upload-artifact@v4
         with:

@@ -4,11 +4,15 @@ import tempfile
 import unittest
 from pathlib import Path
 from types import SimpleNamespace
+from unittest.mock import patch
+import json
+import subprocess
 import sys
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
 from release_manifest import create
 from verify_release_set import verify_set
+import release_manifest
 
 SHA = "a" * 40
 SPECS = {
@@ -49,6 +53,76 @@ def fixture(root, platform, source_sha=SHA):
 
 
 class ReleaseSetTests(unittest.TestCase):
+    def optional_fixture(self, root, source_sha=SHA):
+        folder = root / "rocky10-selinux"
+        folder.mkdir()
+        filename = "liner-notes-selinux-0.1.0-1.el10.noarch.rpm"
+        data = b"synthetic policy; tests mock only the RPM header reader"
+        (folder / filename).write_bytes(data)
+        create(SimpleNamespace(platform="rocky10-selinux", source_sha=source_sha, version="0.1.0-1.el10",
+                               directory=str(folder), package=["liner-notes-selinux=" + filename]))
+        (folder / "SHA256SUMS").write_text(hashlib.sha256(data).hexdigest()+"  "+filename+"\n")
+        (folder / "BUILD-INFO.txt").write_text("source_sha="+source_sha+"\n")
+        return folder
+
+    def test_optional_policy_missing_is_not_verified_and_required_is_rejected(self):
+        with tempfile.TemporaryDirectory() as path:
+            root = Path(path)
+            for platform in SPECS:
+                fixture(root, platform)
+            self.assertEqual(verify_set(root, SHA)["components"], {})
+            with self.assertRaisesRegex(ValueError, "Required SELinux"):
+                verify_set(root, SHA, require_selinux=True)
+            result = subprocess.run([sys.executable, "-B", str(Path(__file__).resolve().parents[1] /
+                                     "scripts/verify_release_set.py"), "--root", str(root),
+                                     "--source-sha", SHA, "--require-selinux"], capture_output=True, text=True)
+            self.assertEqual(result.returncode, 1)
+            self.assertIn("Required SELinux", result.stderr)
+
+    @patch.object(release_manifest.subprocess, "run", return_value=SimpleNamespace(
+        returncode=0, stdout="liner-notes-selinux|0.1.0-1.el10|noarch"))
+    def test_optional_policy_keeps_its_own_version_and_exact_sha(self, query):
+        with tempfile.TemporaryDirectory() as path:
+            root = Path(path)
+            for platform in SPECS:
+                fixture(root, platform)
+            folder = self.optional_fixture(root)
+            result = verify_set(root, SHA, require_selinux=True)
+            self.assertEqual(result["version"], "0.74")
+            self.assertEqual(set(result["platforms"]), set(SPECS))
+            component = result["components"]["rocky10-selinux"]
+            self.assertEqual(component["version"], "0.1.0-1.el10")
+            self.assertEqual(component["source_sha"], SHA)
+            self.assertEqual(set(component["packages"]), {"liner-notes-selinux"})
+            manifest = folder / "RELEASE-MANIFEST.json"
+            document = json.loads(manifest.read_text())
+            document["source_sha"] = "b" * 40
+            manifest.write_text(json.dumps(document))
+            with self.assertRaisesRegex(ValueError, "Source revision"):
+                verify_set(root, SHA)
+
+    @patch.object(release_manifest.subprocess, "run", return_value=SimpleNamespace(
+        returncode=0, stdout="liner-notes-selinux|0.1.0-1.el10|noarch"))
+    def test_optional_policy_rejects_hash_build_info_or_version_tampering(self, query):
+        for tampering in ("hash", "build", "version", "missing"):
+            with self.subTest(tampering=tampering), tempfile.TemporaryDirectory() as path:
+                root = Path(path)
+                for platform in SPECS:
+                    fixture(root, platform)
+                folder = self.optional_fixture(root)
+                if tampering == "hash":
+                    next(folder.glob("*.rpm")).write_bytes(b"changed")
+                elif tampering == "build":
+                    (folder / "BUILD-INFO.txt").write_text("source_sha="+"b"*40+"\n")
+                elif tampering == "version":
+                    manifest = folder / "RELEASE-MANIFEST.json"
+                    doc = json.loads(manifest.read_text());doc["version"]="0.1.1-1.el10"
+                    manifest.write_text(json.dumps(doc))
+                else:
+                    next(folder.glob("*.rpm")).unlink()
+                with self.assertRaises(ValueError):
+                    verify_set(root, SHA)
+
     def test_valid_three_os_release_set(self):
         with tempfile.TemporaryDirectory() as path:
             root = Path(path)
