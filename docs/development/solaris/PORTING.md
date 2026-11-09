@@ -261,3 +261,43 @@ There is no product terminal change, masked comparison or timeout relaxation.
 Hosted/native regression rejects changed local flags, control characters,
 speeds and an elapsed value exactly at the four-second boundary. The final
 post-fix full native run is still required.
+
+
+## Final native acceptance: reviewed main bc6fb02a
+
+- Source: `bc6fb02a67f1a7d668c1423907bac35a91c09fde` (PR #49 + #50).
+- Run: https://github.com/matsuotakeshi/liner-notes/actions/runs/42579830227
+- Job: `129036004868`; result: **success**; elapsed: 825.521 seconds.
+- Artifact: `native-ci-solaris-results`, ID `13658000619`.
+- Downloaded ZIP SHA-256 verified against GitHub metadata:
+  `dc89388f046c572a20dd3c118aaa1df42bdaa29e7164cd035bdb68a69c2411a9`.
+- Exact source archive SHA-256:
+  `6adfac9e53f031939fb2a83011266fa5265e8849a672adacddc63065d95effcf`.
+- CI time: 2026-11-09 07:39:49–07:53:34 UTC.
+- Private directory: `/export/home/ci-test/ci/native-solaris-XXlt6DVc`.
+
+Build, complete selected core suite, C/Python lock lifetimes, full Door suites,
+doctor (33 cases and unchanged blocks/structured originals), database conversion,
+backup/restore, all six WebUI suites, all six link suites and the entire real
+`test-zmodem` target passed on this same main SHA. The five terminal regression
+cases passed natively; real timeout restoration retained the strict four-second
+bound and full flag/control-character/speed equality.
+
+The real batch/resume test retained 1,081,080 bytes after TCP interruption and
+resumed with 1,281,157 wire bytes, less than the 2,097,152-byte full payload, with
+matching SHA-256. Same-session ZUPLOAD retry and default ZRESUME also passed;
+the latter completed in 27.9 seconds with a three-second idle timeout. The host
+control suite preserved a 16GiB receipt value and verified 24 child slots plus
+rejection of a twenty-fifth child; this is not a 16GiB real-wire throughput test.
+
+Capabilities are `passed` for build/core/door/link/lock_lifetime/smf_manifest/
+webui/zmodem. SMF lifecycle remains **unverified: no SMF management authorization**.
+The FreeBSD-only SSH-entry/daemon tests explicitly skip on Solaris. Solaris COM,
+IPS packaging and production-scale transfer performance are not certified by this
+run. No production host, OS package, service or existing data was modified.
+
+The subsequent canonical-manual-only change records this evidence without changing
+product, tests, settings or CI. Its documentation-only classifier must retain
+Canonical manual/lightweight checks and omit builds/native/package work according
+to CI_CD.md. The code acceptance SHA above remains distinct from the later
+manual revision SHA; a documentation-only gate is not new native-test evidence.
