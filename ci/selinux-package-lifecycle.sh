@@ -8,8 +8,13 @@ updated="$2"
 rpm -U "$rpmfile"
 semodule -lfull | grep -E '^200[[:space:]]+liner_notes[[:space:]]'
 # Inspect the compiled allow graph rather than treating an unconfined run as MAC.
-python3 - <<'PY'
-import subprocess
+source_root=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
+python3 - "$source_root/ci/selinux_root.py" <<'PY'
+import importlib.util, subprocess, sys
+spec = importlib.util.spec_from_file_location('acceptance_helper', sys.argv[1])
+helper = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(helper)
+assert 'liner_notes' in helper.installed_modules(), 'Native helper cannot list the real policy store'
 unconfined = subprocess.check_output(['seinfo', '-a', 'unconfined_domain_type', '-x'], text=True)
 assert not any('liner_notes' in row for row in unconfined.splitlines()), unconfined
 for domain, target in [('liner_notes_web_t', 'liner_notes_data_t'),
