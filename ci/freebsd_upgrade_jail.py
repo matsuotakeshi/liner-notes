@@ -26,6 +26,7 @@ from test_members import auth, PASSWORD
 from test_mail import send
 from package_menu_flow import readback, restore_command
 from freebsd_upgrade_root import write_door_fixture
+from freebsd_fixture_permissions import package_install_argv, repair_legacy_sbin
 
 PHASE = 'admission'
 
@@ -60,6 +61,7 @@ def main():
     pkg = '/usr/local/sbin/pkg'
     before = command([pkg, 'query', '%n %v %o']).splitlines()
     assert command([pkg, 'query', '%v %o', 'liner-notes']) == profile['old_version'] + ' comms/liner-notes'
+    public_directory_repairs = repair_legacy_sbin(Path('/'))
     account = pwd.getpwnam('liner_notes')
     web_account = pwd.getpwnam('liner_notes_web')
     assert account.pw_uid != 0 and web_account.pw_uid != 0 and account.pw_uid != web_account.pw_uid
@@ -173,8 +175,8 @@ def main():
         preview = command([*common, 'upgrade', '-n', '-U', '-r', 'liner_notes_release', 'liner-notes'])
         assert 'UPGRADED' in preview and 'INSTALLED' not in preview and 'REMOVED' not in preview
         for argv in package_commands('freebsd15', {'liner-notes': {'filename': package.name}}, repo):
-            command(argv)
-            command(argv)  # already-current package must not initialize data
+            command(package_install_argv(argv))
+            command(package_install_argv(argv))  # already-current package must not initialize data
         assert command([pkg, 'query', '%v %o', 'liner-notes']) == metadata['version']+' comms/liner-notes'
         assert {str(p): hashlib.sha256(p.read_bytes()).hexdigest() for p in (marker, custom, banner)} == before_hashes
         assert pwd.getpwnam('liner_notes').pw_uid == account.pw_uid
@@ -196,7 +198,7 @@ def main():
         shutil.copytree(restored, data)
         for item in [data, *data.rglob('*')]:
             os.chown(item, account.pw_uid, account.pw_gid)
-        command([pkg, 'add', '-f', '/ci/old.pkg'])
+        command(package_install_argv([pkg, 'add', '-f', '/ci/old.pkg']))
         assert command([pkg, 'query', '%v', 'liner-notes']) == profile['old_version']
         service_check()
         PHASE = 'final-inventory'
@@ -208,6 +210,7 @@ def main():
             'old_package_restoration_verified': True, 'maintainer_scripts_executed': True,
             'account_ownership_verified': True, 'web_installed_service_verified': True,
             'link_installed_daemon_verified': True, 'door_pty_verified': True,
+            'fixture_public_directory_repairs': public_directory_repairs,
             'revision_only_fixture': revision_only, 'previous_version': profile['old_version'],
             'candidate_version': metadata['version'], 'previous_source_sha': profile['old_release_source_sha']}, indent=2)+'\n')
     finally:

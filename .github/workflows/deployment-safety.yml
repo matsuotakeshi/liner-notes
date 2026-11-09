@@ -37,6 +37,11 @@ jobs:
           test ! -e /ci/source && test ! -L /ci/source
           sudo ln -s "$GITHUB_WORKSPACE" /ci/source
           python3 tests/test_freebsd_jail_import.py 2>&1 | tee build/deployment-evidence/freebsd-jail-import.log
+      - name: Verify private parent and public package child permissions
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo -n /usr/bin/python3 tests/test_freebsd_fixture_permissions.py 2>&1 | tee build/deployment-evidence/freebsd-fixture-permissions.log
       - uses: actions/upload-artifact@v4
         if: always()
         with:

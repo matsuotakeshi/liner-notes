@@ -17,13 +17,15 @@ import sys
 import tempfile
 
 SOURCE = Path(__file__).resolve().parents[1]
-for candidate in (SOURCE/'ci/freebsd_upgrade_root.py', SOURCE/'ci/selinux_root.py', Path(__file__).resolve()):
+for candidate in (SOURCE/'ci/freebsd_upgrade_root.py', SOURCE/'ci/selinux_root.py',
+                  SOURCE/'ci/freebsd_fixture_permissions.py', Path(__file__).resolve()):
     for path in (candidate, *candidate.parents):
         info = path.lstat()
         if stat.S_ISLNK(info.st_mode) or info.st_uid != 0 or info.st_mode & 0o022:
             raise SystemExit('One-time root setup must use root-owned, non-writable reviewed source')
 sys.path.insert(0, str(SOURCE/'ci'))
 import freebsd_upgrade_root as shared
+from freebsd_fixture_permissions import package_install_argv
 
 BASE_URL = 'https://download.freebsd.org/releases/amd64/amd64/15.1-RELEASE/base.txz'
 BASE_SHA256 = '3768988b151c20f965679062b065c63a977d6bbb9f47fd83695ec2c40790c18f'
@@ -43,7 +45,7 @@ def main():
     require(re.search(r'\binet 10\.0\.0\.50\b', command('/sbin/ifconfig', '-a')), 'Designated test VM only')
     require(command('/usr/bin/uname', '-r').startswith('15.1-') and command('/usr/bin/uname', '-m') == 'amd64',
             'This pinned template is FreeBSD 15.1 amd64 only')
-    for name in ('prepare_freebsd_upgrade_template.py', 'freebsd_upgrade_root.py', 'selinux_root.py'):
+    for name in ('prepare_freebsd_upgrade_template.py', 'freebsd_upgrade_root.py', 'selinux_root.py', 'freebsd_fixture_permissions.py'):
         shared.trusted(SOURCE/'ci'/name)
     spec = importlib.util.spec_from_file_location('trusted_source', SOURCE/'ci/selinux_root.py')
     source_api = importlib.util.module_from_spec(spec)
@@ -62,7 +64,7 @@ def main():
     reviewed = work/'reviewed'
     reviewed.mkdir()
     source_api.extract(source_api.get('https://codeload.github.com/'+shared.REPO+'/tar.gz/'+sha, 128*1024**2), reviewed, sha)
-    for name in ('prepare_freebsd_upgrade_template.py', 'freebsd_upgrade_root.py', 'selinux_root.py'):
+    for name in ('prepare_freebsd_upgrade_template.py', 'freebsd_upgrade_root.py', 'selinux_root.py', 'freebsd_fixture_permissions.py'):
         require((reviewed/'ci'/name).read_bytes() == (SOURCE/'ci'/name).read_bytes(), 'Installed setup source differs from reviewed main')
     require(shutil.disk_usage(parent).free > 8*1024**3, 'At least 8 GiB free required before bootstrap')
     for name, url, expected, limit in [('base.txz', BASE_URL, BASE_SHA256, 512*1024**2),
@@ -90,14 +92,19 @@ def main():
         command('/usr/sbin/jail', '-c', 'name='+jail, 'path='+str(root), 'host.hostname=liner-bootstrap.invalid',
                 'ip4.addr=10.0.0.50', 'ip6=disable', 'persist', 'allow.raw_sockets=0', 'allow.mount=0', 'enforce_statfs=2')
         created = True
-        command('/usr/sbin/jexec', jail, '/usr/bin/env', 'ASSUME_ALWAYS_YES=yes', '/usr/sbin/pkg', 'bootstrap', '-y', timeout=300)
+        command('/usr/sbin/jexec', jail, *package_install_argv([
+            '/usr/bin/env', 'ASSUME_ALWAYS_YES=yes', '/usr/sbin/pkg', 'bootstrap', '-y']), timeout=300)
         metadata = json.loads(command('/usr/bin/tar', '-xOf', work/'old.pkg', '+MANIFEST'))
         require(metadata['name'] == 'liner-notes' and metadata['version'] == '0.74.1'
                 and metadata['origin'] == 'comms/liner-notes', 'Pinned package identity differs')
         dependencies = sorted(set(metadata.get('deps', {})) | {'python312', 'py312-aiohttp', 'py312-cryptography', 'sqlite3', 'lrzsz'})
         require(all(re.fullmatch(r'[A-Za-z0-9][A-Za-z0-9_+.-]*', n) for n in dependencies), 'Unexpected dependency name')
-        command('/usr/sbin/jexec', jail, '/usr/local/sbin/pkg', 'install', '-y', *dependencies, timeout=900)
-        command('/usr/sbin/jexec', jail, '/usr/local/sbin/pkg', 'add', '/ci/old.pkg', timeout=300)
+        command('/usr/sbin/jexec', jail, *package_install_argv([
+            '/usr/local/sbin/pkg', 'install', '-y', *dependencies]), timeout=900)
+        command('/usr/sbin/jexec', jail, *package_install_argv([
+            '/usr/local/sbin/pkg', 'add', '/ci/old.pkg']), timeout=300)
+        require(stat.S_IMODE((root/'usr/local/sbin').stat().st_mode) == 0o755,
+                'Package executable directory must be publicly searchable')
         inventory = command('/usr/sbin/jexec', jail, '/usr/local/sbin/pkg', 'query', '%n %v %o')
         require(all(p.is_dir() and not p.is_symlink() for p in (root/'var/db/liner-notes').rglob('*')),
                 'Initial installation unexpectedly created BBS data; retain and inspect')

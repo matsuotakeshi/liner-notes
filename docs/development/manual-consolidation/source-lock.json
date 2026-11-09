@@ -103,14 +103,14 @@
   "ci/native_ci.py": "65cb55363b95d3b3ead8113733e0fa16213f08e2c615479cfb69886f4be71c53",
   "ci/deploy_release.py": "c9b230f967b86b43aa951e00afd19a2ee77d1de2501c16be775c6bd6249814c6",
   "scripts/deploy_policy.py": "650baa5a8246e859158791d93c4f64cc3b5bc6003f1fa25608f06a13c870e958",
-  "scripts/deploy_host.py": "6e3ac87a5051f7ac2d7721894aba8b1fe75c946598400f7dae8cfbc35d84767d",
+  "scripts/deploy_host.py": "e77ba50264824a71c0ef81b0fbfac2773c7915207f9ea3e46a35c3e0c64ee461",
   "scripts/deploy_restore.py": "4aba798239e8b357789f85c4a4fa889aa949361049a928a0b465d55fb0e77c19",
   "scripts/deploy_transaction.py": "7487299f4f706650425811d7f3160dd39880cca1027863b0bde2b6a495c34367",
   "scripts/deploy_backup_store.py": "ff1a26a98e9a2ba20dae1e31789e8dc4bbb74edc8ac3e9893f271ede716b2d5d",
   "scripts/deploy_manifest.py": "f887023c1ba391904fbebe872928ed4dffcf92515c9fc110b4026fee19fc66bf",
   "ci/freebsd_upgrade_root.py": "494841eba106e4432bcb647cbf2291dddb2f02418c1d8c7dceac6176e9bc13ea",
-  "ci/freebsd_upgrade_jail.py": "d76826c54237b51ce34741ed320b0870831c403da15d809cbb8bd99ed1ef8863",
-  "ci/prepare_freebsd_upgrade_template.py": "5eac9dec0e401223e5f0e67a4d0eda59605f0187bb67f15f3c45ed50a78f0cc0",
+  "ci/freebsd_upgrade_jail.py": "069c9d6aedbca50295cb3ee4c08bd92d13f69db3389c2016467660a708f52d38",
+  "ci/prepare_freebsd_upgrade_template.py": "bb42a82897c2a8ea0768e11317010111b37b51f42f4fc48c79bf396583119f3a",
   "ci/install_freebsd_upgrade_helper.py": "b0b91cdbae13e4c2a0f66a367976d38318c903ff7285ed616e3b445d4eddb038",
   "ci/install-freebsd-upgrade-helper.sh": "b9c0625003843c1f5fe07e7b7a9ad93284480d8e2721593c5f599ffa7a0a6513",
   "ci/freebsd_package_lease.py": "3e9c9cd0ba429b1a16c84a415a74fec57d6573e9c536e4e2a352e84985843712",
@@ -137,5 +137,7 @@
   "tests/test_freebsd_jail_import.py": "388bf96302bc2af9cf1204596f25f77851bf45f92504ea574dc45903b3d1f47a",
   "tests/test_zmodem.py": "a1eeeeacfbd76d8b54a9755c32052be3d03f993c04db62e185123ad6f9a3b167",
   "tests/transfer_terminal_fixture.py": "6935ef9fdaa7c3538d45bac078cc9c634c7562f9a829bad1edc4d2f8564c562e",
-  "tests/test_transfer_terminal.py": "04f0f7d5e62e0a899a171929cb42d88f4237b29d4df4579b882c4f7331a44e37"
+  "tests/test_transfer_terminal.py": "04f0f7d5e62e0a899a171929cb42d88f4237b29d4df4579b882c4f7331a44e37",
+  "ci/freebsd_fixture_permissions.py": "80431c66875b4483f7c6d5401eda9dadc4537f1ca527b9b387aab801227d4b2c",
+  "tests/test_freebsd_fixture_permissions.py": "e2a70d9b451da8bb97cd572bb1f381ce04100c993af5c53fc2b51f7ed15ba3a7"
 }
