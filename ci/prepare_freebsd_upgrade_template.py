@@ -76,6 +76,7 @@ def main():
     root.mkdir(mode=0o755)
     command('/usr/bin/tar', '-xpf', work/'base.txz', '-C', root, timeout=300)
     shared.validate_jail_paths(root)
+    shared.make_jail_root_searchable(root)
     (root/'ci').mkdir(mode=0o755)
     shutil.copyfile(work/'old.pkg', root/'ci/old.pkg')
     shutil.copyfile('/etc/resolv.conf', root/'etc/resolv.conf')

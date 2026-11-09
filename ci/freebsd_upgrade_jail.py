@@ -25,6 +25,7 @@ from test_runtime import Client
 from test_members import auth, PASSWORD
 from test_mail import send
 from test_telnet import Client as TelnetClient
+from freebsd_upgrade_root import write_door_fixture
 
 PHASE = 'admission'
 
@@ -99,7 +100,7 @@ def main():
               'pidfile': '/var/run/liner-ci.pid', 'child_pidfile': '/var/run/liner-ci-child.pid',
               'log_dir': '/var/log/liner-notes', 'logfile': '/var/log/liner-notes/acceptance.log'}
     doors = Path('/ci/doors.conf')
-    doors.write_text('1|0|10|/usr/bin/true|/var/db/liner-notes|Fixture Door\n')
+    write_door_fixture(doors)
     values['doors'] = str(doors)
     config.write_text(''.join('liner_notes_' + k + '=' + shlex.quote(v) + '\n' for k, v in values.items()))
     rc = '/usr/local/etc/rc.d/liner_notes'
