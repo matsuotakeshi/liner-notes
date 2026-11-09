@@ -24,7 +24,7 @@ from test_board import Server, post
 from test_runtime import Client
 from test_members import auth, PASSWORD
 from test_mail import send
-from test_telnet import Client as TelnetClient
+from package_menu_flow import readback, restore_command
 from freebsd_upgrade_root import write_door_fixture
 
 PHASE = 'admission'
@@ -114,19 +114,12 @@ def main():
         command(['/bin/sh', rc, 'status'], env=rc_env)
         pid = Path('/var/run/liner-ci-child.pid').read_text().strip()
         assert int(command(['/bin/ps', '-o', 'uid=', '-p', pid])) == account.pw_uid
-        client = TelnetClient(port)
-        try:
-            client.until()
-            client.cmd('LOGIN deployprobe', b'Password (8-128 bytes)> ')
-            assert b'Logged in as deployprobe' in client.cmd(PASSWORD)
-            assert b'package update article body' in client.cmd('READ 1')
-            client.cmd('0')
-            assert b'package update mail body' in client.cmd('MAIL READ 1')
-            client.cmd('0')
+        def additional_checks(client):
             assert b'Back to BBS' in client.cmd('DOOR 1')
             web_check(port, web_account)
+        try:
+            readback(port, after=additional_checks)
         finally:
-            client.close()
             command(['/bin/sh', rc, 'stop'], env=rc_env)
             running = False
 
@@ -138,7 +131,7 @@ def main():
         command([sys.executable, ROOT/'scripts/maintenance.py', 'db-backup', '--root', data,
                  '--database', data/'liner.sqlite', '--board', 'notes.dat', '--members', 'members.dat', backup])
         restored = Path('/ci/restored')
-        command([sys.executable, ROOT/'scripts/maintenance.py', 'db-restore', backup, restored])
+        command(restore_command(backup, restored, '/usr/local/bin'))
         restore_tree = Path('/ci/restore-tree')
         restored_data = restore_tree/'var/db/liner-notes'
         restored_data.parent.mkdir(parents=True)
