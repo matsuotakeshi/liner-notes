@@ -63,9 +63,12 @@ same offline package command builder as the host helper.
 The designated FreeBSD VM needs a VNET-capable FreeBSD 15/amd64 kernel, Python
 3.12, pkg and the existing CI SSH key. Do not grant arbitrary sudo to takeshi.
 From a root-owned, reviewed exact-main source copy, explicitly run
-`sh ci/install-freebsd-upgrade-helper.sh`; this also installs the reviewed
+`sh ci/install-freebsd-upgrade-helper.sh REVIEWED_MAIN_SHA`; this also installs the reviewed
 `ci/selinux_root.py` acquisition functions as a root-owned import (it does not
 execute the Rocky helper). Check installed-file hashes against that main copy.
+The installer independently compares its source with current main, refuses
+symlinks/unknown existing helper bytes or directory modes, and leaves identical
+files unchanged. It cannot be used as a blanket helper replacement mechanism.
 Permit only `/usr/local/libexec/liner-notes-freebsd-upgrade-ci` through sudo; the
 program itself accepts exactly one lowercase 40-hex SHA and checks current main
 twice. Never use a writable checkout as a sudo command or module source.

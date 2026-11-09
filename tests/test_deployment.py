@@ -393,6 +393,7 @@ class Deployment(unittest.TestCase):
         del changed['platforms']['debian13']['liner-notes-web']
         with self.assertRaises(ValueError):
             policy.validate_release(changed)
+
         optional = copy.deepcopy(self.doc)
         optional['platforms']['rocky10']['liner-notes-selinux'] = dict(
             optional['platforms']['rocky10']['liner-notes'], filename='liner-notes-selinux-0.1.0-1.el10.noarch.rpm', version='0.1.0-1.el10')
@@ -401,6 +402,17 @@ class Deployment(unittest.TestCase):
         changed['platforms']['freebsd15']['liner-notes']['version'] = '0.74.1'
         with self.assertRaises(ValueError):
             policy.validate_release(changed)
+
+    def test_missing_installed_component_is_rejected_before_package_access(self):
+        host = object.__new__(Host)
+        host.platform = 'rocky10'
+        host.root = self.base/'component-state'
+        host.root.mkdir()
+        host.profile = {'incoming_directory': str(self.base/'incoming')}
+        host.inventory = lambda: {'liner-notes': ['0.74.1', 'x86_64'], 'liner-notes-selinux': ['0.1.0-1.el10', 'noarch']}
+        with patch('deploy_host.command', side_effect=AssertionError('Unexpected OS operation')):
+            with self.assertRaisesRegex(ValueError, 'omits an installed BBS component'):
+                host.preflight(self.doc)
 
     @unittest.skipUnless(os.name == 'posix', 'POSIX O_NOFOLLOW package-copy guard is exercised on hosted Linux')
     def test_real_adapter_rejects_package_hash_before_any_package_command(self):

@@ -24,7 +24,7 @@ jobs:
           python3 tests/test_deployment.py
           python3 tests/test_deploy_restore_readonly.py
           python3 tests/test_freebsd_upgrade_boundary.py
-          python3 -m py_compile ci/freebsd_upgrade_root.py ci/freebsd_upgrade_jail.py ci/prepare_freebsd_upgrade_template.py
+          python3 -m py_compile ci/freebsd_upgrade_root.py ci/freebsd_upgrade_jail.py ci/prepare_freebsd_upgrade_template.py ci/install_freebsd_upgrade_helper.py
   restored-runtime:
     needs: changes
     if: ${{ needs.changes.outputs.build == 'true' }}

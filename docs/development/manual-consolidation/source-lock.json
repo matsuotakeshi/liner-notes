@@ -87,12 +87,14 @@
   "webui/static/app.js": "ff79c5ac310c835df7e13595f2027d4c4ee8e699fc77c5192b102cca33ddba8c",
   "ci/deploy_release.py": "7854c91f194f4cba5cbe91b14d3b40ee5654484b58aaaff4dc23dd3e02e62cb6",
   "scripts/deploy_policy.py": "650baa5a8246e859158791d93c4f64cc3b5bc6003f1fa25608f06a13c870e958",
-  "scripts/deploy_host.py": "4dbd7d35b180ea3daf8642c699c1b4ff004ce9dafa53dafa70693825de9a62db",
+  "scripts/deploy_host.py": "6e3ac87a5051f7ac2d7721894aba8b1fe75c946598400f7dae8cfbc35d84767d",
   "scripts/deploy_restore.py": "11222533e6f54c94799abc4218aaabf587e5b3bea358c59d437bd8f3e5ec4dea",
   "scripts/deploy_transaction.py": "7487299f4f706650425811d7f3160dd39880cca1027863b0bde2b6a495c34367",
   "scripts/deploy_backup_store.py": "ff1a26a98e9a2ba20dae1e31789e8dc4bbb74edc8ac3e9893f271ede716b2d5d",
   "scripts/deploy_manifest.py": "f49aaa2d98c6e09e3a2a0e00608dcc4d84bf61d283431d8c30dd70aaf51c204c",
   "ci/freebsd_upgrade_root.py": "61609f118dbe2a3df79a5636d45a365b7deba2b2b366a42ae030dc83f589de8d",
   "ci/freebsd_upgrade_jail.py": "accc6aca750aed3e1b90a98fe0187c0daead34fe808e84b01bf7d1260038413a",
-  "ci/prepare_freebsd_upgrade_template.py": "9dd07a0ee626976c9a81009c3252b2d78d606392315257255212ed0e2ddb8f0d"
+  "ci/prepare_freebsd_upgrade_template.py": "9dd07a0ee626976c9a81009c3252b2d78d606392315257255212ed0e2ddb8f0d",
+  "ci/install_freebsd_upgrade_helper.py": "b0b91cdbae13e4c2a0f66a367976d38318c903ff7285ed616e3b445d4eddb038",
+  "ci/install-freebsd-upgrade-helper.sh": "b9c0625003843c1f5fe07e7b7a9ad93284480d8e2721593c5f599ffa7a0a6513"
 }

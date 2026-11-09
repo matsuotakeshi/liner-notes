@@ -194,6 +194,8 @@ class Host:
         self.stage = self.root / (identity + '-packages')
         self.stage.mkdir(mode=0o700)
         self.before = self.inventory()
+        require(set(self.before).intersection(PACKAGES) <= set(release['platforms'][self.platform]),
+                'Release omits an installed BBS component; refuse before stopping services')
         if self.platform == 'freebsd15':
             require(getattr(self, 'tested_previous_version', None) == self.before.get('liner-notes', [None])[0],
                     'Installed FreeBSD package differs from the tested upgrade starting version')

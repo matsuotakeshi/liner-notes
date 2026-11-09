@@ -7,11 +7,13 @@ from pathlib import Path
 import sys
 import tempfile
 import unittest
+from unittest.mock import patch
 import zipfile
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT/'ci'))
 from freebsd_upgrade_root import select_package_run, unpack_package, validate_jail_paths
+import install_freebsd_upgrade_helper as installer
 
 
 class Boundary(unittest.TestCase):
@@ -88,6 +90,26 @@ class Boundary(unittest.TestCase):
             (root/'dev').symlink_to('/dev', target_is_directory=True)
             with self.assertRaises(ValueError):
                 validate_jail_paths(root)
+
+    @unittest.skipUnless(os.name == 'posix', 'POSIX modes and fchmod run on hosted Linux')
+    def test_initial_installer_never_overwrites_existing_content_or_modes(self):
+        with tempfile.TemporaryDirectory() as temporary, patch.object(installer, 'trusted'):
+            root = Path(temporary)
+            target = root/'helper'
+            self.assertTrue(installer.install_file(target, b'reviewed', 0o755))
+            before = target.stat()
+            self.assertFalse(installer.install_file(target, b'reviewed', 0o755))
+            self.assertEqual(target.stat().st_mtime_ns, before.st_mtime_ns)
+            for data, mode in [(b'replacement', 0o755), (b'reviewed', 0o700)]:
+                with self.assertRaises(ValueError):
+                    installer.install_file(target, data, mode)
+                self.assertEqual(target.read_bytes(), b'reviewed')
+                self.assertEqual(target.stat().st_mode & 0o777, 0o755)
+            folder = root/'existing'
+            folder.mkdir(mode=0o700)
+            with self.assertRaises(ValueError):
+                installer.directory(folder, 0o755)
+            self.assertEqual(folder.stat().st_mode & 0o777, 0o700)
 
 
 if __name__ == '__main__':
