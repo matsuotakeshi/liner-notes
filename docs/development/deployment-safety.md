@@ -147,3 +147,14 @@ is created exclusively and made 0644 for the fixture service UID. This does not
 change production configuration or expose private test data. Hosted filesystem
 tests exercise both helpers under umask 077, including symlink/existing-file
 refusal and preservation of private ancestor/data permissions.
+
+The rootless package acceptance fixture never opens the host package database
+through SQLite, even with mode=ro. It reuses the bounded, no-follow DB/WAL byte
+snapshot before SQLite backup into its new private root. Committed WAL pages
+are preserved, nonempty rollback journals or concurrently changed source files
+reject the fixture, and an existing destination is never overwritten. Hosted
+regression reproduces the former failure in a nonwritable WAL directory and
+checks source hashes, modes, timestamps and absent SHM remain unchanged.
+Remote temporary-directory preparation explicitly uses `/bin/sh -s`; login
+shells such as csh cannot reinterpret `set -eu`, and failed preparation stops
+before a package build starts. Native CI must rerun on the integrated SHA.

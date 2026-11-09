@@ -14,8 +14,9 @@ import time
 from deploy_policy import digest_file, require
 
 
-def snapshot_rows(source, query):
-    """Query a private DB/WAL copy; even a SQLite read-only source can create SHM.
+@contextlib.contextmanager
+def private_database_snapshot(source):
+    """Yield a private DB/WAL copy; a SQLite read-only original can create SHM.
 
     The caller has already stopped services. A changing file or rollback journal
     rejects the backup instead of letting SQLite recover or lock the original.
@@ -37,8 +38,6 @@ def snapshot_rows(source, query):
                     'Unsafe database snapshot source')
             values[path] = identity(info)
         return values
-    require(isinstance(query, str) and query.lstrip().upper().startswith('SELECT '),
-            'Restore verification requires SELECT')
     before = metadata()
     require(before[source] is not None, 'Database snapshot source is missing')
     require(before[paths[2]] is None or before[paths[2]][2] == 0,
@@ -69,13 +68,39 @@ def snapshot_rows(source, query):
                         outgoing.write(block)
                         remaining -= len(block)
         require(metadata() == before, 'Database changed during private copy')
+        yield copy, deadline
+        require(metadata() == before, 'Database changed during verification')
+
+
+def snapshot_rows(source, query):
+    require(isinstance(query, str) and query.lstrip().upper().startswith('SELECT '),
+            'Restore verification requires SELECT')
+    with private_database_snapshot(source) as (copy, deadline):
         with contextlib.closing(sqlite3.connect(copy.as_uri() + '?mode=ro', uri=True, timeout=0)) as db:
             db.execute('PRAGMA query_only=ON')
             db.execute('PRAGMA trusted_schema=OFF')
             db.set_progress_handler(lambda: int(time.monotonic() >= deadline), 1000)
             rows = db.execute(query).fetchall()
-        require(metadata() == before, 'Database changed during verification')
         return rows
+
+
+def backup_database_snapshot(source, destination):
+    """Materialize a standalone DB from private pages, including committed WAL.
+
+    The source is never opened by SQLite. The destination must be a new file;
+    errors leave a failed disposable output, never overwrite an existing DB.
+    """
+    destination = Path(destination).absolute()
+    with private_database_snapshot(source) as (copy, deadline):
+        fd = os.open(destination, os.O_WRONLY | os.O_CREAT | os.O_EXCL | getattr(os, 'O_NOFOLLOW', 0), 0o600)
+        os.close(fd)
+        def progress(status, remaining, total):
+            require(time.monotonic() < deadline, 'Database backup exceeded its time budget')
+        with contextlib.closing(sqlite3.connect(copy.as_uri() + '?mode=ro', uri=True, timeout=0)) as incoming:
+            incoming.execute('PRAGMA query_only=ON')
+            incoming.execute('PRAGMA trusted_schema=OFF')
+            with contextlib.closing(sqlite3.connect(destination.as_uri() + '?mode=rw', uri=True, timeout=0)) as outgoing:
+                incoming.backup(outgoing, pages=256, progress=progress, sleep=0.01)
 
 
 def verify_restored(restored, roots, checks):

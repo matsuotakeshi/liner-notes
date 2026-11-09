@@ -17,6 +17,31 @@ from freebsd_package_lease import runner
 
 
 class Admission(unittest.TestCase):
+    @unittest.skipUnless(os.name == 'posix', 'Remote POSIX shell fixture runs on hosted Linux')
+    def test_workflow_preparation_uses_explicit_sh_and_stops_on_failure(self):
+        import textwrap
+        workflow = (ROOT/'.github/workflows/freebsd-package.yml').read_text()
+        marker = "takeshi@10.0.0.50 /bin/sh -s <<'REMOTE'\n"
+        self.assertEqual(workflow.count(marker), 1)
+        script = textwrap.dedent(workflow.split(marker)[1].split('          REMOTE\n')[0])
+        with tempfile.TemporaryDirectory() as temporary:
+            home = Path(temporary)/'home'
+            home.mkdir()
+            env = dict(os.environ, HOME=str(home), SHELL='/bin/csh')
+            result = subprocess.run(['/bin/sh', '-s'], input=script, text=True, env=env, capture_output=True)
+            self.assertEqual(result.returncode, 0, result.stderr)
+            created = Path(result.stdout.strip())
+            self.assertEqual(created.parent, home/'ci')
+            self.assertTrue(created.name.startswith('freebsd-pkg-'))
+            self.assertEqual(created.stat().st_mode & 0o777, 0o700)
+            blocked = Path(temporary)/'not-a-directory'
+            blocked.write_text('unchanged')
+            result = subprocess.run(['/bin/sh', '-s'], input=script, text=True,
+                                    env=dict(env, HOME=str(blocked)), capture_output=True)
+            self.assertNotEqual(result.returncode, 0)
+            self.assertEqual(result.stdout, '')
+            self.assertEqual(blocked.read_text(), 'unchanged')
+
     def test_pr_never_reaches_ssh_setup(self):
         sha = 'a'*40
         env = dict(GITHUB_SHA=sha, GITHUB_REF='refs/heads/feature', GITHUB_EVENT_NAME='pull_request',
