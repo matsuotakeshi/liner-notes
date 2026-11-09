@@ -5,7 +5,6 @@ Runs unprivileged on the existing CI host. Package maintainer scripts/triggers
 and account/ownership changes are DISABLED; the resulting evidence is partial.
 Host service configuration is never loaded (LINER_NOTES_RC_CONF is mandatory).
 """
-import contextlib
 import hashlib
 import json
 import os
@@ -14,7 +13,6 @@ import pwd
 import shlex
 import shutil
 import socket
-import sqlite3
 import subprocess
 import sys
 import tempfile
@@ -22,6 +20,7 @@ import tempfile
 ROOT = Path(__file__).resolve().parents[1]
 sys.path[:0] = [str(ROOT / 'scripts'), str(ROOT / 'tests')]
 from deploy_policy import package_commands
+from deploy_restore import backup_database_snapshot
 from test_board import Server, post
 from test_runtime import Client as RawClient
 from test_members import auth, PASSWORD
@@ -56,9 +55,9 @@ with tempfile.TemporaryDirectory(prefix='actual-upgrade-', dir=work) as temporar
     dbdir.mkdir(parents=True)
     # Dependency records are copied, never edited in the host package DB. Real
     # runtime execution uses already installed host shared libraries.
-    with contextlib.closing(sqlite3.connect('file:/var/db/pkg/local.sqlite?mode=ro', uri=True)) as source:
-        with contextlib.closing(sqlite3.connect(dbdir / 'local.sqlite')) as copy:
-            source.backup(copy)
+    # Even a SQLite mode=ro connection can need source SHM/recovery writes.
+    # Copy stable DB/WAL bytes first, then use SQLite only on private copies.
+    backup_database_snapshot(Path('/var/db/pkg/local.sqlite'), dbdir / 'local.sqlite')
     common = [PKG, '-r', str(root), '-o', 'RUN_SCRIPTS=false', '-o', 'PKG_ENABLE_PLUGINS=false', '-o', 'PKG_TRIGGERS_ENABLE=false']
     command([*common, 'add', '-f', str(package)])
     binary = root / 'usr/local/sbin/liner-notes'

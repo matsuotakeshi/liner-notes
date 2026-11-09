@@ -2,6 +2,8 @@
 
 ## 未リリース（次期版0.75候補）
 
+- FreeBSD package更新試験の依存DB複製を修正。原本DB/WALの安定したバイトコピーだけを取得し、SQLite backupは私有コピーで実行。SSH先のlogin shellに依存せず準備を/bin/shで実行し、準備失敗を即時検出。
+
 - FreeBSD隔離更新試験の新規jailルートと合成Door設定の参照権限を明示。rootのumask 077でも専用サービスUIDで検証できるようにし、ホスト側の作業領域・秘密データの0700/0600は維持。
 
 - Solarisの独立PTYサイズ試験に、sizeオプションを持つ既存GNU sttyを明示。NAWSの検証値とアプリ側処理は変更せず、標準sttyとのオプション差を吸収。

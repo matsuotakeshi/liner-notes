@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Offline SQLite restore checks must not create locks/SHM on original data."""
 import hashlib
+import contextlib
 import os
 from pathlib import Path
 import shutil
@@ -65,6 +66,83 @@ class ReadOnlyRestoreTests(unittest.TestCase):
         before = self.state()
         self.assertEqual(restore.snapshot_rows(self.database, 'SELECT COUNT(*) FROM records'), [(1,)])
         self.assertEqual(before, self.state())
+
+    def test_private_backup_keeps_committed_wal_without_sqlite_opening_original(self):
+        self.create(wal=True)
+        before = self.state()
+        destination = self.root/'copy.sqlite'
+        connect = sqlite3.connect
+        seen = []
+        def copied_connection(database_uri, **kwargs):
+            self.assertNotIn(self.source.as_uri(), database_uri)
+            seen.append(database_uri)
+            return connect(database_uri, **kwargs)
+        with patch.object(restore.sqlite3, 'connect', side_effect=copied_connection):
+            restore.backup_database_snapshot(self.database, destination)
+        self.assertEqual(len(seen), 2)
+        with contextlib.closing(connect(destination)) as db:
+            self.assertEqual(db.execute('SELECT * FROM records').fetchall(), [(7, 'committed WAL content')])
+        self.assertEqual(before, self.state())
+        self.assertFalse(Path(str(self.database)+'-shm').exists())
+
+    @unittest.skipIf(os.name == 'nt' or getattr(os, 'geteuid', lambda: 0)() == 0,
+                     'Read-only source directory needs hosted unprivileged POSIX user')
+    def test_backup_from_nonwritable_wal_directory_reproduces_and_fixes_failure(self):
+        self.create(wal=True)
+        for path in self.source.iterdir():
+            path.chmod(0o400)
+        self.source.chmod(0o500)
+        before = self.state()
+        try:
+            # The former direct mode=ro approach still needs a writable SHM path.
+            with self.assertRaises(sqlite3.OperationalError):
+                incoming = sqlite3.connect(self.database.as_uri()+'?mode=ro', uri=True)
+                outgoing = sqlite3.connect(self.root/'old-failed.sqlite')
+                try:
+                    incoming.backup(outgoing)
+                finally:
+                    incoming.close()
+                    outgoing.close()
+            destination = self.root/'copied.sqlite'
+            restore.backup_database_snapshot(self.database, destination)
+            with contextlib.closing(sqlite3.connect(destination)) as db:
+                self.assertEqual(db.execute('SELECT * FROM records').fetchall(), [(7, 'committed WAL content')])
+            self.assertEqual(before, self.state())
+            self.assertFalse(Path(str(self.database)+'-shm').exists())
+        finally:
+            self.source.chmod(0o700)
+            for path in self.source.iterdir():
+                path.chmod(0o600)
+
+    def test_backup_refuses_existing_output_and_rollback_source(self):
+        self.create()
+        destination = self.root/'kept.sqlite'
+        destination.write_bytes(b'preserve existing output')
+        before = self.state()
+        with self.assertRaises(FileExistsError):
+            restore.backup_database_snapshot(self.database, destination)
+        self.assertEqual(destination.read_bytes(), b'preserve existing output')
+        Path(str(self.database)+'-journal').write_bytes(b'needs recovery')
+        with self.assertRaisesRegex(ValueError, 'rollback journal'):
+            restore.backup_database_snapshot(self.database, self.root/'never-created.sqlite')
+        self.assertFalse((self.root/'never-created.sqlite').exists())
+        Path(str(self.database)+'-journal').unlink()
+        self.assertEqual(before, self.state())
+
+    def test_backup_rejects_original_change_during_sqlite_operation(self):
+        self.create()
+        connect = sqlite3.connect
+        changed = False
+        def change_after_copy(database_uri, **kwargs):
+            nonlocal changed
+            if not changed:
+                with self.database.open('ab') as stream:
+                    stream.write(b'simulated external writer')
+                changed = True
+            return connect(database_uri, **kwargs)
+        with patch.object(restore.sqlite3, 'connect', side_effect=change_after_copy):
+            with self.assertRaisesRegex(ValueError, 'changed during verification'):
+                restore.backup_database_snapshot(self.database, self.root/'copy.sqlite')
 
     def test_rollback_journal_is_not_recovered(self):
         self.create()

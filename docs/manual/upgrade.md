@@ -277,3 +277,7 @@ Linuxの更新は[Linux導入](install-linux.md)のRPM更新、または停止�
 隔離jailの参照権限は準備処理が設定します。ホスト側の検証領域はroot専用のまま、
 新規jailのルートと試験用Door設定だけを専用サービスUIDから参照可能にします。
 本番設定やゲームデータの権限を変更する手順ではありません。
+
+FreeBSDの非root package試験では、宿主のpackage DBをSQLiteで直接開かず、
+DB/WALの安定した私有コピーから依存情報を複製します。原本の回復処理や権限変更は
+行いません。変更中のDBや未回復のrollback journalを検出した場合は試験を停止します。
