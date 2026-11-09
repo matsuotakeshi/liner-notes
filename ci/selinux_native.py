@@ -9,7 +9,6 @@ import asyncio
 import json
 import os
 from pathlib import Path
-import pwd
 import re
 import shutil
 import socket
@@ -29,8 +28,17 @@ def run(*args, check=True):
     return result
 
 
+def fixture_denials(text):
+    """Export only AVC records for the dedicated fixture, never other audit data."""
+    domain = re.compile(r'\bscontext=[^\s:]+:[^\s:]+:liner_notes(?:_(?:web|link|admin|door|transfer))?_t:')
+    for line in text.splitlines():
+        if 'type=AVC ' in line and re.search(r'\bavc:\s+denied\s', line) and domain.search(line):
+            yield line[:4096]
+
+
 class Fixture:
     def __init__(self):
+        import pwd
         if os.geteuid() != 0 or run('getenforce').stdout.strip() != 'Enforcing':
             raise ValueError('This acceptance requires root and Enforcing, never changes either')
         if '10.0.0.51' not in run('hostname', '-I').stdout.split():
@@ -134,6 +142,17 @@ class Fixture:
             log = run('journalctl', '--no-pager', '-u', unit, '-n', '150', check=False)
             print(log.stdout)
             run('systemctl', 'reset-failed', unit, check=False)
+        # The root orchestrator already refuses any pre-existing Liner Notes
+        # policy. These domains therefore belong to this isolated acceptance.
+        # Do not copy PATH/SYSCALL/EXECVE records or unrelated system denials.
+        if shutil.which('ausearch'):
+            try:
+                audit = subprocess.run(['ausearch', '-m', 'AVC', '-ts', 'recent', '--raw'],
+                                       capture_output=True, text=True, timeout=10, check=False)
+                for denial in fixture_denials(audit.stdout):
+                    print('SELINUX_DENIAL ' + denial)
+            except (OSError, subprocess.TimeoutExpired):
+                print('SELINUX_DIAGNOSTIC unavailable; original acceptance result retained')
         for port in reversed(self.ports):
             run('semanage', 'port', '-d', '-p', 'tcp', port)
         # Keep the private fixture for diagnosis; never erase original BBS data.
@@ -160,9 +179,17 @@ async def bbs_probe(port, create):
             async with a.lock:
                 await a.literal('Private mail under Enforcing')
             assert 'MAIL SENT' in (await a.command('.'))['text']
+            # READ is contextual while the mail menu remains active.
+            await a.command('MAIL EXIT')
         article = response_data((await a.command('READ 1'))['text'])['article']
         assert 'Persisted under Enforcing' in article['body']
         assert 'Private mail under Enforcing' in (await b.command('MAIL READ 1'))['text']
+        if create:
+            link = await Bridge('127.0.0.1', port, timeout=10).open()
+            bridges.append(link)
+            await link.command('REGISTER link')
+            await link.command('selinux-only-fixture-password')
+            assert link.state['user'] == 3, link.state
     finally:
         for b in bridges:
             await b.close()
@@ -288,7 +315,7 @@ async def link_probe(fixture, core_port):
     bridge = await Bridge('127.0.0.1', core_port, timeout=10).open()
     unit = None
     try:
-        await bridge.command('REGISTER link')
+        await bridge.command('LOGIN link')
         await bridge.command('selinux-only-fixture-password')
         assert bridge.state['user'] == 3
         config = fixture.text('link.toml', f'''[node]
@@ -486,6 +513,15 @@ def maintenance_probe(fixture, core):
     return restored
 
 
+def core_arguments(arguments, bootstrap=False):
+    """Enable the link allowlist only after its fixture member exists."""
+    result = list(arguments)
+    if bootstrap:
+        offset = result.index('--link-accounts')
+        del result[offset:offset+2]
+    return result
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--designated-ci-vm', action='store_true', required=True)
@@ -523,12 +559,15 @@ def main():
                 '--link-accounts', str(accounts),
                 '--vault-dir', str(vault), '--zmodem-helper', str(helper),
                 '--database-structured', str(core/'notes.sqlite'), str(port), str(core/'notes'), str(core/'members')]
-        for iteration in range(2):
-            unit = fixture.start('core'+str(iteration), executable, args, core, 'liner_notes_t')
+        for iteration in range(3):
+            # A link allowlist may only reference existing members. Bootstrap
+            # the fresh database first, then enable the fixed test account.
+            current = core_arguments(args, bootstrap=iteration == 0)
+            unit = fixture.start('core'+str(iteration), executable, current, core, 'liner_notes_t')
             # Readiness retries are safe: only connection attempts precede writes.
             fixture.ready(port)
             asyncio.run(bbs_probe(port, iteration == 0))
-            if iteration == 0:
+            if iteration == 1:
                 door_probe(port)
                 web_fixture(fixture, port, secret)
                 asyncio.run(link_probe(fixture, port))
