@@ -22,6 +22,7 @@ sys.path[:0] = [str(ROOT / 'scripts'), str(ROOT / 'tests')]
 from deploy_policy import package_commands
 from deploy_restore import backup_database_snapshot
 from freebsd_fixture_libraries import seed_libraries, verify_libraries
+from freebsd_fixture_config import prepare_assets
 from test_board import Server, post
 from test_runtime import Client as RawClient
 from test_members import auth, PASSWORD
@@ -97,9 +98,9 @@ with tempfile.TemporaryDirectory(prefix='actual-upgrade-', dir=work) as temporar
         'liner_notes_pidfile': str(base / 'supervisor.pid'), 'liner_notes_child_pidfile': str(base / 'child.pid'),
         'liner_notes_log_dir': str(base), 'liner_notes_logfile': str(base / 'daemon.log'),
         'liner_notes_database': str(data / 'liner.sqlite'), 'liner_notes_database_mode': 'structured',
-        'liner_notes_catalog': str(data / 'catalog.dat'), 'liner_notes_banner': '',
-        'liner_notes_sysinfo': '', 'liner_notes_goodbye': '', 'liner_notes_login_text_dir': str(asset),
+        'liner_notes_catalog': str(data / 'catalog.dat'), 'liner_notes_login_text_dir': str(asset),
     }
+    settings.update(prepare_assets(root))
     config.write_text(''.join(k + '=' + shlex.quote(v) + '\n' for k, v in settings.items()))
     rc_env = dict(env, LINER_NOTES_RC_CONF=str(config))
     running = False

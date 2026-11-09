@@ -4,6 +4,8 @@
 
 - SolarisのDoor排他holderをBBSから独立した小さい実行ファイルへexecし、長寿命のforkが約1GiBずつswapを予約して次のゲーム起動がENOMEMになる問題へ対応。既存のpipe寿命・排他・子回収を維持し、全installer/packageへ非特権helperを同梱。実機の最終回帰は継続中。
 
+- maintainer scriptsを無効にしたFreeBSDのrootless試験で、パッケージ内のメニューsampleを私有領域へ初期配置。編集済みメニューは保持し、任意の案内文もホストの既定パスへ戻らないよう試験設定を明示。正式なsample処理は別のjail受入試験で検証する。
+
 - SELinux受入試験と同じZMODEM送受信手順を、実BBS・実lrzszを使うhosted回帰へ追加。転送後の応答待ち失敗時にpeer終了コードと合成試験の受信内容を記録し、Enforcing検査とタイムアウト値は維持。
 - 転送helperが継承RPCソケットをPythonで開く際に必要な`getopt`を専用ドメイン間で許可。`setopt`・新規`connectto`と原本データ読み取りの拒否は維持し、ポリシーの許可グラフで回帰検査。
 
