@@ -187,3 +187,41 @@ a 1 GiB owner and verifies the holder's distinct executable and virtual size
 below 128 MiB, plus installed layout and unsafe helper mode rejection.
 Solaris Door integration now runs before the long core suite to expose failures
 earlier while preserving both suites and their assertions.
+
+## Tiny holder native acceptance and receipt lock follow-up
+
+Main `992d16910b06523503dd0bca72b3fc75bb52c298`, native run
+https://github.com/matsuotakeshi/liner-notes/actions/runs/42571000213,
+job `129008139155`, artifact `13652919042` (verified ZIP SHA-256
+`0f8a555083dd2359480e29b29c2313b7e8573d71f14bdc3e6497e7650cc682cc`)
+passed the complete Door suite twice, including the formerly failing bob/game 3
+case, concurrent slots across two BBS runtimes, DORINFO, timeout/crash/escape,
+disconnect and descendant cleanup. The tiny exec holder resolves the diagnosed
+ENOMEM without changing assertions, timeouts, VM swap or OS configuration.
+Doctor's 32 tests and both actual database read-only probes passed.
+
+The run ended after 511.131 seconds at `tests/test_stage71.py`:
+`ports/test-resume.py:save_receipt` still used flock on a read-only directory,
+which Solaris emulates with an incompatible record lock (EBADF). The receipt
+publisher now reuses `posix_locks.namespace_lock`; native FreeBSD/Linux keep
+directory flock. Solaris uses the same fixed private empty `.namespace-lock`
+as other namespace users, rejects that reserved receipt name, and never removes
+the lock during publication. Existing receipt reuse, backup, atomic replacement
+and symlink refusal remain. The module import works both from the source ports
+directory and as installed `scripts/check-resume.py`, independently of cwd.
+
+Remaining direct flock callsites were inspected: `src/door_lock.c` is the
+FreeBSD/Linux branch; `scripts/serial_connector.py` rejects Solaris before device
+opening; `scripts/deploy_host.py` only targets the declared FreeBSD/Linux hosts;
+`ci/selinux_root.py` and `ci/freebsd_upgrade_root.py` are OS-specific helpers.
+`ci/native_remote.py` holds one ordinary writable lock file for the worker's
+lifetime, does not reopen/close its inode, and has passed the actual Solaris host
+lease tests. Its process-owned semantics do not require a directory lease.
+`scripts/posix_locks.py` selects its dedicated holder on Solaris. The direct
+flock in `tests/test_freebsd_package_lease.py` is a FreeBSD package fixture.
+
+Capabilities for this run are build/lock_lifetime/SMF-manifest/Door passed;
+core incomplete; WebUI/link/ZMODEM not tested; SMF lifecycle unverified (no SMF
+management authorization). This remains a failed native run, not full Solaris
+acceptance. Receipt regression is added to hosted checks and runs early in the
+next trusted-main Solaris CI as well as the full core suite.

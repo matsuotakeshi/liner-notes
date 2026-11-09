@@ -16,7 +16,7 @@ CIログにはOS、コンパイラ候補、ライブラリ配置、Python、正�
 
 Solaris 11.4の`openpty`と`login_tty`はlibcにあり、`termios.h`で宣言されます。FreeBSD/Linux向けの`libutil`をSolarisへリンクしません。ソケットは`-lsocket -lnsl`を明示します。既存のPTYと端末サイズ伝達を維持し、端末の制御取得はSolarisの`login_tty`へ委ねます。SolarisにはBSDの`flock`がないため、専用の小さな実行ファイル`liner-notes-door-lock`へexecした子プロセスがPOSIXファイルロックを保持します。BBSの巨大な静的領域を長寿命の子へ残すと、Solarisのswap予約により後続のforkがENOMEMになるためです。BBSとDoorへ継承したpipeがすべて閉じるまで保持し、BBSの異常終了後も生存中のDoorが同じ枠を占有します。FreeBSD/Linuxは従来の`flock`を使用します。
 
-Python補助ツールもSolarisでは独立したロック保持プロセスを使用します。転送spoolとリンク保守の排他を、同一プロセスの別FDのcloseで解除させません。spool直下の固定ファイル`.namespace-lock`は空の0600管理用ファイルです。削除・置換しないでください。symlink、hardlink、公開権限、不正な内容は拒否します。転送一覧・削除・復元はこのファイルを転送データとして扱いません。既存SunOSの通常ファイルに対するPOSIX記録ロックとは競合しますが、旧版のディレクトリロックは動作しないため、同じspoolで旧新プロセスを並行使用しないでください。FreeBSD/Linuxのflockと保存データ形式は維持します。
+Python補助ツールもSolarisでは独立したロック保持プロセスを使用します。転送spoolとリンク保守の排他を、同一プロセスの別FDのcloseで解除させません。spool直下の固定ファイル`.namespace-lock`は空の0600管理用ファイルです。削除・置換しないでください。symlink、hardlink、公開権限、不正な内容は拒否します。転送一覧・削除・復元はこのファイルを転送データとして扱いません。既存SunOSの通常ファイルに対するPOSIX記録ロックとは競合しますが、旧版のディレクトリロックは動作しないため、同じspoolで旧新プロセスを並行使用しないでください。FreeBSD/Linuxのflockと保存データ形式は維持します。ZMODEM再開検査の検証記録も同じ排他を使い、Solarisでは保存先ディレクトリに`.namespace-lock`を置きます。サービス所有者で実行し、親ディレクトリを他者から書込不可にしてください。`.namespace-lock`は検証記録の名前として使わず、稼働中に削除しません。
 
 独立した作業コピーでの検証入口は次のとおりです。CIでは上記のmain検証を通った後に同じコマンドを使用します。
 
@@ -62,7 +62,7 @@ Doorを有効にするときは同じビルドの排他helperを本体と一緒�
 
 ## 現在の制約
 
-- GCC15で本体・管理コマンドのビルド、C/Python排他寿命、doctorと実DBの非変更診断、SMF staging・定義検証、spool復旧、バックアップ・復元とデータ整理、12,000件の記事・メール、権限・階層・下書き・未読の回帰が成功しました。DoorのNAWS・終了処理と独立GNU sttyアプリのサイズ確認は成功しましたが、複数接続・複数枠の汎用Door起動試験はforkのENOMEMで失敗しました。小さい専用helperへのexecで予約を解放する修正を加え、実機の再検証を待っています。基本回帰全体・Door統合全体・WebUI・リンク・実ZMODEMはまだ成功確認前です。
+- GCC15で本体・管理コマンドのビルド、C/Python排他寿命、doctorと実DBの非変更診断、SMF staging・定義検証、spool復旧、バックアップ・復元とデータ整理、12,000件の記事・メール、権限・階層・下書き・未読の回帰が成功しました。小さい専用helperへのexecでforkのENOMEMを解消し、DoorのNAWS・独立GNU sttyアプリ・複数接続と複数枠・異常終了と切断・子孫終了を含む統合試験が成功しました。続く基本回帰で再開検査の検証記録保存がディレクトリflockに失敗したため、共通排他へ置き換えて再検証します。基本回帰全体・WebUI・リンク・実ZMODEMはまだ成功確認前です。
 - 検証機にはPython3.11/3.13、cryptography、OpenSSL3、SQLite3.51がありますが、aiohttpはありません。CIでは作業コピー内の専用venvへrequirementsからaiohttpを導入してからWebUIを検証します。依存導入・機能試験の成否は次の実機CIで確認します。
 - CIアカウントにはSMF管理権限がありません。既存OS設定や権限を自動変更せず、実サービス登録・稼働は未検証とします。
 - SMFマニフェストと設定保持を行うstaging installerを用意しています。実SMFでの登録・起動・停止・自動起動、および本番用の導入・更新手順は未検証です。FreeBSDのrc.dやLinuxのsystemdの手順をそのまま使用しないでください。
