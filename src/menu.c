@@ -130,7 +130,8 @@ int login_text_load(const char *directory) {
         char path[4096];if(snprintf(path,sizeof(path),"%s/greeting-%02u.txt",directory,h)>=(int)sizeof(path))return 0;
         FILE *f=fopen(path,"rb");if(!f) { if(errno==ENOENT)continue;return 0; }
         unsigned char input[4097];size_t n=fread(input,1,sizeof(input),f);int bad=ferror(f);if(fclose(f))bad=1;
-        if(bad || n>4096)return 0;if(n==3 && !memcmp(input,"\xef\xbb\xbf",3))n=0;
+        if(bad || n>4096)return 0;
+        if(n==3 && !memcmp(input,"\xef\xbb\xbf",3))n=0;
         if(n && !normalize(input,n,hourly_messages[h],sizeof(hourly_messages[h])))return 0;
     }
     const char *names[]={"welcome.txt","systemnews.txt","birthday.txt"};
@@ -138,6 +139,7 @@ int login_text_load(const char *directory) {
         char path[4096];if(snprintf(path,sizeof(path),"%s/%s",directory,names[i])>=(int)sizeof(path))return 0;
         FILE *f=fopen(path,"rb");if(!f) { if(errno==ENOENT)continue;return 0; }
         unsigned char input[4097];size_t n=fread(input,1,sizeof(input),f);int bad=ferror(f);fclose(f);
-        if(bad || n>4096)return 0;if(n && !normalize(input,n,login_messages[i],sizeof(login_messages[i])))return 0;
+        if(bad || n>4096)return 0;
+        if(n && !normalize(input,n,login_messages[i],sizeof(login_messages[i])))return 0;
     }return 1;
 }

@@ -551,7 +551,8 @@ static int classic_editor(Session *s,const char *line,char *translated,size_t si
     if(key=='S') {
         uint32_t first=1,last=count;const char *query=line+1;
         if(*query && *query!=' ') {
-            if(!number_arg(query,&first,&query))goto invalid;last=first;
+            if(!number_arg(query,&first,&query))goto invalid;
+            last=first;
             if(*query=='-') { query++;last=count;if(*query && *query!=' ' && !number_arg(query,&last,&query))goto invalid; }
             if(*query && *query!=' ')goto invalid;
         }
@@ -905,7 +906,8 @@ static void command_core(Session *s,char *line) {
         if(s->application_step==15) {
             if(!strcmp(line,"Y") || !strcmp(line,"y")) { s->application_step=0;s->password_mode='g';emit(s,"PASSWORD\r\n"); }
             else if(!strcmp(line,"E") || !strcmp(line,"e")) { s->application_step=1;s->application_body[0]=0;application_prompt(s); }
-            else queue_text(s,"Y / E / /CANCEL > ");return;
+            else queue_text(s,"Y / E / /CANCEL > ");
+            return;
         }
         const char *key=application_fields[s->application_step-1];int field=profile_field(key);
         if(strlen(line)>320 || !safe_text(line) || (field>=0 && !profile_text_valid((unsigned)field,line))) { emit(s,"ERR application value\r\n");application_prompt(s);return; }
@@ -1141,7 +1143,8 @@ board_syntax:emit(s,"ERR command\r\n");return;
         if(!strncmp(line,"BATCH MATCH ",12)) { if(!line[12] || strlen(line+12)>80 || !safe_text(line+12))goto batch_error;BoardRequest q={0};q.op='Y';q.action=VAULT_CMD_MATCH;snprintf(q.body,sizeof(q.body),"%s|%s",*s->vault_path?s->vault_path:"-",line+12);submit(s,&q);return; }
         if(!strncmp(line,"BATCH COPY ",11)) {
             const char *path=line+11;if(!*path || strlen(path)>48 || !safe_text(path) || !s->batch_count)goto batch_error;
-            if(strcmp(path,s->batch_copy_path))memset(s->batch_copied,0,sizeof(s->batch_copied));strcpy(s->batch_copy_path,path);
+            if(strcmp(path,s->batch_copy_path))memset(s->batch_copied,0,sizeof(s->batch_copied));
+            strcpy(s->batch_copy_path,path);
             s->batch_copy_at=0;while(s->batch_copy_at<s->batch_count && s->batch_copied[s->batch_copy_at])s->batch_copy_at++;
             if(s->batch_copy_at==s->batch_count) { emit(s,"BATCH COPY COMPLETE\r\n");return; }
             BoardRequest q={0};q.op='Y';q.action=VAULT_CMD_COPY;q.number=s->batch[s->batch_copy_at];strcpy(q.body,path);submit(s,&q);s->batch_copying=s->pending;return;
@@ -1633,7 +1636,8 @@ void session_scan_stop(Session *s) {
 void session_door_finish(Session *s) {
     s->door=0;queue_text(s,s->ui.language==LANGUAGE_JA?"\r\nゲーム終了。BBSへ戻ります。\r\n":"\r\nGame ended. Back to BBS.\r\n");
     if(s->game_menu && s->user && !s->closing) { command_core(s,"GAMES");prompt(s);return; }
-    if(s->ui.enabled)show_menu(s,0);prompt(s);
+    if(s->ui.enabled)show_menu(s,0);
+    prompt(s);
 }
 uint64_t session_ui_signature(const Session *s) { return (uint64_t)s->ui.language | ((uint64_t)s->pager_enabled<<2) | ((uint64_t)s->editor_line<<3) | ((uint64_t)s->columns<<8) | ((uint64_t)s->rows<<24) | ((uint64_t)s->editor_numbers<<32) | ((uint64_t)s->transfer_protocol<<33); }
 void session_dispose(Session *s) { free(s->connector_block);s->connector_block=NULL;s->active=0;chat_disconnect(s->id);OPENSSL_cleanse(s,sizeof(*s)); }
@@ -1764,7 +1768,8 @@ static void connector_link(Session *s,char *line) {
         if(!*fields[4] || strlen(fields[4])>12)goto bad;
         for(const char *p=fields[4];*p;p++)if(*p<'0' || *p>'9')goto bad;
         q.since=strtoull(fields[4],NULL,10);if(!q.since || q.since>253402300799ULL)goto bad;
-        if(strlen(fields[5])!=1 || !strchr("PTDCW",fields[5][0]))goto bad;q.action=fields[5][0];
+        if(strlen(fields[5])!=1 || !strchr("PTDCW",fields[5][0]))goto bad;
+        q.action=fields[5][0];
         if(!link_decode(fields[6],q.username,sizeof(q.username)) || !link_decode(fields[7],q.title,sizeof(q.title)) || !link_decode(fields[8],q.body,sizeof(q.body)))goto bad;
         if(!safe_text(q.username) || !safe_text(q.title))goto bad;
         for(const unsigned char *p=(const unsigned char *)q.body;*p;p++)if((*p<32 && *p!='\r' && *p!='\n' && *p!='\t') || *p==127)goto bad;
@@ -1881,7 +1886,8 @@ void session_result(Session *s,const BoardResult *completion,uint64_t now) {
         const char *row=strstr(completion->text,"\r\n");
         while(row && *row) { row+=2;unsigned n=0;char path[49];
             if(sscanf(row,"CHILD %u %48[^|]",&n,path)==2 && n && n<=16) { strcpy(s->vault_children[n-1],path);s->vault_child_count=n; }
-            if(sscanf(row,"END CHILDREN NEXT %u",&s->vault_child_next)==1)break;row=strstr(row,"\r\n");
+            if(sscanf(row,"END CHILDREN NEXT %u",&s->vault_child_next)==1)break;
+            row=strstr(row,"\r\n");
         }
         queue_text(s,completion->text);prompt(s);return;
     }
