@@ -87,6 +87,7 @@ int main(int argc, char **argv) {
         lease = acquire(path); assert(lease >= 0);
         pid_t game = fork(); assert(game >= 0);
         if (!game) {
+            close(control[1]); close(ready[0]);
             char a[32], b[32], c[32];
             snprintf(a, sizeof(a), "%d", lease);
             snprintf(b, sizeof(b), "%d", control[0]);
@@ -113,6 +114,7 @@ int main(int argc, char **argv) {
         lease = acquire(path); assert(lease >= 0);
         pid_t game = fork(); assert(game >= 0);
         if (!game) {
+            close(control[1]); close(ready[0]);
             assert(setsid() >= 0);
             char a[32], b[32], c[32];
             snprintf(a, sizeof(a), "%d", lease);
