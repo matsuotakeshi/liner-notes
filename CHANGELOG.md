@@ -2,6 +2,8 @@
 
 ## 未リリース（次期版0.75候補）
 
+- Solaris向けDoor排他を強制した実runtimeのhosted回帰と、複数slotの排他寿命検査を追加。汎用Door試験の起動失敗時に接続・番号・受信応答を記録し、既存のtimeoutと判定は維持。
+
 - FreeBSD package更新試験の依存DB複製を修正。原本DB/WALの安定したバイトコピーだけを取得し、SQLite backupは私有コピーで実行。SSH先のlogin shellに依存せず準備を/bin/shで実行し、準備失敗を即時検出。
 
 - SELinux受入試験のリンク確認を既存の双方向pull方式へ修正。実BBSと相互TLSを使うhosted回帰試験を追加し、受信記事と送信元記事の内容を両側で照合。

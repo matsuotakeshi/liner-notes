@@ -37,10 +37,16 @@ while True:
         def server(label):
             s=Server(binary,p/(label+'.dat'),members=p/(label+'.members'),menu=True,telnet=True,language='en',options=['--doors',str(conf)]);servers.append(s);return s
         def login(s,name):
-            c=Client(s.port);clients.append(c);c.until();c.send(('REGISTER '+name+'\r\nprivate-password\r\n').encode());assert b'Logged in' in c.until();return c
+            c=Client(s.port);c.door_test_identity=name;clients.append(c);c.until();c.send(('REGISTER '+name+'\r\nprivate-password\r\n').encode());assert b'Logged in' in c.until();return c
         def start(c,n):
             import json
-            out=c.cmd(str(n),b'KEY> ')
+            print(f"Door start: user={c.door_test_identity} game={n}",flush=True)
+            try:
+                out=c.cmd(str(n),b'KEY> ')
+            except (TimeoutError, AssertionError) as error:
+                states=[{'pid':server.proc.pid,'returncode':server.proc.poll()} for server in servers]
+                raise AssertionError(f'Door start failed: user={c.door_test_identity} game={n} '
+                                     f'received={c.buf!r} runtimes={states}') from error
             return json.loads(re.search(rb'PROBE (\{[^\r\n]+\})',out)[1])
         def finish(c,key=b'q'):
             c.send(key);out=c.until(PROMPT);assert b'Back to BBS' in out and b'1: Probe' in out,out

@@ -75,3 +75,7 @@ jobs:
           sudo apt-get install -y libssl-dev libsqlite3-dev
           make -j2 CC=gcc PYTHON=python3 SQLITE_CFLAGS= SQLITE_LIBS=-lsqlite3 all
           make CC=gcc PYTHON=python3 SQLITE_CFLAGS= SQLITE_LIBS=-lsqlite3 test-doors
+      - name: Exercise Solaris record leases in the full hosted runtime
+        run: |
+          make -B CC=gcc PYTHON=python3 SQLITE_CFLAGS= SQLITE_LIBS=-lsqlite3 CPPFLAGS=-DLINER_TEST_POSIX_DOOR_LOCK=1 runtime
+          python3 tests/test_doors_generic.py ./runtime
