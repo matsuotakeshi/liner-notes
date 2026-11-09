@@ -108,5 +108,6 @@
   "scripts/link_maintenance.py": "ee76d893e80f536f65bcf869348d7a083eafc3f0d5280dcd35de431dbfc16c30",
   "src/door_lock.c": "5df88271a138da23c6568a3399afd78b894f9948549e219465bd888d35698374",
   "scripts/posix_locks.py": "657d3bbe77a63e9ee0a2e586f2aa8528ba1401cbbc9f879a0302ab81b1fbcfca",
-  "scripts/build-lrzsz.py": "6cd25f538e9b3320ba199aef5285156e973be999243bff972eba3482a37357de"
+  "scripts/build-lrzsz.py": "6cd25f538e9b3320ba199aef5285156e973be999243bff972eba3482a37357de",
+  ".github/workflows/native-ci-lint.yml": "7dbb4edb31ae56edc310c3142db974edbc2bac976dd0dc3b18616a14ff0047dc"
 }
