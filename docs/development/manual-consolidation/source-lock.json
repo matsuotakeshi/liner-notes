@@ -1,6 +1,6 @@
 {
   "LICENSE": "fb981668c18a279e285fc4d83fba1e836cc84dd4daa73c9697d3cfd2d8aca6e0",
-  "Makefile": "626cc757c942c7c0f390e6d63771bdda37e5abf6c670c171e57ba865643b0924",
+  "Makefile": "ddb172910c9efb71367948ec8716cca365bee04a6f3d59112b72d11b30300306",
   "boards.example.conf": "4bd1a17ecf3966d3829510e8495a1362fb8b922cd754badccc739f5e5ab0bde8",
   "ci/build-freebsd-package.sh": "4e62899471d1f1a6c44e00a783c1aff771332140704ae778da95a95048474108",
   "debian/changelog": "8f3574a094f5a3677a9a7188e530ecdbdc006138b082b57243ca8441c644114d",
@@ -53,7 +53,7 @@
   "scripts/serial_connector.py": "3de6ad32005c5dff9b474d8f550a534232d88f4be73b59b5dcfc15cc11d0e670",
   "scripts/transfer_spool.py": "f7c590b73368c330da611d8ce41f0fd6fe5d8ad3b3e9ae9165e258d1e501db46",
   "scripts/vault_zmodem.py": "ace554ea5b6ab8d479ec39ad7daf7f5f7f34ca34ba13d5b9a73b115a0d63ef15",
-  "src/board.c": "8f4dcc641c00503a86ad5dd47733fdf3bb0e573858ac8bbcffb7dee3012460a8",
+  "src/board.c": "9db06f57c5cbac86ae73341c102b65f17f122fe04561dd438f1046c9cbb6489c",
   "src/board_link.inc": "95a85be0a6ca2d77380775b25befb51a72971908d266c6b72f76fc7ca94e1d4a",
   "src/board_policy.c": "0169bc17649ddc63599b43ca7ae49f6c1c756dac417bd030a79398229414165b",
   "src/catalog.c": "c96bab1f3042b7685cc27df9206ebfd63ad2c79b06ca92d3dd1ca219a0e2a361",
@@ -145,5 +145,8 @@
   "ci/solaris_smf_method.py": "0ef0d00f08680356e7b419706c8312467cf1c92af0fc63b4539f651a34954d42",
   "ci/solaris_smf_lifecycle.py": "2b5bf36ba6ad205af9fe040aadb340f4fd62c106e2a5d872a0086b9d8d88325e",
   "ci/prepare_solaris_smf.py": "cbc80db8cbb11ddabd7c4bc4231d85c4d7594607bb2a92dd30e72e6b935a596e",
-  "tests/test_solaris_smf_ci.py": "2ccf474d0bcd83af553e284ba8690e8862b4f22037246ccae7d540802396aac9"
+  "tests/test_solaris_smf_ci.py": "2ccf474d0bcd83af553e284ba8690e8862b4f22037246ccae7d540802396aac9",
+  "src/article_core.c": "da5606873490589e270a4229d13ddc2d473886c7aa81f389277b03f9cece3792",
+  "src/article_core.h": "5f5b3700a8242dea2a613c40571a9e2b3a1b75535d949e5150fabf164cd50788",
+  "src/article_repository.h": "a56ec3dfc23dd607115d4b7d0894019c34eca5bf03890cf4248535b958f32b30"
 }

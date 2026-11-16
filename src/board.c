@@ -5,6 +5,8 @@
 #include "activity.h"
 /* Stage 2: single-owner board store, bounded asynchronous request queue. */
 #include "board.h"
+#include "article_core.h"
+#include "article_repository.h"
 #include "date_filter.h"
 #include "vault_bridge.h"
 #include "vault_worker.h"
@@ -154,6 +156,18 @@ static int unavailable(uint32_t id) {
     return state!=1;
 }
 
+int article_repository_find(uint32_t id,ArticleMetadata *out) {
+    if(!id || id>article_count)return 0;
+    const Article *a=article_at(id-1);
+    out->board=a->board;memcpy(out->author,a->author,sizeof(out->author));
+    return 1;
+}
+int article_repository_unavailable(uint32_t id) { return unavailable(id); }
+int article_repository_imported(uint32_t id) { return link_imported(id); }
+void article_repository_title_changed(uint32_t id,const char *title) {
+    Article *a=article_at(id-1);strcpy(a->title,title);db_search_title(&article_db,id,title);
+}
+
 static void index_article(uint32_t id) {
     Article *a=&(*article_at(id-1)); a->root=id; a->latest=id;
     if(a->parent) {
@@ -301,24 +315,30 @@ static int matches(const BoardRequest *q,uint32_t id) {
 }
 static void extra_execute(const BoardRequest *q,BoardResult *r) {
     if(q->action==1 || q->action==2) {
-        if(!q->user) { strcpy(r->text,"ERR login required\r\n"); return; }
-        if(!on_board(q->number,q->board) || !catalog_read(q->board,q->user)) { strcpy(r->text,"ERR no article\r\n"); return; }
-        Article *a=&(*article_at(q->number-1));
-        int owner=a->author[0] && strcmp(a->author,"guest") && members_name(q->user) && !strcmp(a->author,members_name(q->user));
-        if(!owner && !catalog_manage((*article_at(q->number-1)).board,q->user)) { strcpy(r->text,"ERR article owner\r\n"); return; }
-        if(q->action==1) {
-            int imported=link_imported(q->number);
-            if(imported<0) { strcpy(r->text,"ERR link storage; restart inspection required\r\n");return; }
-            if(imported) { strcpy(r->text,"ERR imported article; use HIDE for local moderation\r\n");return; }
-            if(q->cursor!=1) { snprintf(r->text,sizeof(r->text),"WITHDRAW CONFIRM %u\r\n",q->number); return; }
-            if(!extras_set('D',q->number,q->user,"")) { strcpy(r->text,"ERR extras storage\r\n"); return; }
-            snprintf(r->text,sizeof(r->text),"WITHDRAW SAVED %u\r\n",q->number); return;
+        ArticleActor actor={q->user,q->user_epoch,q->board_grants};
+        ArticleOutcome result=q->action==1?
+            article_withdraw(&actor,q->board,q->number,q->cursor==1):
+            article_retitle(&actor,q->board,q->number,q->title);
+        /* Legacy protocol adapter: Core returns status, never terminal text. */
+        switch(result) {
+        case ARTICLE_OK:
+            snprintf(r->text,sizeof(r->text),q->action==1?"WITHDRAW SAVED %u\r\n":"RETITLED %u\r\n",q->number);break;
+        case ARTICLE_CONFIRM: snprintf(r->text,sizeof(r->text),"WITHDRAW CONFIRM %u\r\n",q->number);break;
+        case ARTICLE_LOGIN_REQUIRED: strcpy(r->text,"ERR login required\r\n");break;
+        case ARTICLE_REVOKED: r->revoked=1;strcpy(r->text,"ERR session revoked\r\n");break;
+        case ARTICLE_MEMBER_STORAGE: strcpy(r->text,"ERR member storage unavailable\r\n");break;
+        case ARTICLE_MODERATION_STORAGE: strcpy(r->text,"ERR moderation storage unavailable\r\n");break;
+        case ARTICLE_POLICY_STORAGE: strcpy(r->text,"ERR board policy storage\r\n");break;
+        case ARTICLE_EXTRAS_STORAGE: strcpy(r->text,"ERR extras storage\r\n");break;
+        case ARTICLE_NOT_FOUND: strcpy(r->text,"ERR no article\r\n");break;
+        case ARTICLE_OWNER_REQUIRED: strcpy(r->text,"ERR article owner\r\n");break;
+        case ARTICLE_IMPORTED: strcpy(r->text,"ERR imported article; use HIDE for local moderation\r\n");break;
+        case ARTICLE_LINK_STORAGE: strcpy(r->text,"ERR link storage; restart inspection required\r\n");break;
+        case ARTICLE_HIDDEN: strcpy(r->text,"ERR article hidden\r\n");break;
+        case ARTICLE_POSTING_DENIED: strcpy(r->text,"ERR posting denied\r\n");break;
+        case ARTICLE_INVALID_TITLE: strcpy(r->text,"ERR title 1..80 bytes, no controls\r\n");break;
         }
-        if(unavailable(q->number)) { strcpy(r->text,"ERR article hidden\r\n"); return; }
-        if(!catalog_write(q->board,q->user)) { strcpy(r->text,"ERR posting denied\r\n"); return; }
-        if(!extra_text(q->title,80,0)) { strcpy(r->text,"ERR title 1..80 bytes, no controls\r\n"); return; }
-        if(!extras_set('T',q->number,q->user,q->title)) { strcpy(r->text,"ERR extras storage\r\n"); return; }
-        a=article_at(q->number-1);strcpy(a->title,q->title);db_search_title(&article_db,q->number,q->title); snprintf(r->text,sizeof(r->text),"RETITLED %u\r\n",q->number); return;
+        return;
     }
     if(q->action==11) {
         uint64_t since;
