@@ -19,13 +19,20 @@ typedef enum {
     ARTICLE_EXTRAS_STORAGE, ARTICLE_NOT_FOUND, ARTICLE_OWNER_REQUIRED,
     ARTICLE_IMPORTED, ARTICLE_LINK_STORAGE, ARTICLE_HIDDEN,
     ARTICLE_POSTING_DENIED, ARTICLE_INVALID_TITLE, ARTICLE_ADMIN_REQUIRED,
-    ARTICLE_STORAGE, ARTICLE_BUFFER_TOO_SMALL, ARTICLE_INVALID_READ
+    ARTICLE_STORAGE, ARTICLE_BUFFER_TOO_SMALL, ARTICLE_INVALID_READ,
+    ARTICLE_WITHDRAWN_TARGET, ARTICLE_MODERATION_WRITE
 } ArticleOutcome;
 
 ArticleOutcome article_withdraw(const ArticleActor *,uint32_t board,
                                uint32_t article,int confirmed);
 ArticleOutcome article_retitle(const ArticleActor *,uint32_t board,
                               uint32_t article,const char *title);
+/* Local moderation only: current board manager AND read access required.
+ * Imported articles are allowed; withdrawn articles cannot be hidden/restored.
+ * Restore clears this article's local flag, never an ancestor's or origin's
+ * withdrawal. No extras/link event is emitted by either operation. */
+ArticleOutcome article_hide(const ArticleActor *,uint32_t board,uint32_t article);
+ArticleOutcome article_restore(const ArticleActor *,uint32_t board,uint32_t article);
 /* A structured read result owns its metadata; body storage belongs to the
  * caller. Hidden/withdrawn results contain only IDs and state, never title,
  * author or body. On any error the result and supplied body buffer are cleared.

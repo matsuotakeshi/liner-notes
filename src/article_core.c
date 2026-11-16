@@ -77,6 +77,35 @@ ArticleOutcome article_retitle(const ArticleActor *actor,uint32_t board,uint32_t
     return result;
 }
 
+static ArticleOutcome moderate(const ArticleActor *actor,uint32_t board,uint32_t id,int hide) {
+    ArticleOutcome result=health();
+    if(result!=ARTICLE_OK)return result;
+    result=identity(actor,0);
+    if(result!=ARTICLE_OK)return result;
+    if(!catalog_manage(board,actor->user))return ARTICLE_ADMIN_REQUIRED;
+    ArticleMetadata article;
+    if(!article_repository_find(id,&article) || article.board!=board ||
+       !catalog_read(board,actor->user))return ARTICLE_NOT_FOUND;
+    if(extras_removed(id))return ARTICLE_WITHDRAWN_TARGET;
+    if((uint64_t)moderation_count()+extras_audit_count()>=UINT32_MAX)
+        return ARTICLE_MODERATION_WRITE;
+    return moderation_set(id,board,actor->user,hide)?ARTICLE_OK:ARTICLE_MODERATION_WRITE;
+}
+
+static ArticleOutcome local_moderation(const ArticleActor *actor,uint32_t board,uint32_t id,int hide) {
+    policy_context(actor?actor->board_grants:NULL);
+    ArticleOutcome result=moderate(actor,board,id,hide);
+    policy_context(NULL);
+    return result;
+}
+
+ArticleOutcome article_hide(const ArticleActor *actor,uint32_t board,uint32_t id) {
+    return local_moderation(actor,board,id,1);
+}
+ArticleOutcome article_restore(const ArticleActor *actor,uint32_t board,uint32_t id) {
+    return local_moderation(actor,board,id,0);
+}
+
 static ArticleOutcome read_article(const ArticleActor *actor,uint32_t id,int inspect,
                                    ArticleView *out,char *body,size_t capacity) {
     ArticleOutcome result=health();

@@ -53,7 +53,7 @@
   "scripts/serial_connector.py": "3de6ad32005c5dff9b474d8f550a534232d88f4be73b59b5dcfc15cc11d0e670",
   "scripts/transfer_spool.py": "f7c590b73368c330da611d8ce41f0fd6fe5d8ad3b3e9ae9165e258d1e501db46",
   "scripts/vault_zmodem.py": "ace554ea5b6ab8d479ec39ad7daf7f5f7f34ca34ba13d5b9a73b115a0d63ef15",
-  "src/board.c": "a0883afad52ca5a2b1515a7574d5099410a2029b9232908f2bbf3f073eca95fe",
+  "src/board.c": "5aa8778a54caee8af9f2179f7cbe517983ea4fbeb768711da84d3355a71a63be",
   "src/board_link.inc": "95a85be0a6ca2d77380775b25befb51a72971908d266c6b72f76fc7ca94e1d4a",
   "src/board_policy.c": "0169bc17649ddc63599b43ca7ae49f6c1c756dac417bd030a79398229414165b",
   "src/catalog.c": "c96bab1f3042b7685cc27df9206ebfd63ad2c79b06ca92d3dd1ca219a0e2a361",
@@ -146,7 +146,7 @@
   "ci/solaris_smf_lifecycle.py": "2b5bf36ba6ad205af9fe040aadb340f4fd62c106e2a5d872a0086b9d8d88325e",
   "ci/prepare_solaris_smf.py": "cbc80db8cbb11ddabd7c4bc4231d85c4d7594607bb2a92dd30e72e6b935a596e",
   "tests/test_solaris_smf_ci.py": "2ccf474d0bcd83af553e284ba8690e8862b4f22037246ccae7d540802396aac9",
-  "src/article_core.c": "f7f4e066c4da3fe26f3d7ddab42b6c1fa689e988624e51b2dd167828e4e76f1a",
-  "src/article_core.h": "5ba467afe93ccb7d168a81b2ef33debdc71bb310fcb454d38a5eb1e46ecdd225",
+  "src/article_core.c": "bfad9bc20a9a8ce4624918ffcaa05092041b0933bb52fbc1fb9ed37def3ba446",
+  "src/article_core.h": "6cfc9bec9510aecf2f33b52e3d5d40546fb435792440b09099c709f1c5178c8d",
   "src/article_repository.h": "db20f3904d8552276cabdfc1c7d99ac23f9bdb860188e19ecc0ed49505745b9d"
 }

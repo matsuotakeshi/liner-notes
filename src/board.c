@@ -371,6 +371,8 @@ static void extra_execute(const BoardRequest *q,BoardResult *r) {
         case ARTICLE_STORAGE: case ARTICLE_BUFFER_TOO_SMALL: case ARTICLE_INVALID_READ:
             strcpy(r->text,"ERR article storage\r\n");break;
         case ARTICLE_ADMIN_REQUIRED: strcpy(r->text,"ERR admin required\r\n");break;
+        case ARTICLE_WITHDRAWN_TARGET: strcpy(r->text,"ERR article withdrawn\r\n");break;
+        case ARTICLE_MODERATION_WRITE: strcpy(r->text,"ERR moderation storage uncertain\r\n");break;
         }
         return;
     }
@@ -980,10 +982,24 @@ static void execute(const BoardRequest *q,BoardResult *r) {
     if(strchr("hri",q->op)) {
         if(!on_board(q->number,q->board)) { strcpy(r->text,"ERR no article\r\n"); return; }
         if(q->op=='i') { display_article(q,q->number,r,1); return; }
-        if(extras_removed(q->number)) { strcpy(r->text,"ERR article withdrawn\r\n"); return; }
-        if((uint64_t)moderation_count()+extras_audit_count()>=UINT32_MAX) { strcpy(r->text,"ERR moderation storage uncertain\r\n"); return; }
-        if(!moderation_set(q->number,q->board,q->user,q->op=='h')) { strcpy(r->text,"ERR moderation storage uncertain\r\n"); return; }
-        snprintf(r->text,sizeof(r->text),"%s %u\r\n",q->op=='h'?"HIDDEN SAVED":"RESTORED",q->number); return;
+        ArticleActor actor={q->user,q->user_epoch,q->board_grants};
+        ArticleOutcome result=q->op=='h'?article_hide(&actor,q->board,q->number):
+                                            article_restore(&actor,q->board,q->number);
+        switch(result) {
+        case ARTICLE_OK:
+            snprintf(r->text,sizeof(r->text),"%s %u\r\n",q->op=='h'?"HIDDEN SAVED":"RESTORED",q->number);break;
+        case ARTICLE_LOGIN_REQUIRED: strcpy(r->text,"ERR login required\r\n");break;
+        case ARTICLE_REVOKED: r->revoked=1;strcpy(r->text,"ERR session revoked\r\n");break;
+        case ARTICLE_ADMIN_REQUIRED: strcpy(r->text,"ERR admin required\r\n");break;
+        case ARTICLE_MEMBER_STORAGE: strcpy(r->text,"ERR member storage unavailable\r\n");break;
+        case ARTICLE_MODERATION_STORAGE: strcpy(r->text,"ERR moderation storage unavailable\r\n");break;
+        case ARTICLE_POLICY_STORAGE: strcpy(r->text,"ERR board policy storage\r\n");break;
+        case ARTICLE_EXTRAS_STORAGE: strcpy(r->text,"ERR extras storage\r\n");break;
+        case ARTICLE_NOT_FOUND: strcpy(r->text,"ERR no article\r\n");break;
+        case ARTICLE_WITHDRAWN_TARGET: strcpy(r->text,"ERR article withdrawn\r\n");break;
+        default: strcpy(r->text,"ERR moderation storage uncertain\r\n");break;
+        }
+        return;
     }
     if(q->number && strchr("Pesu",q->op) && unavailable(q->number)) { strcpy(r->text,"ERR article hidden\r\n"); return; }
     if((q->op=='P'||q->op=='e') && !catalog_write(q->board,q->user)) { strcpy(r->text,"ERR posting denied\r\n"); return; }
