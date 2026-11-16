@@ -46,3 +46,24 @@ PR専用へ移す3本は現在の必須チェック一覧には含まれませ�
 
 本変更ではCIを手動で大量起動せず、ローカルの起動条件・依存契約検査と通常のPR CIを
 利用します。マージは利用者確認後に行います。
+
+## マニュアル根拠の再照合
+
+PR #65の初回CIでは、Canonical manualとRPM/DEBのマニュアル生成検査が
+`CI_CD.md` / `.github/workflows/native-ci-lint.yml` のsource-lock不一致で停止しました。
+2026-11-17に基準mainとの差分を確認し、前者は重複起動方針の追加、後者は
+hostedソース検査のmain push削除だけであり、PRの検査内容とmain限定ネイティブ
+試験は変わらないことを再確認しました。
+
+公開原稿のinstall-solaris.mdの「PRでは接続を伴わないCI制御のテスト」、
+install-linux.mdの同一SHAによるRelease Set・パッケージ検証説明との矛盾は
+ありません。利用者向けの導入・更新・保存形式の仕様変更もありません。
+開発運用の詳細は本書とCI_CD.mdに集約し、公開原稿や検査条件は変更せず、
+確認済みの2ファイルだけsource-lockを更新します。旧アーカイブは変更しません。
+
+修正後のローカル検証: `scripts/manual/build.py build/pr65-source-lock/manual --zip`、
+`scripts/manual/check.py build/pr65-source-lock/manual --report build/pr65-source-lock/validation.json`、
+`node scripts/manual/test-search.cjs build/pr65-source-lock/manual` が成功。
+正本42ページ、HTML 131ページ、内部リンク2,812件、旧URL 172件、検索8ケースと
+Markdown/HTML/ZIPの一致を確認しました。ブラウザー描画・RPM/DEBの再生成は
+このローカル検証には含めず、通常のPR CIへ委ねます。
