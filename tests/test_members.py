@@ -45,6 +45,7 @@ def run(binary):
         try:
             a.send(b'POST forbidden\n'); a.expect(b'ERR login required')
             a.send(b'NEW\n'); a.expect(b'ERR login required')
+            a.send(b'NOTES UNREAD\n'); a.expect(b'ERR login required')
             auth(a,'alice',True); auth(b,'bob',True)
             for i in range(12): assert post(a,f'note {i}','body')==i+1
             assert post(b,'response','body',1)==13
@@ -59,6 +60,11 @@ def run(binary):
             assert unread(a,13)==[13]  # Selecting/reading does not acknowledge it.
             navigate(a,'NEW 1',13); a.send(b'SEEN\n'); a.expect(b'SEEN 13')
             a.send(b'NEW 1\n'); a.expect(b'NO UNREAD')
+            header,rows,_=page(a,'NOTES UNREAD')
+            assert header==b'NOTES UNREAD 10' and rows[0].startswith(b'#2 ')
+            _,rows,_=page(a,'NOTES'); assert rows[0].startswith(b'#1 ') and b' unread=0 ' in rows[0]
+            header,rows,_=page(b,'NOTES UNREAD')
+            assert header==b'NOTES UNREAD 12' and rows[0].startswith(b'#1 ') and b' unread=2 ' in rows[0]
             mark(a,1,False); assert unread(a,1)==[1]
             a.send(b'READ 13\n'); assert b'AUTHOR bob' in a.line()
             a.line(); n=int(a.line().split()[1])

@@ -7,7 +7,7 @@
  * Never called by UI/transport code. Copies metadata instead of exposing the
  * SQLite-backed index's transient pointers. The existing worker queue owns
  * serialization of lookup, authorization, journal sync and index publication. */
-typedef struct { uint32_t board,parent,body_size,root,depth; char author[33],title[81]; } ArticleMetadata;
+typedef struct { uint32_t board,parent,body_size,root,depth; uint64_t created; char author[33],title[81]; } ArticleMetadata;
 int article_repository_find(uint32_t article,ArticleMetadata *out);
 /* -1 visibility/storage failure; otherwise 0 visible, 1 concealed. */
 int article_repository_unavailable(uint32_t article);

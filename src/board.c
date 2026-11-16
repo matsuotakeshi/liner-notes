@@ -160,7 +160,7 @@ int article_repository_find(uint32_t id,ArticleMetadata *out) {
     if(!id || id>article_count)return 0;
     const Article *a=article_at(id-1);
     out->board=a->board;out->parent=a->parent;out->body_size=a->body_size;
-    out->root=a->root;out->depth=a->depth;
+    out->root=a->root;out->depth=a->depth;out->created=a->created;
     memcpy(out->author,a->author,sizeof(out->author));memcpy(out->title,a->title,sizeof(out->title));
     return 1;
 }
@@ -268,6 +268,35 @@ static void display_article_tree(const BoardRequest *q,BoardResult *r) {
         const ArticleTreeRow *row=&page.rows[i];unsigned indent=row->depth>12?24:row->depth*2;
         pos+=(size_t)snprintf(r->text+pos,sizeof(r->text)-pos,"%*s#%u parent=%u depth=%u %.80s\r\n",
                              (int)indent,"",row->summary.id,row->summary.parent,row->depth,row->summary.title);
+    }
+    snprintf(r->text+pos,sizeof(r->text)-pos,"END NEXT %u\r\n",page.next);
+}
+static void display_article_notes(const BoardRequest *q,BoardResult *r) {
+    ArticleActor actor={q->user,q->user_epoch,q->board_grants};ArticleNotesPage page;
+    ArticleOutcome result=article_notes(&actor,q->board,q->number,q->notes_unread,&page);
+    if(result!=ARTICLE_OK) {
+        switch(result) {
+        case ARTICLE_LOGIN_REQUIRED: strcpy(r->text,"ERR login required\r\n");break;
+        case ARTICLE_REVOKED: r->revoked=1;strcpy(r->text,"ERR session revoked\r\n");break;
+        case ARTICLE_BOARD_DENIED: strcpy(r->text,"ERR board unavailable\r\n");break;
+        case ARTICLE_MEMBER_STORAGE: strcpy(r->text,"ERR member storage unavailable\r\n");break;
+        case ARTICLE_MODERATION_STORAGE: strcpy(r->text,"ERR moderation storage unavailable\r\n");break;
+        case ARTICLE_POLICY_STORAGE: strcpy(r->text,"ERR board policy storage\r\n");break;
+        case ARTICLE_EXTRAS_STORAGE: strcpy(r->text,"ERR extras storage\r\n");break;
+        case ARTICLE_READ_STATE_STORAGE: strcpy(r->text,"ERR read-state storage\r\n");break;
+        default: strcpy(r->text,"ERR storage unavailable\r\n");break;
+        }
+        return;
+    }
+    size_t pos=(size_t)snprintf(r->text,sizeof(r->text),q->notes_unread?"NOTES UNREAD %u\r\n":"NOTES %u\r\n",page.total);
+    for(unsigned i=0;i<page.count;i++) {
+        const ArticleNoteRow *row=&page.rows[i];char date[32]="unknown",unread_text[16];
+        time_t t=(time_t)row->updated;struct tm *tm=row->updated?localtime(&t):NULL;
+        if(tm)strftime(date,sizeof(date),date_pattern(),tm);
+        if(page.unread_known)snprintf(unread_text,sizeof(unread_text),"%u",row->unread);
+        else strcpy(unread_text,"-");
+        pos+=(size_t)snprintf(r->text+pos,sizeof(r->text)-pos,"#%u replies=%u latest=%u updated=%s unread=%s %.80s\r\n",
+                             row->summary.id,row->replies,row->latest,date,unread_text,row->summary.title);
     }
     snprintf(r->text+pos,sizeof(r->text)-pos,"END NEXT %u\r\n",page.next);
 }
@@ -1109,38 +1138,7 @@ static void execute(const BoardRequest *q,BoardResult *r) {
     } else if(q->op=='T') {
         display_article_tree(q,r);
     } else if(q->op=='O') {
-        uint32_t id=q->number?q->number:1, count=0;
-        if(q->notes_unread && !q->user) { strcpy(r->text,"ERR login required\r\n"); return; }
-        unsigned *unread_counts=calloc((size_t)article_count+1,sizeof(*unread_counts));
-        if(!unread_counts) { strcpy(r->text,"ERR storage unavailable\r\n");return; }
-        if(q->user) for(uint32_t i=1;i<=article_count;i++)
-            if(on_board(i,q->board) && !unavailable(i) && !members_seen(q->user,i))
-                unread_counts[(*article_at(i-1)).root]++;
-        for(uint32_t i=0;i<article_count;i++)
-            if((*article_at(i)).board==q->board && !(*article_at(i)).parent && !unavailable(i+1) &&
-               (!q->notes_unread || unread_counts[i+1])) count++;
-        size_t pos=(size_t)snprintf(r->text,sizeof(r->text),q->notes_unread?"NOTES UNREAD %u\r\n":"NOTES %u\r\n",count);
-        int shown=0;
-        for(;id<=article_count;id++) {
-            if(unavailable(id))continue;
-            Article *a=&(*article_at(id-1)); if(a->board!=q->board || a->parent) continue;
-            if(q->notes_unread && !unread_counts[id]) continue;
-            if(shown++==5) break;
-            uint32_t replies=0,latest=id;
-            for(uint32_t child=tree_next(id);child;child=tree_next(child))
-                if(!unavailable(child)) { replies++;if(child>latest)latest=child; }
-            char date[32]="unknown";
-            uint64_t stamp=(*article_at(latest-1)).created;
-            time_t t=(time_t)stamp; struct tm *tm=stamp?localtime(&t):NULL;
-            if(tm) strftime(date,sizeof(date),date_pattern(),tm);
-            char unread_text[16];
-            if(q->user) snprintf(unread_text,sizeof(unread_text),"%u",unread_counts[id]);
-            else strcpy(unread_text,"-");
-            pos+=(size_t)snprintf(r->text+pos,sizeof(r->text)-pos,"#%u replies=%u latest=%u updated=%s unread=%s %.80s\r\n",
-                                 id,replies,latest,date,unread_text,article_at(id-1)->title);
-        }
-        snprintf(r->text+pos,sizeof(r->text)-pos,"END NEXT %u\r\n",id<=article_count?id:0);
-        free(unread_counts);
+        display_article_notes(q,r);
     } else {
         display_article_page(q,r,0);
     }

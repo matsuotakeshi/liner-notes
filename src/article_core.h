@@ -93,4 +93,23 @@ typedef struct {
 } ArticleUnreadPage;
 ArticleOutcome article_unread(const ArticleActor *,uint32_t board,uint32_t thread,
                               uint32_t start,ArticleUnreadPage *out);
+/* Root threads, ascending IDs, inclusive start (0=1), up to 5 rows.
+ * Replies/latest/unread include only effectively visible nodes. Latest means
+ * greatest visible ID, not greatest timestamp; updated is that node's created.
+ * Guests may list all threads; unread_only requires membership. No marking.
+ * Total covers all qualifying roots; next is the next root or 0.
+ * Output is owned, with no formatted dates/body/index pointers. Errors clear it. */
+typedef struct {
+    ArticleSummary summary;
+    uint32_t replies,latest,unread;
+    uint64_t updated;
+} ArticleNoteRow;
+typedef struct {
+    uint32_t total,next;
+    unsigned count;
+    int unread_known;
+    ArticleNoteRow rows[5];
+} ArticleNotesPage;
+ArticleOutcome article_notes(const ArticleActor *,uint32_t board,uint32_t start,
+                             int unread_only,ArticleNotesPage *out);
 #endif

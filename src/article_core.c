@@ -333,3 +333,68 @@ ArticleOutcome article_unread(const ArticleActor *actor,uint32_t board,uint32_t 
     if(result!=ARTICLE_OK)memset(out,0,sizeof(*out));
     return result;
 }
+
+static ArticleOutcome note_summary(uint32_t user,uint32_t board,uint32_t root,uint32_t count,
+                                   uint32_t *visited,ArticleNoteRow *row) {
+    for(uint32_t id=root;id;id=article_repository_tree_next(id)) {
+        ArticleMetadata article;
+        if(++(*visited)>count || id>count || !article_repository_find(id,&article) ||
+           article.board!=board || article.root!=root ||
+           (id==root?article.parent!=0:article.parent==0))return ARTICLE_STORAGE;
+        int hidden=article_repository_unavailable(id);
+        if(hidden<0)return ARTICLE_STORAGE;
+        if(hidden)continue;
+        if(id==root) {
+            row->summary.id=id;row->summary.board=board;row->summary.parent=0;
+            memcpy(row->summary.title,article.title,sizeof(row->summary.title));
+        } else row->replies++;
+        if(id>row->latest) { row->latest=id;row->updated=article.created; }
+        if(user) {
+            int seen=members_seen(user,id);
+            if(members_broken())return ARTICLE_READ_STATE_STORAGE;
+            if(!seen)row->unread++;
+        }
+    }
+    return ARTICLE_OK;
+}
+
+static ArticleOutcome notes_articles(const ArticleActor *actor,uint32_t board,uint32_t start,
+                                     int unread_only,ArticleNotesPage *out) {
+    ArticleOutcome result=health();
+    if(result!=ARTICLE_OK)return result;
+    result=identity(actor,!unread_only);
+    if(result!=ARTICLE_OK)return result;
+    uint32_t user=actor?actor->user:0;
+    if(!catalog_read(board,user))return ARTICLE_BOARD_DENIED;
+    uint32_t count=article_repository_count(),visited=0;
+    if(count>CONTENT_ID_MAX)return ARTICLE_STORAGE;
+    out->unread_known=!!user;
+    for(uint32_t id=1;id<=count;id++) {
+        ArticleMetadata article;
+        if(!article_repository_find(id,&article))return ARTICLE_STORAGE;
+        if(article.board!=board || article.parent)continue;
+        int hidden=article_repository_unavailable(id);
+        if(hidden<0)return ARTICLE_STORAGE;
+        if(hidden)continue;
+        ArticleNoteRow row={0};
+        result=note_summary(user,board,id,count,&visited,&row);
+        if(result!=ARTICLE_OK)return result;
+        if(unread_only && !row.unread)continue;
+        out->total++;
+        if(id<start)continue;
+        if(out->count<5)out->rows[out->count++]=row;
+        else if(!out->next)out->next=id;
+    }
+    return ARTICLE_OK;
+}
+
+ArticleOutcome article_notes(const ArticleActor *actor,uint32_t board,uint32_t start,
+                             int unread_only,ArticleNotesPage *out) {
+    if(!out)return ARTICLE_INVALID_READ;
+    memset(out,0,sizeof(*out));
+    policy_context(actor?actor->board_grants:NULL);
+    ArticleOutcome result=notes_articles(actor,board,start,unread_only,out);
+    policy_context(NULL);
+    if(result!=ARTICLE_OK)memset(out,0,sizeof(*out));
+    return result;
+}
