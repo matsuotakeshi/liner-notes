@@ -30,6 +30,12 @@ static ArticleMetadata page_items[301];
 static char page_bodies[301][32];
 static unsigned char page_hidden[301],candidates[301];
 static unsigned body_probes[301],candidate_calls;
+static uint32_t tree_next_ids[301];
+static unsigned tree_steps;
+
+uint32_t article_repository_tree_next(uint32_t id) {
+    assert(paging && id && id<=page_count && id<=300);tree_steps++;return tree_next_ids[id];
+}
 
 uint32_t article_repository_count(void) { return page_count; }
 uint32_t article_repository_search_next(uint32_t start,const char *query) {
@@ -282,6 +288,102 @@ static ArticleActor page_reset(uint32_t count) {
     }
     return actor;
 }
+static ArticleActor tree_reset(uint32_t count) {
+    ArticleActor actor=page_reset(count);memset(tree_next_ids,0,sizeof(tree_next_ids));tree_steps=0;
+    for(uint32_t i=1;i<=count;i++) {
+        page_items[i].root=1;page_items[i].depth=i==1?0:1;page_items[i].parent=i==1?0:1;
+        tree_next_ids[i]=i<count?i+1:0;
+    }
+    return actor;
+}
+static void tree_cleared(const ArticleTreePage *page) {
+    const unsigned char *p=(const unsigned char *)page;
+    for(size_t i=0;i<sizeof(*page);i++)assert(!p[i]);
+    assert(!context && !commits && !moderation_writes && !publications && !body_reads);
+    for(unsigned i=0;i<=300;i++)assert(!body_probes[i]);
+}
+static void tree_tests(void) {
+    ArticleTreePage page;ArticleActor actor=tree_reset(6);
+    tree_next_ids[2]=4;tree_next_ids[4]=3;tree_next_ids[3]=6;
+    page_items[4].parent=2;page_items[4].depth=2;page_items[5].root=5;
+    assert(article_tree(NULL,2,4,0,&page)==ARTICLE_OK);
+    assert(page.root==1 && page.count==5 && !page.next && !context);
+    uint32_t expected[]={1,2,4,3,6};
+    for(unsigned i=0;i<5;i++)assert(page.rows[i].summary.id==expected[i]);
+    assert(page.rows[2].summary.parent==2 && page.rows[2].depth==2);
+    strcpy(page_items[4].title,"changed");assert(!strcmp(page.rows[2].summary.title,"row 4"));
+    page_hidden[2]=page_hidden[4]=1;
+    assert(article_tree(&actor,2,4,2,&page)==ARTICLE_OK);
+    assert(page.root==1 && page.count==2 && page.rows[0].summary.id==3 && page.rows[1].summary.id==6);
+    assert(article_tree(&actor,2,1,5,&page)==ARTICLE_INVALID_CURSOR);tree_cleared(&page);
+    assert(article_tree(&actor,2,1,7,&page)==ARTICLE_INVALID_CURSOR);tree_cleared(&page);
+    assert(article_tree(&actor,2,1,UINT32_MAX,&page)==ARTICLE_INVALID_CURSOR);tree_cleared(&page);
+    assert(article_tree(&actor,2,0,0,&page)==ARTICLE_NOT_FOUND);tree_cleared(&page);
+    assert(article_tree(&actor,2,7,0,&page)==ARTICLE_NOT_FOUND);tree_cleared(&page);
+    page_items[6].board=3;
+    assert(article_tree(&actor,2,6,0,&page)==ARTICLE_NOT_FOUND);tree_cleared(&page);
+    assert(article_tree(&actor,2,1,6,&page)==ARTICLE_INVALID_CURSOR);tree_cleared(&page);
+    assert(article_tree(&actor,2,1,0,&page)==ARTICLE_STORAGE);tree_cleared(&page);
+
+    actor=tree_reset(12);page_hidden[9]=page_hidden[10]=1;
+    page_items[8].depth=10000;
+    assert(article_tree(&actor,2,1,0,&page)==ARTICLE_OK);
+    assert(page.count==8 && page.next==11 && page.rows[7].depth==10000);
+    assert(article_tree(&actor,2,1,page.next,&page)==ARTICLE_OK);
+    assert(page.count==2 && page.rows[0].summary.id==11 && !page.next);
+    page_hidden[11]=1;
+    assert(article_tree(&actor,2,1,11,&page)==ARTICLE_OK);
+    assert(page.count==1 && page.rows[0].summary.id==12 && !page.next);
+    page_hidden[12]=1;
+    assert(article_tree(&actor,2,1,0,&page)==ARTICLE_OK);
+    assert(page.count==8 && !page.next);
+    memset(page_hidden,1,sizeof(page_hidden));
+    assert(article_tree(&actor,2,1,0,&page)==ARTICLE_OK);
+    assert(page.root==1 && !page.count && !page.next);
+    for(unsigned i=0;i<8;i++)assert(!page.rows[i].summary.id && !page.rows[i].summary.title[0]);
+    page_hidden[1]=0;
+    assert(article_tree(&actor,2,1,0,&page)==ARTICLE_OK);assert(page.count==1);
+
+    actor=tree_reset(3);epoch++;
+    assert(article_tree(&actor,2,1,0,&page)==ARTICLE_REVOKED);tree_cleared(&page);
+    epoch--;suspended=1;
+    assert(article_tree(&actor,2,1,0,&page)==ARTICLE_REVOKED);tree_cleared(&page);
+    suspended=0;actor.user=99;
+    assert(article_tree(&actor,2,1,0,&page)==ARTICLE_REVOKED);tree_cleared(&page);
+    actor.user=1;manager=1;readable=0;
+    assert(article_tree(&actor,2,1,0,&page)==ARTICLE_BOARD_DENIED);tree_cleared(&page);
+    readable=1;locked=1;
+    assert(article_tree(&actor,2,1,0,&page)==ARTICLE_BOARD_DENIED);tree_cleared(&page);
+    grants[2]=9;assert(article_tree(&actor,2,1,0,&page)==ARTICLE_OK);
+    grant_revision++;
+    assert(article_tree(&actor,2,1,2,&page)==ARTICLE_BOARD_DENIED);tree_cleared(&page);
+    locked=0;
+    int *errors[]={&member_error,&moderation_error,&policy_error,&extras_error};
+    ArticleOutcome wanted[]={ARTICLE_MEMBER_STORAGE,ARTICLE_MODERATION_STORAGE,
+                             ARTICLE_POLICY_STORAGE,ARTICLE_EXTRAS_STORAGE};
+    for(unsigned i=0;i<4;i++) {
+        *errors[i]=1;assert(article_tree(&actor,2,1,0,&page)==wanted[i]);tree_cleared(&page);*errors[i]=0;
+    }
+    actor=tree_reset(12);visibility_error=9;
+    assert(article_tree(&actor,2,1,0,&page)==ARTICLE_STORAGE);tree_cleared(&page);
+    visibility_error=0;missing_id=2;
+    assert(article_tree(&actor,2,1,0,&page)==ARTICLE_STORAGE);tree_cleared(&page);
+    missing_id=0;page_items[2].root=2;
+    assert(article_tree(&actor,2,1,0,&page)==ARTICLE_STORAGE);tree_cleared(&page);
+    page_items[2].root=1;tree_next_ids[2]=13;
+    assert(article_tree(&actor,2,1,0,&page)==ARTICLE_STORAGE);tree_cleared(&page);
+    tree_next_ids[2]=1;
+    assert(article_tree(&actor,2,1,0,&page)==ARTICLE_STORAGE);tree_cleared(&page);
+    memset(page_hidden,1,sizeof(page_hidden));tree_steps=0;
+    assert(article_tree(&actor,2,1,0,&page)==ARTICLE_STORAGE);tree_cleared(&page);
+    assert(tree_steps==12);
+    page_items[1].root=0;
+    assert(article_tree(&actor,2,1,0,&page)==ARTICLE_STORAGE);tree_cleared(&page);
+    page_count=UINT32_MAX;
+    assert(article_tree(&actor,2,1,0,&page)==ARTICLE_STORAGE);tree_cleared(&page);
+    assert(article_tree(&actor,2,1,0,NULL)==ARTICLE_INVALID_READ);
+    puts("PASS: structured tree DFS, thread/board cursor bounds, hidden pages, revoked grants and partial-result clearing");
+}
 static void page_cleared(const ArticlePage *page) {
     const unsigned char *p=(const unsigned char *)page;
     for(size_t i=0;i<sizeof(*page);i++)assert(!p[i]);
@@ -473,5 +575,6 @@ int main(void) {
     read_tests();
     moderation_tests();
     page_tests();
+    tree_tests();
     return 0;
 }

@@ -2,8 +2,9 @@
 
 Baseline: main `3e7be1e2c6531a8564356fdcc8549a281104ad90` (PR #59).
 This LN-23/24 slice extracts ordinary LIST and current-board SEARCH/SEARCHFROM.
-It does not yet extract NOTES, TREE, FIND, NEWS, unread or sequential navigation,
-and does not complete Issue #54 or provide a network-facing structured API.
+NOTES, FIND, NEWS, unread and sequential navigation remain separate work.
+TREE is now documented in [Structured article trees](ARTICLE_TREE.md).
+These slices do not complete Issue #54 or provide a network-facing structured API.
 
 ## Service and ownership
 

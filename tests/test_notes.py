@@ -77,6 +77,8 @@ def run(binary):
             rows=tree(a,1)
             assert [int(r.strip().split()[0][1:]) for r in rows]==[1,2,4,3,6]
             assert rows[2].startswith(b'    #4 parent=2 depth=2')
+            header,child_rows,child_cursor=page(a,'TREE 4')
+            assert header==b'TREE 1' and child_rows==rows and child_cursor==0
             a.send(b'TREE 1 5\n'); a.expect(b'ERR tree cursor')
             a.send(b'TREE 1 10001\n'); a.expect(b'ERR tree cursor')
             print('PASS: branched DFS, parent/child/sibling navigation, current reply and session isolation')
