@@ -25,7 +25,7 @@ typedef enum {
     ARTICLE_READ_STATE_STORAGE,
     ARTICLE_LEGACY_BOARDS, ARTICLE_LEGACY_MEMBERS, ARTICLE_BODY_LIMIT,
     ARTICLE_FULL, ARTICLE_INVALID_DRAFT, ARTICLE_LEGACY_BODY,
-    ARTICLE_POST_UNAVAILABLE, ARTICLE_POST_UNCERTAIN
+    ARTICLE_POST_UNAVAILABLE, ARTICLE_POST_UNCERTAIN, ARTICLE_DRAFT_CONFLICT
 } ArticleOutcome;
 
 /* Local editing admission and posting. Preparation grants no durable authority:
@@ -37,6 +37,22 @@ typedef enum {
 ArticleOutcome article_prepare_post(const ArticleActor *,uint32_t board,uint32_t parent);
 ArticleOutcome article_post(const ArticleActor *,uint32_t board,uint32_t parent,
                             const char *guest_name,const char *title,const char *body,uint32_t *out_id);
+
+/* Member-owned saved article copy, distinct from the live editor and posting.
+ * Status reveals only the revision (0 = none). Resume copies metadata/body
+ * only after current read/write ACL and parent visibility checks. Outputs are
+ * caller-owned and cleared on error; body needs room for its terminating NUL.
+ * Save/remove use the store's exact revision comparison, never force overwrite.
+ * Removal/status remain available after board access is lost. Empty body can
+ * be saved; posting quotas/format upgrades are checked by article_post later.
+ * No target-member override, session/SEEN mutation or implicit copy removal.
+ * Input/output buffers must not overlap. Calls run on the existing worker. */
+typedef struct { uint32_t board,parent,revision; char title[81]; } ArticleDraftView;
+ArticleOutcome article_draft_status(const ArticleActor *,uint32_t *revision);
+ArticleOutcome article_draft_resume(const ArticleActor *,ArticleDraftView *,char *body,size_t capacity);
+ArticleOutcome article_draft_save(const ArticleActor *,uint32_t board,uint32_t parent,
+                                 const char *title,const char *body,uint32_t expected,uint32_t *revision);
+ArticleOutcome article_draft_remove(const ArticleActor *,uint32_t expected,uint32_t *revision);
 
 ArticleOutcome article_withdraw(const ArticleActor *,uint32_t board,
                                uint32_t article,int confirmed);

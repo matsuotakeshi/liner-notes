@@ -63,6 +63,26 @@ int article_repository_append(uint32_t board,uint32_t parent,uint32_t user,
     *id=append_bad_id?page_count+1:page_count;return 1;
 }
 
+/* Saved-copy store keeps per-member revisions, including delete tombstones. */
+static MemberDraft saved_copies[4];
+static unsigned draft_reads,draft_writes;
+static int draft_read_error,draft_write_error;
+int members_draft(uint32_t user,MemberDraft *out) {
+    assert(user>0 && user<4);draft_reads++;*out=saved_copies[user];
+    if(draft_read_error) { strcpy(out->body,"partial secret");member_error=1;return 0; }
+    return out->board!=0;
+}
+int members_store_draft(uint32_t user,const MemberDraft *draft,uint32_t expected,int remove,uint32_t *revision) {
+    assert(user>0 && user<4);draft_writes++;
+    MemberDraft *current=&saved_copies[user];
+    if(draft_write_error) { *revision=999;return -1; }
+    if(expected!=current->revision && !(expected==0 && !current->board && !remove))return 0;
+    if(remove && !current->board)return 0;
+    *revision=current->revision+1;
+    if(remove)memset(current,0,sizeof(*current));else *current=*draft;
+    current->revision=*revision;return 1;
+}
+
 static int discovery;
 static unsigned char board_present[CATALOG_MAX+1],board_visible[CATALOG_MAX+1],board_readable[CATALOG_MAX+1],board_writable[CATALOG_MAX+1];
 static uint32_t board_next[CATALOG_MAX+1],board_parent[CATALOG_MAX+1],board_depth[CATALOG_MAX+1];
@@ -1252,6 +1272,130 @@ static void notes_tests(void) {
     assert(article_notes(&actor,2,0,0,NULL)==ARTICLE_INVALID_READ);
     puts("PASS: structured thread summaries, visible statistics, member unread filter, guest pages, revoked authority and bounded traversal");
 }
+static ArticleActor draft_reset(void) {
+    ArticleActor actor=reset();
+    memset(saved_copies,0,sizeof(saved_copies));draft_reads=draft_writes=0;
+    draft_read_error=draft_write_error=0;
+    return actor;
+}
+static void draft_error(ArticleOutcome actual,ArticleOutcome expected,const ArticleDraftView *view,const char *body,size_t size) {
+    ArticleDraftView empty={0};assert(actual==expected && !context);
+    assert(!memcmp(view,&empty,sizeof(empty)));
+    for(size_t i=0;i<size;i++)assert(!body[i]);
+}
+static void draft_tests(void) {
+    ArticleActor actor=draft_reset(),other=actor;other.user=2;
+    ArticleDraftView view;char body[64];uint32_t revision=999;
+    assert(article_draft_status(&actor,&revision)==ARTICLE_OK && !revision);
+    assert(article_draft_resume(&actor,&view,body,sizeof(body))==ARTICLE_OK && !view.revision && !*body);
+    assert(article_draft_save(&actor,2,7,"draft","text\r\n",0,&revision)==ARTICLE_OK && revision==1);
+    assert(saved_copies[1].board==2 && saved_copies[1].parent==7 && !context);
+    assert(article_draft_status(&other,&revision)==ARTICLE_OK && !revision);
+    assert(article_draft_resume(&other,&view,body,sizeof(body))==ARTICLE_OK && !view.revision && !*body);
+    manager=1;assert(article_draft_remove(&other,1,&revision)==ARTICLE_DRAFT_CONFLICT && !revision);
+    assert(article_draft_resume(&actor,&view,body,sizeof(body))==ARTICLE_OK);
+    assert(view.board==2 && view.parent==7 && view.revision==1 && !strcmp(view.title,"draft") && !strcmp(body,"text\r\n"));
+    assert(article_draft_save(&actor,2,7,"newer","new\r\n",view.revision,&revision)==ARTICLE_OK && revision==2);
+    assert(article_draft_save(&actor,2,7,"stale","old\r\n",view.revision,&revision)==ARTICLE_DRAFT_CONFLICT && !revision);
+    assert(article_draft_save(&actor,2,7,"fresh","",0,&revision)==ARTICLE_DRAFT_CONFLICT && !revision);
+    assert(article_draft_remove(&actor,1,&revision)==ARTICLE_DRAFT_CONFLICT && !revision);
+    assert(!strcmp(saved_copies[1].title,"newer") && saved_copies[1].revision==2);
+    /* Losing board access prevents resume/save, but not checking/removing own copy. */
+    readable=0;
+    memset(&view,0x7f,sizeof(view));memset(body,0x7f,sizeof(body));
+    draft_error(article_draft_resume(&actor,&view,body,sizeof(body)),ARTICLE_BOARD_DENIED,&view,body,sizeof(body));
+    unsigned before=draft_writes;
+    assert(article_draft_save(&actor,2,7,"title","",2,&revision)==ARTICLE_BOARD_DENIED && !revision && draft_writes==before);
+    assert(article_draft_status(&actor,&revision)==ARTICLE_OK && revision==2);
+    assert(article_draft_remove(&actor,2,&revision)==ARTICLE_OK && revision==3);
+    assert(!saved_copies[1].board && saved_copies[1].revision==3);
+    assert(article_draft_status(&actor,&revision)==ARTICLE_OK && !revision);
+    assert(article_draft_remove(&actor,3,&revision)==ARTICLE_DRAFT_CONFLICT && !revision);
+    readable=1;
+    assert(article_draft_save(&actor,2,0,"empty","",0,&revision)==ARTICLE_OK && revision==4);
+    assert(article_draft_resume(&actor,&view,body,1)==ARTICLE_OK && view.revision==4 && !*body);
+    /* Save is not a post: no article publication, quota reservation or read marks. */
+    assert(!commits && !publications && !mark_calls && !seen_calls);
+
+    actor=draft_reset();
+    assert(article_draft_save(&actor,2,7,"draft","secret\r\n",0,&revision)==ARTICLE_OK);
+    before=draft_writes;writable=0;
+    draft_error(article_draft_resume(&actor,&view,body,sizeof(body)),ARTICLE_BOARD_DENIED,&view,body,sizeof(body));
+    assert(article_draft_save(&actor,2,7,"x","",1,&revision)==ARTICLE_BOARD_DENIED);
+    writable=1;locked=1;
+    draft_error(article_draft_resume(&actor,&view,body,sizeof(body)),ARTICLE_BOARD_DENIED,&view,body,sizeof(body));
+    grants[2]=(uint32_t)grant_revision;
+    assert(article_draft_resume(&actor,&view,body,sizeof(body))==ARTICLE_OK);
+    grant_revision++;
+    draft_error(article_draft_resume(&actor,&view,body,sizeof(body)),ARTICLE_BOARD_DENIED,&view,body,sizeof(body));
+    locked=0;hidden=1;
+    draft_error(article_draft_resume(&actor,&view,body,sizeof(body)),ARTICLE_HIDDEN,&view,body,sizeof(body));
+    assert(article_draft_save(&actor,2,7,"x","",1,&revision)==ARTICLE_HIDDEN && !revision);
+    hidden=-1;
+    draft_error(article_draft_resume(&actor,&view,body,sizeof(body)),ARTICLE_STORAGE,&view,body,sizeof(body));
+    hidden=0;stored.board=3;
+    draft_error(article_draft_resume(&actor,&view,body,sizeof(body)),ARTICLE_NOT_FOUND,&view,body,sizeof(body));
+    stored.board=2;saved_copies[1].parent=8;
+    draft_error(article_draft_resume(&actor,&view,body,sizeof(body)),ARTICLE_NOT_FOUND,&view,body,sizeof(body));
+    saved_copies[1].parent=7;
+    draft_error(article_draft_resume(&actor,&view,body,8),ARTICLE_BUFFER_TOO_SMALL,&view,body,8);
+    assert(article_draft_resume(&actor,&view,body,9)==ARTICLE_OK && !strcmp(body,"secret\r\n"));
+    assert(article_draft_resume(&actor,&view,NULL,0)==ARTICLE_BUFFER_TOO_SMALL && !view.revision);
+    assert(draft_writes==before && saved_copies[1].revision==1);
+
+    /* All entry points reject guests, revoked/unknown identities and broken stores. */
+    int *errors[]={&member_error,&moderation_error,&policy_error,&extras_error};
+    ArticleOutcome failures[]={ARTICLE_MEMBER_STORAGE,ARTICLE_MODERATION_STORAGE,ARTICLE_POLICY_STORAGE,ARTICLE_EXTRAS_STORAGE};
+    for(unsigned i=0;i<9;i++) {
+        actor=draft_reset();ArticleOutcome want=ARTICLE_REVOKED;
+        if(i<4) { *errors[i]=1;want=failures[i]; }
+        else if(i==4) { actor.user=0;want=ARTICLE_LOGIN_REQUIRED; }
+        else if(i==5)epoch++;
+        else if(i==6)suspended=1;
+        else if(i==7)actor.user=99;
+        else { draft_read_error=1;want=ARTICLE_MEMBER_STORAGE; }
+        assert(article_draft_status(&actor,&revision)==want && !revision);
+        draft_error(article_draft_resume(&actor,&view,body,sizeof(body)),want,&view,body,sizeof(body));
+        assert(article_draft_save(&actor,2,0,"x","",0,&revision)==want && !revision);
+        assert(article_draft_remove(&actor,1,&revision)==want && !revision);
+        assert(!draft_writes && !context);
+    }
+    /* Inject read failure independently at every entry, including partial body. */
+    for(unsigned op=0;op<4;op++) {
+        actor=draft_reset();draft_read_error=1;ArticleOutcome result;
+        if(op==0)result=article_draft_status(&actor,&revision);
+        else if(op==1)result=article_draft_resume(&actor,&view,body,sizeof(body));
+        else if(op==2)result=article_draft_save(&actor,2,0,"x","",0,&revision);
+        else result=article_draft_remove(&actor,1,&revision);
+        assert(result==ARTICLE_MEMBER_STORAGE && draft_reads==1 && !draft_writes && !context);
+        if(op==1)draft_error(result,ARTICLE_MEMBER_STORAGE,&view,body,sizeof(body));
+        else assert(!revision);
+    }
+    actor=draft_reset();
+    assert(article_draft_status(NULL,&revision)==ARTICLE_LOGIN_REQUIRED && !revision);
+    assert(article_draft_save(&actor,2,0,NULL,"",0,&revision)==ARTICLE_INVALID_DRAFT && !revision);
+    assert(article_draft_save(&actor,2,0,"", "",0,&revision)==ARTICLE_INVALID_DRAFT);
+    assert(article_draft_save(&actor,2,0,"x",NULL,0,&revision)==ARTICLE_INVALID_DRAFT);
+    char title[82];memset(title,'x',81);title[81]=0;
+    assert(article_draft_save(&actor,2,0,title,"",0,&revision)==ARTICLE_INVALID_DRAFT);
+    static char large[CONTENT_BODY+2];memset(large,'x',sizeof(large)-1);large[sizeof(large)-1]=0;
+    assert(article_draft_save(&actor,2,0,"x",large,0,&revision)==ARTICLE_INVALID_DRAFT && !draft_writes);
+    title[80]=0;large[CONTENT_BODY-2]='\r';large[CONTENT_BODY-1]='\n';large[CONTENT_BODY]=0;
+    assert(article_draft_save(&actor,2,0,title,large,0,&revision)==ARTICLE_OK && revision==1);
+    memset(large,0x7f,sizeof(large));
+    assert(article_draft_resume(&actor,&view,large,sizeof(large))==ARTICLE_OK && strlen(large)==CONTENT_BODY && strlen(view.title)==80);
+    draft_write_error=1;
+    assert(article_draft_save(&actor,2,0,"failure","",1,&revision)==ARTICLE_MEMBER_STORAGE && !revision);
+    assert(article_draft_remove(&actor,1,&revision)==ARTICLE_MEMBER_STORAGE && !revision);
+    assert(saved_copies[1].revision==1 && !context);
+    assert(article_draft_status(&actor,NULL)==ARTICLE_INVALID_DRAFT);
+    assert(article_draft_save(&actor,2,0,"x","",1,NULL)==ARTICLE_INVALID_DRAFT);
+    assert(article_draft_remove(&actor,1,NULL)==ARTICLE_INVALID_DRAFT);
+    memset(body,0x7f,sizeof(body));assert(article_draft_resume(&actor,NULL,body,sizeof(body))==ARTICLE_INVALID_DRAFT);
+    for(unsigned i=0;i<sizeof(body);i++)assert(!body[i]);
+    puts("PASS: saved draft Core ownership, revision conflicts, ACL/parent rechecks, failed-output clearing and body boundaries");
+}
+
 int main(void) {
     ArticleActor actor=reset();
     denied(article_withdraw(NULL,2,7,1),ARTICLE_LOGIN_REQUIRED);
@@ -1349,5 +1493,6 @@ int main(void) {
     navigation_tests();
     discovery_tests();
     posting_tests();
+    draft_tests();
     return 0;
 }

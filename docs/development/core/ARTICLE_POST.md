@@ -3,7 +3,9 @@
 Baseline: main `364739cf195028b33d8d7fe257bc3f4db2ce8a61` (PR #70).
 This LN-23/24 slice extracts local POST/REPLY admission and commit into Core.
 Session editors, saved-draft persistence/resume, protocol rendering and shared
-board import authentication remain in their existing layers.
+board import authentication remain in their existing layers at this baseline.
+The subsequent [saved-draft extraction](ARTICLE_DRAFT.md) moves saved-copy
+operations into Core; login notices and live editor state remain separate.
 
 ## API and trust boundary
 
