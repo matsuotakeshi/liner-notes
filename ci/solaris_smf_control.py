@@ -79,8 +79,30 @@ def act(action):
     return {"requested": action}
 
 
-def send(value):
-    print(json.dumps(value, sort_keys=True), flush=True)
+def send(value, fd=1, clock=time.monotonic):
+    # A caller keeping stdout open without reading must not stall the root
+    # helper past its cleanup deadline. The fixed log reply is also bounded.
+    data = (json.dumps(value, sort_keys=True) + "\n").encode()
+    if len(data) > 262144:
+        raise ValueError("Oversized SMF reply")
+    blocking = os.get_blocking(fd)
+    deadline = clock() + 10
+    os.set_blocking(fd, False)
+    try:
+        while data:
+            if clock() >= deadline:
+                raise TimeoutError("SMF reply reader stalled")
+            if not select.select([], [fd], [], 0.2)[1]:
+                continue
+            try:
+                written = os.write(fd, data)
+            except BlockingIOError:
+                continue
+            if not written:
+                raise BrokenPipeError("SMF reply reader closed")
+            data = data[written:]
+    finally:
+        os.set_blocking(fd, blocking)
 
 
 def serve(fd=0, clock=time.monotonic):

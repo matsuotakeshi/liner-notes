@@ -24,6 +24,8 @@ Liner Notes SMF service was present. No host configuration was changed.
   Neither service method nor runtime runs as root.
 - The helper reads bounded chunks, not blocking readline. A partial request cannot
   bypass the 30-second heartbeat or 600-second overall session limit.
+- Replies use bounded nonblocking writes with a 10-second deadline. A caller
+  leaving the reply pipe open without reading cannot indefinitely prevent cleanup.
 - EOF, invalid input, expiry and ordinary interruption stop the owned service with
   `disable -s -T 30`, then delete only that registration. Deletion is refused if
   disabled state is not confirmed. The helper is outside the build process group;

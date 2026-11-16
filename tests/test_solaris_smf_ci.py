@@ -199,6 +199,32 @@ class SmfTests(unittest.TestCase):
         for action in ("import", "reboot", "disable ssh", "log /etc/shadow"):
             with self.assertRaises(ValueError): instance.request(action)
 
+    @unittest.skipUnless(os.name == "posix", "POSIX nonblocking pipe")
+    def test_blocked_reply_writer_expires_and_restores_fd_mode(self):
+        read, write = os.pipe()
+        try:
+            os.set_blocking(write, False)
+            while True:
+                try: os.write(write, b"x" * 4096)
+                except BlockingIOError: break
+            while True:
+                try: os.write(write, b"x")
+                except BlockingIOError: break
+            os.set_blocking(write, True)
+            with self.assertRaisesRegex(TimeoutError, "reader stalled"):
+                control.send({"alive": True}, write, clock=iter((0, 0, 11)).__next__)
+            self.assertTrue(os.get_blocking(write))
+        finally:
+            os.close(read); os.close(write)
+
+    def test_reply_failure_cleans_owned_service(self):
+        fake = Fake()
+        with patch.object(control, "command", fake), \
+             patch.object(control, "send", side_effect=TimeoutError("reply reader stalled")), \
+             self.assertRaises(TimeoutError):
+            control.serve()
+        self.assertFalse(fake.present)
+
 
 if __name__ == "__main__":
     unittest.main()
