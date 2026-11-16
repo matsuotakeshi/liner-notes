@@ -89,7 +89,12 @@
         "tests/test_resume_receipt.py",
         "tests/test_zmodem.py",
         "tests/transfer_terminal_fixture.py",
-        "tests/test_transfer_terminal.py"
+        "tests/test_transfer_terminal.py",
+        "ci/solaris_smf_control.py",
+        "ci/solaris_smf_method.py",
+        "ci/solaris_smf_lifecycle.py",
+        "ci/prepare_solaris_smf.py",
+        "tests/test_solaris_smf_ci.py"
       ]
     },
     {

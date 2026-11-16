@@ -9,6 +9,8 @@ on:
       - "tests/test_freebsd_package_lease.py"
       - ".github/workflows/freebsd-package.yml"
       - "ci/solaris_ci.py"
+      - "ci/*solaris_smf*.py"
+      - "tests/test_solaris_smf_ci.py"
       - "solaris/**"
       - "scripts/*solaris*.py"
       - "tests/test_solaris_service.py"
@@ -39,6 +41,8 @@ on:
       - "tests/test_freebsd_package_lease.py"
       - ".github/workflows/freebsd-package.yml"
       - "ci/solaris_ci.py"
+      - "ci/*solaris_smf*.py"
+      - "tests/test_solaris_smf_ci.py"
       - "solaris/**"
       - "scripts/*solaris*.py"
       - "tests/test_solaris_service.py"
@@ -81,6 +85,7 @@ jobs:
       - run: python tests/test_freebsd_package_lease.py
       - run: python tests/test_solaris_port.py
       - run: python tests/test_solaris_service.py
+      - run: python tests/test_solaris_smf_ci.py
       - run: python tests/test_door_lock.py
       - run: python tests/test_posix_locks.py
       - run: python tests/test_resume_receipt.py
