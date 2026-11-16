@@ -1,9 +1,15 @@
 """Diagnose both current runtime SQLite formats without modifying their files."""
-import hashlib,json,os,subprocess,sys,tempfile,time
+import argparse,hashlib,json,os,subprocess,sys,tempfile,time
 from pathlib import Path
 
 ROOT=Path(__file__).resolve().parents[1]
-runtime=Path(sys.argv[1] if len(sys.argv)>1 else './runtime').resolve()
+parser=argparse.ArgumentParser(description=__doc__)
+parser.add_argument('runtime',nargs='?',type=Path,default=Path('./runtime'))
+parser.add_argument('--doctor',type=Path,help='Installed doctor executable; defaults to the source script')
+args=parser.parse_args()
+runtime=args.runtime.resolve(strict=True)
+doctor_command=([str(args.doctor.resolve(strict=True))] if args.doctor else
+                [sys.executable,'-B',str(ROOT/'scripts/doctor.py')])
 
 with tempfile.TemporaryDirectory(prefix='doctor-runtime-') as temporary:
     root=Path(temporary)
@@ -27,7 +33,7 @@ with tempfile.TemporaryDirectory(prefix='doctor-runtime-') as temporary:
         config.write_text('LINER_NOTES_OPTIONS="'+option+' /var/lib/liner-notes/liner.sqlite 2222"\n',encoding='utf-8')
         def state():return {str(p.relative_to(stage)):(hashlib.sha256(p.read_bytes()).hexdigest(),p.stat().st_mode,p.stat().st_mtime_ns) for p in stage.rglob('*') if p.is_file()}
         before=state()
-        result=subprocess.run([sys.executable,'-B',str(ROOT/'scripts/doctor.py'),'--root',str(stage),'--os','Linux','--check-database','--json','--lang','en'],capture_output=True,text=True,timeout=60)
+        result=subprocess.run([*doctor_command,'--root',str(stage),'--os','Linux','--check-database','--json','--lang','en'],capture_output=True,text=True,timeout=60)
         assert result.returncode==0,(result.stdout,result.stderr)
         assert json.loads(result.stdout)['read_only']
         assert before==state(),'diagnosis changed runtime data/configuration'
