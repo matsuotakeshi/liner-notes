@@ -21,7 +21,8 @@ typedef enum {
     ARTICLE_POSTING_DENIED, ARTICLE_INVALID_TITLE, ARTICLE_ADMIN_REQUIRED,
     ARTICLE_STORAGE, ARTICLE_BUFFER_TOO_SMALL, ARTICLE_INVALID_READ,
     ARTICLE_WITHDRAWN_TARGET, ARTICLE_MODERATION_WRITE,
-    ARTICLE_BOARD_DENIED, ARTICLE_INVALID_QUERY, ARTICLE_INVALID_CURSOR
+    ARTICLE_BOARD_DENIED, ARTICLE_INVALID_QUERY, ARTICLE_INVALID_CURSOR,
+    ARTICLE_READ_STATE_STORAGE
 } ArticleOutcome;
 
 ArticleOutcome article_withdraw(const ArticleActor *,uint32_t board,
@@ -77,4 +78,19 @@ typedef struct {
 } ArticleTreePage;
 ArticleOutcome article_tree(const ArticleActor *,uint32_t board,uint32_t article,
                             uint32_t start,ArticleTreePage *out);
+/* Authenticated member's own read state. No target-member override; only
+ * readable, effectively visible articles may be marked. Nonzero seen=read. */
+ArticleOutcome article_mark_seen(const ArticleActor *,uint32_t board,uint32_t article,int seen);
+/* thread=0 means whole board; otherwise use that article's containing thread.
+ * total/first cover the whole scope; rows start at start (0=1), at most 8.
+ * next is the next eligible ID or 0. Neither listing nor selecting first
+ * acknowledges delivery. Every call rechecks identity/ACL; errors clear output. */
+typedef struct { ArticleSummary summary; uint32_t root; } ArticleUnreadRow;
+typedef struct {
+    uint32_t total,first,next;
+    unsigned count;
+    ArticleUnreadRow rows[8];
+} ArticleUnreadPage;
+ArticleOutcome article_unread(const ArticleActor *,uint32_t board,uint32_t thread,
+                              uint32_t start,ArticleUnreadPage *out);
 #endif

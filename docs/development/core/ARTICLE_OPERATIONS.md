@@ -13,7 +13,7 @@ API. The canonical manual and Japanese/English HELP keep their current behavior.
 | `session.c`, `classic_commands.inc` | Menus, command parsing, editor, session presentation state | Builds legacy BoardRequest operations; consumes formatted results |
 | `ui.c`, `messages.c`, `menu.c` | Terminal formatting, languages, external HELP/menu text | Not an authority source |
 | `board.c` | Single-owner worker/queue, global store health, legacy request/response adapter, article repository | Many other operations still mix formatting with domain logic |
-| `article_core.c` | Typed mutations, reads, current-board lists/search and thread trees; live identity/ACL checks, durable mutation order | Uses existing member/catalog/moderation/extras modules on the same worker |
+| `article_core.c` | Typed mutations, reads, current-board lists/search, thread trees and member-owned unread/read state; live identity/ACL checks, durable mutation order | Uses existing member/catalog/moderation/extras modules on the same worker |
 | `members.c`, `catalog.c`, `moderation.c`, `board_policy.c` | Membership, epochs, ACLs, inherited SIGOP roles, board grants | Existing process-global worker-owned state |
 | `mailbox.c`, `mail_files.c`, `chat.c`, vault modules | Mail, attachments, chat/talk, vault services | Their Session/Board command adapters remain unchanged |
 | `doors.c`, `board_link.inc`, `webui/bridge.py` | PTY Door management, signed article exchange, Web connector | Web still uses the legacy command bridge; no new auth transport |
@@ -90,6 +90,7 @@ cover the reviewed extraction and build integration, not a specification change.
 The next read extraction is documented in [Structured article reads](ARTICLE_READ.md).
 Current-board list/search extraction is documented in [Article pages](ARTICLE_PAGES.md).
 Thread trees now use [Structured article trees](ARTICLE_TREE.md).
-Structured cross-board/NOTES/unread operations and Session UI adapters remain separate work. Auth/ACL must stay in the worker/Core rather
+Member-owned read state now uses [Unread selection and marks](ARTICLE_UNREAD.md).
+Structured cross-board/NOTES operations and Session UI adapters remain separate work. Auth/ACL must stay in the worker/Core rather
 than being copied into MMM/Web/SSH. Neither UI selection nor future Door broker
 identity is implemented by this PR.

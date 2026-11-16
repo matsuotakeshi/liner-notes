@@ -300,6 +300,40 @@ static void display_article(const BoardRequest *q,uint32_t id,BoardResult *r,int
     }
     OPENSSL_cleanse(r->draft_body,sizeof(r->draft_body));
 }
+static void article_read_state(const BoardRequest *q,BoardResult *r) {
+    ArticleActor actor={q->user,q->user_epoch,q->board_grants};ArticleUnreadPage page;
+    int mark=q->op=='s' || q->op=='u';
+    ArticleOutcome result=mark?article_mark_seen(&actor,q->board,q->number,q->op=='s'):
+                               article_unread(&actor,q->board,q->number,q->cursor,&page);
+    if(result!=ARTICLE_OK) {
+        switch(result) {
+        case ARTICLE_LOGIN_REQUIRED: strcpy(r->text,"ERR login required\r\n");break;
+        case ARTICLE_REVOKED: r->revoked=1;strcpy(r->text,"ERR session revoked\r\n");break;
+        case ARTICLE_BOARD_DENIED: strcpy(r->text,"ERR board unavailable\r\n");break;
+        case ARTICLE_NOT_FOUND: strcpy(r->text,"ERR no article\r\n");break;
+        case ARTICLE_HIDDEN: strcpy(r->text,"ERR article hidden\r\n");break;
+        case ARTICLE_MEMBER_STORAGE: strcpy(r->text,"ERR member storage unavailable\r\n");break;
+        case ARTICLE_MODERATION_STORAGE: strcpy(r->text,"ERR moderation storage unavailable\r\n");break;
+        case ARTICLE_POLICY_STORAGE: strcpy(r->text,"ERR board policy storage\r\n");break;
+        case ARTICLE_EXTRAS_STORAGE: strcpy(r->text,"ERR extras storage\r\n");break;
+        case ARTICLE_READ_STATE_STORAGE: strcpy(r->text,"ERR read-state storage\r\n");break;
+        default: strcpy(r->text,"ERR article storage\r\n");break;
+        }
+        return;
+    }
+    if(mark)snprintf(r->text,sizeof(r->text),"%s %u\r\n",q->op=='s'?"SEEN":"UNSEEN",q->number);
+    else if(q->op=='n') {
+        if(page.first)display_article(q,page.first,r,0);else strcpy(r->text,"NO UNREAD\r\n");
+    } else {
+        size_t pos=(size_t)snprintf(r->text,sizeof(r->text),"UNREAD %u\r\n",page.total);
+        for(unsigned i=0;i<page.count;i++) {
+            const ArticleUnreadRow *row=&page.rows[i];
+            pos+=(size_t)snprintf(r->text+pos,sizeof(r->text)-pos,"#%u root=%u %.80s\r\n",
+                                 row->summary.id,row->root,row->summary.title);
+        }
+        snprintf(r->text+pos,sizeof(r->text)-pos,"END NEXT %u\r\n",page.next);
+    }
+}
 static uint32_t checksum(const unsigned char *p,size_t n) {
     uint32_t h=2166136261u;
     for(size_t i=0;i<n;i++) h=(h^p[i])*16777619u;
@@ -439,6 +473,7 @@ static void extra_execute(const BoardRequest *q,BoardResult *r) {
         case ARTICLE_BOARD_DENIED: strcpy(r->text,"ERR board unavailable\r\n");break;
         case ARTICLE_INVALID_QUERY: strcpy(r->text,"ERR search query\r\n");break;
         case ARTICLE_INVALID_CURSOR: strcpy(r->text,"ERR search cursor\r\n");break;
+        case ARTICLE_READ_STATE_STORAGE: strcpy(r->text,"ERR read-state storage\r\n");break;
         }
         return;
     }
@@ -1054,28 +1089,7 @@ static void execute(const BoardRequest *q,BoardResult *r) {
     if((q->op=='P'||q->op=='e') && version<4 && q->board!=1) { strcpy(r->text,"ERR multiple boards need RTBOARD4\r\n"); return; }
     if(q->op=='e') { if(q->action=='?') { r->service_action='E';r->service_number=q->number?2:1;return; }r->editing=1; strcpy(r->text,"EDIT end with . or /CANCEL\r\n"); return; }
     if(q->op=='s' || q->op=='u' || q->op=='v' || q->op=='n') {
-        if(!members_name(q->user)) { strcpy(r->text,"ERR login required\r\n"); return; }
-        if(q->op=='s' || q->op=='u') {
-            if(!q->number || q->number>article_count) { strcpy(r->text,"ERR no article\r\n"); return; }
-            if(!members_mark(q->user,q->number,q->op=='s')) strcpy(r->text,"ERR read-state storage\r\n");
-            else snprintf(r->text,sizeof(r->text),"%s %u\r\n",q->op=='s'?"SEEN":"UNSEEN",q->number);
-        } else {
-            if(q->number>article_count) { strcpy(r->text,"ERR no article\r\n"); return; }
-            uint32_t root=q->number?(*article_at(q->number-1)).root:0, total=0, first=0;
-            for(uint32_t i=1;i<=article_count;i++) if(on_board(i,q->board) && !unavailable(i) && (!root || (*article_at(i-1)).root==root) && !members_seen(q->user,i)) { total++; if(!first) first=i; }
-            if(q->op=='n') {
-                if(first) display_article(q,first,r,0); else strcpy(r->text,"NO UNREAD\r\n");
-            } else {
-                size_t pos=(size_t)snprintf(r->text,sizeof(r->text),"UNREAD %u\r\n",total);
-                uint32_t i=q->cursor?q->cursor:1; int shown=0;
-                for(;i<=article_count;i++) if(on_board(i,q->board) && !unavailable(i) && (!root || (*article_at(i-1)).root==root) && !members_seen(q->user,i)) {
-                    if(shown++==8) break;
-                    pos+=(size_t)snprintf(r->text+pos,sizeof(r->text)-pos,"#%u root=%u %.80s\r\n",i,(*article_at(i-1)).root,(*article_at(i-1)).title);
-                }
-                snprintf(r->text+pos,sizeof(r->text)-pos,"END NEXT %u\r\n",i<=article_count?i:0);
-            }
-        }
-        return;
+        article_read_state(q,r);return;
     }
     if(q->op=='P') {
         post_article(q,r,NULL,0,0);
