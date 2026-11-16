@@ -105,6 +105,92 @@ ArticleOutcome article_post(const ArticleActor *actor,uint32_t board,uint32_t pa
     return result;
 }
 
+typedef enum { DRAFT_STATUS, DRAFT_RESUME, DRAFT_SAVE, DRAFT_REMOVE } DraftAction;
+
+static ArticleOutcome saved_draft(const ArticleActor *actor,DraftAction action,
+                                  uint32_t board,uint32_t parent,const char *title,const char *body,
+                                  uint32_t expected,ArticleDraftView *out,char *text,size_t capacity) {
+    ArticleOutcome result=health();
+    if(result!=ARTICLE_OK)return result;
+    result=identity(actor,0);
+    if(result!=ARTICLE_OK)return result;
+    MemberDraft draft={0};
+    int exists=members_draft(actor->user,&draft);
+    /* A failed/partial body read must not look like an absent saved copy. */
+    if(members_broken())return ARTICLE_MEMBER_STORAGE;
+    if(action==DRAFT_STATUS) {
+        if(exists)out->revision=draft.revision;
+        return ARTICLE_OK;
+    }
+    if(action==DRAFT_REMOVE) {
+        int ok=members_store_draft(actor->user,&draft,expected,1,&out->revision);
+        return ok==1?ARTICLE_OK:ok==0?ARTICLE_DRAFT_CONFLICT:ARTICLE_MEMBER_STORAGE;
+    }
+    if(action==DRAFT_SAVE) { draft.board=board;draft.parent=parent; }
+    else if(!exists)return ARTICLE_OK;
+    if(!catalog_read(draft.board,actor->user) || !catalog_write(draft.board,actor->user))
+        return ARTICLE_BOARD_DENIED;
+    if(draft.parent) {
+        ArticleMetadata article;
+        if(!article_repository_find(draft.parent,&article) || article.board!=draft.board)return ARTICLE_NOT_FOUND;
+        int unavailable=article_repository_unavailable(draft.parent);
+        if(unavailable<0)return ARTICLE_STORAGE;
+        if(unavailable)return ARTICLE_HIDDEN;
+    }
+    if(action==DRAFT_SAVE) {
+        size_t tl=post_length(title,80),bl=post_length(body,CONTENT_BODY);
+        if(!tl || tl>80 || !body || bl>CONTENT_BODY)return ARTICLE_INVALID_DRAFT;
+        memcpy(draft.title,title,tl+1);memcpy(draft.body,body,bl+1);
+        int ok=members_store_draft(actor->user,&draft,expected,0,&out->revision);
+        return ok==1?ARTICLE_OK:ok==0?ARTICLE_DRAFT_CONFLICT:ARTICLE_MEMBER_STORAGE;
+    }
+    size_t length=post_length(draft.body,CONTENT_BODY);
+    if(length>CONTENT_BODY)return ARTICLE_MEMBER_STORAGE;
+    if(!text || capacity<=length)return ARTICLE_BUFFER_TOO_SMALL;
+    out->board=draft.board;out->parent=draft.parent;out->revision=draft.revision;
+    memcpy(out->title,draft.title,sizeof(out->title));memcpy(text,draft.body,length+1);
+    return ARTICLE_OK;
+}
+
+static ArticleOutcome draft_call(const ArticleActor *actor,DraftAction action,
+                                 uint32_t board,uint32_t parent,const char *title,const char *body,
+                                 uint32_t expected,ArticleDraftView *out,char *text,size_t capacity) {
+    if(text && capacity)memset(text,0,capacity);
+    if(!out)return ARTICLE_INVALID_DRAFT;
+    memset(out,0,sizeof(*out));
+    policy_context(actor?actor->board_grants:NULL);
+    ArticleOutcome result=saved_draft(actor,action,board,parent,title,body,expected,out,text,capacity);
+    policy_context(NULL);
+    if(result!=ARTICLE_OK) {
+        memset(out,0,sizeof(*out));
+        if(text && capacity)memset(text,0,capacity);
+    }
+    return result;
+}
+
+ArticleOutcome article_draft_status(const ArticleActor *actor,uint32_t *revision) {
+    if(!revision)return ARTICLE_INVALID_DRAFT;
+    ArticleDraftView view;
+    ArticleOutcome result=draft_call(actor,DRAFT_STATUS,0,0,NULL,NULL,0,&view,NULL,0);
+    *revision=view.revision;return result;
+}
+ArticleOutcome article_draft_resume(const ArticleActor *actor,ArticleDraftView *out,char *body,size_t capacity) {
+    return draft_call(actor,DRAFT_RESUME,0,0,NULL,NULL,0,out,body,capacity);
+}
+ArticleOutcome article_draft_save(const ArticleActor *actor,uint32_t board,uint32_t parent,
+                                 const char *title,const char *body,uint32_t expected,uint32_t *revision) {
+    if(!revision)return ARTICLE_INVALID_DRAFT;
+    ArticleDraftView view;
+    ArticleOutcome result=draft_call(actor,DRAFT_SAVE,board,parent,title,body,expected,&view,NULL,0);
+    *revision=view.revision;return result;
+}
+ArticleOutcome article_draft_remove(const ArticleActor *actor,uint32_t expected,uint32_t *revision) {
+    if(!revision)return ARTICLE_INVALID_DRAFT;
+    ArticleDraftView view;
+    ArticleOutcome result=draft_call(actor,DRAFT_REMOVE,0,0,NULL,NULL,expected,&view,NULL,0);
+    *revision=view.revision;return result;
+}
+
 static ArticleOutcome authorize(const ArticleActor *actor,uint32_t board,uint32_t id) {
     ArticleOutcome result=health();
     if(result!=ARTICLE_OK)return result;

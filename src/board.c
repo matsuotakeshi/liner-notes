@@ -494,7 +494,7 @@ static void extra_execute(const BoardRequest *q,BoardResult *r) {
         case ARTICLE_STORAGE: case ARTICLE_BUFFER_TOO_SMALL: case ARTICLE_INVALID_READ:
         case ARTICLE_LEGACY_BOARDS: case ARTICLE_LEGACY_MEMBERS: case ARTICLE_BODY_LIMIT:
         case ARTICLE_FULL: case ARTICLE_INVALID_DRAFT: case ARTICLE_LEGACY_BODY:
-        case ARTICLE_POST_UNAVAILABLE: case ARTICLE_POST_UNCERTAIN:
+        case ARTICLE_POST_UNAVAILABLE: case ARTICLE_POST_UNCERTAIN: case ARTICLE_DRAFT_CONFLICT:
             strcpy(r->text,"ERR article storage\r\n");break;
         case ARTICLE_ADMIN_REQUIRED: strcpy(r->text,"ERR admin required\r\n");break;
         case ARTICLE_WITHDRAWN_TARGET: strcpy(r->text,"ERR article withdrawn\r\n");break;
@@ -795,6 +795,7 @@ static void post_result(ArticleOutcome result,BoardResult *r) {
     case ARTICLE_BODY_LIMIT: strcpy(r->text,"ERR body limit\r\n");break;
     case ARTICLE_FULL: strcpy(r->text,"ERR board full\r\n");break;
     case ARTICLE_INVALID_DRAFT: strcpy(r->text,"ERR draft\r\n");break;
+    case ARTICLE_DRAFT_CONFLICT: strcpy(r->text,"ERR draft conflict\r\n");break;
     case ARTICLE_LEGACY_BODY: strcpy(r->text,"ERR legacy board capacity; compact to RTBOARD4 first\r\n");break;
     case ARTICLE_POST_UNAVAILABLE: strcpy(r->text,"ERR storage unavailable\r\n");break;
     case ARTICLE_POST_UNCERTAIN: strcpy(r->text,"ERR storage uncertain; restart inspection required\r\n");break;
@@ -994,34 +995,23 @@ static void execute(const BoardRequest *q,BoardResult *r) {
     }
     if(q->op=='Z') { extra_execute(q,r); return; }
     if(q->op=='d' || q->op=='w' || q->op=='o' || q->op=='X') {
-        if(!q->user) { strcpy(r->text,"ERR login required\r\n"); return; }
-        MemberDraft draft={0}; int exists=members_draft(q->user,&draft);
-        if(q->op=='d') {
-            if(!exists) strcpy(r->text,"DRAFT NONE\r\n");
-            else snprintf(r->text,sizeof(r->text),"DRAFT STORED %u\r\n",draft.revision);
-            return;
-        }
-        if(q->op=='X') {
-            uint32_t revision;
-            int ok=members_store_draft(q->user,&draft,q->cursor,1,&revision);
-            strcpy(r->text,ok==1?"DRAFT REMOVED\r\n":ok==0?"ERR draft conflict\r\n":"ERR member storage unavailable\r\n"); return;
-        }
-        if(q->op=='w') {
-            draft.board=q->board; draft.parent=q->number;
-            strcpy(draft.title,q->title); strcpy(draft.body,q->body);
-        } else if(!exists) { strcpy(r->text,"DRAFT NONE\r\n"); return; }
-        if(!catalog_read(draft.board,q->user) || !catalog_write(draft.board,q->user)) { strcpy(r->text,"ERR board unavailable\r\n"); return; }
-        if(draft.parent && !on_board(draft.parent,draft.board)) { strcpy(r->text,"ERR no parent\r\n"); return; }
-        if(draft.parent && unavailable(draft.parent)) { strcpy(r->text,"ERR article hidden\r\n"); return; }
-        if(q->op=='w') {
-            size_t tl=strlen(draft.title),bl=strlen(draft.body);
-            if(!tl || tl>80 || bl>BOARD_BODY) { strcpy(r->text,"ERR draft\r\n"); return; }
-            uint32_t revision; int ok=members_store_draft(q->user,&draft,q->cursor,0,&revision);
-            if(ok==1) { r->draft_revision=revision; snprintf(r->text,sizeof(r->text),"DRAFT STORED %u\r\n",revision); }
-            else strcpy(r->text,ok==0?"ERR draft conflict\r\n":"ERR member storage unavailable\r\n");
-        } else {
-            r->draft_loaded=1; r->draft_revision=draft.revision; r->draft_parent=draft.parent; r->board=draft.board; r->editing=1;
-            strcpy(r->draft_title,draft.title); strcpy(r->draft_body,draft.body); strcpy(r->text,"DRAFT RESUMED\r\n");
+        ArticleActor actor={q->user,q->user_epoch,q->board_grants};
+        ArticleDraftView draft={0};uint32_t revision=0;ArticleOutcome result;
+        if(q->op=='d')result=article_draft_status(&actor,&revision);
+        else if(q->op=='X')result=article_draft_remove(&actor,q->cursor,&revision);
+        else if(q->op=='w')result=article_draft_save(&actor,q->board,q->number,q->title,q->body,q->cursor,&revision);
+        else result=article_draft_resume(&actor,&draft,r->draft_body,sizeof(r->draft_body));
+        if(result!=ARTICLE_OK) { post_result(result,r);return; }
+        if(q->op=='X')strcpy(r->text,"DRAFT REMOVED\r\n");
+        else if(q->op=='w') {
+            r->draft_revision=revision;snprintf(r->text,sizeof(r->text),"DRAFT STORED %u\r\n",revision);
+        } else if(q->op=='d') {
+            if(revision)snprintf(r->text,sizeof(r->text),"DRAFT STORED %u\r\n",revision);
+            else strcpy(r->text,"DRAFT NONE\r\n");
+        } else if(!draft.revision)strcpy(r->text,"DRAFT NONE\r\n");
+        else {
+            r->draft_loaded=1;r->draft_revision=draft.revision;r->draft_parent=draft.parent;r->board=draft.board;r->editing=1;
+            strcpy(r->draft_title,draft.title);strcpy(r->text,"DRAFT RESUMED\r\n");
         }
         return;
     }
