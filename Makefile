@@ -337,7 +337,7 @@ test-stage74-scale: runtime generate-scale
 # Typed Core service tests run without a terminal, socket or live database.
 .PHONY: test-article-core
 runtime test-adapters: src/article_core.h src/article_repository.h
-test-article-core: tests/test_article_core.c src/article_core.c src/article_core.h src/article_repository.h src/members.h src/catalog.h src/moderation.h src/board_policy.h src/extras.h
+test-article-core: src/content_limits.h tests/test_article_core.c src/article_core.c src/article_core.h src/article_repository.h src/members.h src/catalog.h src/moderation.h src/board_policy.h src/extras.h
 	$(CC) $(CPPFLAGS) $(CFLAGS) $(LDFLAGS) -std=c11 -Wall -Wextra -Werror -Isrc tests/test_article_core.c src/article_core.c -o test-article-core
 	./test-article-core
 check: test-article-core
