@@ -40,6 +40,29 @@ static int mark_ok,mark_value;
 static int other_readable;
 static uint32_t probe_user;
 static int lookup_error;
+static ArticlePostingPolicy posting_rules;
+static int posting_rules_ok,posting_capacity,append_ok,append_bad_id;
+static unsigned append_calls;
+static uint32_t appended_board,appended_parent,appended_user;
+static char appended_author[33],appended_title[81];
+static size_t appended_size;
+int article_repository_posting_policy(uint32_t board,uint32_t user,ArticlePostingPolicy *out) {
+    (void)board;(void)user;*out=posting_rules;return posting_rules_ok;
+}
+int article_repository_post_capacity(uint32_t board,size_t size) {
+    (void)board;(void)size;return posting_capacity;
+}
+int article_repository_append(uint32_t board,uint32_t parent,uint32_t user,
+                              const char *author,const char *title,const char *body,uint32_t *id) {
+    assert(catalog_read(board,user) && catalog_write(board,user));
+    append_calls++;*id=0;
+    if(!append_ok) { posting_rules.storage_failed=1;return 0; }
+    appended_board=board;appended_parent=parent;appended_user=user;
+    strcpy(appended_author,author);strcpy(appended_title,title);appended_size=strlen(body);
+    page_count++;if(user)posting_rules.user_posts++;
+    *id=append_bad_id?page_count+1:page_count;return 1;
+}
+
 static int discovery;
 static unsigned char board_present[CATALOG_MAX+1],board_visible[CATALOG_MAX+1],board_readable[CATALOG_MAX+1],board_writable[CATALOG_MAX+1];
 static uint32_t board_next[CATALOG_MAX+1],board_parent[CATALOG_MAX+1],board_depth[CATALOG_MAX+1];
@@ -548,6 +571,121 @@ static void discovery_tests(void) {
     assert(article_next_board(&actor,1,&next)==ARTICLE_OK);discovery_cleared(&next,sizeof(next));
     assert(!mark_calls && !body_reads && !commits && !publications && !context);
     puts("PASS: catalog-order board discovery, private/locked unread counts, wrap, revoked grants and fail-closed traversal");
+}
+static ArticleActor posting_reset(void) {
+    ArticleActor actor=discovery_reset();
+    memset(&posting_rules,0,sizeof(posting_rules));posting_rules.version=4;
+    posting_rules.members_required=1;posting_rules.body_limit=CONTENT_BODY;
+    posting_rules_ok=posting_capacity=append_ok=1;append_bad_id=0;
+    append_calls=0;appended_board=appended_parent=appended_user=0;
+    appended_author[0]=appended_title[0]=0;appended_size=0;
+    return actor;
+}
+static void post_rejected(ArticleOutcome wanted,const ArticleActor *actor,uint32_t board,uint32_t parent,
+                          const char *guest,const char *title,const char *body) {
+    uint32_t id=999;unsigned before=append_calls;
+    assert(article_post(actor,board,parent,guest,title,body,&id)==wanted);
+    assert(!id && append_calls==before && !context && !body_reads && !mark_calls);
+}
+static void posting_tests(void) {
+    ArticleActor actor=posting_reset();uint32_t id;
+    assert(article_prepare_post(&actor,2,2)==ARTICLE_OK);assert(!append_calls && !context);
+    assert(article_post(&actor,2,0,"forged-author","new note","body\r\n",&id)==ARTICLE_OK);
+    assert(id==7 && appended_board==2 && !appended_parent && appended_user==1);
+    assert(!strcmp(appended_author,"alice") && !strcmp(appended_title,"new note") && appended_size==6);
+    assert(article_post(&actor,2,2,NULL,"reply","body",&id)==ARTICLE_OK);assert(id==8 && appended_parent==2);
+    posting_rules.user_limit=2;
+    post_rejected(ARTICLE_FULL,&actor,2,0,NULL,"quota recheck","body");
+    assert(!mark_calls && !seen_calls && !body_reads && !context);
+    actor=posting_reset();
+    post_rejected(ARTICLE_LOGIN_REQUIRED,NULL,2,0,"visitor","title","body");
+    assert(article_prepare_post(NULL,2,0)==ARTICLE_LOGIN_REQUIRED);
+    posting_rules.guest_allowed=1;
+    assert(article_post(NULL,2,0,"visitor","title","body",&id)==ARTICLE_OK);
+    assert(!strcmp(appended_author,"visitor") && !appended_user && !posting_rules.user_posts);
+    assert(article_post(NULL,2,0,NULL,"title","body",&id)==ARTICLE_OK);assert(!strcmp(appended_author,"guest"));
+    char long_name[34];memset(long_name,'x',33);long_name[33]=0;
+    post_rejected(ARTICLE_INVALID_DRAFT,NULL,2,0,long_name,"title","body");
+    post_rejected(ARTICLE_INVALID_DRAFT,NULL,2,0,"bad\nname","title","body");
+    actor=posting_reset();posting_rules.members_required=0;
+    assert(article_prepare_post(NULL,2,0)==ARTICLE_OK);
+    assert(article_post(NULL,2,0,"","title","body",&id)==ARTICLE_OK);assert(!strcmp(appended_author,"guest"));
+    actor=posting_reset();assert(article_prepare_post(&actor,2,2)==ARTICLE_OK);page_hidden[2]=1;
+    post_rejected(ARTICLE_HIDDEN,&actor,2,2,NULL,"title","body");
+    assert(article_prepare_post(&actor,2,2)==ARTICLE_HIDDEN);
+    page_hidden[2]=0;page_items[2].board=1;
+    post_rejected(ARTICLE_NOT_FOUND,&actor,2,2,NULL,"title","body");
+    post_rejected(ARTICLE_NOT_FOUND,&actor,2,100,NULL,"title","body");
+    actor=posting_reset();visibility_error=2;
+    post_rejected(ARTICLE_STORAGE,&actor,2,2,NULL,"title","body");
+    actor=posting_reset();board_readable[2]=0;
+    post_rejected(ARTICLE_BOARD_DENIED,&actor,2,0,NULL,"title","body");
+    board_readable[2]=1;board_writable[2]=0;
+    post_rejected(ARTICLE_POSTING_DENIED,&actor,2,0,NULL,"title","body");
+    actor=posting_reset();locked=1;grants[2]=(uint32_t)grant_revision;
+    assert(article_prepare_post(&actor,2,0)==ARTICLE_OK);grant_revision++;
+    post_rejected(ARTICLE_BOARD_DENIED,&actor,2,0,NULL,"title","body");
+    actor=posting_reset();assert(article_prepare_post(&actor,2,0)==ARTICLE_OK);epoch++;
+    post_rejected(ARTICLE_REVOKED,&actor,2,0,NULL,"title","body");
+    epoch--;suspended=1;post_rejected(ARTICLE_REVOKED,&actor,2,0,NULL,"title","body");
+    suspended=0;actor.user=99;post_rejected(ARTICLE_REVOKED,&actor,2,0,NULL,"title","body");
+    actor=posting_reset();posting_rules.total_limit=page_count;
+    assert(article_prepare_post(&actor,2,0)==ARTICLE_OK);
+    post_rejected(ARTICLE_FULL,&actor,2,0,NULL,"title","body");
+    posting_rules.total_limit=0;posting_rules.user_limit=2;posting_rules.user_posts=2;
+    post_rejected(ARTICLE_FULL,&actor,2,0,NULL,"title","body");
+    posting_rules.user_limit=0;posting_rules.user_posts=10000;
+    assert(article_post(&actor,2,0,NULL,"title","body",&id)==ARTICLE_OK);assert(id==7);
+    actor=posting_reset();posting_capacity=0;
+    post_rejected(ARTICLE_FULL,&actor,2,0,NULL,"title","body");
+    posting_capacity=-1;post_rejected(ARTICLE_STORAGE,&actor,2,0,NULL,"title","body");
+    actor=posting_reset();page_count=CONTENT_ID_MAX;
+    post_rejected(ARTICLE_FULL,&actor,2,0,NULL,"title","body");
+    actor=posting_reset();posting_rules.body_limit=3;
+    post_rejected(ARTICLE_BODY_LIMIT,&actor,2,0,NULL,"title","body");
+    posting_rules.body_limit=CONTENT_BODY;
+    post_rejected(ARTICLE_INVALID_DRAFT,&actor,2,0,NULL,"title",NULL);
+    post_rejected(ARTICLE_INVALID_DRAFT,&actor,2,0,NULL,NULL,"body");
+    post_rejected(ARTICLE_INVALID_DRAFT,&actor,2,0,NULL,"","body");
+    post_rejected(ARTICLE_INVALID_DRAFT,&actor,2,0,NULL,"title","");
+    post_rejected(ARTICLE_INVALID_DRAFT,&actor,2,0,NULL,"bad\ntitle","body");
+    post_rejected(ARTICLE_INVALID_DRAFT,&actor,2,0,NULL,"bad\177title","body");
+    char title[82];memset(title,'x',81);title[81]=0;
+    post_rejected(ARTICLE_INVALID_DRAFT,&actor,2,0,NULL,title,"body");
+    title[80]=0;assert(article_post(&actor,2,0,NULL,title,"body",&id)==ARTICLE_OK);
+    static char large[CONTENT_BODY+2];memset(large,'x',CONTENT_BODY+1);large[CONTENT_BODY+1]=0;
+    post_rejected(ARTICLE_BODY_LIMIT,&actor,2,0,NULL,"title",large);
+    large[CONTENT_BODY]=0;assert(article_post(&actor,2,0,NULL,"title",large,&id)==ARTICLE_OK);
+    assert(appended_size==CONTENT_BODY);
+    actor=posting_reset();posting_rules.version=3;
+    post_rejected(ARTICLE_LEGACY_BOARDS,&actor,2,0,NULL,"title","body");
+    large[1025]=0;post_rejected(ARTICLE_LEGACY_BODY,&actor,1,0,NULL,"title",large);
+    large[1024]=0;assert(article_post(&actor,1,0,NULL,"title",large,&id)==ARTICLE_OK);
+    posting_rules.version=2;post_rejected(ARTICLE_LEGACY_MEMBERS,&actor,1,0,NULL,"title","body");
+    posting_rules.members_required=0;
+    assert(article_post(NULL,1,0,NULL,"title","body",&id)==ARTICLE_OK);
+    posting_rules.version=1;assert(article_post(NULL,1,0,NULL,"title","body",&id)==ARTICLE_OK);
+    actor=posting_reset();posting_rules.storage_failed=1;
+    post_rejected(ARTICLE_POST_UNAVAILABLE,&actor,2,0,NULL,"title","body");
+    actor=posting_reset();posting_rules_ok=0;
+    post_rejected(ARTICLE_STORAGE,&actor,2,0,NULL,"title","body");
+    posting_rules_ok=1;posting_rules.version=0;
+    post_rejected(ARTICLE_STORAGE,&actor,2,0,NULL,"title","body");
+    actor=posting_reset();append_ok=0;id=999;
+    assert(article_post(&actor,2,0,NULL,"title","body",&id)==ARTICLE_POST_UNCERTAIN);
+    assert(!id && append_calls==1 && page_count==6 && !context);
+    post_rejected(ARTICLE_POST_UNAVAILABLE,&actor,2,0,NULL,"title","body");
+    actor=posting_reset();append_bad_id=1;id=999;
+    assert(article_post(&actor,2,0,NULL,"title","body",&id)==ARTICLE_POST_UNCERTAIN);assert(!id && !context);
+    actor=posting_reset();assert(article_post(&actor,2,0,NULL,"title","body",NULL)==ARTICLE_INVALID_DRAFT);assert(!append_calls);
+    int *errors[]={&member_error,&moderation_error,&policy_error,&extras_error};
+    ArticleOutcome wanted[]={ARTICLE_MEMBER_STORAGE,ARTICLE_MODERATION_STORAGE,ARTICLE_POLICY_STORAGE,ARTICLE_EXTRAS_STORAGE};
+    for(unsigned i=0;i<4;i++) {
+        actor=posting_reset();*errors[i]=1;
+        assert(article_prepare_post(&actor,2,0)==wanted[i]);assert(!context);
+        post_rejected(wanted[i],&actor,2,0,NULL,"title","body");
+    }
+    puts("PASS: local posting admission/commit ACL, guest identity, quotas, legacy formats, body boundaries and uncertain append");
 }
 static void navigation_cleared(const ArticleSummary *row) {
     const unsigned char *p=(const unsigned char *)row;
@@ -1210,5 +1348,6 @@ int main(void) {
     find_scan_tests();
     navigation_tests();
     discovery_tests();
+    posting_tests();
     return 0;
 }
