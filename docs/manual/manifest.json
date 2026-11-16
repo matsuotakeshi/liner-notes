@@ -251,7 +251,10 @@
         "help/ja/adminboards.txt",
         "help/ja/adminmembers.txt",
         "src/board.c",
-        "src/session.c"
+        "src/session.c",
+        "src/article_core.c",
+        "src/article_core.h",
+        "src/article_repository.h"
       ]
     },
     {
@@ -273,7 +276,10 @@
         "help/ja/adminboards.txt",
         "boards.example.conf",
         "src/board.c",
-        "src/board_policy.c"
+        "src/board_policy.c",
+        "src/article_core.c",
+        "src/article_core.h",
+        "src/article_repository.h"
       ]
     },
     {
