@@ -198,7 +198,11 @@ memberctl: src/db_index.h src/memberctl.c src/members.c src/members.h src/app_li
 	$(CC) $(CPPFLAGS) $(SQLITE_CFLAGS) $(CFLAGS) $(LDFLAGS) -std=c11 -Wall -Wextra -Werror src/memberctl.c src/members.c -lcrypto $(SQLITE_LIBS) $(LDLIBS) src/storage_sqlite.c $(SQLITE_CFLAGS) -pthread -lcrypto $(SQLITE_LIBS) -o memberctl
 
 .PHONY: test-stage63
-test-stage63: runtime vaultctl memberctl generate-scale
+.PHONY: test-server-diagnostics
+test-server-diagnostics:
+	$(PYTHON) tests/test_server_diagnostics.py
+
+test-stage63: test-server-diagnostics runtime vaultctl memberctl generate-scale
 	$(PYTHON) tests/test_state_compact.py
 	$(PYTHON) tests/test_stage63_read_errors.py ./runtime
 	$(PYTHON) tests/test_stage63.py ./runtime ./vaultctl ./memberctl
