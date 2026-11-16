@@ -24,6 +24,13 @@ def run(binary):
    h,rows,_=page(b,'NOTES');assert h==b'NOTES 1' and b'replies=1 latest=4' in rows[0],(h,rows)
    read(b,root);navigate(b,'CHILD',sibling)
    expect(b,'PREV','ERR no neighbour')
+   # Navigation may leave a now-hidden selection but must not display it.
+   expect(b,f'READ {grand}',f'HIDDEN {grand} PARENT {hidden}')
+   navigate(b,'PARENT',root)
+   expect(b,f'READ {hidden}',f'HIDDEN {hidden} PARENT {root}')
+   navigate(b,'NEXT',sibling)
+   expect(b,'NEXT','ERR no neighbour')
+   navigate(b,'PARENT',root)  # a failed move preserves the current article
    assert unread(b)==[root,sibling]
    expect(a,f'RESTORE {hidden}',f'RESTORED {hidden}')
    expect(b,f'WITHDRAW {root} CONFIRM',f'WITHDRAW SAVED {root}')

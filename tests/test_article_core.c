@@ -430,6 +430,89 @@ static void page_cleared(const ArticlePage *page) {
     for(size_t i=0;i<sizeof(*page);i++)assert(!p[i]);
     assert(!context && !commits && !moderation_writes && !publications);
 }
+static void navigation_cleared(const ArticleSummary *row) {
+    const unsigned char *p=(const unsigned char *)row;
+    for(size_t i=0;i<sizeof(*row);i++)assert(!p[i]);
+    assert(!context && !mark_calls && !seen_calls && !commits && !moderation_writes && !publications && !body_reads);
+    for(unsigned i=0;i<=300;i++)assert(!body_probes[i]);
+}
+static ArticleActor navigation_reset(void) {
+    ArticleActor actor=page_reset(6);
+    page_items[1].child=2;
+    for(unsigned i=2;i<=4;i++) {
+        page_items[i].parent=1;page_items[i].next=i==4?0:i+1;page_items[i].prev=i==2?0:i-1;
+    }
+    page_items[2].child=5;page_items[5].parent=2;
+    return actor;
+}
+static void navigation_tests(void) {
+    ArticleSummary row;ArticleActor actor=navigation_reset();
+    assert(article_navigate(NULL,2,1,ARTICLE_CHILD,&row)==ARTICLE_OK);assert(row.id==2 && row.board==2 && row.parent==1);
+    page_items[2].title[0]='X';assert(row.title[0]!='X');
+    assert(article_navigate(&actor,2,2,ARTICLE_NEXT,&row)==ARTICLE_OK);assert(row.id==3);
+    assert(article_navigate(&actor,2,3,ARTICLE_PREVIOUS,&row)==ARTICLE_OK);assert(row.id==2);
+    assert(article_navigate(&actor,2,5,ARTICLE_PARENT,&row)==ARTICLE_OK);assert(row.id==2);
+    page_hidden[2]=page_hidden[3]=page_hidden[5]=1;
+    assert(article_navigate(&actor,2,1,ARTICLE_CHILD,&row)==ARTICLE_OK);assert(row.id==4);
+    assert(article_navigate(&actor,2,2,ARTICLE_NEXT,&row)==ARTICLE_OK);assert(row.id==4);
+    assert(article_navigate(&actor,2,4,ARTICLE_PREVIOUS,&row)==ARTICLE_OK);navigation_cleared(&row);
+    assert(article_navigate(&actor,2,5,ARTICLE_PARENT,&row)==ARTICLE_OK);assert(row.id==1);
+    page_hidden[1]=1;
+    assert(article_navigate(&actor,2,5,ARTICLE_PARENT,&row)==ARTICLE_OK);navigation_cleared(&row);
+    assert(article_navigate(&actor,2,6,ARTICLE_CHILD,&row)==ARTICLE_OK);navigation_cleared(&row);
+    assert(article_navigate(&actor,2,1,ARTICLE_PARENT,&row)==ARTICLE_OK);navigation_cleared(&row);
+    assert(article_navigate(&actor,2,1,(ArticleDirection)99,&row)==ARTICLE_INVALID_QUERY);navigation_cleared(&row);
+    assert(article_navigate(&actor,2,0,ARTICLE_CHILD,&row)==ARTICLE_NOT_FOUND);navigation_cleared(&row);
+    assert(article_navigate(&actor,2,7,ARTICLE_CHILD,&row)==ARTICLE_NOT_FOUND);navigation_cleared(&row);
+    assert(article_navigate(&actor,2,1,ARTICLE_CHILD,NULL)==ARTICLE_INVALID_READ);
+    page_items[1].board=3;
+    assert(article_navigate(&actor,2,1,ARTICLE_CHILD,&row)==ARTICLE_NOT_FOUND);navigation_cleared(&row);
+    actor=navigation_reset();page_items[2].board=3;other_readable=1;
+    assert(article_navigate(&actor,2,1,ARTICLE_CHILD,&row)==ARTICLE_STORAGE);navigation_cleared(&row);
+    page_items[2].board=2;page_items[2].parent=6;
+    assert(article_navigate(&actor,2,1,ARTICLE_CHILD,&row)==ARTICLE_STORAGE);navigation_cleared(&row);
+    assert(article_navigate(&actor,2,3,ARTICLE_PREVIOUS,&row)==ARTICLE_STORAGE);navigation_cleared(&row);
+    actor=navigation_reset();missing_id=2;
+    assert(article_navigate(&actor,2,1,ARTICLE_CHILD,&row)==ARTICLE_STORAGE);navigation_cleared(&row);
+    missing_id=0;visibility_error=2;
+    assert(article_navigate(&actor,2,1,ARTICLE_CHILD,&row)==ARTICLE_STORAGE);navigation_cleared(&row);
+    visibility_error=0;page_items[1].child=7;
+    assert(article_navigate(&actor,2,1,ARTICLE_CHILD,&row)==ARTICLE_STORAGE);navigation_cleared(&row);
+    page_items[1].child=1;
+    assert(article_navigate(&actor,2,1,ARTICLE_CHILD,&row)==ARTICLE_STORAGE);navigation_cleared(&row);
+    actor=navigation_reset();page_hidden[2]=page_hidden[3]=1;page_items[3].next=2;
+    assert(article_navigate(&actor,2,1,ARTICLE_CHILD,&row)==ARTICLE_STORAGE);navigation_cleared(&row);
+    page_items[2].parent=3;page_items[3].parent=2;
+    assert(article_navigate(&actor,2,5,ARTICLE_PARENT,&row)==ARTICLE_STORAGE);navigation_cleared(&row);
+    actor=navigation_reset();page_count=CONTENT_ID_MAX+1;
+    assert(article_navigate(&actor,2,1,ARTICLE_CHILD,&row)==ARTICLE_STORAGE);navigation_cleared(&row);page_count=6;
+    epoch++;
+    assert(article_navigate(&actor,2,1,ARTICLE_CHILD,&row)==ARTICLE_REVOKED);navigation_cleared(&row);epoch--;
+    suspended=1;
+    assert(article_navigate(&actor,2,1,ARTICLE_CHILD,&row)==ARTICLE_REVOKED);navigation_cleared(&row);suspended=0;
+    actor.user=99;
+    assert(article_navigate(&actor,2,1,ARTICLE_CHILD,&row)==ARTICLE_REVOKED);navigation_cleared(&row);actor.user=1;
+    readable=0;manager=1;
+    assert(article_navigate(&actor,2,1,ARTICLE_CHILD,&row)==ARTICLE_BOARD_DENIED);navigation_cleared(&row);readable=1;
+    locked=1;
+    assert(article_navigate(&actor,2,1,ARTICLE_CHILD,&row)==ARTICLE_BOARD_DENIED);navigation_cleared(&row);
+    grants[2]=(uint32_t)grant_revision;
+    assert(article_navigate(&actor,2,1,ARTICLE_CHILD,&row)==ARTICLE_OK);assert(row.id==2);
+    grant_revision++;
+    assert(article_navigate(&actor,2,1,ARTICLE_CHILD,&row)==ARTICLE_BOARD_DENIED);navigation_cleared(&row);locked=0;
+    int *errors[]={&member_error,&moderation_error,&policy_error,&extras_error};
+    ArticleOutcome wanted[]={ARTICLE_MEMBER_STORAGE,ARTICLE_MODERATION_STORAGE,ARTICLE_POLICY_STORAGE,ARTICLE_EXTRAS_STORAGE};
+    for(unsigned i=0;i<4;i++) {
+        *errors[i]=1;
+        assert(article_navigate(&actor,2,1,ARTICLE_CHILD,&row)==wanted[i]);navigation_cleared(&row);*errors[i]=0;
+    }
+    actor=page_reset(300);
+    for(unsigned i=2;i<=300;i++) { page_items[i].parent=i-1;page_hidden[i]=1; }
+    assert(article_navigate(&actor,2,300,ARTICLE_PARENT,&row)==ARTICLE_OK);assert(row.id==1);
+    page_hidden[1]=1;
+    assert(article_navigate(&actor,2,300,ARTICLE_PARENT,&row)==ARTICLE_OK);navigation_cleared(&row);
+    puts("PASS: related article navigation, hidden chains, revoked identity/ACL and bounded corrupt references");
+}
 static void scan_cleared(const ArticleScan *scan) {
     const unsigned char *p=(const unsigned char *)scan;
     for(size_t i=0;i<sizeof(*scan);i++)assert(!p[i]);
@@ -1006,5 +1089,6 @@ int main(void) {
     notes_tests();
     news_tests();
     find_scan_tests();
+    navigation_tests();
     return 0;
 }

@@ -148,6 +148,51 @@ ArticleOutcome article_read(const ArticleActor *actor,uint32_t id,int inspect,
     return result;
 }
 
+static ArticleOutcome navigate_article(const ArticleActor *actor,uint32_t board,uint32_t current,
+                                       ArticleDirection direction,ArticleSummary *out) {
+    ArticleOutcome result=health();
+    if(result!=ARTICLE_OK)return result;
+    result=identity(actor,1);
+    if(result!=ARTICLE_OK)return result;
+    if(!catalog_read(board,actor?actor->user:0))return ARTICLE_BOARD_DENIED;
+    if(direction!=ARTICLE_PARENT && direction!=ARTICLE_CHILD &&
+       direction!=ARTICLE_NEXT && direction!=ARTICLE_PREVIOUS)return ARTICLE_INVALID_QUERY;
+    uint32_t count=article_repository_count();
+    if(count>CONTENT_ID_MAX)return ARTICLE_STORAGE;
+    ArticleMetadata source;
+    if(!current || current>count || !article_repository_find(current,&source) ||
+       source.board!=board)return ARTICLE_NOT_FOUND;
+    uint32_t target=direction==ARTICLE_PARENT?source.parent:direction==ARTICLE_CHILD?source.child:
+                    direction==ARTICLE_NEXT?source.next:source.prev;
+    uint32_t parent=direction==ARTICLE_CHILD?current:source.parent;
+    for(uint32_t visited=0;target;visited++) {
+        ArticleMetadata article;
+        if(visited>=count || target==current || target>count ||
+           !article_repository_find(target,&article) || article.board!=board ||
+           (direction!=ARTICLE_PARENT && article.parent!=parent))return ARTICLE_STORAGE;
+        int hidden=article_repository_unavailable(target);
+        if(hidden<0)return ARTICLE_STORAGE;
+        if(!hidden) {
+            out->id=target;out->board=board;out->parent=article.parent;
+            memcpy(out->title,article.title,sizeof(out->title));return ARTICLE_OK;
+        }
+        target=direction==ARTICLE_PARENT?article.parent:
+               direction==ARTICLE_PREVIOUS?article.prev:article.next;
+    }
+    return ARTICLE_OK;
+}
+
+ArticleOutcome article_navigate(const ArticleActor *actor,uint32_t board,uint32_t current,
+                                ArticleDirection direction,ArticleSummary *out) {
+    if(!out)return ARTICLE_INVALID_READ;
+    memset(out,0,sizeof(*out));
+    policy_context(actor?actor->board_grants:NULL);
+    ArticleOutcome result=navigate_article(actor,board,current,direction,out);
+    policy_context(NULL);
+    if(result!=ARTICLE_OK)memset(out,0,sizeof(*out));
+    return result;
+}
+
 static int visible_summary(uint32_t id,uint32_t board,ArticleMetadata *article) {
     if(!article_repository_find(id,article))return -1;
     if(article->board!=board)return 0;
