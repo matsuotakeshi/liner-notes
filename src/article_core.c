@@ -268,3 +268,68 @@ ArticleOutcome article_tree(const ArticleActor *actor,uint32_t board,uint32_t ta
     if(result!=ARTICLE_OK)memset(out,0,sizeof(*out));
     return result;
 }
+
+static ArticleOutcome mark_seen(const ArticleActor *actor,uint32_t board,uint32_t id,int seen) {
+    ArticleOutcome result=health();
+    if(result!=ARTICLE_OK)return result;
+    result=identity(actor,0);
+    if(result!=ARTICLE_OK)return result;
+    if(!catalog_read(board,actor->user))return ARTICLE_BOARD_DENIED;
+    ArticleMetadata article;
+    if(!article_repository_find(id,&article) || article.board!=board)return ARTICLE_NOT_FOUND;
+    int hidden=article_repository_unavailable(id);
+    if(hidden<0)return ARTICLE_STORAGE;
+    if(hidden)return ARTICLE_HIDDEN;
+    return members_mark(actor->user,id,!!seen)?ARTICLE_OK:ARTICLE_READ_STATE_STORAGE;
+}
+
+ArticleOutcome article_mark_seen(const ArticleActor *actor,uint32_t board,uint32_t id,int seen) {
+    policy_context(actor?actor->board_grants:NULL);
+    ArticleOutcome result=mark_seen(actor,board,id,seen);
+    policy_context(NULL);
+    return result;
+}
+
+static ArticleOutcome unread_articles(const ArticleActor *actor,uint32_t board,uint32_t thread,
+                                       uint32_t start,ArticleUnreadPage *out) {
+    ArticleOutcome result=health();
+    if(result!=ARTICLE_OK)return result;
+    result=identity(actor,0);
+    if(result!=ARTICLE_OK)return result;
+    if(!catalog_read(board,actor->user))return ARTICLE_BOARD_DENIED;
+    uint32_t count=article_repository_count(),root=0;
+    if(count>CONTENT_ID_MAX)return ARTICLE_STORAGE;
+    if(thread) {
+        ArticleMetadata article;
+        if(!article_repository_find(thread,&article) || article.board!=board)return ARTICLE_NOT_FOUND;
+        root=article.root;
+        if(!root || root>count)return ARTICLE_STORAGE;
+    }
+    for(uint32_t id=1;id<=count;id++) {
+        ArticleMetadata article;int visible=visible_summary(id,board,&article);
+        if(visible<0)return ARTICLE_STORAGE;
+        if(!visible || (root && article.root!=root))continue;
+        int seen=members_seen(actor->user,id);
+        if(members_broken())return ARTICLE_READ_STATE_STORAGE;
+        if(seen)continue;
+        out->total++;
+        if(!out->first)out->first=id;
+        if(id<start)continue;
+        if(out->count==8) { if(!out->next)out->next=id;continue; }
+        ArticleUnreadRow *row=&out->rows[out->count++];
+        row->summary.id=id;row->summary.board=board;row->summary.parent=article.parent;
+        memcpy(row->summary.title,article.title,sizeof(row->summary.title));row->root=article.root;
+    }
+    return ARTICLE_OK;
+}
+
+ArticleOutcome article_unread(const ArticleActor *actor,uint32_t board,uint32_t thread,
+                              uint32_t start,ArticleUnreadPage *out) {
+    if(!out)return ARTICLE_INVALID_READ;
+    memset(out,0,sizeof(*out));
+    policy_context(actor?actor->board_grants:NULL);
+    ArticleOutcome result=unread_articles(actor,board,thread,start,out);
+    policy_context(NULL);
+    if(result!=ARTICLE_OK)memset(out,0,sizeof(*out));
+    return result;
+}

@@ -54,6 +54,9 @@ def run(binary):
             mark(a,10); assert 9 in unread(a) and 10 not in unread(a)
             assert 10 in unread(b)
             mark(a,1); assert unread(a,1)==[13]
+            assert unread(a,13)==[13]  # A reply selects its containing thread.
+            navigate(a,'NEW 13',13)
+            assert unread(a,13)==[13]  # Selecting/reading does not acknowledge it.
             navigate(a,'NEW 1',13); a.send(b'SEEN\n'); a.expect(b'SEEN 13')
             a.send(b'NEW 1\n'); a.expect(b'NO UNREAD')
             mark(a,1,False); assert unread(a,1)==[1]
