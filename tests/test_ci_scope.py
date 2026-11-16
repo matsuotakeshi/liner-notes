@@ -206,6 +206,18 @@ class WorkflowTests(unittest.TestCase):
         self.assertIn('case "$BUILD" in true|false)', guard)
         self.assertIn("needs.changes.outputs.build == 'true'", job['steps'][-1]['if'])
 
+    def test_independent_checks_do_not_repeat_on_main_push(self):
+        for name in ('ci-scope-checks.yml', 'shared-visibility.yml', 'native-ci-lint.yml'):
+            events = workflow(name)['on']
+            self.assertNotIn('push', events)
+            self.assertIn('pull_request', events)
+            self.assertIn('workflow_dispatch', events)
+        # Exact-main evidence consumers still require push runs.
+        for name in ('linux.yml', 'manual.yml', 'deployment-safety.yml', 'doctor.yml',
+                     'rocky-package.yml', 'debian-package.yml', 'freebsd-package.yml',
+                     'multi-os-ci.yml'):
+            self.assertIn('push', workflow(name)['on'])
+
     def test_pr_only_cancellation_preserves_main_evidence(self):
         for name in ('linux.yml', 'rocky-package.yml', 'debian-package.yml',
                      'shared-visibility.yml', 'deployment-safety.yml', 'manual.yml'):

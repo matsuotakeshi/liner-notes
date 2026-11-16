@@ -41,6 +41,12 @@ Actions画面での確認方法と手動実行の扱いは[文書変更のCI運�
 - `workflow_dispatch`と`release/**`・タグは省略対象にしません。文書だけを変更したSHAでパッケージが必要な場合は、mainの各パッケージCIを手動実行し、すべて成功した後に同一SHAを指定してRelease Setを実行します。Release Setは同一SHAのpushまたは手動実行の候補を照合します。
 - 文書変更で生成されなかったパッケージやネイティブ証跡を、別SHAの古い成果物で補ったことにしません。本番配備の承認・前検査は変更せず、対象外のCIだけでは配備条件を満たしません。
 
+## PRとmainの重複実行の抑制
+
+`CI scope checks`、`Shared board visibility`、`Native CI Source Checks` はPRと手動実行を維持し、main pushでの重複起動を行いません。手動実行では従来の全対象を検査できます。これはPRの成功を最終main SHAの実行証跡へ転用するものではありません。
+
+`Linux compatibility`、`Canonical manual`、`Deployment safety`、`Read-only installation diagnostics` は `ci/deploy_release.py` が同一main SHAのpush成功を要求するため変更しません。パッケージ生成、SELinux、Release Set Verification、FreeBSD更新検証、main限定のNative CIも維持します。これらの重複削減には証跡の採用規則を含む別設計が必要です。
+
 ## テストの拡張と証跡
 
 新機能には原則として自動テストを追加します。既存ワークフローで検証できない動作はCIへの追加を検討し、未自動化の範囲と補助検証の結果を明記します。重点項目は次のとおりです。
