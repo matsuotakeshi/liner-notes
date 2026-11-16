@@ -7,6 +7,7 @@
 #include "moderation.h"
 #include "board_policy.h"
 #include "extras.h"
+#include "store_limits.h"
 #include <assert.h>
 #include <stdio.h>
 #include <string.h>
@@ -36,6 +37,7 @@ static unsigned char read_flags[4][301];
 static unsigned mark_calls,seen_calls;
 static uint32_t seen_error,mark_user,mark_id;
 static int mark_ok,mark_value;
+static int other_readable;
 
 int members_seen(uint32_t user,uint32_t id) {
     assert(user>0 && user<4 && id>0 && id<=300 && paging);
@@ -91,7 +93,12 @@ uint32_t moderation_epoch(uint32_t user) { (void)user;return epoch; }
 void policy_context(const uint32_t *p) { context=p; }
 int catalog_read(uint32_t board,uint32_t user) {
     (void)user;
+    if(board==3 || board==4)return other_readable && user==1;
     return board==2 && readable && (!locked || (context && context[2]==(uint32_t)grant_revision));
+}
+int catalog_under(uint32_t board,uint32_t root) {
+    return (root==2 && (board==2 || board==3)) ||
+           ((root==3 || root==4) && board==root);
 }
 int catalog_manage(uint32_t board,uint32_t user) { return board==2 && user && manager; }
 int catalog_write(uint32_t board,uint32_t user) { return catalog_read(board,user) && writable; }
@@ -122,7 +129,7 @@ void article_repository_title_changed(uint32_t id,const char *title) {
     assert(!strcmp(title,journal_text));publications++;
 }
 static ArticleActor reset(void) {
-    paging=0;
+    paging=0;other_readable=0;
     memset(read_flags,0,sizeof(read_flags));mark_calls=seen_calls=seen_error=mark_user=mark_id=0;mark_ok=1;mark_value=0;
     memset(&stored,0,sizeof(stored));stored.board=2;stored.parent=5;strcpy(stored.author,"alice");
     strcpy(stored.title,"article-title");strcpy(persisted_body,"secret body\r\n");
@@ -407,6 +414,74 @@ static void page_cleared(const ArticlePage *page) {
     const unsigned char *p=(const unsigned char *)page;
     for(size_t i=0;i<sizeof(*page);i++)assert(!p[i]);
     assert(!context && !commits && !moderation_writes && !publications);
+}
+static void news_tests(void) {
+    ArticlePage page;ArticleActor actor=page_reset(12);
+    for(uint32_t i=1;i<=12;i++)page_items[i].created=100+i;
+    assert(article_news(&actor,2,ARTICLE_HERE,0,101,108,&page)==ARTICLE_OK);
+    assert(page.count==8 && page.next==9 && !page.total && page.rows[0].id==1 && page.rows[7].id==8);
+    page_items[1].title[0]='X';assert(page.rows[0].title[0]!='X'); /* owned copy */
+    assert(article_news(&actor,2,ARTICLE_HERE,page.next,101,108,&page)==ARTICLE_OK);page_cleared(&page);
+    page_items[2].created=0;page_hidden[3]=1;page_items[4].parent=3;page_hidden[4]=1;
+    page_items[5].board=3;page_items[6].board=4;other_readable=1;
+    assert(article_news(&actor,2,ARTICLE_SUBTREE,0,0,106,&page)==ARTICLE_OK);
+    assert(page.count==2 && page.rows[0].id==1 && page.rows[1].id==5 && page.rows[1].board==3 && !page.next);
+    assert(article_news(&actor,2,ARTICLE_ALL,0,0,106,&page)==ARTICLE_OK);
+    assert(page.count==3 && page.rows[2].id==6);
+    assert(article_news(NULL,2,ARTICLE_ALL,0,0,106,&page)==ARTICLE_OK);
+    assert(page.count==1 && page.rows[0].id==1); /* private child/sibling */
+    actor.user=2;assert(article_news(&actor,2,ARTICLE_ALL,0,0,106,&page)==ARTICLE_OK);
+    assert(page.count==1);actor.user=1;
+    readable=0;manager=1;
+    assert(article_news(&actor,2,ARTICLE_HERE,0,0,0,&page)==ARTICLE_BOARD_DENIED);page_cleared(&page);
+    assert(article_news(&actor,2,ARTICLE_SUBTREE,0,0,0,&page)==ARTICLE_OK);
+    assert(page.count==1 && page.rows[0].id==5); /* unreadable parent does not grant/deny child */
+    assert(article_news(&actor,999,ARTICLE_SUBTREE,0,0,0,&page)==ARTICLE_OK);page_cleared(&page);
+    readable=1;locked=1;other_readable=0;
+    assert(article_news(&actor,2,ARTICLE_ALL,0,0,0,&page)==ARTICLE_OK);page_cleared(&page);
+    grants[2]=(uint32_t)grant_revision;
+    assert(article_news(&actor,2,ARTICLE_ALL,0,0,0,&page)==ARTICLE_OK);assert(page.count);
+    grant_revision++;
+    assert(article_news(&actor,2,ARTICLE_ALL,0,0,0,&page)==ARTICLE_OK);page_cleared(&page);
+    assert(article_news(&actor,2,ARTICLE_HERE,0,0,0,&page)==ARTICLE_BOARD_DENIED);page_cleared(&page);
+    locked=0;
+    assert(article_news(&actor,2,(ArticleScope)-1,0,0,0,&page)==ARTICLE_INVALID_QUERY);page_cleared(&page);
+    assert(article_news(&actor,2,(ArticleScope)3,0,0,0,&page)==ARTICLE_INVALID_QUERY);page_cleared(&page);
+    assert(article_news(&actor,2,ARTICLE_ALL,UINT32_MAX,0,0,&page)==ARTICLE_INVALID_CURSOR);page_cleared(&page);
+    assert(article_news(&actor,2,ARTICLE_ALL,CONTENT_ID_MAX+1,0,0,&page)==ARTICLE_OK);page_cleared(&page);
+    assert(article_news(&actor,2,ARTICLE_ALL,0,106,101,&page)==ARTICLE_OK);page_cleared(&page);
+    assert(article_news(&actor,2,ARTICLE_ALL,0,UINT64_MAX,0,&page)==ARTICLE_OK);page_cleared(&page);
+    assert(article_news(&actor,2,ARTICLE_ALL,0,0,0,NULL)==ARTICLE_INVALID_READ);
+    epoch++;
+    assert(article_news(&actor,2,ARTICLE_ALL,0,0,0,&page)==ARTICLE_REVOKED);page_cleared(&page);
+    epoch--;suspended=1;
+    assert(article_news(&actor,2,ARTICLE_ALL,0,0,0,&page)==ARTICLE_REVOKED);page_cleared(&page);
+    suspended=0;actor.user=99;
+    assert(article_news(&actor,2,ARTICLE_ALL,0,0,0,&page)==ARTICLE_REVOKED);page_cleared(&page);
+
+    actor=page_reset(3);
+    for(uint32_t i=1;i<=3;i++)page_items[i].created=100;
+    missing_id=2;
+    assert(article_news(&actor,2,ARTICLE_ALL,0,0,0,&page)==ARTICLE_STORAGE);page_cleared(&page);
+    missing_id=0;visibility_error=2;
+    assert(article_news(&actor,2,ARTICLE_ALL,0,0,0,&page)==ARTICLE_STORAGE);page_cleared(&page);
+    visibility_error=0;page_count=CONTENT_ID_MAX+1;
+    assert(article_news(&actor,2,ARTICLE_ALL,0,0,0,&page)==ARTICLE_STORAGE);page_cleared(&page);page_count=3;
+    int *errors[]={&member_error,&moderation_error,&policy_error,&extras_error};
+    ArticleOutcome wanted[]={ARTICLE_MEMBER_STORAGE,ARTICLE_MODERATION_STORAGE,ARTICLE_POLICY_STORAGE,ARTICLE_EXTRAS_STORAGE};
+    for(unsigned i=0;i<4;i++) {
+        *errors[i]=1;
+        assert(article_news(&actor,2,ARTICLE_ALL,0,0,0,&page)==wanted[i]);page_cleared(&page);
+        *errors[i]=0;
+    }
+    actor=page_reset(300);page_items[300].created=100;
+    assert(article_news(&actor,2,ARTICLE_ALL,0,0,0,&page)==ARTICLE_OK);
+    assert(!page.count && page.next==257); /* rejected candidates still consume budget */
+    assert(article_news(&actor,2,ARTICLE_ALL,page.next,0,0,&page)==ARTICLE_OK);
+    assert(page.count==1 && page.rows[0].id==300 && !page.next);
+    assert(!body_reads && !candidate_calls && !mark_calls && !context);
+    for(unsigned i=0;i<=300;i++)assert(!body_probes[i]);
+    puts("PASS: NEWS scope/ACL, timestamp bounds, paging, no body reads, revoked grants and atomic errors");
 }
 static void page_tests(void) {
     ArticlePage page;ArticleActor actor=page_reset(9);
@@ -800,5 +875,6 @@ int main(void) {
     tree_tests();
     unread_tests();
     notes_tests();
+    news_tests();
     return 0;
 }

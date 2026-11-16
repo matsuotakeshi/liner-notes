@@ -227,6 +227,47 @@ ArticleOutcome article_search(const ArticleActor *actor,uint32_t board,uint32_t 
     return article_page(actor,board,start,query,1,out);
 }
 
+static ArticleOutcome news_articles(const ArticleActor *actor,uint32_t board,ArticleScope scope,
+                                    uint32_t start,uint64_t since,uint64_t until,ArticlePage *out) {
+    ArticleOutcome result=health();
+    if(result!=ARTICLE_OK)return result;
+    result=identity(actor,1);
+    if(result!=ARTICLE_OK)return result;
+    if(scope!=ARTICLE_HERE && scope!=ARTICLE_ALL && scope!=ARTICLE_SUBTREE)
+        return ARTICLE_INVALID_QUERY;
+    if(start>CONTENT_ID_MAX+1)return ARTICLE_INVALID_CURSOR;
+    uint32_t user=actor?actor->user:0;
+    if(scope==ARTICLE_HERE && !catalog_read(board,user))return ARTICLE_BOARD_DENIED;
+    uint32_t count=article_repository_count(),id=start?start:1;
+    if(count>CONTENT_ID_MAX)return ARTICLE_STORAGE;
+    unsigned scanned=0;
+    for(;id<=count && out->count<8 && scanned<256;id++,scanned++) {
+        ArticleMetadata article;
+        if(!article_repository_find(id,&article))return ARTICLE_STORAGE;
+        if((scope==ARTICLE_HERE && article.board!=board) ||
+           (scope==ARTICLE_SUBTREE && !catalog_under(article.board,board)) ||
+           !catalog_read(article.board,user))continue;
+        int hidden=article_repository_unavailable(id);
+        if(hidden<0)return ARTICLE_STORAGE;
+        if(hidden || !article.created || article.created<since ||
+           (until && article.created>until))continue;
+        add_summary(out,id,&article);
+    }
+    out->next=id<=count?id:0;
+    return ARTICLE_OK;
+}
+
+ArticleOutcome article_news(const ArticleActor *actor,uint32_t board,ArticleScope scope,
+                            uint32_t start,uint64_t since,uint64_t until,ArticlePage *out) {
+    if(!out)return ARTICLE_INVALID_READ;
+    memset(out,0,sizeof(*out));
+    policy_context(actor?actor->board_grants:NULL);
+    ArticleOutcome result=news_articles(actor,board,scope,start,since,until,out);
+    policy_context(NULL);
+    if(result!=ARTICLE_OK)memset(out,0,sizeof(*out));
+    return result;
+}
+
 static ArticleOutcome tree_articles(const ArticleActor *actor,uint32_t board,uint32_t target,
                                      uint32_t start,ArticleTreePage *out) {
     ArticleOutcome result=health();
