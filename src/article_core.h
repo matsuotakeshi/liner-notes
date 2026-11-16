@@ -73,6 +73,24 @@ ArticleOutcome article_search(const ArticleActor *,uint32_t board,uint32_t start
 typedef enum { ARTICLE_HERE, ARTICLE_ALL, ARTICLE_SUBTREE } ArticleScope;
 ArticleOutcome article_news(const ArticleActor *,uint32_t board,ArticleScope scope,
                             uint32_t start,uint64_t since,uint64_t until,ArticlePage *out);
+/* Borrowed exact-author/literal-query filter. "*" means any author/no term.
+ * Named authors must exist; query is 1..80 bytes without controls. Core checks
+ * each result's read ACL and effective visibility before body matching.
+ * FIND: up to 8 rows/256 index candidates, total=0, next=unscanned cursor.
+ * SCAN: first match in the chosen direction, or article.id=0 for end. No 256
+ * candidate cutoff for sequential reading. start=0 means 1; descending starts
+ * above the repository end are clamped (UINT32_MAX selects newest).
+ * Result next is an inclusive cursor, not a capability; reauthorize each call.
+ * No body, read mark, audit or session selection is returned/mutated. */
+typedef struct {
+    uint32_t board;
+    ArticleScope scope;
+    const char *author,*query;
+} ArticleFilter;
+typedef struct { ArticleSummary article; uint32_t next; } ArticleScan;
+ArticleOutcome article_find(const ArticleActor *,const ArticleFilter *,uint32_t start,ArticlePage *out);
+ArticleOutcome article_scan(const ArticleActor *,const ArticleFilter *,uint32_t start,
+                            int descending,ArticleScan *out);
 /* Whole thread containing article, in existing depth-first order. start=0
  * begins at its root; other cursors must belong to this thread and board.
  * Up to 8 visible rows, next=next visible node or 0. Hidden nodes contribute

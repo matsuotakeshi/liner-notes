@@ -38,6 +38,8 @@ static unsigned mark_calls,seen_calls;
 static uint32_t seen_error,mark_user,mark_id;
 static int mark_ok,mark_value;
 static int other_readable;
+static uint32_t probe_user;
+static int lookup_error;
 
 int members_seen(uint32_t user,uint32_t id) {
     assert(user>0 && user<4 && id>0 && id<=300 && paging);
@@ -65,9 +67,17 @@ uint32_t article_repository_search_next(uint32_t start,const char *query) {
     for(uint32_t i=start;i<=page_count;i++)if(candidates[i])return i;
     return 0;
 }
+uint32_t article_repository_search_ordered(uint32_t start,const char *query,int descending) {
+    if(!descending)return article_repository_search_next(start,query);
+    candidate_calls++;
+    if(bad_candidate)return bad_candidate;
+    if(!indexed)return start;
+    for(uint32_t i=start;i;i--)if(candidates[i])return i;
+    return 0;
+}
 int article_repository_body_contains(uint32_t id,const char *query) {
-    assert(paging && id && id<=page_count && page_items[id].board==2 && !page_hidden[id]);
-    assert(catalog_read(2,0));body_probes[id]++;
+    assert(paging && id && id<=page_count && !page_hidden[id]);
+    assert(catalog_read(page_items[id].board,probe_user));body_probes[id]++;
     return id==body_error?-1:strstr(page_bodies[id],query)!=NULL;
 }
 
@@ -87,6 +97,11 @@ int policy_broken(void) { return policy_error; }
 int extras_broken(void) { return extras_error; }
 const char *members_name(uint32_t user) {
     return user==1?"alice":user==2?"bob":user==3?"guest":NULL;
+}
+uint32_t members_find(const char *name) {
+    if(lookup_error) { member_error=1;return 0; }
+    for(uint32_t i=1;i<=3;i++)if(!strcmp(name,members_name(i)))return i;
+    return 0;
 }
 int moderation_suspended(uint32_t user) { (void)user;return suspended; }
 uint32_t moderation_epoch(uint32_t user) { (void)user;return epoch; }
@@ -129,7 +144,7 @@ void article_repository_title_changed(uint32_t id,const char *title) {
     assert(!strcmp(title,journal_text));publications++;
 }
 static ArticleActor reset(void) {
-    paging=0;other_readable=0;
+    paging=0;other_readable=0;probe_user=0;lookup_error=0;
     memset(read_flags,0,sizeof(read_flags));mark_calls=seen_calls=seen_error=mark_user=mark_id=0;mark_ok=1;mark_value=0;
     memset(&stored,0,sizeof(stored));stored.board=2;stored.parent=5;strcpy(stored.author,"alice");
     strcpy(stored.title,"article-title");strcpy(persisted_body,"secret body\r\n");
@@ -414,6 +429,120 @@ static void page_cleared(const ArticlePage *page) {
     const unsigned char *p=(const unsigned char *)page;
     for(size_t i=0;i<sizeof(*page);i++)assert(!p[i]);
     assert(!context && !commits && !moderation_writes && !publications);
+}
+static void scan_cleared(const ArticleScan *scan) {
+    const unsigned char *p=(const unsigned char *)scan;
+    for(size_t i=0;i<sizeof(*scan);i++)assert(!p[i]);
+    assert(!context && !mark_calls && !commits && !moderation_writes && !publications);
+}
+static void filter_denied(const ArticleActor *actor,const ArticleFilter *filter,ArticleOutcome wanted) {
+    ArticlePage page;ArticleScan scan;
+    memset(&page,0xa5,sizeof(page));memset(&scan,0xa5,sizeof(scan));
+    assert(article_find(actor,filter,0,&page)==wanted);page_cleared(&page);
+    assert(article_scan(actor,filter,0,0,&scan)==wanted);scan_cleared(&scan);
+}
+static void find_scan_tests(void) {
+    ArticlePage page;ArticleScan scan;
+    ArticleActor actor=page_reset(12);ArticleFilter filter={2,ARTICLE_HERE,"*","*"};
+    assert(article_find(NULL,&filter,0,&page)==ARTICLE_OK);
+    assert(page.count==8 && page.next==9 && !page.total && page.rows[0].id==1 && page.rows[7].id==8);
+    assert(article_find(&actor,&filter,page.next,&page)==ARTICLE_OK);
+    assert(page.count==4 && page.rows[3].id==12 && !page.next);
+    page_items[12].title[0]='X';assert(page.rows[3].title[0]!='X');
+    assert(article_find(&actor,&filter,CONTENT_ID_MAX+1,&page)==ARTICLE_OK);page_cleared(&page);
+    assert(article_find(&actor,&filter,UINT32_MAX,&page)==ARTICLE_INVALID_CURSOR);page_cleared(&page);
+    assert(article_scan(&actor,&filter,UINT32_MAX,1,&scan)==ARTICLE_OK);
+    assert(scan.article.id==12 && scan.next==11 && !context);
+    assert(article_scan(&actor,&filter,0,1,&scan)==ARTICLE_OK);assert(scan.article.id==1 && !scan.next);
+    assert(article_scan(&actor,&filter,13,0,&scan)==ARTICLE_OK);scan_cleared(&scan);
+    assert(article_scan(&actor,&filter,UINT32_MAX,0,&scan)==ARTICLE_INVALID_CURSOR);scan_cleared(&scan);
+    assert(article_find(&actor,&filter,0,NULL)==ARTICLE_INVALID_READ);
+    assert(article_scan(&actor,&filter,0,0,NULL)==ARTICLE_INVALID_READ);
+
+    actor=page_reset(6);probe_user=1;other_readable=1;
+    for(unsigned i=1;i<=6;i++)strcpy(page_items[i].author,i==5?"bob":"alice");
+    strcpy(page_items[1].title,"needle-title");strcpy(page_bodies[2],"body needle");
+    page_hidden[2]=1;page_items[3].board=3;strcpy(page_bodies[3],"body needle");
+    page_items[4].board=4;strcpy(page_bodies[4],"body needle");
+    page_items[5].parent=1;strcpy(page_bodies[5],"body needle");
+    filter=(ArticleFilter){2,ARTICLE_SUBTREE,"alice","needle"};
+    assert(article_find(&actor,&filter,0,&page)==ARTICLE_OK);
+    assert(page.count==2 && page.rows[0].id==1 && page.rows[1].id==3 && page.rows[1].board==3);
+    assert(!body_probes[1] && !body_probes[2] && body_probes[3] && !body_probes[4] && !body_probes[5]);
+    filter.scope=ARTICLE_ALL;
+    assert(article_scan(&actor,&filter,UINT32_MAX,1,&scan)==ARTICLE_OK);assert(scan.article.id==4 && scan.next==3);
+    assert(article_scan(&actor,&filter,scan.next,1,&scan)==ARTICLE_OK);assert(scan.article.id==3 && scan.next==2);
+    page_hidden[3]=1; /* visibility rechecked when the cursor is reused */
+    assert(article_scan(&actor,&filter,3,1,&scan)==ARTICLE_OK);assert(scan.article.id==1 && !scan.next);
+    probe_user=0;
+    assert(article_find(NULL,&filter,0,&page)==ARTICLE_OK);assert(page.count==1 && page.rows[0].id==1);
+    actor.user=2;probe_user=2;
+    assert(article_scan(&actor,&filter,UINT32_MAX,1,&scan)==ARTICLE_OK);assert(scan.article.id==1);
+    filter.author="bob";
+    assert(article_find(&actor,&filter,0,&page)==ARTICLE_OK);assert(page.count==1 && page.rows[0].id==5 && page.rows[0].parent==1);
+    filter.query="Needle";
+    assert(article_scan(&actor,&filter,0,0,&scan)==ARTICLE_OK);scan_cleared(&scan);
+    filter.author="*";filter.query="*";readable=0;manager=1;
+    assert(article_find(&actor,&filter,0,&page)==ARTICLE_OK);page_cleared(&page); /* manager cannot read private results */
+    actor.user=1;probe_user=1;
+    assert(article_find(&actor,&filter,0,&page)==ARTICLE_OK);assert(page.count==1 && page.rows[0].id==4);
+    filter.scope=ARTICLE_HERE;filter_denied(&actor,&filter,ARTICLE_BOARD_DENIED);
+    readable=1;locked=1;filter_denied(&actor,&filter,ARTICLE_BOARD_DENIED);
+    grants[2]=(uint32_t)grant_revision;
+    assert(article_scan(&actor,&filter,0,0,&scan)==ARTICLE_OK);assert(scan.article.id==1);
+    grant_revision++;filter_denied(&actor,&filter,ARTICLE_BOARD_DENIED);locked=0;
+
+    filter_denied(&actor,NULL,ARTICLE_INVALID_QUERY);
+    filter.scope=(ArticleScope)3;filter_denied(&actor,&filter,ARTICLE_INVALID_QUERY);filter.scope=ARTICLE_ALL;
+    const char *bad[]={NULL,"","unknown","Alice","bad\nname"};
+    for(unsigned i=0;i<sizeof(bad)/sizeof(*bad);i++) { filter.author=bad[i];filter_denied(&actor,&filter,ARTICLE_INVALID_QUERY); }
+    filter.author="*";
+    const char *bad_query[]={NULL,"","bad\nterm","bad\177term"};
+    for(unsigned i=0;i<sizeof(bad_query)/sizeof(*bad_query);i++) { filter.query=bad_query[i];filter_denied(&actor,&filter,ARTICLE_INVALID_QUERY); }
+    char query[82];memset(query,'q',81);query[81]=0;filter.query=query;
+    filter_denied(&actor,&filter,ARTICLE_INVALID_QUERY);query[80]=0;
+    assert(article_find(&actor,&filter,0,&page)==ARTICLE_OK);page_cleared(&page);
+    filter.query="*";epoch++;filter_denied(&actor,&filter,ARTICLE_REVOKED);epoch--;
+    suspended=1;filter_denied(&actor,&filter,ARTICLE_REVOKED);suspended=0;
+    actor.user=99;filter_denied(&actor,&filter,ARTICLE_REVOKED);actor.user=1;
+    filter.author="alice";lookup_error=1;filter_denied(&actor,&filter,ARTICLE_MEMBER_STORAGE);lookup_error=member_error=0;
+    int *errors[]={&member_error,&moderation_error,&policy_error,&extras_error};
+    ArticleOutcome wanted[]={ARTICLE_MEMBER_STORAGE,ARTICLE_MODERATION_STORAGE,ARTICLE_POLICY_STORAGE,ARTICLE_EXTRAS_STORAGE};
+    for(unsigned i=0;i<4;i++) { *errors[i]=1;filter_denied(&actor,&filter,wanted[i]);*errors[i]=0; }
+
+    actor=page_reset(300);filter=(ArticleFilter){2,ARTICLE_ALL,"*","needle"};
+    strcpy(page_items[300].title,"needle");
+    assert(article_find(&actor,&filter,0,&page)==ARTICLE_OK);assert(!page.count && page.next==257 && candidate_calls==256);
+    assert(article_find(&actor,&filter,page.next,&page)==ARTICLE_OK);assert(page.count==1 && page.rows[0].id==300 && !page.next);
+    assert(article_scan(&actor,&filter,0,0,&scan)==ARTICLE_OK);assert(scan.article.id==300 && !scan.next);
+    strcpy(page_items[300].title,"no match");strcpy(page_items[1].title,"needle");
+    assert(article_scan(&actor,&filter,UINT32_MAX,1,&scan)==ARTICLE_OK);assert(scan.article.id==1 && !scan.next);
+    indexed=1;candidates[1]=candidates[300]=1;strcpy(page_items[300].title,"needle");candidate_calls=0;
+    assert(article_find(&actor,&filter,0,&page)==ARTICLE_OK);assert(page.count==2 && candidate_calls==2);
+    assert(article_scan(&actor,&filter,299,1,&scan)==ARTICLE_OK);assert(scan.article.id==1);
+    memset(candidates,0,sizeof(candidates));
+    assert(article_scan(&actor,&filter,UINT32_MAX,1,&scan)==ARTICLE_OK);scan_cleared(&scan);
+    bad_candidate=301;filter_denied(&actor,&filter,ARTICLE_STORAGE);
+    bad_candidate=1;
+    assert(article_find(&actor,&filter,2,&page)==ARTICLE_STORAGE);page_cleared(&page);
+    assert(article_scan(&actor,&filter,2,0,&scan)==ARTICLE_STORAGE);scan_cleared(&scan);
+    bad_candidate=3;
+    assert(article_scan(&actor,&filter,2,1,&scan)==ARTICLE_STORAGE);scan_cleared(&scan);
+    bad_candidate=0;indexed=0;missing_id=2;
+    assert(article_find(&actor,&filter,0,&page)==ARTICLE_STORAGE);page_cleared(&page);
+    assert(article_scan(&actor,&filter,2,0,&scan)==ARTICLE_STORAGE);scan_cleared(&scan);
+    missing_id=0;visibility_error=2;
+    assert(article_find(&actor,&filter,0,&page)==ARTICLE_STORAGE);page_cleared(&page);
+    assert(article_scan(&actor,&filter,2,0,&scan)==ARTICLE_STORAGE);scan_cleared(&scan);
+    visibility_error=0;body_error=2;
+    assert(article_find(&actor,&filter,0,&page)==ARTICLE_STORAGE);page_cleared(&page);
+    assert(article_scan(&actor,&filter,2,0,&scan)==ARTICLE_STORAGE);scan_cleared(&scan);
+    body_error=0;page_count=CONTENT_ID_MAX+1;filter_denied(&actor,&filter,ARTICLE_STORAGE);
+    actor=page_reset(0);filter=(ArticleFilter){2,ARTICLE_ALL,"*","*"};
+    assert(article_find(&actor,&filter,0,&page)==ARTICLE_OK);page_cleared(&page);
+    assert(article_scan(&actor,&filter,UINT32_MAX,1,&scan)==ARTICLE_OK);scan_cleared(&scan);
+    assert(!mark_calls && !seen_calls && !body_reads);
+    puts("PASS: FIND/SCAN exact filters, per-result ACL, ordered index bounds, owned pages and failure clearing");
 }
 static void news_tests(void) {
     ArticlePage page;ArticleActor actor=page_reset(12);
@@ -876,5 +1005,6 @@ int main(void) {
     unread_tests();
     notes_tests();
     news_tests();
+    find_scan_tests();
     return 0;
 }

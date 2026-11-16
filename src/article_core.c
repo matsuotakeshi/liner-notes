@@ -268,6 +268,110 @@ ArticleOutcome article_news(const ArticleActor *actor,uint32_t board,ArticleScop
     return result;
 }
 
+static int filter_text(const char *text,size_t max) {
+    if(!text || !*text)return 0;
+    size_t n=0;
+    for(const unsigned char *p=(const unsigned char *)text;*p;p++)
+        if(++n>max || *p<32 || *p==127)return 0;
+    return 1;
+}
+
+static ArticleOutcome validate_filter(const ArticleActor *actor,const ArticleFilter *filter) {
+    ArticleOutcome result=health();
+    if(result!=ARTICLE_OK)return result;
+    result=identity(actor,1);
+    if(result!=ARTICLE_OK)return result;
+    if(!filter)return ARTICLE_INVALID_QUERY;
+    if(filter->scope==ARTICLE_HERE && !catalog_read(filter->board,actor?actor->user:0))
+        return ARTICLE_BOARD_DENIED;
+    if((filter->scope!=ARTICLE_HERE && filter->scope!=ARTICLE_ALL && filter->scope!=ARTICLE_SUBTREE) ||
+       !filter_text(filter->query,80) || !filter_text(filter->author,32))return ARTICLE_INVALID_QUERY;
+    int known=!strcmp(filter->author,"*") || members_find(filter->author)!=0;
+    if(members_broken())return ARTICLE_MEMBER_STORAGE;
+    return known?ARTICLE_OK:ARTICLE_INVALID_QUERY;
+}
+
+/* -1 storage failure, 0 excluded, 1 visible exact match. */
+static int filter_match(const ArticleActor *actor,const ArticleFilter *filter,
+                        uint32_t id,ArticleMetadata *article) {
+    if(!article_repository_find(id,article))return -1;
+    if((filter->scope==ARTICLE_HERE && article->board!=filter->board) ||
+       (filter->scope==ARTICLE_SUBTREE && !catalog_under(article->board,filter->board)) ||
+       !catalog_read(article->board,actor?actor->user:0))return 0;
+    int hidden=article_repository_unavailable(id);
+    if(hidden)return hidden<0?-1:0;
+    if(strcmp(filter->author,"*") && strcmp(filter->author,article->author))return 0;
+    if(!strcmp(filter->query,"*") || strstr(article->title,filter->query))return 1;
+    return article_repository_body_contains(id,filter->query);
+}
+
+static ArticleOutcome find_articles(const ArticleActor *actor,const ArticleFilter *filter,
+                                    uint32_t start,ArticlePage *out) {
+    ArticleOutcome result=validate_filter(actor,filter);
+    if(result!=ARTICLE_OK)return result;
+    uint32_t count=article_repository_count(),id=start?start:1;
+    if(count>CONTENT_ID_MAX)return ARTICLE_STORAGE;
+    if(id>CONTENT_ID_MAX+1)return ARTICLE_INVALID_CURSOR;
+    unsigned scanned=0;
+    for(;id<=count && out->count<8 && scanned<256;id++,scanned++) {
+        uint32_t candidate=article_repository_search_next(id,filter->query);
+        if(!candidate) { id=count+1;break; }
+        if(candidate<id || candidate>count)return ARTICLE_STORAGE;
+        id=candidate;
+        ArticleMetadata article;int match=filter_match(actor,filter,id,&article);
+        if(match<0)return ARTICLE_STORAGE;
+        if(match)add_summary(out,id,&article);
+    }
+    out->next=id<=count?id:0;
+    return ARTICLE_OK;
+}
+
+ArticleOutcome article_find(const ArticleActor *actor,const ArticleFilter *filter,
+                            uint32_t start,ArticlePage *out) {
+    if(!out)return ARTICLE_INVALID_READ;
+    memset(out,0,sizeof(*out));
+    policy_context(actor?actor->board_grants:NULL);
+    ArticleOutcome result=find_articles(actor,filter,start,out);
+    policy_context(NULL);
+    if(result!=ARTICLE_OK)memset(out,0,sizeof(*out));
+    return result;
+}
+
+static ArticleOutcome scan_articles(const ArticleActor *actor,const ArticleFilter *filter,
+                                    uint32_t start,int descending,ArticleScan *out) {
+    ArticleOutcome result=validate_filter(actor,filter);
+    if(result!=ARTICLE_OK)return result;
+    uint32_t count=article_repository_count(),id=start?start:1;
+    if(count>CONTENT_ID_MAX)return ARTICLE_STORAGE;
+    if(descending && id>count)id=count;
+    if(id>CONTENT_ID_MAX+1)return ARTICLE_INVALID_CURSOR;
+    for(;id && id<=count;id=descending?id-1:id+1) {
+        uint32_t candidate=article_repository_search_ordered(id,filter->query,descending!=0);
+        if(!candidate)break;
+        if(candidate>count || (descending?candidate>id:candidate<id))return ARTICLE_STORAGE;
+        id=candidate;
+        ArticleMetadata article;int match=filter_match(actor,filter,id,&article);
+        if(match<0)return ARTICLE_STORAGE;
+        if(!match)continue;
+        out->article.id=id;out->article.board=article.board;out->article.parent=article.parent;
+        memcpy(out->article.title,article.title,sizeof(out->article.title));
+        out->next=descending?id-1:id<count?id+1:0;
+        break;
+    }
+    return ARTICLE_OK;
+}
+
+ArticleOutcome article_scan(const ArticleActor *actor,const ArticleFilter *filter,
+                            uint32_t start,int descending,ArticleScan *out) {
+    if(!out)return ARTICLE_INVALID_READ;
+    memset(out,0,sizeof(*out));
+    policy_context(actor?actor->board_grants:NULL);
+    ArticleOutcome result=scan_articles(actor,filter,start,descending,out);
+    policy_context(NULL);
+    if(result!=ARTICLE_OK)memset(out,0,sizeof(*out));
+    return result;
+}
+
 static ArticleOutcome tree_articles(const ArticleActor *actor,uint32_t board,uint32_t target,
                                      uint32_t start,ArticleTreePage *out) {
     ArticleOutcome result=health();

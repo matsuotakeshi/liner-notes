@@ -211,6 +211,9 @@ uint32_t article_repository_count(void) { return article_count; }
 uint32_t article_repository_search_next(uint32_t start,const char *query) {
     return db_search_next(&article_db,start,query,0);
 }
+uint32_t article_repository_search_ordered(uint32_t start,const char *query,int descending) {
+    return db_search_next(&article_db,start,query,descending);
+}
 int article_repository_body_contains(uint32_t id,const char *query) {
     if(!id || id>article_count)return -1;
     const char *body=article_body(article_at(id-1));
@@ -463,13 +466,6 @@ static int extra_text(const char *text,size_t max,int empty) {
     for(const unsigned char *p=(const unsigned char *)text;*p;p++) if(*p<32 || *p==127) return 0;
     return 1;
 }
-static int matches(const BoardRequest *q,uint32_t id) {
-    if(unavailable(id))return 0;
-    Article *a=&(*article_at(id-1));
-    return catalog_read(a->board,q->user) && (q->scope==1 || (q->scope==2?catalog_under(a->board,q->board):a->board==q->board)) &&
-           (!strcmp(q->username,"*") || !strcmp(q->username,a->author)) &&
-           (!strcmp(q->title,"*") || strstr(a->title,q->title) || strstr(article_body(a),q->title));
-}
 static void extra_execute(const BoardRequest *q,BoardResult *r) {
     if(q->action==1 || q->action==2) {
         ArticleActor actor={q->user,q->user_epoch,q->board_grants};
@@ -533,28 +529,38 @@ static void extra_execute(const BoardRequest *q,BoardResult *r) {
         snprintf(r->text+pos,sizeof(r->text)-pos,"END NEXT %u\r\n",page.next);return;
     }
     if(q->action==3 || q->action==4) {
-        if(!q->scope && !catalog_read(q->board,q->user)) { strcpy(r->text,"ERR board unavailable\r\n"); return; }
-        if((q->scope<0 || q->scope>2) || !extra_text(q->title,80,0) ||
-           (strcmp(q->username,"*") && !user_named(q->username))) { strcpy(r->text,"ERR find syntax\r\n"); return; }
-        uint32_t id=q->cursor?q->cursor:1;
-        if(q->action==4 && q->descending && id>article_count)id=article_count;
-        if(id>CONTENT_ID_MAX+1) { strcpy(r->text,"ERR find syntax\r\n"); return; }
+        ArticleActor actor={q->user,q->user_epoch,q->board_grants};
+        ArticleFilter filter={q->board,(ArticleScope)q->scope,q->username,q->title};
+        ArticlePage page;ArticleScan scan;
+        ArticleOutcome result=q->action==4?article_scan(&actor,&filter,q->cursor,q->descending,&scan):
+                                             article_find(&actor,&filter,q->cursor,&page);
+        if(result!=ARTICLE_OK) {
+            switch(result) {
+            case ARTICLE_REVOKED: r->revoked=1;strcpy(r->text,"ERR session revoked\r\n");break;
+            case ARTICLE_BOARD_DENIED: strcpy(r->text,"ERR board unavailable\r\n");break;
+            case ARTICLE_INVALID_QUERY: case ARTICLE_INVALID_CURSOR: strcpy(r->text,"ERR find syntax\r\n");break;
+            case ARTICLE_MEMBER_STORAGE: strcpy(r->text,"ERR member storage unavailable\r\n");break;
+            case ARTICLE_MODERATION_STORAGE: strcpy(r->text,"ERR moderation storage unavailable\r\n");break;
+            case ARTICLE_POLICY_STORAGE: strcpy(r->text,"ERR board policy storage\r\n");break;
+            case ARTICLE_EXTRAS_STORAGE: strcpy(r->text,"ERR extras storage\r\n");break;
+            default: strcpy(r->text,"ERR article storage\r\n");break;
+            }
+            return;
+        }
         if(q->action==4) {
             r->sequence=1;
-            for(;id && id<=article_count;id=q->descending?id-1:id+1) { id=db_search_next(&article_db,id,q->title,q->descending);if(!id)break;if(matches(q,id)) {
-                display_article(q,id,r,0); r->board=(*article_at(id-1)).board; r->direct=1; r->sequence_next=q->descending?id-1:id<article_count?id+1:0; return;
-            }
+            if(scan.article.id) {
+                display_article(q,scan.article.id,r,0);r->board=scan.article.board;
+                r->direct=1;r->sequence_next=scan.next;return;
             }
             strcpy(r->text,"SCAN END\r\n"); return;
         }
         size_t pos=(size_t)snprintf(r->text,sizeof(r->text),"FIND %s %s %s\r\n",q->scope==2?"SUBTREE":q->scope?"ALL":"HERE",q->username,q->title);
-        unsigned shown=0,scanned=0;
-        for(;id<=article_count && shown<8 && scanned<256;id++,scanned++) { id=db_search_next(&article_db,id,q->title,0);if(!id) { id=article_count+1;break; }if(matches(q,id)) {
-            Article *a=&(*article_at(id-1));
-            pos+=(size_t)snprintf(r->text+pos,sizeof(r->text)-pos,"%u %u %u %.80s\r\n",id,a->board,a->parent,a->title); shown++;
+        for(unsigned i=0;i<page.count;i++) {
+            const ArticleSummary *row=&page.rows[i];
+            pos+=(size_t)snprintf(r->text+pos,sizeof(r->text)-pos,"%u %u %u %s\r\n",row->id,row->board,row->parent,row->title);
         }
-        }
-        snprintf(r->text+pos,sizeof(r->text)-pos,"END NEXT %u\r\n",id<=article_count?id:0); return;
+        snprintf(r->text+pos,sizeof(r->text)-pos,"END NEXT %u\r\n",page.next);return;
     }
     if(q->action==5) {
         if(!q->number || q->number>article_count || !catalog_read((*article_at(q->number-1)).board,q->user)) { strcpy(r->text,"ERR no article\r\n"); return; }

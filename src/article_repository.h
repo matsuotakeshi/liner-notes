@@ -21,6 +21,9 @@ uint32_t article_repository_count(void);
 /* Existing index selects candidates, never authorizes visibility. 0=end;
  * otherwise candidate >= start. Database errors retain fail-closed behavior. */
 uint32_t article_repository_search_next(uint32_t start,const char *query);
+/* Ordered candidate selection for SCAN; descending candidate <= start.
+ * Like search_next, 0=end. Core validates bounds and strict cursor progress. */
+uint32_t article_repository_search_ordered(uint32_t start,const char *query,int descending);
 /* -1 storage failure; 0 no literal match; 1 match. Core checks ACL and
  * effective visibility before asking storage to inspect the body. */
 int article_repository_body_contains(uint32_t article,const char *query);
