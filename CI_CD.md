@@ -27,6 +27,20 @@
 
 CIを通すためだけのテスト無効化や検証条件の緩和は禁止です。必要な環境が利用できない場合は検証未完了として報告し、手動試験で成功に置き換えません。
 
+## PRとmainの重複実行
+
+独立したGitHub-hosted検査の `CI scope checks`、`Shared board visibility`、
+`Native CI Source Checks` はPRと手動起動で実行し、mainへのpushでは繰り返しません。
+PRの対象パス・試験内容は維持します。マージ前に該当するPR検査を確認してください。
+リリース候補や統合後の確認では、必要な検査をmainで手動起動し、対象SHAの証跡を
+取得します。PRの成功を未検証のmainコミットの成功に読み替えません。
+
+Canonical manualはPR、main・linux-support・release/**のpush、タグ、手動起動を
+対象とします。通常の開発ブランチはPR作成後に自動検証されます。
+mainの成果物と配備判定が参照する検査、ネイティブCI、パッケージ、Release Set、
+更新試験は従来の起動条件を維持します。
+変更範囲と残る制約は[CI重複実行の整理](docs/development/release-ci/CI_DEDUPLICATION.md)を参照してください。
+
 ## 文書のみの変更
 
 Actions画面での確認方法と手動実行の扱いは[文書変更のCI運用ガイド](docs/development/release-ci/DOCS_ONLY_CI.md)を参照してください。
