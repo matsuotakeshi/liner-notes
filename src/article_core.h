@@ -57,6 +57,14 @@ ArticleOutcome article_read(const ArticleActor *,uint32_t article,int inspect,
  * means end; start=0 means first page. Reauthorize every call, not just page 1.
  * Errors clear the entire page. No SEEN/cursor/session state is mutated. */
 typedef struct { uint32_t id,board,parent; char title[81]; } ArticleSummary;
+/* Select a related visible article; no body/read mark/audit/selection mutation.
+ * Hidden parent chains move upward; hidden children/next siblings move forward,
+ * previous siblings backward. A hidden current article may still navigate out.
+ * id=0 means no visible neighbour. Invalid references/cycles fail closed and
+ * all errors clear the caller-owned result. Recheck identity/board ACL per call. */
+typedef enum { ARTICLE_PARENT, ARTICLE_CHILD, ARTICLE_NEXT, ARTICLE_PREVIOUS } ArticleDirection;
+ArticleOutcome article_navigate(const ArticleActor *,uint32_t board,uint32_t current,
+                                ArticleDirection direction,ArticleSummary *out);
 typedef struct {
     uint32_t total,next;
     unsigned count;

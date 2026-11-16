@@ -161,6 +161,7 @@ int article_repository_find(uint32_t id,ArticleMetadata *out) {
     const Article *a=article_at(id-1);
     out->board=a->board;out->parent=a->parent;out->body_size=a->body_size;
     out->root=a->root;out->depth=a->depth;out->created=a->created;
+    out->child=a->child;out->next=a->next;out->prev=a->prev;
     memcpy(out->author,a->author,sizeof(out->author));memcpy(out->title,a->title,sizeof(out->title));
     return 1;
 }
@@ -1145,14 +1146,25 @@ static void execute(const BoardRequest *q,BoardResult *r) {
         display_article(q,q->number,r,0);
     } else if(q->op=='U' || q->op=='C' || q->op=='N' || q->op=='B') {
         if(!q->number || q->number>article_count) { strcpy(r->text,"ERR no current article\r\n"); return; }
-        Article *a=&(*article_at(q->number-1));
-        uint32_t target=q->op=='U'?a->parent:q->op=='C'?a->child:q->op=='N'?a->next:a->prev;
-        while(target && unavailable(target)) {
-            Article *next=article_at(target-1);
-            target=q->op=='U'?next->parent:q->op=='B'?next->prev:next->next;
+        ArticleActor actor={q->user,q->user_epoch,q->board_grants};ArticleSummary target;
+        ArticleDirection direction=q->op=='U'?ARTICLE_PARENT:q->op=='C'?ARTICLE_CHILD:
+                                   q->op=='N'?ARTICLE_NEXT:ARTICLE_PREVIOUS;
+        ArticleOutcome result=article_navigate(&actor,q->board,q->number,direction,&target);
+        if(result!=ARTICLE_OK) {
+            switch(result) {
+            case ARTICLE_REVOKED: r->revoked=1;strcpy(r->text,"ERR session revoked\r\n");break;
+            case ARTICLE_BOARD_DENIED: strcpy(r->text,"ERR board unavailable\r\n");break;
+            case ARTICLE_NOT_FOUND: strcpy(r->text,"ERR no article\r\n");break;
+            case ARTICLE_MEMBER_STORAGE: strcpy(r->text,"ERR member storage unavailable\r\n");break;
+            case ARTICLE_MODERATION_STORAGE: strcpy(r->text,"ERR moderation storage unavailable\r\n");break;
+            case ARTICLE_POLICY_STORAGE: strcpy(r->text,"ERR board policy storage\r\n");break;
+            case ARTICLE_EXTRAS_STORAGE: strcpy(r->text,"ERR extras storage\r\n");break;
+            default: strcpy(r->text,"ERR article storage\r\n");break;
+            }
+            return;
         }
-        if(!target) { strcpy(r->text,"ERR no neighbour\r\n"); return; }
-        display_article(q,target,r,0);
+        if(!target.id) { strcpy(r->text,"ERR no neighbour\r\n"); return; }
+        display_article(q,target.id,r,0);
     } else if(q->op=='T') {
         display_article_tree(q,r);
     } else if(q->op=='O') {
