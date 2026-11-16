@@ -4,7 +4,9 @@ Baseline: main `4e1b5e7c557146e7c4c61613d9d0275ffca33ced` (PR #68).
 This LN-23/24 slice moves BOARDS and NEXTBOARD selection/counting out of the
 command adapter. It does not change the catalog format, article storage, wire
 commands or UI profiles. Board selection/password entry remains in its existing
-session/worker path.
+session/worker path at this baseline. The subsequent
+[board entry and information extraction](BOARD_ENTRY.md) moves their access
+decisions into Core while leaving password input and session state in the adapter.
 
 ## API and ownership
 
