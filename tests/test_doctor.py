@@ -1,4 +1,5 @@
 """Read-only diagnostics: fixtures, corruption, live WAL and secret isolation."""
+import argparse
 import hashlib
 import importlib.util
 import json
@@ -14,7 +15,12 @@ from contextlib import closing
 from unittest.mock import patch
 
 ROOT = Path(__file__).resolve().parents[1]
-spec = importlib.util.spec_from_file_location('doctor', ROOT/'scripts/doctor.py')
+target_parser = argparse.ArgumentParser(add_help=False)
+target_parser.add_argument('--doctor-module', type=Path, default=ROOT/'scripts/doctor.py')
+target_args, unittest_args = target_parser.parse_known_args()
+sys.argv[1:] = unittest_args
+DOCTOR = target_args.doctor_module.resolve(strict=True)
+spec = importlib.util.spec_from_file_location('doctor', DOCTOR)
 doctor = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(doctor)
 
@@ -221,7 +227,7 @@ class DoctorTests(unittest.TestCase):
 
     def test_cli_json_language_and_exit_codes(self):
         for lang in ('ja','en'):
-            p=subprocess.run([sys.executable,'-B',str(ROOT/'scripts/doctor.py'),'--root',str(self.root),'--os','Linux','--check-database','--json','--lang',lang],capture_output=True,encoding='utf-8',env=dict(os.environ,PYTHONIOENCODING='utf-8'))
+            p=subprocess.run([sys.executable,'-B',str(DOCTOR),'--root',str(self.root),'--os','Linux','--check-database','--json','--lang',lang],capture_output=True,encoding='utf-8',env=dict(os.environ,PYTHONIOENCODING='utf-8'))
             self.assertEqual(p.returncode,0,p.stderr)
             report=json.loads(p.stdout)
             self.assertTrue(report['read_only'])

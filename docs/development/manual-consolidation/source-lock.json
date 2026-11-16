@@ -71,8 +71,8 @@
   "src/userlog.c": "989a93c9993e7b93aba2815214a1075b3cd37ddfa0712803eab4d9f940f6e58e",
   "src/vault.c": "797c144ebaca5938ba0c523227b654c41e3d6c83aa5042e756dc60d479ad6340",
   "src/vault.h": "9c8e22630fe3bc38aba5736455b067d272654b6c3f5884676f09283da591121e",
-  "tests/test_doctor.py": "9bc6b75ce947de1b21966d54b1037205e55c38b36f743c4061f811743160e11a",
-  "tests/test_doctor_runtime.py": "2f49786b53071f4a684a21bf08b67b55319e230d61f1a2d963c35a41050da4a4",
+  "tests/test_doctor.py": "fabe6d550f39a16a6f5ddda1ea3431809b448cf473f9026546e702a33b6547f4",
+  "tests/test_doctor_runtime.py": "d760c3224792289ac1a7a167505cd47a19fac28b43990319169b78d3e964ffcb",
   "tests/test_freebsd_plist.py": "b0d63881c93d6adbfcfa2a77fc80c2cb839ec4ac83604ad0244b03e1b3786ff0",
   "tests/test_help_release.py": "cad9e7d7f46bb4c31a36a867b36afa72bed209cd4d5eed35a35559c29382f61f",
   "tests/test_linux_install.py": "9e672a2a8d8d36c4677c9c55974f72a8b005b74eebb9ba0b925a7297e0ea1d8c",
@@ -139,5 +139,6 @@
   "tests/transfer_terminal_fixture.py": "6935ef9fdaa7c3538d45bac078cc9c634c7562f9a829bad1edc4d2f8564c562e",
   "tests/test_transfer_terminal.py": "04f0f7d5e62e0a899a171929cb42d88f4237b29d4df4579b882c4f7331a44e37",
   "ci/freebsd_fixture_permissions.py": "80431c66875b4483f7c6d5401eda9dadc4537f1ca527b9b387aab801227d4b2c",
-  "tests/test_freebsd_fixture_permissions.py": "e2a70d9b451da8bb97cd572bb1f381ce04100c993af5c53fc2b51f7ed15ba3a7"
+  "tests/test_freebsd_fixture_permissions.py": "e2a70d9b451da8bb97cd572bb1f381ce04100c993af5c53fc2b51f7ed15ba3a7",
+  ".github/workflows/debian-package.yml": "52da1e55a41c3561427d20702814728e45325058f6936833076a9b48e51efcd3"
 }
