@@ -45,7 +45,16 @@ def command(args, check=True):
 
 
 def exists():
-    return command([SVCS, "-H", "-o", "fmri", SERVICE], check=False).returncode == 0
+    # svcs exit 1 means fatal error, not specifically "not found". A successful
+    # repository list also detects a service with no default instance yet.
+    name = SERVICE.removeprefix("svc:/")
+    result = command([SVCCFG, "list", name], check=False)
+    if result.returncode or result.stderr:
+        raise RuntimeError("Cannot determine dedicated SMF registration")
+    found = result.stdout.splitlines()
+    if found not in ([], [name]):
+        raise RuntimeError("Unexpected dedicated SMF registration reply")
+    return bool(found)
 
 
 def status():

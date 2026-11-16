@@ -11,7 +11,7 @@ import subprocess
 import sys
 import time
 
-from solaris_smf_control import FMRI
+from solaris_smf_control import FMRI, exists
 from prepare_solaris_smf import manifest
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -206,8 +206,7 @@ def run():
             session.close()
         if selected:
             selection.unlink()
-    check = subprocess.run(["/usr/bin/svcs", "-H", "-o", "fmri", FMRI], capture_output=True)
-    assert check.returncode != 0, "SMF fixture registration was not removed"
+    assert not exists(), "SMF fixture registration was not removed"
     print("PASS SMF: private registration/start/stop/restart, crash recovery, retained enable state, maintenance recovery and cleanup; OS boot not tested")
 
 

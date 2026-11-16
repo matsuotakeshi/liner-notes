@@ -16,7 +16,9 @@ Liner Notes SMF service was present. No host configuration was changed.
 - The sole elevated command is `/opt/liner-notes-ci/solaris_smf_control.py session`.
   It accepts no FMRI, path, shell program, PID or manifest arguments.
 - The fixed FMRI is `svc:/application/liner-notes-ci:default`. Pre-existing service
-  registration is refused before import. Other services are never modified.
+  registration is refused before import, even without a default instance. A
+  successful `svccfg list application/liner-notes-ci` must establish absence;
+  query failures are never interpreted as absence. Other services are not modified.
 - Root-owned helper/manifest/lock and their ancestors reject symlinks, other owners
   and group/world write permission. CI cannot change method credentials or exec.
 - The method runs as `ci-test:staff`, with both privilege sets restricted to
@@ -69,7 +71,8 @@ grep -E '^[#@]includedir[[:space:]]+/etc/sudoers.d[[:space:]]*$' /etc/sudoers ||
 test ! -e /opt/liner-notes-ci && test ! -L /opt/liner-notes-ci || exit 1
 test ! -e /etc/sudoers.d/liner-notes-smf-ci || exit 1
 test ! -e /etc/liner-notes-smf-ci.required || exit 1
-if /usr/bin/svcs -H svc:/application/liner-notes-ci >/dev/null 2>&1; then exit 1; fi
+SMF_EXISTING=$(/usr/sbin/svccfg list application/liner-notes-ci) || exit 1
+test -z "$SMF_EXISTING" || exit 1
 /usr/sbin/svccfg validate "$SMF_BUNDLE/liner-notes-ci.xml" || exit 1
 /usr/sbin/visudo -cf "$SMF_BUNDLE/liner-notes-smf-ci.sudoers" || exit 1
 umask 077
@@ -136,8 +139,7 @@ credentials and contract to confirm it is this fixture. Then, and only then:
 
 ```sh
 /usr/sbin/svcadm disable -s -T 30 svc:/application/liner-notes-ci:default
-# Require disabled state before the next command.
-/usr/bin/svcs -H -o state svc:/application/liner-notes-ci:default
+test "$(/usr/bin/svcs -H -o state svc:/application/liner-notes-ci:default)" = disabled || exit 1
 /usr/sbin/svccfg delete svc:/application/liner-notes-ci
 ```
 
@@ -160,4 +162,5 @@ service's data. No OS restart is part of rollback.
 
 Primary references: [Oracle SMF permissions](https://docs.oracle.com/cd/E37838_01/html/E60998/svcprivs.html),
 [service start semantics](https://docs.oracle.com/cd/E37838_01/html/E60998/svcstart.html),
-[service processes](https://docs.oracle.com/cd/E37838_01/html/E60998/svclist.html).
+[service processes](https://docs.oracle.com/cd/E37838_01/html/E60998/svclist.html),
+[repository list semantics](https://docs.oracle.com/cd/E88353_01/html/E72487/svccfg-8.html).

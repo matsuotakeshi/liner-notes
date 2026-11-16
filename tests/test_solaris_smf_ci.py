@@ -34,6 +34,9 @@ class Fake:
         if args[0] == control.SVCPROP:
             return SimpleNamespace(returncode=0, stdout=self.enabled)
         if args[0] == control.SVCCFG:
+            if args[1] == "list":
+                return SimpleNamespace(returncode=0, stderr="",
+                                       stdout="application/liner-notes-ci\n" if self.present else "")
             if args[1] == "import": self.present = True
             if args[1] == "delete": self.present = False
         if args[0] == control.SVCADM:
@@ -83,7 +86,17 @@ class SmfTests(unittest.TestCase):
         fake = Fake(True)
         with patch.object(control, "command", fake), self.assertRaisesRegex(ValueError, "already exists"):
             control.serve()
-        self.assertEqual(fake.commands, [[control.SVCS, "-H", "-o", "fmri", control.SERVICE]])
+        self.assertEqual(fake.commands, [[control.SVCCFG, "list", "application/liner-notes-ci"]])
+
+    def test_repository_errors_never_mean_absent(self):
+        for result in (SimpleNamespace(returncode=1, stdout="", stderr="fatal"),
+                       SimpleNamespace(returncode=2, stdout="", stderr="bad option"),
+                       SimpleNamespace(returncode=0, stdout="", stderr="warning"),
+                       SimpleNamespace(returncode=0, stdout="other/service\n", stderr="")):
+            with self.subTest(result=result), patch.object(control, "command", return_value=result) as call, \
+                 self.assertRaises(RuntimeError):
+                control.serve()
+            self.assertEqual(call.call_count, 1)  # no validate/import/delete
 
     @unittest.skipUnless(os.name == "posix", "POSIX pipe/select")
     def test_finish_eof_and_invalid_request_all_clean_owned_service(self):

@@ -141,9 +141,9 @@
   "ci/freebsd_fixture_permissions.py": "80431c66875b4483f7c6d5401eda9dadc4537f1ca527b9b387aab801227d4b2c",
   "tests/test_freebsd_fixture_permissions.py": "e2a70d9b451da8bb97cd572bb1f381ce04100c993af5c53fc2b51f7ed15ba3a7",
   ".github/workflows/debian-package.yml": "52da1e55a41c3561427d20702814728e45325058f6936833076a9b48e51efcd3",
-  "ci/solaris_smf_control.py": "0e96b6c219bf97e7489647c800c9dc0b89649accd28388b364bdc97a8183bed1",
+  "ci/solaris_smf_control.py": "7fbd6e3b1fc1524e25a968ffc6ad171370cf5d472aaaf950ef8d1c35df710a2e",
   "ci/solaris_smf_method.py": "0ef0d00f08680356e7b419706c8312467cf1c92af0fc63b4539f651a34954d42",
-  "ci/solaris_smf_lifecycle.py": "996d039e0f51d195adc339c9310a191880924af7a3dfb6c46820c9619b0e32a7",
+  "ci/solaris_smf_lifecycle.py": "2b5bf36ba6ad205af9fe040aadb340f4fd62c106e2a5d872a0086b9d8d88325e",
   "ci/prepare_solaris_smf.py": "cbc80db8cbb11ddabd7c4bc4231d85c4d7594607bb2a92dd30e72e6b935a596e",
-  "tests/test_solaris_smf_ci.py": "52fa1a3fe0f56e465871b1ad3bd3333725a3777448f24a91ba3de6905ae38c43"
+  "tests/test_solaris_smf_ci.py": "2ccf474d0bcd83af553e284ba8690e8862b4f22037246ccae7d540802396aac9"
 }
