@@ -21,6 +21,19 @@ static int removed,body_ok;
 static char persisted_body[64];
 static char journal_kind,journal_text[81];
 static uint32_t journal_actor;
+static uint32_t moderation_entries,extras_entries;
+static unsigned moderation_writes;
+static int local_hidden,moderation_commit_ok;
+
+uint32_t moderation_count(void) { return moderation_entries; }
+uint32_t extras_audit_count(void) { return extras_entries; }
+int moderation_set(uint32_t id,uint32_t board,uint32_t actor,int hide) {
+    assert(id==7 && board==2 && actor && catalog_manage(board,actor));
+    assert(catalog_read(board,actor) && !removed && (hide==0 || hide==1));
+    moderation_writes++;journal_actor=actor;
+    if(!moderation_commit_ok)return 0;
+    local_hidden=hide;return 1;
+}
 
 int members_broken(void) { return member_error; }
 int moderation_broken(void) { return moderation_error; }
@@ -65,10 +78,12 @@ static ArticleActor reset(void) {
     member_error=moderation_error=policy_error=extras_error=suspended=0;
     readable=writable=commit_ok=1;manager=hidden=imported=locked=0;grant_revision=9;
     commits=publications=0;journal_kind=0;journal_actor=0;journal_text[0]=0;
+    moderation_entries=extras_entries=moderation_writes=0;
+    local_hidden=0;moderation_commit_ok=1;
     ArticleActor actor={1,epoch,grants};return actor;
 }
 static void denied(ArticleOutcome got,ArticleOutcome wanted) {
-    assert(got==wanted && commits==0 && publications==0 && context==NULL);
+    assert(got==wanted && commits==0 && publications==0 && !moderation_writes && context==NULL);
 }
 static void cleared(const ArticleView *view,const char *body,size_t size) {
     const unsigned char *p=(const unsigned char *)view;
@@ -168,6 +183,65 @@ static void read_tests(void) {
     }
     puts("PASS: structured reads, guest/inspection ACL, tombstone non-disclosure, owned output and failure cleansing");
 }
+static void moderation_tests(void) {
+    typedef ArticleOutcome (*Moderate)(const ArticleActor *,uint32_t,uint32_t);
+    Moderate operations[]={article_hide,article_restore};
+    for(unsigned op=0;op<2;op++) {
+        Moderate apply=operations[op];ArticleActor actor=reset();
+        denied(apply(NULL,2,7),ARTICLE_LOGIN_REQUIRED);
+        actor.user=0;denied(apply(&actor,2,7),ARTICLE_LOGIN_REQUIRED);
+        actor.user=99;denied(apply(&actor,2,7),ARTICLE_REVOKED);
+        actor=reset();epoch++;denied(apply(&actor,2,7),ARTICLE_REVOKED);
+        actor=reset();suspended=1;denied(apply(&actor,2,7),ARTICLE_REVOKED);
+        actor=reset();
+        /* Authorship alone never grants local moderation authority. */
+        denied(apply(&actor,2,7),ARTICLE_ADMIN_REQUIRED);
+        manager=1;
+        denied(apply(&actor,2,0),ARTICLE_NOT_FOUND);
+        denied(apply(&actor,2,8),ARTICLE_NOT_FOUND);
+        denied(apply(&actor,3,7),ARTICLE_ADMIN_REQUIRED);
+        stored.board=3;denied(apply(&actor,2,7),ARTICLE_NOT_FOUND);
+        stored.board=2;readable=0;denied(apply(&actor,2,7),ARTICLE_NOT_FOUND);
+        readable=1;locked=1;denied(apply(&actor,2,7),ARTICLE_NOT_FOUND);
+        grants[2]=9;grant_revision++;denied(apply(&actor,2,7),ARTICLE_NOT_FOUND);
+        locked=0;manager=0;denied(apply(&actor,2,7),ARTICLE_ADMIN_REQUIRED);
+
+        actor=reset();manager=1;removed=1;imported=1;
+        denied(apply(&actor,2,7),ARTICLE_WITHDRAWN_TARGET);
+        imported=0;denied(apply(&actor,2,7),ARTICLE_WITHDRAWN_TARGET);
+        for(unsigned i=0;i<3;i++) {
+            actor=reset();manager=1;
+            moderation_entries=i?UINT32_MAX-2:UINT32_MAX;
+            extras_entries=i==1?2:i==2?UINT32_MAX:0;
+            denied(apply(&actor,2,7),ARTICLE_MODERATION_WRITE);
+        }
+        int *errors[]={&member_error,&moderation_error,&policy_error,&extras_error};
+        ArticleOutcome expected[]={ARTICLE_MEMBER_STORAGE,ARTICLE_MODERATION_STORAGE,
+                                   ARTICLE_POLICY_STORAGE,ARTICLE_EXTRAS_STORAGE};
+        for(unsigned i=0;i<4;i++) {
+            actor=reset();manager=1;*errors[i]=1;denied(apply(&actor,2,7),expected[i]);
+        }
+        /* Imported/local articles, including hidden descendants, use only the
+         * local moderation journal. No origin lookup/withdrawal event needed. */
+        for(int origin=-1;origin<=1;origin++) {
+            actor=reset();actor.user=2;manager=1;writable=0;imported=origin;hidden=1;
+            moderation_entries=UINT32_MAX-3;extras_entries=1;
+            local_hidden=(int)op;
+            assert(apply(&actor,2,7)==ARTICLE_OK);
+            assert(moderation_writes==1 && local_hidden==(op==0) && journal_actor==2);
+            assert(!commits && !publications && !body_reads && !context && !removed);
+            /* Restore does not override the visibility of an ancestor. */
+            ArticleView view;char body[64];
+            assert(article_read(&actor,7,0,&view,body,sizeof(body))==ARTICLE_OK);
+            tombstone(&view,body,sizeof(body),ARTICLE_CONCEALED);
+        }
+        actor=reset();manager=1;moderation_commit_ok=0;local_hidden=(int)op;
+        assert(apply(&actor,2,7)==ARTICLE_MODERATION_WRITE);
+        assert(local_hidden==(int)op && moderation_writes==1 && !context);
+        assert(!commits && !publications && !body_reads);
+    }
+    puts("PASS: local moderation authority, revoked identity/grants, withdrawn rejection, audit bounds and write failure");
+}
 int main(void) {
     ArticleActor actor=reset();
     denied(article_withdraw(NULL,2,7,1),ARTICLE_LOGIN_REQUIRED);
@@ -255,5 +329,6 @@ int main(void) {
     }
     puts("PASS: typed article Core identity/ACL, revoked grants, origin authority, validation and durable publication");
     read_tests();
+    moderation_tests();
     return 0;
 }

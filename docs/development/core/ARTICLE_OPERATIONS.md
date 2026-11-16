@@ -13,7 +13,7 @@ API. The canonical manual and Japanese/English HELP keep their current behavior.
 | `session.c`, `classic_commands.inc` | Menus, command parsing, editor, session presentation state | Builds legacy BoardRequest operations; consumes formatted results |
 | `ui.c`, `messages.c`, `menu.c` | Terminal formatting, languages, external HELP/menu text | Not an authority source |
 | `board.c` | Single-owner worker/queue, global store health, legacy request/response adapter, article repository | Many other operations still mix formatting with domain logic |
-| `article_core.c` | Typed withdrawal/retitle and reads; live identity/ACL checks, durable mutation order | Uses existing member/catalog/moderation/extras modules on the same worker |
+| `article_core.c` | Typed withdrawal/retitle, reads and local hide/restore; live identity/ACL checks, durable mutation order | Uses existing member/catalog/moderation/extras modules on the same worker |
 | `members.c`, `catalog.c`, `moderation.c`, `board_policy.c` | Membership, epochs, ACLs, inherited SIGOP roles, board grants | Existing process-global worker-owned state |
 | `mailbox.c`, `mail_files.c`, `chat.c`, vault modules | Mail, attachments, chat/talk, vault services | Their Session/Board command adapters remain unchanged |
 | `doors.c`, `board_link.inc`, `webui/bridge.py` | PTY Door management, signed article exchange, Web connector | Web still uses the legacy command bridge; no new auth transport |
@@ -59,8 +59,9 @@ IDs, link signatures and visibility cache invalidation remain unchanged.
 
 `board.c` maps outcomes to the unchanged RAW/terminal responses. The existing
 Session/menu confirmation and Web connector therefore need no new protocol.
-HIDE/RESTORE, read/search, ancestor visibility, link synchronization and physical
-body reclamation are not reimplemented in this extraction.
+Local HIDE/RESTORE are now extracted as described in
+[Local article moderation](ARTICLE_MODERATION.md). Search, ancestor visibility,
+link synchronization and physical body reclamation remain in existing modules.
 
 ## Verification and limits
 
