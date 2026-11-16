@@ -7,7 +7,7 @@
  * Never called by UI/transport code. Copies metadata instead of exposing the
  * SQLite-backed index's transient pointers. The existing worker queue owns
  * serialization of lookup, authorization, journal sync and index publication. */
-typedef struct { uint32_t board,parent,body_size; char author[33],title[81]; } ArticleMetadata;
+typedef struct { uint32_t board,parent,body_size,root,depth; char author[33],title[81]; } ArticleMetadata;
 int article_repository_find(uint32_t article,ArticleMetadata *out);
 /* -1 visibility/storage failure; otherwise 0 visible, 1 concealed. */
 int article_repository_unavailable(uint32_t article);
@@ -24,4 +24,7 @@ uint32_t article_repository_search_next(uint32_t start,const char *query);
 /* -1 storage failure; 0 no literal match; 1 match. Core checks ACL and
  * effective visibility before asking storage to inspect the body. */
 int article_repository_body_contains(uint32_t article,const char *query);
+/* Existing depth-first index traversal, including invisible nodes; 0=end.
+ * Core must independently check board/root membership and visibility. */
+uint32_t article_repository_tree_next(uint32_t article);
 #endif

@@ -160,6 +160,7 @@ int article_repository_find(uint32_t id,ArticleMetadata *out) {
     if(!id || id>article_count)return 0;
     const Article *a=article_at(id-1);
     out->board=a->board;out->parent=a->parent;out->body_size=a->body_size;
+    out->root=a->root;out->depth=a->depth;
     memcpy(out->author,a->author,sizeof(out->author));memcpy(out->title,a->title,sizeof(out->title));
     return 1;
 }
@@ -190,6 +191,7 @@ static uint32_t tree_next(uint32_t id) {
     }
     return 0;
 }
+uint32_t article_repository_tree_next(uint32_t id) { return tree_next(id); }
 static uint32_t board_of(uint32_t id) { return id && id<=article_count?(*article_at(id-1)).board:0; }
 static const char *article_body(const Article *a) {
     static char body[BOARD_BODY+1];
@@ -241,6 +243,31 @@ static void display_article_page(const BoardRequest *q,BoardResult *r,int search
     for(unsigned i=0;i<page.count;i++) {
         const ArticleSummary *row=&page.rows[i];
         pos+=(size_t)snprintf(r->text+pos,sizeof(r->text)-pos,"%u %u %s\r\n",row->id,row->parent,row->title);
+    }
+    snprintf(r->text+pos,sizeof(r->text)-pos,"END NEXT %u\r\n",page.next);
+}
+static void display_article_tree(const BoardRequest *q,BoardResult *r) {
+    ArticleActor actor={q->user,q->user_epoch,q->board_grants};ArticleTreePage page;
+    ArticleOutcome result=article_tree(&actor,q->board,q->number,q->cursor,&page);
+    if(result!=ARTICLE_OK) {
+        switch(result) {
+        case ARTICLE_REVOKED: r->revoked=1;strcpy(r->text,"ERR session revoked\r\n");break;
+        case ARTICLE_BOARD_DENIED: strcpy(r->text,"ERR board unavailable\r\n");break;
+        case ARTICLE_NOT_FOUND: strcpy(r->text,"ERR no article\r\n");break;
+        case ARTICLE_INVALID_CURSOR: strcpy(r->text,"ERR tree cursor\r\n");break;
+        case ARTICLE_MEMBER_STORAGE: strcpy(r->text,"ERR member storage unavailable\r\n");break;
+        case ARTICLE_MODERATION_STORAGE: strcpy(r->text,"ERR moderation storage unavailable\r\n");break;
+        case ARTICLE_POLICY_STORAGE: strcpy(r->text,"ERR board policy storage\r\n");break;
+        case ARTICLE_EXTRAS_STORAGE: strcpy(r->text,"ERR extras storage\r\n");break;
+        default: strcpy(r->text,"ERR article storage\r\n");break;
+        }
+        return;
+    }
+    size_t pos=(size_t)snprintf(r->text,sizeof(r->text),"TREE %u\r\n",page.root);
+    for(unsigned i=0;i<page.count;i++) {
+        const ArticleTreeRow *row=&page.rows[i];unsigned indent=row->depth>12?24:row->depth*2;
+        pos+=(size_t)snprintf(r->text+pos,sizeof(r->text)-pos,"%*s#%u parent=%u depth=%u %.80s\r\n",
+                             (int)indent,"",row->summary.id,row->summary.parent,row->depth,row->summary.title);
     }
     snprintf(r->text+pos,sizeof(r->text)-pos,"END NEXT %u\r\n",page.next);
 }
@@ -1066,19 +1093,7 @@ static void execute(const BoardRequest *q,BoardResult *r) {
         if(!target) { strcpy(r->text,"ERR no neighbour\r\n"); return; }
         display_article(q,target,r,0);
     } else if(q->op=='T') {
-        if(!q->number || q->number>article_count) { strcpy(r->text,"ERR no article\r\n"); return; }
-        uint32_t root=(*article_at(q->number-1)).root, id=q->cursor?q->cursor:root;
-        if(id>article_count || (*article_at(id-1)).root!=root) { strcpy(r->text,"ERR tree cursor\r\n"); return; }
-        size_t pos=(size_t)snprintf(r->text,sizeof(r->text),"TREE %u\r\n",root);
-        for(int shown=0;id;) {
-            if(unavailable(id)) { id=tree_next(id);continue; }
-            if(shown++==8)break;
-            Article *a=&(*article_at(id-1)); unsigned indent=a->depth>12?24:a->depth*2;
-            pos+=(size_t)snprintf(r->text+pos,sizeof(r->text)-pos,"%*s#%u parent=%u depth=%u %.80s\r\n",
-                                 (int)indent,"",id,a->parent,a->depth,a->title);
-            id=tree_next(id);
-        }
-        snprintf(r->text+pos,sizeof(r->text)-pos,"END NEXT %u\r\n",id);
+        display_article_tree(q,r);
     } else if(q->op=='O') {
         uint32_t id=q->number?q->number:1, count=0;
         if(q->notes_unread && !q->user) { strcpy(r->text,"ERR login required\r\n"); return; }

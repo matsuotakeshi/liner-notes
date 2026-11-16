@@ -226,3 +226,45 @@ ArticleOutcome article_search(const ArticleActor *actor,uint32_t board,uint32_t 
                               const char *query,ArticlePage *out) {
     return article_page(actor,board,start,query,1,out);
 }
+
+static ArticleOutcome tree_articles(const ArticleActor *actor,uint32_t board,uint32_t target,
+                                     uint32_t start,ArticleTreePage *out) {
+    ArticleOutcome result=health();
+    if(result!=ARTICLE_OK)return result;
+    result=identity(actor,1);
+    if(result!=ARTICLE_OK)return result;
+    if(!catalog_read(board,actor?actor->user:0))return ARTICLE_BOARD_DENIED;
+    uint32_t count=article_repository_count();
+    if(count>CONTENT_ID_MAX)return ARTICLE_STORAGE;
+    ArticleMetadata article;
+    if(!article_repository_find(target,&article) || article.board!=board)return ARTICLE_NOT_FOUND;
+    uint32_t root=article.root,id=start?start:root;
+    if(!root || root>count)return ARTICLE_STORAGE;
+    if(!id || id>count || !article_repository_find(id,&article) || article.root!=root || article.board!=board)
+        return ARTICLE_INVALID_CURSOR;
+    out->root=root;
+    for(uint32_t visited=0;id;id=article_repository_tree_next(id)) {
+        if(++visited>count || id>count || !article_repository_find(id,&article) ||
+           article.board!=board || article.root!=root)return ARTICLE_STORAGE;
+        int hidden=article_repository_unavailable(id);
+        if(hidden<0)return ARTICLE_STORAGE;
+        if(hidden)continue;
+        for(unsigned i=0;i<out->count;i++)if(out->rows[i].summary.id==id)return ARTICLE_STORAGE;
+        if(out->count==8) { out->next=id;break; }
+        ArticleTreeRow *row=&out->rows[out->count++];
+        row->summary.id=id;row->summary.board=board;row->summary.parent=article.parent;
+        memcpy(row->summary.title,article.title,sizeof(row->summary.title));row->depth=article.depth;
+    }
+    return ARTICLE_OK;
+}
+
+ArticleOutcome article_tree(const ArticleActor *actor,uint32_t board,uint32_t target,
+                            uint32_t start,ArticleTreePage *out) {
+    if(!out)return ARTICLE_INVALID_READ;
+    memset(out,0,sizeof(*out));
+    policy_context(actor?actor->board_grants:NULL);
+    ArticleOutcome result=tree_articles(actor,board,target,start,out);
+    policy_context(NULL);
+    if(result!=ARTICLE_OK)memset(out,0,sizeof(*out));
+    return result;
+}

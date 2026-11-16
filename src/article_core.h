@@ -64,4 +64,17 @@ typedef struct {
 ArticleOutcome article_list(const ArticleActor *,uint32_t board,uint32_t start,ArticlePage *out);
 ArticleOutcome article_search(const ArticleActor *,uint32_t board,uint32_t start,
                               const char *query,ArticlePage *out);
+/* Whole thread containing article, in existing depth-first order. start=0
+ * begins at its root; other cursors must belong to this thread and board.
+ * Up to 8 visible rows, next=next visible node or 0. Hidden nodes contribute
+ * no rows. root remains the thread identifier even for an empty hidden tree.
+ * Depth is structural; indentation belongs to UI. Errors clear all output. */
+typedef struct { ArticleSummary summary; uint32_t depth; } ArticleTreeRow;
+typedef struct {
+    uint32_t root,next;
+    unsigned count;
+    ArticleTreeRow rows[8];
+} ArticleTreePage;
+ArticleOutcome article_tree(const ArticleActor *,uint32_t board,uint32_t article,
+                            uint32_t start,ArticleTreePage *out);
 #endif
