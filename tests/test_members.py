@@ -8,14 +8,14 @@ import hashlib
 import os
 import signal
 import shutil
-from test_runtime import Client
+from test_runtime import Client, test_wait_timeout
 from test_board import Server,post,read
 from test_notes import page,navigate
 
 PASSWORD='test-only-secret-8721'
 
 def auth(c,name,create=False,password=PASSWORD):
-    c.sock.settimeout(10)
+    c.sock.settimeout(test_wait_timeout('LINER_TEST_AUTH_TIMEOUT', 10))
     command=f'{"REGISTER" if create else "LOGIN"} {name}\n'.encode()
     c.send(command);reply=c.line()
     # Re-login after fast operations may still be inside the documented

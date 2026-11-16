@@ -13,18 +13,33 @@ import tempfile
 import threading
 import time
 import unittest
+from unittest.mock import Mock, patch
+
 
 import yaml
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "ci"))
 from native_ci import all_passed, parse_result, require_trusted_main, run_parallel, ssh_options, supervise, validate_remote_directory
+import native_remote
 from native_remote import RESULT, commands_for, host_lock, unpack
 
 SHA = "a" * 40
 
 
 class PolicyTests(unittest.TestCase):
+    def test_native_sets_bounded_io_waits(self):
+        child = Mock()
+        child.poll.return_value = 0
+        with patch.object(native_remote.subprocess, 'Popen', return_value=child) as spawn, \
+             patch.object(native_remote, 'heartbeat'):
+            native_remote.run_commands([['test-only']], 0)
+        env = spawn.call_args.kwargs['env']
+        self.assertEqual(env['LINER_TEST_START_TIMEOUT'], '180')
+        self.assertEqual(env['LINER_TEST_AUTH_TIMEOUT'], '30')
+        self.assertEqual(env['LINER_TEST_STOP_TIMEOUT'], '30')
+
+
     def test_only_exact_trusted_main_can_reach_ssh(self):
         env = dict(GITHUB_REF="refs/heads/main", GITHUB_EVENT_NAME="push",
                    GITHUB_REPOSITORY="matsuotakeshi/liner-notes", GITHUB_SHA=SHA)

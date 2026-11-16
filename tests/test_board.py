@@ -9,7 +9,7 @@ import threading
 import time
 import os
 import signal
-from test_runtime import Client
+from test_runtime import Client, test_wait_timeout
 
 
 class Server:
@@ -35,14 +35,15 @@ class Server:
         self.expected_errors = []
 
     def close(self, crash=False):
+        timeout = test_wait_timeout("LINER_TEST_STOP_TIMEOUT", 5)
         if crash:
             self.proc.kill()
         else:
             self.proc.terminate()
         try:
-            self.proc.wait(timeout=5)
+            self.proc.wait(timeout=timeout)
         except subprocess.TimeoutExpired as error:
-            # Keep the five-second watchdog; collect a bounded process-state
+            # Keep a finite watchdog; collect a bounded process-state
             # snapshot before killing the slow child for diagnostics.
             try:
                 state = subprocess.run(
@@ -54,7 +55,7 @@ class Server:
                 state = 'unavailable'
             self.proc.kill()
             self.proc.wait()
-            raise AssertionError(('shutdown exceeded 5 seconds after terminate',
+            raise AssertionError((f'shutdown exceeded {timeout:g} seconds after terminate',
                                   'ps', state,
                                   'exit_after_kill', self.proc.returncode,
                                   'stderr', self.proc.stderr.read())) from error

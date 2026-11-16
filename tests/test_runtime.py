@@ -1,10 +1,20 @@
 """Black-box socket checks. Runs the same probe on Windows and FreeBSD."""
+import math
+import os
 import pathlib
 import socket
 import subprocess
 import sys
 import time
 import threading
+
+
+def test_wait_timeout(name, default):
+    """Bounded harness-only override; never accept an infinite CI wait."""
+    value = float(os.environ.get(name, str(default)))
+    if not math.isfinite(value) or not 0 < value <= 120:
+        raise ValueError(f'{name} must be finite and between 0 and 120 seconds')
+    return value
 
 
 class Client:
