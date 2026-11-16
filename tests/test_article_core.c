@@ -40,10 +40,21 @@ static int mark_ok,mark_value;
 static int other_readable;
 static uint32_t probe_user;
 static int lookup_error;
+static int discovery;
+static unsigned char board_present[CATALOG_MAX+1],board_visible[CATALOG_MAX+1],board_readable[CATALOG_MAX+1],board_writable[CATALOG_MAX+1];
+static uint32_t board_next[CATALOG_MAX+1],board_parent[CATALOG_MAX+1],board_depth[CATALOG_MAX+1];
+static char board_titles[CATALOG_MAX+1][81];
+int catalog_exists(uint32_t id) { return id>0 && id<=CATALOG_MAX && board_present[id]; }
+int catalog_visible(uint32_t id,uint32_t user) { (void)user;return catalog_exists(id) && board_visible[id]; }
+uint32_t catalog_next(uint32_t id) { assert(catalog_exists(id));return board_next[id]; }
+uint32_t catalog_parent(uint32_t id) { assert(catalog_exists(id));return board_parent[id]; }
+unsigned catalog_depth(uint32_t id) { assert(catalog_exists(id));return board_depth[id]; }
+const char *catalog_title(uint32_t id) { assert(catalog_exists(id));return board_titles[id]; }
+
 
 int members_seen(uint32_t user,uint32_t id) {
     assert(user>0 && user<4 && id>0 && id<=300 && paging);
-    assert(page_items[id].board==2 && !page_hidden[id]);seen_calls++;
+    assert((discovery?catalog_read(page_items[id].board,user):page_items[id].board==2) && !page_hidden[id]);seen_calls++;
     if(id==seen_error)member_error=1;
     return read_flags[user][id];
 }
@@ -107,6 +118,8 @@ int moderation_suspended(uint32_t user) { (void)user;return suspended; }
 uint32_t moderation_epoch(uint32_t user) { (void)user;return epoch; }
 void policy_context(const uint32_t *p) { context=p; }
 int catalog_read(uint32_t board,uint32_t user) {
+    if(discovery)return catalog_visible(board,user) && board_readable[board] &&
+        (board!=2 || !locked || (context && context[2]==(uint32_t)grant_revision));
     (void)user;
     if(board==3 || board==4)return other_readable && user==1;
     return board==2 && readable && (!locked || (context && context[2]==(uint32_t)grant_revision));
@@ -116,7 +129,7 @@ int catalog_under(uint32_t board,uint32_t root) {
            ((root==3 || root==4) && board==root);
 }
 int catalog_manage(uint32_t board,uint32_t user) { return board==2 && user && manager; }
-int catalog_write(uint32_t board,uint32_t user) { return catalog_read(board,user) && writable; }
+int catalog_write(uint32_t board,uint32_t user) { return discovery?(catalog_visible(board,user) && board_writable[board]):(catalog_read(board,user) && writable); }
 int article_repository_find(uint32_t id,ArticleMetadata *out) {
     if(paging) {
         if(!id || id>page_count || id==missing_id)return 0;
@@ -144,6 +157,7 @@ void article_repository_title_changed(uint32_t id,const char *title) {
     assert(!strcmp(title,journal_text));publications++;
 }
 static ArticleActor reset(void) {
+    discovery=0;
     paging=0;other_readable=0;probe_user=0;lookup_error=0;
     memset(read_flags,0,sizeof(read_flags));mark_calls=seen_calls=seen_error=mark_user=mark_id=0;mark_ok=1;mark_value=0;
     memset(&stored,0,sizeof(stored));stored.board=2;stored.parent=5;strcpy(stored.author,"alice");
@@ -429,6 +443,111 @@ static void page_cleared(const ArticlePage *page) {
     const unsigned char *p=(const unsigned char *)page;
     for(size_t i=0;i<sizeof(*page);i++)assert(!p[i]);
     assert(!context && !commits && !moderation_writes && !publications);
+}
+static ArticleActor discovery_reset(void) {
+    ArticleActor actor=page_reset(6);discovery=1;
+    memset(board_present,0,sizeof(board_present));memset(board_visible,0,sizeof(board_visible));
+    memset(board_readable,0,sizeof(board_readable));memset(board_writable,0,sizeof(board_writable));
+    memset(board_parent,0,sizeof(board_parent));memset(board_depth,0,sizeof(board_depth));
+    memset(board_next,0,sizeof(board_next));memset(board_titles,0,sizeof(board_titles));
+    for(uint32_t id=1;id<=11;id++) {
+        board_present[id]=board_visible[id]=board_readable[id]=board_writable[id]=1;
+        board_next[id]=id<11?id+1:0;
+        snprintf(board_titles[id],sizeof(board_titles[id]),"board %u",id);
+    }
+    board_visible[3]=0;board_readable[5]=0;board_writable[5]=0;
+    board_parent[3]=board_parent[4]=board_parent[5]=2;
+    board_depth[3]=board_depth[4]=board_depth[5]=1;
+    board_parent[6]=4;board_depth[6]=2;
+    page_items[1].board=1;page_items[2].board=page_items[3].board=2;
+    page_items[4].board=3;page_items[5].board=4;page_items[6].board=5;
+    page_hidden[3]=1;read_flags[1][5]=1;
+    return actor;
+}
+static void discovery_cleared(const void *out,size_t size) {
+    const unsigned char *p=out;
+    for(size_t i=0;i<size;i++)assert(!p[i]);
+    assert(!context && !mark_calls && !commits && !moderation_writes && !publications && !body_reads);
+    for(unsigned i=0;i<=300;i++)assert(!body_probes[i]);
+}
+static void discovery_tests(void) {
+    ArticleBoardsPage page;ArticleBoardRow next;ArticleActor actor=discovery_reset();
+    assert(article_boards(&actor,0,0,&page)==ARTICLE_OK);
+    assert(page.count==8 && page.next==10 && page.rows[0].id==1 && page.rows[2].id==4);
+    assert(page.rows[0].unread==1 && page.rows[1].unread==1 && page.rows[2].unread==0);
+    assert(page.rows[2].unread_known && page.rows[2].parent==2 && page.rows[2].depth==1);
+    assert(page.rows[3].id==5 && !page.rows[3].unread_known && !page.rows[3].writable);
+    board_titles[1][0]='X';assert(page.rows[0].title[0]!='X');
+    assert(article_boards(&actor,page.next,0,&page)==ARTICLE_OK);assert(page.count==2 && page.rows[0].id==10 && !page.next);
+    assert(article_boards(&actor,2,1,&page)==ARTICLE_OK);assert(page.count==2 && page.rows[0].id==4 && page.rows[1].id==5 && !page.next);
+    assert(article_boards(&actor,11,1,&page)==ARTICLE_OK);discovery_cleared(&page,sizeof(page));
+    unsigned before=seen_calls;missing_id=1;
+    assert(article_boards(NULL,0,0,&page)==ARTICLE_OK);assert(seen_calls==before);
+    for(unsigned i=0;i<page.count;i++)assert(!page.rows[i].unread_known && !page.rows[i].unread);
+    missing_id=0;
+    assert(article_next_board(NULL,1,&next)==ARTICLE_LOGIN_REQUIRED);discovery_cleared(&next,sizeof(next));
+    assert(article_next_board(&actor,1,&next)==ARTICLE_OK);assert(next.id==2 && next.unread==1);
+    assert(article_next_board(&actor,2,&next)==ARTICLE_OK);assert(next.id==1);
+    read_flags[1][1]=1;
+    assert(article_next_board(&actor,2,&next)==ARTICLE_OK);discovery_cleared(&next,sizeof(next));
+    assert(article_boards(&actor,12,0,&page)==ARTICLE_BOARD_DENIED);discovery_cleared(&page,sizeof(page));
+    assert(article_boards(&actor,CATALOG_MAX+1,0,&page)==ARTICLE_BOARD_DENIED);discovery_cleared(&page,sizeof(page));
+    assert(article_next_board(&actor,0,&next)==ARTICLE_BOARD_DENIED);discovery_cleared(&next,sizeof(next));
+    assert(article_boards(&actor,1,0,NULL)==ARTICLE_INVALID_READ);
+    assert(article_next_board(&actor,1,NULL)==ARTICLE_INVALID_READ);
+    actor=discovery_reset();board_next[1]=4;board_next[4]=2;board_next[3]=5;
+    assert(article_boards(&actor,1,0,&page)==ARTICLE_OK);assert(page.rows[1].id==4 && page.rows[2].id==2);
+    actor=discovery_reset();locked=1;
+    assert(article_boards(&actor,2,0,&page)==ARTICLE_OK);assert(!page.rows[0].unread_known);
+    assert(article_next_board(&actor,1,&next)==ARTICLE_OK);discovery_cleared(&next,sizeof(next));
+    grants[2]=(uint32_t)grant_revision;
+    assert(article_next_board(&actor,1,&next)==ARTICLE_OK);assert(next.id==2);
+    grant_revision++;
+    assert(article_next_board(&actor,1,&next)==ARTICLE_OK);discovery_cleared(&next,sizeof(next));
+    actor=discovery_reset();epoch++;
+    assert(article_boards(&actor,1,0,&page)==ARTICLE_REVOKED);discovery_cleared(&page,sizeof(page));
+    assert(article_next_board(&actor,1,&next)==ARTICLE_REVOKED);discovery_cleared(&next,sizeof(next));
+    epoch--;suspended=1;
+    assert(article_boards(&actor,1,0,&page)==ARTICLE_REVOKED);discovery_cleared(&page,sizeof(page));
+    suspended=0;actor.user=99;
+    assert(article_next_board(&actor,1,&next)==ARTICLE_REVOKED);discovery_cleared(&next,sizeof(next));
+    actor=discovery_reset();board_visible[2]=0;
+    assert(article_next_board(&actor,1,&next)==ARTICLE_OK);discovery_cleared(&next,sizeof(next));
+    actor=discovery_reset();seen_error=2;
+    assert(article_boards(&actor,1,0,&page)==ARTICLE_READ_STATE_STORAGE);discovery_cleared(&page,sizeof(page));
+    actor=discovery_reset();missing_id=2;
+    assert(article_next_board(&actor,1,&next)==ARTICLE_STORAGE);discovery_cleared(&next,sizeof(next));
+    missing_id=0;visibility_error=2;
+    assert(article_boards(&actor,1,0,&page)==ARTICLE_STORAGE);discovery_cleared(&page,sizeof(page));
+    visibility_error=0;page_items[2].board=CATALOG_MAX+1;
+    assert(article_boards(&actor,1,0,&page)==ARTICLE_STORAGE);discovery_cleared(&page,sizeof(page));
+    page_items[2].board=0;
+    assert(article_next_board(&actor,1,&next)==ARTICLE_STORAGE);discovery_cleared(&next,sizeof(next));
+    actor=discovery_reset();page_count=CONTENT_ID_MAX+1;
+    assert(article_boards(&actor,1,0,&page)==ARTICLE_STORAGE);discovery_cleared(&page,sizeof(page));
+    actor=discovery_reset();board_next[2]=1;
+    assert(article_boards(&actor,1,0,&page)==ARTICLE_STORAGE);discovery_cleared(&page,sizeof(page));
+    read_flags[1][1]=read_flags[1][2]=1;
+    assert(article_next_board(&actor,4,&next)==ARTICLE_STORAGE);discovery_cleared(&next,sizeof(next));
+    actor=discovery_reset();board_next[2]=CATALOG_MAX+1;
+    assert(article_boards(&actor,1,0,&page)==ARTICLE_STORAGE);discovery_cleared(&page,sizeof(page));
+    actor=discovery_reset();board_next[2]=12;
+    assert(article_boards(&actor,1,0,&page)==ARTICLE_STORAGE);discovery_cleared(&page,sizeof(page));
+    actor=discovery_reset();board_parent[4]=4;
+    assert(article_boards(&actor,1,0,&page)==ARTICLE_STORAGE);discovery_cleared(&page,sizeof(page));
+    actor=discovery_reset();board_depth[4]=CATALOG_MAX;
+    assert(article_boards(&actor,1,0,&page)==ARTICLE_STORAGE);discovery_cleared(&page,sizeof(page));
+    int *errors[]={&member_error,&moderation_error,&policy_error,&extras_error};
+    ArticleOutcome wanted[]={ARTICLE_MEMBER_STORAGE,ARTICLE_MODERATION_STORAGE,ARTICLE_POLICY_STORAGE,ARTICLE_EXTRAS_STORAGE};
+    for(unsigned i=0;i<4;i++) {
+        actor=discovery_reset();*errors[i]=1;
+        assert(article_boards(&actor,1,0,&page)==wanted[i]);discovery_cleared(&page,sizeof(page));
+        assert(article_next_board(&actor,1,&next)==wanted[i]);discovery_cleared(&next,sizeof(next));
+    }
+    actor=discovery_reset();page_count=0;
+    assert(article_next_board(&actor,1,&next)==ARTICLE_OK);discovery_cleared(&next,sizeof(next));
+    assert(!mark_calls && !body_reads && !commits && !publications && !context);
+    puts("PASS: catalog-order board discovery, private/locked unread counts, wrap, revoked grants and fail-closed traversal");
 }
 static void navigation_cleared(const ArticleSummary *row) {
     const unsigned char *p=(const unsigned char *)row;
@@ -1090,5 +1209,6 @@ int main(void) {
     news_tests();
     find_scan_tests();
     navigation_tests();
+    discovery_tests();
     return 0;
 }

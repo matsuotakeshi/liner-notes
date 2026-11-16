@@ -1061,39 +1061,38 @@ static void execute(const BoardRequest *q,BoardResult *r) {
         snprintf(r->text,sizeof(r->text),"%s %u\r\n",q->op=='x'?"SUSPENDED":"RESUMED",q->number); return;
     }
     if(q->op=='b' || q->op=='J') {
-        if(q->op=='J' && !q->user) { strcpy(r->text,"ERR login required\r\n"); return; }
-        size_t pos=(size_t)snprintf(r->text,sizeof(r->text),"BOARDS\r\n");
-        uint32_t id=q->number?q->number:1; int shown=0;
-        if(!catalog_exists(id)) { strcpy(r->text,"ERR board unavailable\r\n"); return; }
-        unsigned unread[CATALOG_MAX+1]={0};
-        int readable[CATALOG_MAX+1]={0};
-        for(uint32_t b=1;b<=CATALOG_MAX;b++) readable[b]=catalog_read(b,q->user);
-        if(q->user) for(uint32_t i=1;i<=article_count;i++) {
-            uint32_t b=(*article_at(i-1)).board;
-            if(readable[b] && !unavailable(i) && !members_seen(q->user,i)) unread[b]++;
+        ArticleActor actor={q->user,q->user_epoch,q->board_grants};
+        ArticleBoardsPage page;ArticleBoardRow next;
+        ArticleOutcome result=q->op=='J'?article_next_board(&actor,q->board,&next):
+                                        article_boards(&actor,q->number,q->action=='C',&page);
+        if(result!=ARTICLE_OK) {
+            switch(result) {
+            case ARTICLE_LOGIN_REQUIRED: strcpy(r->text,"ERR login required\r\n");break;
+            case ARTICLE_REVOKED: r->revoked=1;strcpy(r->text,"ERR session revoked\r\n");break;
+            case ARTICLE_BOARD_DENIED: strcpy(r->text,"ERR board unavailable\r\n");break;
+            case ARTICLE_MEMBER_STORAGE: strcpy(r->text,"ERR member storage unavailable\r\n");break;
+            case ARTICLE_MODERATION_STORAGE: strcpy(r->text,"ERR moderation storage unavailable\r\n");break;
+            case ARTICLE_POLICY_STORAGE: strcpy(r->text,"ERR board policy storage\r\n");break;
+            case ARTICLE_EXTRAS_STORAGE: strcpy(r->text,"ERR extras storage\r\n");break;
+            case ARTICLE_READ_STATE_STORAGE: strcpy(r->text,"ERR read-state storage\r\n");break;
+            default: strcpy(r->text,"ERR article storage\r\n");break;
+            }
+            return;
         }
         if(q->op=='J') {
-            uint32_t next=q->board;
-            for(unsigned visited=0;visited<CATALOG_MAX;visited++) {
-                next=catalog_next(next); if(!next) next=1;
-                if(next==q->board) break;
-                if(readable[next] && unread[next]) {
-                    r->board=next;
-                    snprintf(r->text,sizeof(r->text),"BOARD %u %.80s\r\n",next,catalog_title(next));
-                    return;
-                }
-            }
-            strcpy(r->text,"NEXTBOARD NONE\r\n"); return;
+            if(!next.id) { strcpy(r->text,"NEXTBOARD NONE\r\n");return; }
+            r->board=next.id;
+            snprintf(r->text,sizeof(r->text),"BOARD %u %.80s\r\n",next.id,next.title);return;
         }
-        for(;id;id=catalog_next(id)) if(catalog_visible(id,q->user) && (q->action!='C' || catalog_parent(id)==q->number)) {
-            if(shown++==8) break;
-            unsigned depth=catalog_depth(id), indent=depth>12?24:depth*2;
-            char count[16];
-            if(q->user && readable[id]) snprintf(count,sizeof(count),"%u",unread[id]); else strcpy(count,"-");
+        size_t pos=(size_t)snprintf(r->text,sizeof(r->text),"BOARDS\r\n");
+        for(unsigned i=0;i<page.count;i++) {
+            const ArticleBoardRow *row=&page.rows[i];
+            unsigned indent=row->depth>12?24:row->depth*2;char count[16];
+            if(row->unread_known)snprintf(count,sizeof(count),"%u",row->unread);else strcpy(count,"-");
             pos+=(size_t)snprintf(r->text+pos,sizeof(r->text)-pos,"%*s#%u parent=%u depth=%u write=%s unread=%s %.80s\r\n",
-                (int)indent,"",id,catalog_parent(id),depth,catalog_write(id,q->user)?"yes":"no",count,catalog_title(id));
+                (int)indent,"",row->id,row->parent,row->depth,row->writable?"yes":"no",count,row->title);
         }
-        snprintf(r->text+pos,sizeof(r->text)-pos,"END NEXT %u\r\n",id); return;
+        snprintf(r->text+pos,sizeof(r->text)-pos,"END NEXT %u\r\n",page.next);return;
     }
     if(q->op=='j') {
         if(!catalog_visible(q->number,q->user)) strcpy(r->text,"ERR board unavailable\r\n");
