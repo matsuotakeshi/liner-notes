@@ -2,7 +2,9 @@
 
 Baseline: main `12649b49788fb5a1dc95709f701e67188f47bae5` (PR #65).
 This LN-23/24 slice extracts the NEWS listing used by dated article news and
-CHECK ARTICLES. FIND/SCAN and session/UI profiles remain separate work.
+CHECK ARTICLES. FIND/SCAN is now documented in
+[Cross-board filters and sequential selection](ARTICLE_FIND_SCAN.md).
+Session/UI profiles remain separate work.
 It does not complete the Core/UI refactor or add a public network API.
 
 ## Contract and ownership

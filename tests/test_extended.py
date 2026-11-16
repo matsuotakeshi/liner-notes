@@ -91,6 +91,13 @@ def run(binary):
             got=[article(b,'SCAN ALL * needle')[0]]
             for _ in expected[1:]:got.append(article(b,'CONTINUE')[0])
             expect(b,'CONTINUE','SCAN END');assert got==expected
+            # The same Core filter preserves reverse order and end signalling.
+            reverse=[article(b,'SCAN DESC ALL * needle')[0]]
+            for _ in expected[1:]:reverse.append(article(b,'CONTINUE')[0])
+            expect(b,'CONTINUE','SCAN END');assert reverse==list(reversed(expected))
+            expect(b,'FIND ALL no_such_member *','ERR find syntax')
+            expect(b,'SCAN ALL no_such_member *','ERR find syntax')
+            assert [int(x.split()[0]) for x in findall(g,'SUBTREE alice needle')]==[other]
             switch(b,1);assert unread(b)==before
             article(b,'SCAN ALL alice *');b.send(b'STOP\n');assert b.line()=='連続読み出しを中止しました。'.encode()
             expect(b,'PING','PONG')
