@@ -93,6 +93,9 @@ def run(binary):
             assert len({r.strip().split()[0] for r in saved})==17
             _,notes,_=page(a,'NOTES')
             assert notes[0].startswith(b'#1 replies=16 latest=18 updated=') and b'unknown' not in notes[0]
+            assert b' unread=- ' in notes[0]
+            header,after_reply,last=page(a,'NOTES 2')
+            assert header==b'NOTES 2' and len(after_reply)==1 and after_reply[0].startswith(b'#5 ') and last==0
             for i in range(6): post(a,f'root {i}','root')
             _,roots,cursor=page(a,'NOTES'); assert len(roots)==5 and cursor
             _,rest,last=page(a,f'NOTES {cursor}'); assert len(rest)==3 and last==0

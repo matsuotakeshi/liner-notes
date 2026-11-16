@@ -605,6 +605,109 @@ static void unread_tests(void) {
     }
     puts("PASS: member-owned read state, unread scope/pagination, explicit marks, revoked authority and failure clearing");
 }
+static ArticleActor notes_reset(uint32_t count) {
+    ArticleActor actor=page_reset(count);memset(tree_next_ids,0,sizeof(tree_next_ids));tree_steps=0;
+    for(uint32_t i=1;i<=count;i++) { page_items[i].root=i;page_items[i].created=1000+i; }
+    return actor;
+}
+static void notes_cleared(const ArticleNotesPage *page) {
+    const unsigned char *p=(const unsigned char *)page;
+    for(size_t i=0;i<sizeof(*page);i++)assert(!p[i]);
+    assert(!context && !commits && !moderation_writes && !publications && !body_reads && !mark_calls);
+    for(unsigned i=0;i<=300;i++)assert(!body_probes[i]);
+}
+static void notes_tests(void) {
+    ArticleNotesPage page;ArticleActor actor=notes_reset(10);
+    page_items[2].root=page_items[3].root=1;page_items[2].parent=page_items[3].parent=1;
+    tree_next_ids[1]=3;tree_next_ids[3]=2;
+    page_items[2].created=9000;page_items[3].created=5000;
+    page_hidden[5]=1;page_items[6].board=3;read_flags[1][1]=1;
+    assert(article_notes(&actor,2,0,0,&page)==ARTICLE_OK);
+    assert(page.total==6 && page.count==5 && page.next==10 && page.unread_known);
+    uint32_t expected[]={1,4,7,8,9};
+    for(unsigned i=0;i<5;i++)assert(page.rows[i].summary.id==expected[i]);
+    assert(page.rows[0].replies==2 && page.rows[0].latest==3 && page.rows[0].updated==5000 && page.rows[0].unread==2);
+    strcpy(page_items[1].title,"changed");assert(!strcmp(page.rows[0].summary.title,"row 1"));
+    assert(article_notes(&actor,2,page.next,0,&page)==ARTICLE_OK);
+    assert(page.total==6 && page.count==1 && !page.next && page.rows[0].summary.id==10);
+    assert(page.rows[0].updated==1010 && page.rows[0].latest==10 && !page.rows[0].replies);
+    assert(article_notes(&actor,2,2,0,&page)==ARTICLE_OK);
+    assert(page.total==6 && page.count==5 && !page.next && page.rows[0].summary.id==4);
+    assert(article_notes(&actor,2,UINT32_MAX,0,&page)==ARTICLE_OK);
+    assert(page.total==6 && !page.count && !page.next);
+    page_hidden[3]=1;
+    assert(article_notes(&actor,2,0,0,&page)==ARTICLE_OK);
+    assert(page.rows[0].replies==1 && page.rows[0].latest==2 && page.rows[0].updated==9000 && page.rows[0].unread==1);
+    read_flags[1][2]=1;
+    assert(article_notes(&actor,2,0,1,&page)==ARTICLE_OK);
+    assert(page.total==5 && page.count==5 && page.rows[0].summary.id==4 && !page.next);
+    actor.user=2;
+    assert(article_notes(&actor,2,0,1,&page)==ARTICLE_OK);
+    assert(page.total==6 && page.rows[0].summary.id==1 && page.rows[0].unread==2);
+    unsigned calls=seen_calls;
+    assert(article_notes(NULL,2,0,0,&page)==ARTICLE_OK);
+    assert(!page.unread_known && !page.rows[0].unread && seen_calls==calls);
+    assert(article_notes(NULL,2,0,1,&page)==ARTICLE_LOGIN_REQUIRED);notes_cleared(&page);
+    actor.user=0;
+    assert(article_notes(&actor,2,0,1,&page)==ARTICLE_LOGIN_REQUIRED);notes_cleared(&page);
+    page_hidden[1]=1;
+    assert(article_notes(NULL,2,0,0,&page)==ARTICLE_OK);
+    assert(page.total==5 && page.rows[0].summary.id==4); /* Concealed parent hides the whole thread. */
+
+    actor=notes_reset(0);
+    assert(article_notes(NULL,2,0,0,&page)==ARTICLE_OK);notes_cleared(&page);
+    actor=notes_reset(3);memset(read_flags[1],1,sizeof(read_flags[1]));
+    assert(article_notes(&actor,2,0,1,&page)==ARTICLE_OK);
+    assert(page.unread_known && !page.total && !page.count && !page.next);
+    assert(article_notes(&actor,2,0,0,&page)==ARTICLE_OK);assert(page.total==3 && !page.rows[0].unread);
+    page_items[1].created=0;
+    assert(article_notes(&actor,2,0,0,&page)==ARTICLE_OK);assert(!page.rows[0].updated);
+    actor.user=99;
+    assert(article_notes(&actor,2,0,0,&page)==ARTICLE_REVOKED);notes_cleared(&page);
+    actor.user=1;epoch++;
+    assert(article_notes(&actor,2,0,0,&page)==ARTICLE_REVOKED);notes_cleared(&page);
+    epoch--;suspended=1;
+    assert(article_notes(&actor,2,0,0,&page)==ARTICLE_REVOKED);notes_cleared(&page);
+    suspended=0;readable=0;manager=1;
+    assert(article_notes(&actor,2,0,0,&page)==ARTICLE_BOARD_DENIED);notes_cleared(&page);
+    readable=1;locked=1;grants[2]=9;
+    assert(article_notes(&actor,2,0,0,&page)==ARTICLE_OK);
+    grant_revision++;
+    assert(article_notes(&actor,2,2,0,&page)==ARTICLE_BOARD_DENIED);notes_cleared(&page);
+
+    int *errors[]={&member_error,&moderation_error,&policy_error,&extras_error};
+    ArticleOutcome wanted[]={ARTICLE_MEMBER_STORAGE,ARTICLE_MODERATION_STORAGE,ARTICLE_POLICY_STORAGE,ARTICLE_EXTRAS_STORAGE};
+    for(unsigned i=0;i<4;i++) {
+        actor=notes_reset(7);*errors[i]=1;
+        assert(article_notes(&actor,2,0,0,&page)==wanted[i]);notes_cleared(&page);
+    }
+    actor=notes_reset(7);visibility_error=7;
+    assert(article_notes(&actor,2,0,0,&page)==ARTICLE_STORAGE);notes_cleared(&page);
+    visibility_error=0;missing_id=7;
+    assert(article_notes(&actor,2,0,0,&page)==ARTICLE_STORAGE);notes_cleared(&page);
+    missing_id=0;seen_error=7;
+    assert(article_notes(&actor,2,0,0,&page)==ARTICLE_READ_STATE_STORAGE);notes_cleared(&page);
+    actor=notes_reset(7);page_items[7].root=6;
+    assert(article_notes(&actor,2,0,0,&page)==ARTICLE_STORAGE);notes_cleared(&page);
+    actor=tree_reset(3);tree_next_ids[3]=2;
+    assert(article_notes(&actor,2,0,0,&page)==ARTICLE_STORAGE);notes_cleared(&page);assert(tree_steps<=3);
+    actor=tree_reset(3);page_hidden[2]=page_hidden[3]=1;tree_next_ids[3]=2;
+    assert(article_notes(&actor,2,0,0,&page)==ARTICLE_STORAGE);notes_cleared(&page);assert(tree_steps<=3);
+    actor=tree_reset(3);page_items[2].board=3;
+    assert(article_notes(&actor,2,0,0,&page)==ARTICLE_STORAGE);notes_cleared(&page);
+    actor=tree_reset(3);tree_next_ids[3]=4;
+    assert(article_notes(&actor,2,0,0,&page)==ARTICLE_STORAGE);notes_cleared(&page);
+    actor=notes_reset(300);
+    assert(article_notes(&actor,2,0,0,&page)==ARTICLE_OK);
+    assert(page.total==300 && page.count==5 && page.next==6 && tree_steps==300 && seen_calls==300);
+    actor=tree_reset(300);
+    assert(article_notes(&actor,2,0,0,&page)==ARTICLE_OK);
+    assert(page.total==1 && page.rows[0].replies==299 && page.rows[0].latest==300 && page.rows[0].unread==300 && tree_steps==300);
+    page_count=UINT32_MAX;
+    assert(article_notes(&actor,2,0,0,&page)==ARTICLE_STORAGE);notes_cleared(&page);
+    assert(article_notes(&actor,2,0,0,NULL)==ARTICLE_INVALID_READ);
+    puts("PASS: structured thread summaries, visible statistics, member unread filter, guest pages, revoked authority and bounded traversal");
+}
 int main(void) {
     ArticleActor actor=reset();
     denied(article_withdraw(NULL,2,7,1),ARTICLE_LOGIN_REQUIRED);
@@ -696,5 +799,6 @@ int main(void) {
     page_tests();
     tree_tests();
     unread_tests();
+    notes_tests();
     return 0;
 }
