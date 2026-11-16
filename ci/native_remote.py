@@ -110,7 +110,8 @@ def run_commands(commands, heartbeat_fd, timeout=3300, lease=45, stopped=lambda:
     """EOF, lost heartbeat, cancellation and timeouts all fail closed."""
     deadline = time.monotonic() + timeout
     state = heartbeat_state if heartbeat_state is not None else {'last': time.monotonic(), 'pending': b''}
-    env = dict(os.environ, LINER_TEST_START_TIMEOUT="180")
+    env = dict(os.environ, LINER_TEST_START_TIMEOUT="180",
+               LINER_TEST_AUTH_TIMEOUT="30", LINER_TEST_STOP_TIMEOUT="30")
     for command in commands:
         print("NATIVE_STEP " + json.dumps(command), flush=True)
         process = subprocess.Popen(command, stdin=subprocess.DEVNULL, env=env, start_new_session=True)
