@@ -94,7 +94,7 @@
   "linux/selinux/selinux_labels.py": "b510853830441309bd9c4253de0ae83a10e9edc75ccb5c83fdb7c61cc844dd6c",
   "ci/selinux_root.py": "09b84e1b13219228f983392142c8f15595a0582ae1fb824d8b7a85fb2d9078c5",
   "ci/selinux_native.py": "a039ada55051b2e59e7eb0fb4d00c070d2d0b2726536f3933a62d2d37dec45a6",
-  "ci/solaris_ci.py": "062ed52589b68ed4d1866f6538e0cd13250af4543d51040abb8402be3d561cf2",
+  "ci/solaris_ci.py": "1229e6fb03b7b30ead9ebabc39e4e45c9543cbf7cc58ada3d71d790626f54705",
   "scripts/install-solaris.py": "f440934a9889f7282fc6ab5eb4b9f63f7ed79153ef4a72c9e170ea8da5b3d2bc",
   "scripts/link_maintenance.py": "ee76d893e80f536f65bcf869348d7a083eafc3f0d5280dcd35de431dbfc16c30",
   "src/door_lock.c": "6e6e2798a5c626767a89f2cb1ef8f8cc79f13caaba879e45155f13c6bc421e34",
@@ -116,7 +116,7 @@
   "ci/freebsd_package_lease.py": "3e9c9cd0ba429b1a16c84a415a74fec57d6573e9c536e4e2a352e84985843712",
   ".github/workflows/freebsd-package.yml": "c6e74f7f1d7b6f21591fc27087ba920055a813dba8d609199b75d3bd0cf2d277",
   "CI_CD.md": "a62c1849bad237d013546205b72fe168e0d1b50f41d79e156c3e4ead2e0d92d2",
-  ".github/workflows/native-ci-lint.yml": "790eb6d0389145915fb32cee7867a64225431a8e4d81a202ee96a81fcf43d439",
+  ".github/workflows/native-ci-lint.yml": "df1894e6263b09c2b18fbb4bb076ac38073d234c29aa7cc37c6b1a0827a34769",
   "scripts/release_manifest.py": "35ea4b812c9ef6a69b09db52ff08dce61e9433d2ffe8b971c97b230f4635c970",
   "scripts/verify_release_set.py": "4322ffce4f92a9625b076435b2d0029d48c68319943fef7b46d5f7ce30d8b890",
   "tests/test_release_manifest.py": "08b5c8cab61c4556d1ac5e6137e252e195c76c0572fd72577bce92a1529b3791",
@@ -140,5 +140,10 @@
   "tests/test_transfer_terminal.py": "04f0f7d5e62e0a899a171929cb42d88f4237b29d4df4579b882c4f7331a44e37",
   "ci/freebsd_fixture_permissions.py": "80431c66875b4483f7c6d5401eda9dadc4537f1ca527b9b387aab801227d4b2c",
   "tests/test_freebsd_fixture_permissions.py": "e2a70d9b451da8bb97cd572bb1f381ce04100c993af5c53fc2b51f7ed15ba3a7",
-  ".github/workflows/debian-package.yml": "52da1e55a41c3561427d20702814728e45325058f6936833076a9b48e51efcd3"
+  ".github/workflows/debian-package.yml": "52da1e55a41c3561427d20702814728e45325058f6936833076a9b48e51efcd3",
+  "ci/solaris_smf_control.py": "e60f039682cdf60de742c68abcf970e9ffca131188299b082a87177f5f5c8561",
+  "ci/solaris_smf_method.py": "0ef0d00f08680356e7b419706c8312467cf1c92af0fc63b4539f651a34954d42",
+  "ci/solaris_smf_lifecycle.py": "996d039e0f51d195adc339c9310a191880924af7a3dfb6c46820c9619b0e32a7",
+  "ci/prepare_solaris_smf.py": "cbc80db8cbb11ddabd7c4bc4231d85c4d7594607bb2a92dd30e72e6b935a596e",
+  "tests/test_solaris_smf_ci.py": "6752dddef79079e9eb77be408b1c59f0f3ff42f82c3e8c1b57bae6ca80451f47"
 }

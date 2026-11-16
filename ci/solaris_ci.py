@@ -107,6 +107,13 @@ def test():
         run([sys.executable, "scripts/install-solaris.py", "--destdir", "build/solaris-stage", "--python", sys.executable])
         run(["/usr/sbin/svccfg", "validate", "build/solaris-stage/opt/liner-notes/share/smf/liner-notes.xml"])
         capabilities["smf_manifest"] = "passed"
+        # Explicitly prepared fixed-target helper only. No sudo fallback, host
+        # installation or authorization changes are performed by ordinary CI.
+        if (Path("/opt/liner-notes-ci/solaris_smf_control.py").exists()
+                or Path("/etc/liner-notes-smf-ci.required").exists()):
+            capabilities["smf_lifecycle"] = "incomplete"
+            run([sys.executable, "ci/solaris_smf_lifecycle.py"])
+            capabilities["smf_lifecycle"] = "passed (OS boot not tested)"
         run(flags + ["test-doors"])
         capabilities["door"] = "passed"
         capabilities["core"] = "incomplete"
