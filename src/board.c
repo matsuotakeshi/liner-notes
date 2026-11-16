@@ -205,8 +205,44 @@ int article_repository_body(uint32_t id,char *body,size_t capacity) {
     if(failed || body_read_failed)return 0;
     memcpy(body,text,length+1);return 1;
 }
+uint32_t article_repository_count(void) { return article_count; }
+uint32_t article_repository_search_next(uint32_t start,const char *query) {
+    return db_search_next(&article_db,start,query,0);
+}
+int article_repository_body_contains(uint32_t id,const char *query) {
+    if(!id || id>article_count)return -1;
+    const char *body=article_body(article_at(id-1));
+    if(failed || body_read_failed)return -1;
+    return strstr(body,query)!=NULL;
+}
 static const char *mail_body(const MailMessage *m) {
     const char *body=mailbox_body(m);if(mailbox_broken())body_read_failed=1;return body;
+}
+static void display_article_page(const BoardRequest *q,BoardResult *r,int search) {
+    ArticleActor actor={q->user,q->user_epoch,q->board_grants};ArticlePage page;
+    ArticleOutcome result=search?article_search(&actor,q->board,q->cursor,q->title,&page):
+                                 article_list(&actor,q->board,q->number,&page);
+    if(result!=ARTICLE_OK) {
+        switch(result) {
+        case ARTICLE_REVOKED: r->revoked=1;strcpy(r->text,"ERR session revoked\r\n");break;
+        case ARTICLE_BOARD_DENIED: strcpy(r->text,"ERR board unavailable\r\n");break;
+        case ARTICLE_INVALID_QUERY: strcpy(r->text,"ERR search query\r\n");break;
+        case ARTICLE_INVALID_CURSOR: strcpy(r->text,"ERR search cursor\r\n");break;
+        case ARTICLE_MEMBER_STORAGE: strcpy(r->text,"ERR member storage unavailable\r\n");break;
+        case ARTICLE_MODERATION_STORAGE: strcpy(r->text,"ERR moderation storage unavailable\r\n");break;
+        case ARTICLE_POLICY_STORAGE: strcpy(r->text,"ERR board policy storage\r\n");break;
+        case ARTICLE_EXTRAS_STORAGE: strcpy(r->text,"ERR extras storage\r\n");break;
+        default: strcpy(r->text,"ERR article storage\r\n");break;
+        }
+        return;
+    }
+    size_t pos=search?(size_t)snprintf(r->text,sizeof(r->text),"SEARCH %s\r\n",q->title):
+                      (size_t)snprintf(r->text,sizeof(r->text),"LIST %u\r\n",page.total);
+    for(unsigned i=0;i<page.count;i++) {
+        const ArticleSummary *row=&page.rows[i];
+        pos+=(size_t)snprintf(r->text+pos,sizeof(r->text)-pos,"%u %u %s\r\n",row->id,row->parent,row->title);
+    }
+    snprintf(r->text+pos,sizeof(r->text)-pos,"END NEXT %u\r\n",page.next);
 }
 static void display_article(const BoardRequest *q,uint32_t id,BoardResult *r,int inspect) {
     ArticleActor actor={q->user,q->user_epoch,q->board_grants};ArticleView view;
@@ -373,6 +409,9 @@ static void extra_execute(const BoardRequest *q,BoardResult *r) {
         case ARTICLE_ADMIN_REQUIRED: strcpy(r->text,"ERR admin required\r\n");break;
         case ARTICLE_WITHDRAWN_TARGET: strcpy(r->text,"ERR article withdrawn\r\n");break;
         case ARTICLE_MODERATION_WRITE: strcpy(r->text,"ERR moderation storage uncertain\r\n");break;
+        case ARTICLE_BOARD_DENIED: strcpy(r->text,"ERR board unavailable\r\n");break;
+        case ARTICLE_INVALID_QUERY: strcpy(r->text,"ERR search query\r\n");break;
+        case ARTICLE_INVALID_CURSOR: strcpy(r->text,"ERR search cursor\r\n");break;
         }
         return;
     }
@@ -955,25 +994,7 @@ static void execute(const BoardRequest *q,BoardResult *r) {
     }
     if(!catalog_read(q->board,q->user)) { strcpy(r->text,"ERR board unavailable\r\n"); return; }
     if(q->op=='f') {
-        size_t length=strlen(q->title);
-        if(!length || length>80) { strcpy(r->text,"ERR search query\r\n"); return; }
-        for(size_t k=0;k<length;k++) if((unsigned char)q->title[k]<32 || (unsigned char)q->title[k]==127) {
-            strcpy(r->text,"ERR search query\r\n"); return;
-        }
-        uint32_t id=q->cursor?q->cursor:1;
-        if(id>article_count+1) { strcpy(r->text,"ERR search cursor\r\n"); return; }
-        size_t pos=(size_t)snprintf(r->text,sizeof(r->text),"SEARCH %s\r\n",q->title);
-        unsigned shown=0,scanned=0;
-        for(;id<=article_count && shown<8 && scanned<256;id++,scanned++) {
-            id=db_search_next(&article_db,id,q->title,0);if(!id) { id=article_count+1;break; }
-            if(unavailable(id))continue;
-            Article *a=&(*article_at(id-1));
-            if(a->board!=q->board) continue;
-            if(!strstr(a->title,q->title) && !strstr(article_body(a),q->title)) continue;
-            pos+=(size_t)snprintf(r->text+pos,sizeof(r->text)-pos,"%u %u %.80s\r\n",id,a->parent,a->title);
-            shown++;
-        }
-        snprintf(r->text+pos,sizeof(r->text)-pos,"END NEXT %u\r\n",id<=article_count?id:0); return;
+        display_article_page(q,r,1);return;
     }
     if((q->op=='P'||q->op=='e') && members_enabled() && !q->user && !feature_setting("guest_boards",q->board)) { strcpy(r->text,"ERR login required\r\n");return; }
     if(q->number && strchr("PeRUCNBTsunvhri",q->op) && !on_board(q->number,q->board)) {
@@ -1092,16 +1113,7 @@ static void execute(const BoardRequest *q,BoardResult *r) {
         snprintf(r->text+pos,sizeof(r->text)-pos,"END NEXT %u\r\n",id<=article_count?id:0);
         free(unread_counts);
     } else {
-        uint32_t id=q->number?q->number:1, count=0; int shown=0;
-        for(uint32_t i=1;i<=article_count;i++) if(on_board(i,q->board) && !unavailable(i)) count++;
-        size_t pos=(size_t)snprintf(r->text,sizeof(r->text),"LIST %u\r\n",count);
-        for(;id<=article_count;id++) {
-            if(!on_board(id,q->board) || unavailable(id)) continue;
-            if(shown++==5) break;
-            Article *a=&(*article_at(id-1));
-            pos+=(size_t)snprintf(r->text+pos,sizeof(r->text)-pos,"%u %u %s\r\n",id,a->parent,a->title);
-        }
-        snprintf(r->text+pos,sizeof(r->text)-pos,"END NEXT %u\r\n",id<=article_count?id:0);
+        display_article_page(q,r,0);
     }
 }
 #ifdef _WIN32

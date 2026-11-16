@@ -18,8 +18,9 @@ catalog implementation.
 The six legacy display call sites now use this operation: direct READ, neighbour
 navigation, NEW/unread selection, SCAN, READGLOBAL and INSPECT. Their existing
 board/scope/cursor filters stay in the worker. Only a body read already selected
-by those operations is extracted here; list/search result creation and counts
-are still handled by the old worker code. No new wire command exists.
+by those operations is extracted here. Current-board LIST/SEARCH pages are now
+handled by [Article pages](ARTICLE_PAGES.md); thread/unread/cross-board selection
+remains in the old worker. No new wire command exists.
 
 ## Output and non-disclosure
 

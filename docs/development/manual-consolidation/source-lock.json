@@ -1,6 +1,6 @@
 {
   "LICENSE": "fb981668c18a279e285fc4d83fba1e836cc84dd4daa73c9697d3cfd2d8aca6e0",
-  "Makefile": "22505f71cb014b2d3c74f22e7da08defa902cf08e995fec190ff8704b767f8f0",
+  "Makefile": "6ee5f51db0b55998efb634ccc35421c43864195b64eaabdcf8f42b602f74de60",
   "boards.example.conf": "4bd1a17ecf3966d3829510e8495a1362fb8b922cd754badccc739f5e5ab0bde8",
   "ci/build-freebsd-package.sh": "4e62899471d1f1a6c44e00a783c1aff771332140704ae778da95a95048474108",
   "debian/changelog": "8f3574a094f5a3677a9a7188e530ecdbdc006138b082b57243ca8441c644114d",
@@ -53,7 +53,7 @@
   "scripts/serial_connector.py": "3de6ad32005c5dff9b474d8f550a534232d88f4be73b59b5dcfc15cc11d0e670",
   "scripts/transfer_spool.py": "f7c590b73368c330da611d8ce41f0fd6fe5d8ad3b3e9ae9165e258d1e501db46",
   "scripts/vault_zmodem.py": "ace554ea5b6ab8d479ec39ad7daf7f5f7f34ca34ba13d5b9a73b115a0d63ef15",
-  "src/board.c": "5aa8778a54caee8af9f2179f7cbe517983ea4fbeb768711da84d3355a71a63be",
+  "src/board.c": "292f02827ab6c13ef0fb8ea8b9eda91328c3b60c1ff4e7eac0a2f44e34792a0c",
   "src/board_link.inc": "95a85be0a6ca2d77380775b25befb51a72971908d266c6b72f76fc7ca94e1d4a",
   "src/board_policy.c": "0169bc17649ddc63599b43ca7ae49f6c1c756dac417bd030a79398229414165b",
   "src/catalog.c": "c96bab1f3042b7685cc27df9206ebfd63ad2c79b06ca92d3dd1ca219a0e2a361",
@@ -146,7 +146,7 @@
   "ci/solaris_smf_lifecycle.py": "2b5bf36ba6ad205af9fe040aadb340f4fd62c106e2a5d872a0086b9d8d88325e",
   "ci/prepare_solaris_smf.py": "cbc80db8cbb11ddabd7c4bc4231d85c4d7594607bb2a92dd30e72e6b935a596e",
   "tests/test_solaris_smf_ci.py": "2ccf474d0bcd83af553e284ba8690e8862b4f22037246ccae7d540802396aac9",
-  "src/article_core.c": "bfad9bc20a9a8ce4624918ffcaa05092041b0933bb52fbc1fb9ed37def3ba446",
-  "src/article_core.h": "6cfc9bec9510aecf2f33b52e3d5d40546fb435792440b09099c709f1c5178c8d",
-  "src/article_repository.h": "db20f3904d8552276cabdfc1c7d99ac23f9bdb860188e19ecc0ed49505745b9d"
+  "src/article_core.c": "eda8a6a9766ad81b628099d229e61c1ffb967361cd9bfaf953e418a66e1eb48b",
+  "src/article_core.h": "15e04aee9e21c16dcb467f5cde1790fd5b07f3ed2dd5472f5c1563555eceecec",
+  "src/article_repository.h": "5a4dbe43646aa97e1ffcdedf7e3d86bcee4c426034891894a332e694047ac1e6"
 }

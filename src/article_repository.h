@@ -17,4 +17,11 @@ int article_repository_imported(uint32_t article);
 void article_repository_title_changed(uint32_t article,const char *title);
 /* Copy a complete NUL-terminated body, or return 0 without claiming success. */
 int article_repository_body(uint32_t article,char *body,size_t capacity);
+uint32_t article_repository_count(void);
+/* Existing index selects candidates, never authorizes visibility. 0=end;
+ * otherwise candidate >= start. Database errors retain fail-closed behavior. */
+uint32_t article_repository_search_next(uint32_t start,const char *query);
+/* -1 storage failure; 0 no literal match; 1 match. Core checks ACL and
+ * effective visibility before asking storage to inspect the body. */
+int article_repository_body_contains(uint32_t article,const char *query);
 #endif
