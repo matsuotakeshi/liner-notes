@@ -20,7 +20,8 @@ typedef enum {
     ARTICLE_IMPORTED, ARTICLE_LINK_STORAGE, ARTICLE_HIDDEN,
     ARTICLE_POSTING_DENIED, ARTICLE_INVALID_TITLE, ARTICLE_ADMIN_REQUIRED,
     ARTICLE_STORAGE, ARTICLE_BUFFER_TOO_SMALL, ARTICLE_INVALID_READ,
-    ARTICLE_WITHDRAWN_TARGET, ARTICLE_MODERATION_WRITE
+    ARTICLE_WITHDRAWN_TARGET, ARTICLE_MODERATION_WRITE,
+    ARTICLE_BOARD_DENIED, ARTICLE_INVALID_QUERY, ARTICLE_INVALID_CURSOR
 } ArticleOutcome;
 
 ArticleOutcome article_withdraw(const ArticleActor *,uint32_t board,
@@ -49,4 +50,18 @@ typedef struct {
 } ArticleView;
 ArticleOutcome article_read(const ArticleActor *,uint32_t article,int inspect,
                             ArticleView *out,char *body,size_t capacity);
+/* Owned, bounded current-board pages. No body/hidden metadata is returned.
+ * LIST returns up to 5 rows and the visible board total; SEARCH up to 8 rows
+ * after at most 256 index candidates, with total=0 (no global count). next=0
+ * means end; start=0 means first page. Reauthorize every call, not just page 1.
+ * Errors clear the entire page. No SEEN/cursor/session state is mutated. */
+typedef struct { uint32_t id,board,parent; char title[81]; } ArticleSummary;
+typedef struct {
+    uint32_t total,next;
+    unsigned count;
+    ArticleSummary rows[8];
+} ArticlePage;
+ArticleOutcome article_list(const ArticleActor *,uint32_t board,uint32_t start,ArticlePage *out);
+ArticleOutcome article_search(const ArticleActor *,uint32_t board,uint32_t start,
+                              const char *query,ArticlePage *out);
 #endif
