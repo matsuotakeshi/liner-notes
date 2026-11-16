@@ -25,6 +25,86 @@ static ArticleOutcome identity(const ArticleActor *actor,int guest_allowed) {
     return ARTICLE_OK;
 }
 
+static ArticleOutcome posting_access(const ArticleActor *actor,uint32_t board,uint32_t parent,
+                                     ArticlePostingPolicy *rules) {
+    ArticleOutcome result=health();
+    if(result!=ARTICLE_OK)return result;
+    result=identity(actor,1);
+    if(result!=ARTICLE_OK)return result;
+    uint32_t user=actor?actor->user:0;
+    if(!catalog_read(board,user))return ARTICLE_BOARD_DENIED;
+    if(!article_repository_posting_policy(board,user,rules) || rules->version<1 || rules->version>4)
+        return ARTICLE_STORAGE;
+    if(rules->members_required && !user && !rules->guest_allowed)return ARTICLE_LOGIN_REQUIRED;
+    if(parent) {
+        ArticleMetadata article;
+        if(!article_repository_find(parent,&article) || article.board!=board)return ARTICLE_NOT_FOUND;
+        int hidden=article_repository_unavailable(parent);
+        if(hidden<0)return ARTICLE_STORAGE;
+        if(hidden)return ARTICLE_HIDDEN;
+    }
+    if(!catalog_write(board,user))return ARTICLE_POSTING_DENIED;
+    if(rules->version<4 && board!=1)return ARTICLE_LEGACY_BOARDS;
+    return ARTICLE_OK;
+}
+
+ArticleOutcome article_prepare_post(const ArticleActor *actor,uint32_t board,uint32_t parent) {
+    ArticlePostingPolicy rules;
+    policy_context(actor?actor->board_grants:NULL);
+    ArticleOutcome result=posting_access(actor,board,parent,&rules);
+    policy_context(NULL);
+    return result;
+}
+
+static size_t post_length(const char *text,size_t limit) {
+    if(!text)return 0;
+    size_t n=0;while(n<=limit && text[n])n++;return n;
+}
+
+static int post_plain_text(const char *text) {
+    for(const unsigned char *p=(const unsigned char *)text;*p;p++)
+        if(*p<32 || *p==127)return 0;
+    return 1;
+}
+
+static ArticleOutcome post_local(const ArticleActor *actor,uint32_t board,uint32_t parent,
+                                 const char *guest_name,const char *title,const char *body,uint32_t *out_id) {
+    ArticlePostingPolicy rules;
+    ArticleOutcome result=posting_access(actor,board,parent,&rules);
+    if(result!=ARTICLE_OK)return result;
+    if(rules.members_required && rules.version<3)return ARTICLE_LEGACY_MEMBERS;
+    if(rules.storage_failed)return ARTICLE_POST_UNAVAILABLE;
+    uint32_t count=article_repository_count(),user=actor?actor->user:0;
+    if(parent>count)return ARTICLE_NOT_FOUND;
+    size_t tl=post_length(title,80),bl=post_length(body,CONTENT_BODY);
+    if(bl>rules.body_limit)return ARTICLE_BODY_LIMIT;
+    if(count>=CONTENT_ID_MAX || (rules.total_limit && count>=rules.total_limit) ||
+       (user && rules.user_limit && rules.user_posts>=rules.user_limit))return ARTICLE_FULL;
+    int fits=article_repository_post_capacity(board,bl);
+    if(fits<0)return ARTICLE_STORAGE;
+    if(!fits)return ARTICLE_FULL;
+    if(!tl || tl>80 || !bl || bl>CONTENT_BODY || !post_plain_text(title))return ARTICLE_INVALID_DRAFT;
+    if(bl>1024 && rules.version!=4)return ARTICLE_LEGACY_BODY;
+    const char *author=user?members_name(user):guest_name;
+    if(!author || !*author)author="guest";
+    if(post_length(author,32)>32 || !post_plain_text(author))return ARTICLE_INVALID_DRAFT;
+    uint32_t id=0;
+    if(!article_repository_append(board,parent,user,author,title,body,&id) || id!=count+1)
+        return ARTICLE_POST_UNCERTAIN;
+    *out_id=id;return ARTICLE_OK;
+}
+
+ArticleOutcome article_post(const ArticleActor *actor,uint32_t board,uint32_t parent,
+                            const char *guest_name,const char *title,const char *body,uint32_t *out_id) {
+    if(!out_id)return ARTICLE_INVALID_DRAFT;
+    *out_id=0;
+    policy_context(actor?actor->board_grants:NULL);
+    ArticleOutcome result=post_local(actor,board,parent,guest_name,title,body,out_id);
+    policy_context(NULL);
+    if(result!=ARTICLE_OK)*out_id=0;
+    return result;
+}
+
 static ArticleOutcome authorize(const ArticleActor *actor,uint32_t board,uint32_t id) {
     ArticleOutcome result=health();
     if(result!=ARTICLE_OK)return result;

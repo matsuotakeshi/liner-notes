@@ -492,6 +492,9 @@ static void extra_execute(const BoardRequest *q,BoardResult *r) {
         case ARTICLE_POSTING_DENIED: strcpy(r->text,"ERR posting denied\r\n");break;
         case ARTICLE_INVALID_TITLE: strcpy(r->text,"ERR title 1..80 bytes, no controls\r\n");break;
         case ARTICLE_STORAGE: case ARTICLE_BUFFER_TOO_SMALL: case ARTICLE_INVALID_READ:
+        case ARTICLE_LEGACY_BOARDS: case ARTICLE_LEGACY_MEMBERS: case ARTICLE_BODY_LIMIT:
+        case ARTICLE_FULL: case ARTICLE_INVALID_DRAFT: case ARTICLE_LEGACY_BODY:
+        case ARTICLE_POST_UNAVAILABLE: case ARTICLE_POST_UNCERTAIN:
             strcpy(r->text,"ERR article storage\r\n");break;
         case ARTICLE_ADMIN_REQUIRED: strcpy(r->text,"ERR admin required\r\n");break;
         case ARTICLE_WITHDRAWN_TARGET: strcpy(r->text,"ERR article withdrawn\r\n");break;
@@ -730,6 +733,75 @@ storage:snprintf(r->text,sizeof(r->text),"%s",mail_text(q,MSG_MAIL_STORAGE,"MAIL
 }
 #include "link_schema.h"
 #include "features64.inc"
+static int append_article_record(uint32_t board,uint32_t parent,uint32_t user,
+                                 const char *author,const char *title,const char *body,
+                                 int remote,uint64_t remote_stamp,uint32_t *id) {
+        *id=0;size_t tl=strlen(title),bl=strlen(body);
+        unsigned char raw[RECORD_MAX]={0};
+        int compact=bl>1024;
+        size_t base=compact?100+bl:RECORD_SIZE;
+        size_t record_size=base+(version>=2?8:0)+(version>=3?32:0)+(version==4?4:0);
+        time_t clock_now=time(NULL);
+        uint64_t stamp=remote?remote_stamp:version>=2 && clock_now>0?(uint64_t)clock_now:0;
+        put32(raw,(article_count+1)|(compact?0x80000000u:0)); put32(raw+4,parent);
+        put32(raw+8,(uint32_t)tl); put32(raw+12,(uint32_t)bl);
+        memcpy(raw+16,title,tl); memcpy(raw+16+BOARD_TITLE,body,bl);
+        if(version>=2) { put32(raw+base-4,(uint32_t)stamp); put32(raw+base,(uint32_t)(stamp>>32)); }
+        if(version>=3) memcpy(raw+base+4,author,strlen(author));
+        if(version==4) put32(raw+base+36,board);
+        put32(raw+record_size-4,checksum(raw,record_size-4));
+        int64_t record_offset=SEEK(store,0,SEEK_END);
+        if(record_offset<0 || !write_all(raw,record_size) || SYNC(store)) {
+            failed=1;return 0;
+        }
+        Article *a=&(*article_at(article_count++)); a->parent=parent;
+        strcpy(a->title,title); a->body_size=(uint32_t)bl;a->body_offset=(uint64_t)record_offset+96;
+        if(version>=3) strcpy(a->author,author);
+        a->board=board;a->origin=board;
+        a->created=stamp;db_search_set(&article_db,article_count,a->title,body,bl); if(user && !remote)user_posts[user]++; index_article(article_count); *id=article_count;
+        return 1;
+}
+
+int article_repository_posting_policy(uint32_t board,uint32_t user,ArticlePostingPolicy *out) {
+    out->version=(unsigned)version;out->members_required=members_enabled();
+    out->guest_allowed=!user && out->members_required?(int)feature_setting("guest_boards",board):0;
+    out->storage_failed=failed;out->total_limit=limit_articles;out->user_limit=limit_user_posts;
+    out->user_posts=user?user_posts[user]:0;out->body_limit=ln_limit("BODY",BOARD_BODY);
+    return !features_broken;
+}
+int article_repository_post_capacity(uint32_t board,size_t size) {
+    int fits=board_usage(board,1,size);
+    return policy_broken() || extras_broken()?-1:fits;
+}
+int article_repository_append(uint32_t board,uint32_t parent,uint32_t user,
+                              const char *author,const char *title,const char *body,uint32_t *id) {
+    return append_article_record(board,parent,user,author,title,body,0,0,id);
+}
+
+static void post_result(ArticleOutcome result,BoardResult *r) {
+    switch(result) {
+    case ARTICLE_REVOKED: r->revoked=1;strcpy(r->text,"ERR session revoked\r\n");break;
+    case ARTICLE_LOGIN_REQUIRED: strcpy(r->text,"ERR login required\r\n");break;
+    case ARTICLE_BOARD_DENIED: strcpy(r->text,"ERR board unavailable\r\n");break;
+    case ARTICLE_POSTING_DENIED: strcpy(r->text,"ERR posting denied\r\n");break;
+    case ARTICLE_NOT_FOUND: strcpy(r->text,"ERR no parent\r\n");break;
+    case ARTICLE_HIDDEN: strcpy(r->text,"ERR article hidden\r\n");break;
+    case ARTICLE_MEMBER_STORAGE: strcpy(r->text,"ERR member storage unavailable\r\n");break;
+    case ARTICLE_MODERATION_STORAGE: strcpy(r->text,"ERR moderation storage unavailable\r\n");break;
+    case ARTICLE_POLICY_STORAGE: strcpy(r->text,"ERR board policy storage\r\n");break;
+    case ARTICLE_EXTRAS_STORAGE: strcpy(r->text,"ERR extras storage\r\n");break;
+    case ARTICLE_LEGACY_BOARDS: strcpy(r->text,"ERR multiple boards need RTBOARD4\r\n");break;
+    case ARTICLE_LEGACY_MEMBERS: strcpy(r->text,"ERR member posting needs RTBOARD3\r\n");break;
+    case ARTICLE_BODY_LIMIT: strcpy(r->text,"ERR body limit\r\n");break;
+    case ARTICLE_FULL: strcpy(r->text,"ERR board full\r\n");break;
+    case ARTICLE_INVALID_DRAFT: strcpy(r->text,"ERR draft\r\n");break;
+    case ARTICLE_LEGACY_BODY: strcpy(r->text,"ERR legacy board capacity; compact to RTBOARD4 first\r\n");break;
+    case ARTICLE_POST_UNAVAILABLE: strcpy(r->text,"ERR storage unavailable\r\n");break;
+    case ARTICLE_POST_UNCERTAIN: strcpy(r->text,"ERR storage uncertain; restart inspection required\r\n");break;
+    default: strcpy(r->text,"ERR article storage\r\n");break;
+    }
+}
+
 static void post_article(const BoardRequest *q,BoardResult *r,const char *remote_author,uint64_t remote_stamp,int validate_only) {
         if(members_enabled() && !members_name(q->user) && !feature_setting("guest_boards",q->board)) { strcpy(r->text,"ERR login required\r\n"); return; }
         if(members_enabled() && version<3) { strcpy(r->text,"ERR member posting needs RTBOARD3\r\n"); return; }
@@ -741,31 +813,11 @@ static void post_article(const BoardRequest *q,BoardResult *r,const char *remote
         if(!board_usage(q->board,1,bl)) { strcpy(r->text,"ERR board full\r\n");return; }
         if(!tl || tl>BOARD_TITLE || !bl || bl>BOARD_BODY) { strcpy(r->text,"ERR draft\r\n"); return; }
         if(validate_only) { r->selected=article_count+1;return; }
-        unsigned char raw[RECORD_MAX]={0};
         if(bl>1024 && version!=4) { strcpy(r->text,"ERR legacy board capacity; compact to RTBOARD4 first\r\n");return; }
-        int compact=bl>1024;
-        size_t base=compact?100+bl:RECORD_SIZE;
-        size_t record_size=base+(version>=2?8:0)+(version>=3?32:0)+(version==4?4:0);
-        time_t clock_now=time(NULL);
-        uint64_t stamp=remote_author?remote_stamp:version>=2 && clock_now>0?(uint64_t)clock_now:0;
-        put32(raw,(article_count+1)|(compact?0x80000000u:0)); put32(raw+4,q->number);
-        put32(raw+8,(uint32_t)tl); put32(raw+12,(uint32_t)bl);
-        memcpy(raw+16,q->title,tl); memcpy(raw+16+BOARD_TITLE,q->body,bl);
-        if(version>=2) { put32(raw+base-4,(uint32_t)stamp); put32(raw+base,(uint32_t)(stamp>>32)); }
-        const char *author=remote_author?remote_author:members_name(q->user); if(!author) author=*q->username?q->username:"guest";
-        if(version>=3) memcpy(raw+base+4,author,strlen(author));
-        if(version==4) put32(raw+base+36,q->board);
-        put32(raw+record_size-4,checksum(raw,record_size-4));
-        int64_t record_offset=SEEK(store,0,SEEK_END);
-        if(record_offset<0 || !write_all(raw,record_size) || SYNC(store)) {
-            failed=1; strcpy(r->text,"ERR storage uncertain; restart inspection required\r\n"); return;
+        if(!append_article_record(q->board,q->number,q->user,remote_author,q->title,q->body,1,remote_stamp,&r->selected)) {
+            strcpy(r->text,"ERR storage uncertain; restart inspection required\r\n");return;
         }
-        Article *a=&(*article_at(article_count++)); a->parent=q->number;
-        strcpy(a->title,q->title); a->body_size=(uint32_t)bl;a->body_offset=(uint64_t)record_offset+96;
-        if(version>=3) strcpy(a->author,author);
-        a->board=q->board;a->origin=q->board;
-        a->created=stamp;db_search_set(&article_db,article_count,a->title,q->body,bl); if(q->user && !remote_author)user_posts[q->user]++; index_article(article_count); r->selected=article_count;
-        snprintf(r->text,sizeof(r->text),"SAVED %u\r\n",article_count);
+        snprintf(r->text,sizeof(r->text),"SAVED %u\r\n",r->selected);
 }
 #include "board_link.inc"
 static void execute(const BoardRequest *q,BoardResult *r) {
@@ -1105,9 +1157,18 @@ static void execute(const BoardRequest *q,BoardResult *r) {
     if(q->op=='f') {
         display_article_page(q,r,1);return;
     }
-    if((q->op=='P'||q->op=='e') && members_enabled() && !q->user && !feature_setting("guest_boards",q->board)) { strcpy(r->text,"ERR login required\r\n");return; }
-    if(q->number && strchr("PeRUCNBTsunvhri",q->op) && !on_board(q->number,q->board)) {
-        strcpy(r->text,q->op=='P'||q->op=='e'?"ERR no parent\r\n":"ERR no article\r\n"); return;
+    if(q->op=='P' || q->op=='e') {
+        ArticleActor actor={q->user,q->user_epoch,q->board_grants};
+        ArticleOutcome result=q->op=='e'?article_prepare_post(&actor,q->board,q->number):
+            article_post(&actor,q->board,q->number,q->username,q->title,q->body,&r->selected);
+        if(result!=ARTICLE_OK) { post_result(result,r);return; }
+        if(q->op=='P')snprintf(r->text,sizeof(r->text),"SAVED %u\r\n",r->selected);
+        else if(q->action=='?') { r->service_action='E';r->service_number=q->number?2:1; }
+        else { r->editing=1;strcpy(r->text,"EDIT end with . or /CANCEL\r\n"); }
+        return;
+    }
+    if(q->number && strchr("RUCNBTsunvhri",q->op) && !on_board(q->number,q->board)) {
+        strcpy(r->text,"ERR no article\r\n"); return;
     }
     if(strchr("hri",q->op)) {
         if(!on_board(q->number,q->board)) { strcpy(r->text,"ERR no article\r\n"); return; }
@@ -1131,16 +1192,11 @@ static void execute(const BoardRequest *q,BoardResult *r) {
         }
         return;
     }
-    if(q->number && strchr("Pesu",q->op) && unavailable(q->number)) { strcpy(r->text,"ERR article hidden\r\n"); return; }
-    if((q->op=='P'||q->op=='e') && !catalog_write(q->board,q->user)) { strcpy(r->text,"ERR posting denied\r\n"); return; }
-    if((q->op=='P'||q->op=='e') && version<4 && q->board!=1) { strcpy(r->text,"ERR multiple boards need RTBOARD4\r\n"); return; }
-    if(q->op=='e') { if(q->action=='?') { r->service_action='E';r->service_number=q->number?2:1;return; }r->editing=1; strcpy(r->text,"EDIT end with . or /CANCEL\r\n"); return; }
+    if(q->number && strchr("su",q->op) && unavailable(q->number)) { strcpy(r->text,"ERR article hidden\r\n"); return; }
     if(q->op=='s' || q->op=='u' || q->op=='v' || q->op=='n') {
         article_read_state(q,r);return;
     }
-    if(q->op=='P') {
-        post_article(q,r,NULL,0,0);
-    } else if(q->op=='R') {
+    if(q->op=='R') {
         if(q->number==0 || q->number>article_count) { strcpy(r->text,"ERR no article\r\n"); return; }
         display_article(q,q->number,r,0);
     } else if(q->op=='U' || q->op=='C' || q->op=='N' || q->op=='B') {

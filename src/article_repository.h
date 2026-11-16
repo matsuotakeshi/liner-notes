@@ -30,4 +30,21 @@ int article_repository_body_contains(uint32_t article,const char *query);
 /* Existing depth-first index traversal, including invisible nodes; 0=end.
  * Core must independently check board/root membership and visibility. */
 uint32_t article_repository_tree_next(uint32_t article);
+/* Store-owned posting configuration/counters, never supplied by a UI caller.
+ * 0 means configuration/storage read failure. The worker serializes snapshots
+ * with append; zero limits retain the existing unlimited policy. */
+typedef struct {
+    unsigned version;
+    int members_required,guest_allowed,storage_failed;
+    uint32_t total_limit,user_limit,user_posts;
+    size_t body_limit;
+} ArticlePostingPolicy;
+int article_repository_posting_policy(uint32_t board,uint32_t user,ArticlePostingPolicy *out);
+/* -1 failure, 0 board quota exhausted, 1 fits. No reservation or mutation. */
+int article_repository_post_capacity(uint32_t board,size_t body_size);
+/* Core-authorized LOCAL append only. Caller validates lengths/ACL/quotas;
+ * journal sync precedes publication, ID and counter increment. No remote
+ * identity/timestamp input is exposed here. Failure returns no acknowledged ID. */
+int article_repository_append(uint32_t board,uint32_t parent,uint32_t user,
+                              const char *author,const char *title,const char *body,uint32_t *id);
 #endif

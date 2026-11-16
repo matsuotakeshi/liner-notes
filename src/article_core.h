@@ -22,8 +22,21 @@ typedef enum {
     ARTICLE_STORAGE, ARTICLE_BUFFER_TOO_SMALL, ARTICLE_INVALID_READ,
     ARTICLE_WITHDRAWN_TARGET, ARTICLE_MODERATION_WRITE,
     ARTICLE_BOARD_DENIED, ARTICLE_INVALID_QUERY, ARTICLE_INVALID_CURSOR,
-    ARTICLE_READ_STATE_STORAGE
+    ARTICLE_READ_STATE_STORAGE,
+    ARTICLE_LEGACY_BOARDS, ARTICLE_LEGACY_MEMBERS, ARTICLE_BODY_LIMIT,
+    ARTICLE_FULL, ARTICLE_INVALID_DRAFT, ARTICLE_LEGACY_BODY,
+    ARTICLE_POST_UNAVAILABLE, ARTICLE_POST_UNCERTAIN
 } ArticleOutcome;
+
+/* Local editing admission and posting. Preparation grants no durable authority:
+ * post repeats identity/ACL/parent/guest checks and validates current limits.
+ * Borrowed strings must be NUL-terminated; caller keeps them alive for the call.
+ * The authenticated name wins over guest_name. No remote origin/time override.
+ * out_id is zero on failure; acknowledged IDs follow durable store publication.
+ * No implicit SEEN, session selection or draft deletion. Worker-thread only. */
+ArticleOutcome article_prepare_post(const ArticleActor *,uint32_t board,uint32_t parent);
+ArticleOutcome article_post(const ArticleActor *,uint32_t board,uint32_t parent,
+                            const char *guest_name,const char *title,const char *body,uint32_t *out_id);
 
 ArticleOutcome article_withdraw(const ArticleActor *,uint32_t board,
                                uint32_t article,int confirmed);

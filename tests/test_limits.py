@@ -67,5 +67,27 @@ def run(binary):
     else:
      command(a,'POST limit',b'EDIT');a.send(b'body\n.\n');a.expect(b'ERR board full')
    finally:a.close();s.close()
+ # Editing admission is not a reservation: another session can consume the
+ # member quota before this draft is committed. Recheck without consuming an ID.
+ with tempfile.TemporaryDirectory(prefix='post-core-quota-') as d:
+  p=pathlib.Path(d);board=p/'board';users=p/'users'
+  s=Server(binary,board,members=users,options=['--max-user-posts','1'])
+  a,b=Client(s.port),Client(s.port)
+  try:
+   auth(a,'alice',True);auth(b,'alice')
+   command(a,'POST waiting-draft',b'EDIT')
+   assert post(b,'committed-first','retained body')==1
+   before=board.read_bytes()
+   a.send(b'late body\n.\n');a.expect(b'ERR board full')
+   assert board.read_bytes()==before
+   assert read(b,1)[1]=='committed-first'
+   command(b,'READ 2',b'ERR no article')
+  finally:a.close();b.close();s.close()
+  s=Server(binary,board,members=users);a=Client(s.port)
+  try:
+   auth(a,'alice');assert read(a,1)[2]=='retained body\r\n'
+   assert post(a,'after-restart','next body')==2
+  finally:a.close();s.close()
+ print('PASS: commit rechecks concurrent member quota; rejected draft preserves bytes and next ID across restart')
  print('PASS: >1000 per-author / >10000 article-mail IDs; reply/search/read/delete/moderation/compaction/restart; quotas and monotonic IDs')
 if __name__=='__main__':run(sys.argv[1])
