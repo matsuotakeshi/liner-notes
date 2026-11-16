@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """Real Git histories and workflow contracts for documentation-only CI."""
+import ast
 import json
 import os
 from pathlib import Path
@@ -148,6 +149,33 @@ def workflow(name):
 
 
 class WorkflowTests(unittest.TestCase):
+    def test_standalone_hosted_checks_keep_pr_and_manual_without_main_duplicate(self):
+        for name in ('ci-scope-checks.yml', 'shared-visibility.yml', 'native-ci-lint.yml'):
+            with self.subTest(workflow=name):
+                triggers = workflow(name)['on']
+                self.assertEqual(set(triggers), {'pull_request', 'workflow_dispatch'})
+
+    def test_deployment_dependencies_keep_their_expected_events(self):
+        # Read the real admission table without importing deployment code or using the network.
+        module = ast.parse((ROOT / 'ci/deploy_release.py').read_text(encoding='utf-8'))
+        gates = next(ast.literal_eval(node.value) for node in module.body
+                     if isinstance(node, ast.Assign)
+                     and any(isinstance(target, ast.Name) and target.id == 'GATES'
+                             for target in node.targets))
+        for name, event, _step, _artifact in gates.values():
+            with self.subTest(workflow=name):
+                triggers = workflow(name)['on']
+                self.assertIn(event, triggers)
+                if event == 'push':
+                    self.assertIn('main', triggers[event]['branches'])
+
+    def test_manual_avoids_feature_push_duplicate_and_keeps_release_builds(self):
+        triggers = workflow('manual.yml')['on']
+        self.assertIn('pull_request', triggers)
+        self.assertIn('workflow_dispatch', triggers)
+        self.assertEqual(triggers['push'], {
+            'branches': ['main', 'linux-support', 'release/**'], 'tags': ['*']})
+
     def test_package_source_checks_keep_lightweight_and_gate_real_build(self):
         doc = workflow('freebsd-package-lint.yml')
         self.assertEqual(doc['jobs']['changes']['uses'], './.github/workflows/change-scope.yml')

@@ -33,38 +33,6 @@ on:
       - ".github/workflows/*build-test.yml"
       - ".github/workflows/multi-os-ci.yml"
       - ".github/workflows/native-ci-lint.yml"
-  push:
-    branches: [main]
-    paths:
-      - "ci/native_*.py"
-      - "ci/freebsd_package_lease.py"
-      - "tests/test_freebsd_package_lease.py"
-      - ".github/workflows/freebsd-package.yml"
-      - "ci/solaris_ci.py"
-      - "ci/*solaris_smf*.py"
-      - "tests/test_solaris_smf_ci.py"
-      - "solaris/**"
-      - "scripts/*solaris*.py"
-      - "tests/test_solaris_service.py"
-      - "src/door_lock.*"
-      - "src/door_lock_helper.c"
-      - "tests/test_doors_generic.py"
-      - "tests/test_door_lock.*"
-      - "scripts/posix_locks.py"
-      - "tests/test_posix_locks.py"
-      - "ports/test-resume.py"
-      - "tests/test_resume_receipt.py"
-      - "tests/test_transfer_terminal.py"
-      - "tests/transfer_terminal_fixture.py"
-      - "tests/test_zmodem.py"
-      - "tests/test_solaris_port.py"
-      - ".github/workflows/solaris-ssh-test.yml"
-      - "ci/native-test-requirements.txt"
-      - "tests/test_native_ci.py"
-      - "tests/test_native_lock_wait.py"
-      - ".github/workflows/*build-test.yml"
-      - ".github/workflows/multi-os-ci.yml"
-      - ".github/workflows/native-ci-lint.yml"
   workflow_dispatch:
 permissions:
   contents: read
