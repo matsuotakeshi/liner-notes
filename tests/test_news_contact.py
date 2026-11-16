@@ -43,6 +43,13 @@ def run(binary):
             assert not page(a,f'NEWSFROM {cursor} ALL 2020-01-05')[1] if cursor else True
             assert not page(a,'NEWS 9999-12-31')[1]
             assert [int(r.split()[0]) for r in page(g,'NEWS 2020-01-01')[1]]==[1,4,5,6,7,8,9,10]
+            # Scope, parent metadata and continuation retain the legacy wire format.
+            header,rows,cursor=page(b,'NEWS HERE 2020-01-01')
+            assert header==b'NEWS HERE 2020-01-01' and len(rows)==1 and rows[0].split()[:3]==[b'13',b'2',b'0'] and not cursor
+            header,rows,cursor=page(g,'NEWS ALL 2020-01-01')
+            assert header==b'NEWS ALL 2020-01-01' and [int(r.split()[0]) for r in rows]==[1,4,5,6,7,8,9,10] and cursor==11
+            header,rows,cursor=page(g,f'NEWSFROM {cursor} ALL 2020-01-01')
+            assert [int(r.split()[0]) for r in rows]==[11,12] and not cursor
             for query in ['2020-02-30','1900-01-01','2023-02-29','2020-1-01','2020-01-01 x']:command(a,'NEWS '+query,b'ERR extended syntax')
             assert len([r for r in listing(b,'MAIL SEARCH needle') if r.startswith(b'MAIL ROW')])==8
             assert len([r for r in listing(b,'+') if r.startswith(b'MAIL ROW')])==4

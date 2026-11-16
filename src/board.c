@@ -509,16 +509,28 @@ static void extra_execute(const BoardRequest *q,BoardResult *r) {
     if(q->action==11) {
         uint64_t since;
         if((q->until?(since=q->since,0):!date_filter(q->title,&since)) || q->cursor>CONTENT_ID_MAX+1 || (q->scope<0 || q->scope>2)) { strcpy(r->text,"ERR extended syntax\r\n");return; }
-        if(!q->scope && !catalog_read(q->board,q->user)) { strcpy(r->text,"ERR board unavailable\r\n");return; }
-        size_t pos=(size_t)snprintf(r->text,sizeof(r->text),"NEWS %s %s\r\n",q->scope==2?"SUBTREE":q->scope?"ALL":"HERE",q->title);
-        uint32_t id=q->cursor?q->cursor:1;unsigned shown=0,scanned=0;
-        for(;id<=article_count && shown<8 && scanned<256;id++,scanned++) {
-            if(unavailable(id))continue;
-            Article *a=&(*article_at(id-1));
-            if(!a->created || a->created<since || (q->until && a->created>q->until) || (!q->scope && a->board!=q->board) || (q->scope==2 && !catalog_under(a->board,q->board)) || !catalog_read(a->board,q->user))continue;
-            pos+=(size_t)snprintf(r->text+pos,sizeof(r->text)-pos,"%u %u %u %.80s\r\n",id,a->board,a->parent,a->title);shown++;
+        ArticleActor actor={q->user,q->user_epoch,q->board_grants};ArticlePage page;
+        ArticleOutcome result=article_news(&actor,q->board,(ArticleScope)q->scope,q->cursor,since,q->until,&page);
+        if(result!=ARTICLE_OK) {
+            switch(result) {
+            case ARTICLE_REVOKED: r->revoked=1;strcpy(r->text,"ERR session revoked\r\n");break;
+            case ARTICLE_BOARD_DENIED: strcpy(r->text,"ERR board unavailable\r\n");break;
+            case ARTICLE_INVALID_QUERY: case ARTICLE_INVALID_CURSOR:
+                strcpy(r->text,"ERR extended syntax\r\n");break;
+            case ARTICLE_MEMBER_STORAGE: strcpy(r->text,"ERR member storage unavailable\r\n");break;
+            case ARTICLE_MODERATION_STORAGE: strcpy(r->text,"ERR moderation storage unavailable\r\n");break;
+            case ARTICLE_POLICY_STORAGE: strcpy(r->text,"ERR board policy storage\r\n");break;
+            case ARTICLE_EXTRAS_STORAGE: strcpy(r->text,"ERR extras storage\r\n");break;
+            default: strcpy(r->text,"ERR article storage\r\n");break;
+            }
+            return;
         }
-        snprintf(r->text+pos,sizeof(r->text)-pos,"END NEXT %u\r\n",id<=article_count?id:0);return;
+        size_t pos=(size_t)snprintf(r->text,sizeof(r->text),"NEWS %s %s\r\n",q->scope==2?"SUBTREE":q->scope?"ALL":"HERE",q->title);
+        for(unsigned i=0;i<page.count;i++) {
+            const ArticleSummary *row=&page.rows[i];
+            pos+=(size_t)snprintf(r->text+pos,sizeof(r->text)-pos,"%u %u %u %s\r\n",row->id,row->board,row->parent,row->title);
+        }
+        snprintf(r->text+pos,sizeof(r->text)-pos,"END NEXT %u\r\n",page.next);return;
     }
     if(q->action==3 || q->action==4) {
         if(!q->scope && !catalog_read(q->board,q->user)) { strcpy(r->text,"ERR board unavailable\r\n"); return; }

@@ -65,6 +65,14 @@ typedef struct {
 ArticleOutcome article_list(const ArticleActor *,uint32_t board,uint32_t start,ArticlePage *out);
 ArticleOutcome article_search(const ArticleActor *,uint32_t board,uint32_t start,
                               const char *query,ArticlePage *out);
+/* NEWS metadata pages: inclusive timestamps; until=0 means no upper bound.
+ * Unknown (zero) creation times are excluded. Scope root need not be readable
+ * for ALL/SUBTREE, but every result's board must be. Scan at most 256 IDs,
+ * return at most 8 rows, total=0. start=0 means 1; an empty continuation is
+ * valid. No body reads, acknowledgement or check-time/session mutation. */
+typedef enum { ARTICLE_HERE, ARTICLE_ALL, ARTICLE_SUBTREE } ArticleScope;
+ArticleOutcome article_news(const ArticleActor *,uint32_t board,ArticleScope scope,
+                            uint32_t start,uint64_t since,uint64_t until,ArticlePage *out);
 /* Whole thread containing article, in existing depth-first order. start=0
  * begins at its root; other cursors must belong to this thread and board.
  * Up to 8 visible rows, next=next visible node or 0. Hidden nodes contribute

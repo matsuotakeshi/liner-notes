@@ -1,7 +1,8 @@
 # Structured thread summaries
 
 Baseline: main `170d0cffd4df7600c6e46563aef2d048521de619` (PR #62).
-This LN-23/24 slice extracts NOTES and NOTES UNREAD. Cross-board queries and
+This LN-23/24 slice extracts NOTES and NOTES UNREAD. NEWS is now documented in
+[Structured article news pages](ARTICLE_NEWS.md). Other cross-board queries and
 Session UI profiles remain separate work; this is not completion of the broader
 Core/UI refactor. No public API, command, configuration or schema is added.
 
