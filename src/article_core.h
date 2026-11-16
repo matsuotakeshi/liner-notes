@@ -146,4 +146,20 @@ typedef struct {
 } ArticleNotesPage;
 ArticleOutcome article_notes(const ArticleActor *,uint32_t board,uint32_t start,
                              int unread_only,ArticleNotesPage *out);
+/* Catalog-order board discovery. start=0 means board 1; children_only filters
+ * direct children of start (legacy menu-node listing). At most eight owned
+ * rows; next is an inclusive catalog cursor. Visible locked boards keep title
+ * and write capability but have unread_known=0. Guests never read seen state.
+ * NEXTBOARD requires membership, skips current and wraps to board 1. id=0
+ * means no other readable board with unread articles. No session/read mutation.
+ * Recheck identity/grants on every call; errors clear all output. */
+typedef struct {
+    uint32_t id,parent,depth,unread;
+    int writable,unread_known;
+    char title[81];
+} ArticleBoardRow;
+typedef struct { uint32_t next; unsigned count; ArticleBoardRow rows[8]; } ArticleBoardsPage;
+ArticleOutcome article_boards(const ArticleActor *,uint32_t start,int children_only,ArticleBoardsPage *out);
+ArticleOutcome article_next_board(const ArticleActor *,uint32_t current,ArticleBoardRow *out);
+
 #endif

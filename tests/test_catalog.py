@@ -67,6 +67,15 @@ def run(binary):
             assert unread(b)==[1]
             switch(b,2); assert unread(b)==[ids[2]]; mark(b,ids[2]); assert unread(b)==[]
             switch(b,7); assert unread(b)==[ids[7]]
+            # Cross-board discovery skips private boards and wraps without marking.
+            denied(g,'NEXTBOARD',b'ERR login required')
+            b.send(b'NEXTBOARD\n'); b.expect(b'BOARD 1 Public')
+            b.send(b'NEXTBOARD\n'); b.expect(b'BOARD 5 Notices')
+            b.send(b'NEXTBOARD\n'); b.expect(b'BOARD 7 Other')
+            assert unread(b)==[ids[7]]
+            counts={int(row.strip().split()[0][1:]):row for row in boards(b)}
+            assert b'unread=0 ' in counts[2] and b'unread=1 ' in counts[5]
+            assert 3 not in counts and 4 not in counts
             denied(b,'PARENT',b'ERR no current article')
             switch(a,3); a.send(b'LOGOUT\n'); a.expect(b'LOGGED OUT')
             denied(a,f'READ {ids[3]}',b'ERR no article')

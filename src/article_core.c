@@ -148,6 +148,108 @@ ArticleOutcome article_read(const ArticleActor *actor,uint32_t id,int inspect,
     return result;
 }
 
+/* Catalog-sized scratch only: no per-article array or body materialization. */
+static ArticleOutcome board_unread_counts(const ArticleActor *actor,int *readable,uint32_t *unread) {
+    uint32_t user=actor?actor->user:0;
+    for(uint32_t board=1;board<=CATALOG_MAX;board++)readable[board]=catalog_read(board,user);
+    if(!user)return ARTICLE_OK;
+    uint32_t count=article_repository_count();
+    if(count>CONTENT_ID_MAX)return ARTICLE_STORAGE;
+    for(uint32_t id=1;id<=count;id++) {
+        ArticleMetadata article;
+        if(!article_repository_find(id,&article) || !article.board || article.board>CATALOG_MAX)
+            return ARTICLE_STORAGE;
+        if(!readable[article.board])continue;
+        int hidden=article_repository_unavailable(id);
+        if(hidden<0)return ARTICLE_STORAGE;
+        if(hidden)continue;
+        int seen=members_seen(user,id);
+        if(members_broken())return ARTICLE_READ_STATE_STORAGE;
+        if(!seen)unread[article.board]++;
+    }
+    return ARTICLE_OK;
+}
+
+static ArticleOutcome board_summary(const ArticleActor *actor,uint32_t id,int readable,
+                                    uint32_t unread,ArticleBoardRow *out) {
+    const char *title=catalog_title(id);
+    uint32_t parent=catalog_parent(id);unsigned depth=catalog_depth(id);
+    if(!title || strlen(title)>80 || parent>CATALOG_MAX || parent==id || depth>=CATALOG_MAX)
+        return ARTICLE_STORAGE;
+    out->id=id;out->parent=parent;out->depth=depth;
+    out->writable=!!catalog_write(id,actor?actor->user:0);
+    out->unread_known=actor && actor->user && readable;
+    out->unread=out->unread_known?unread:0;
+    memcpy(out->title,title,strlen(title)+1);
+    return ARTICLE_OK;
+}
+
+static ArticleOutcome list_boards(const ArticleActor *actor,uint32_t start,int children_only,
+                                  ArticleBoardsPage *out) {
+    ArticleOutcome result=health();
+    if(result!=ARTICLE_OK)return result;
+    result=identity(actor,1);
+    if(result!=ARTICLE_OK)return result;
+    uint32_t first=start?start:1,user=actor?actor->user:0;
+    if(first>CATALOG_MAX || !catalog_exists(first))return ARTICLE_BOARD_DENIED;
+    int readable[CATALOG_MAX+1]={0};uint32_t unread[CATALOG_MAX+1]={0};
+    unsigned char visited[CATALOG_MAX+1]={0};
+    result=board_unread_counts(actor,readable,unread);
+    if(result!=ARTICLE_OK)return result;
+    for(uint32_t id=first;id;id=catalog_next(id)) {
+        if(id>CATALOG_MAX || !catalog_exists(id) || visited[id])return ARTICLE_STORAGE;
+        visited[id]=1;
+        if(!catalog_visible(id,user) || (children_only && catalog_parent(id)!=first))continue;
+        if(out->count==8) { out->next=id;return ARTICLE_OK; }
+        result=board_summary(actor,id,readable[id],unread[id],&out->rows[out->count]);
+        if(result!=ARTICLE_OK)return result;
+        out->count++;
+    }
+    return ARTICLE_OK;
+}
+
+ArticleOutcome article_boards(const ArticleActor *actor,uint32_t start,int children_only,
+                              ArticleBoardsPage *out) {
+    if(!out)return ARTICLE_INVALID_READ;
+    memset(out,0,sizeof(*out));
+    policy_context(actor?actor->board_grants:NULL);
+    ArticleOutcome result=list_boards(actor,start,children_only,out);
+    policy_context(NULL);
+    if(result!=ARTICLE_OK)memset(out,0,sizeof(*out));
+    return result;
+}
+
+static ArticleOutcome next_unread_board(const ArticleActor *actor,uint32_t current,ArticleBoardRow *out) {
+    ArticleOutcome result=health();
+    if(result!=ARTICLE_OK)return result;
+    result=identity(actor,0);
+    if(result!=ARTICLE_OK)return result;
+    if(!current || current>CATALOG_MAX || !catalog_exists(current))return ARTICLE_BOARD_DENIED;
+    int readable[CATALOG_MAX+1]={0};uint32_t unread[CATALOG_MAX+1]={0};
+    unsigned char visited[CATALOG_MAX+1]={0};
+    result=board_unread_counts(actor,readable,unread);
+    if(result!=ARTICLE_OK)return result;
+    uint32_t next=current;
+    for(unsigned n=0;n<CATALOG_MAX;n++) {
+        next=catalog_next(next);if(!next)next=1;
+        if(next==current)return ARTICLE_OK;
+        if(next>CATALOG_MAX || !catalog_exists(next) || visited[next])return ARTICLE_STORAGE;
+        visited[next]=1;
+        if(readable[next] && unread[next])return board_summary(actor,next,1,unread[next],out);
+    }
+    return ARTICLE_STORAGE;
+}
+
+ArticleOutcome article_next_board(const ArticleActor *actor,uint32_t current,ArticleBoardRow *out) {
+    if(!out)return ARTICLE_INVALID_READ;
+    memset(out,0,sizeof(*out));
+    policy_context(actor?actor->board_grants:NULL);
+    ArticleOutcome result=next_unread_board(actor,current,out);
+    policy_context(NULL);
+    if(result!=ARTICLE_OK)memset(out,0,sizeof(*out));
+    return result;
+}
+
 static ArticleOutcome navigate_article(const ArticleActor *actor,uint32_t board,uint32_t current,
                                        ArticleDirection direction,ArticleSummary *out) {
     ArticleOutcome result=health();
