@@ -1,6 +1,7 @@
 #ifndef ARTICLE_CORE_H
 #define ARTICLE_CORE_H
 #include <stdint.h>
+#include <stddef.h>
 
 /* Internal, worker-thread-only API, not a wire protocol. The trusted session
  * supplies its authenticated member/epoch and board-password grants. The Core
@@ -17,11 +18,28 @@ typedef enum {
     ARTICLE_MEMBER_STORAGE, ARTICLE_MODERATION_STORAGE, ARTICLE_POLICY_STORAGE,
     ARTICLE_EXTRAS_STORAGE, ARTICLE_NOT_FOUND, ARTICLE_OWNER_REQUIRED,
     ARTICLE_IMPORTED, ARTICLE_LINK_STORAGE, ARTICLE_HIDDEN,
-    ARTICLE_POSTING_DENIED, ARTICLE_INVALID_TITLE
+    ARTICLE_POSTING_DENIED, ARTICLE_INVALID_TITLE, ARTICLE_ADMIN_REQUIRED,
+    ARTICLE_STORAGE, ARTICLE_BUFFER_TOO_SMALL, ARTICLE_INVALID_READ
 } ArticleOutcome;
 
 ArticleOutcome article_withdraw(const ArticleActor *,uint32_t board,
                                uint32_t article,int confirmed);
 ArticleOutcome article_retitle(const ArticleActor *,uint32_t board,
                               uint32_t article,const char *title);
+/* A structured read result owns its metadata; body storage belongs to the
+ * caller. Hidden/withdrawn results contain only IDs and state, never title,
+ * author or body. On any error the result and supplied body buffer are cleared.
+ * NULL actor means guest. Inspection always rechecks the actual board's ACL.
+ * No selection, seen-state or access-log side effect: the legacy worker keeps
+ * those responsibilities until their own service extraction. */
+typedef enum { ARTICLE_EMPTY, ARTICLE_VISIBLE, ARTICLE_CONCEALED, ARTICLE_WITHDRAWN } ArticleViewState;
+typedef struct {
+    uint32_t id,board,parent;
+    ArticleViewState state;
+    int inspected_hidden;
+    size_t body_size;
+    char author[33],title[81];
+} ArticleView;
+ArticleOutcome article_read(const ArticleActor *,uint32_t article,int inspect,
+                            ArticleView *out,char *body,size_t capacity);
 #endif

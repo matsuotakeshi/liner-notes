@@ -159,10 +159,13 @@ static int unavailable(uint32_t id) {
 int article_repository_find(uint32_t id,ArticleMetadata *out) {
     if(!id || id>article_count)return 0;
     const Article *a=article_at(id-1);
-    out->board=a->board;memcpy(out->author,a->author,sizeof(out->author));
+    out->board=a->board;out->parent=a->parent;out->body_size=a->body_size;
+    memcpy(out->author,a->author,sizeof(out->author));memcpy(out->title,a->title,sizeof(out->title));
     return 1;
 }
-int article_repository_unavailable(uint32_t id) { return unavailable(id); }
+int article_repository_unavailable(uint32_t id) {
+    int hidden=unavailable(id);return body_read_failed?-1:hidden;
+}
 int article_repository_imported(uint32_t id) { return link_imported(id); }
 void article_repository_title_changed(uint32_t id,const char *title) {
     Article *a=article_at(id-1);strcpy(a->title,title);db_search_title(&article_db,id,title);
@@ -194,17 +197,45 @@ static const char *article_body(const Article *a) {
     size_t done=0;while(done<a->body_size) { int n=(int)READ(store,body+done,a->body_size-done);if(n<=0) { failed=body_read_failed=1;return ""; }done+=(size_t)n; }
     body[done]=0;return body;
 }
+int article_repository_body(uint32_t id,char *body,size_t capacity) {
+    if(!id || id>article_count || !body)return 0;
+    const Article *a=article_at(id-1);size_t length=a->body_size;
+    if(capacity<=length)return 0;
+    const char *text=article_body(a);
+    if(failed || body_read_failed)return 0;
+    memcpy(body,text,length+1);return 1;
+}
 static const char *mail_body(const MailMessage *m) {
     const char *body=mailbox_body(m);if(mailbox_broken())body_read_failed=1;return body;
 }
-static void display_article(uint32_t id,BoardResult *r,int inspect) {
-    int hidden=unavailable(id);
-    Article *a=&(*article_at(id-1)); r->selected=id;
-    if(extras_removed(id)) { snprintf(r->text,sizeof(r->text),"WITHDRAWN %u PARENT %u\r\n",id,a->parent); return; }
-    if(hidden && !inspect) { snprintf(r->text,sizeof(r->text),"HIDDEN %u PARENT %u\r\n",id,a->parent); return; }
-    snprintf(r->text,sizeof(r->text),"ARTICLE %u PARENT %u AUTHOR %.32s%s\r\nTITLE %.80s\r\nBODY %zu\r\n%sEND\r\n",
-             id,a->parent,a->author[0]?a->author:"guest",hidden?" HIDDEN 1":"",a->title,(size_t)a->body_size,article_body(a));
-    if(failed) { r->selected=0;strcpy(r->text,"ERR article storage\r\n"); }
+static void display_article(const BoardRequest *q,uint32_t id,BoardResult *r,int inspect) {
+    ArticleActor actor={q->user,q->user_epoch,q->board_grants};ArticleView view;
+    /* Reuse an existing worker-owned buffer; do not add a full-body allocation.
+     * Consume the structured result now and clear scratch before queue delivery. */
+    ArticleOutcome result=article_read(&actor,id,inspect,&view,r->draft_body,sizeof(r->draft_body));
+    if(result!=ARTICLE_OK) {
+        r->selected=0;
+        switch(result) {
+        case ARTICLE_REVOKED: r->revoked=1;strcpy(r->text,"ERR session revoked\r\n");break;
+        case ARTICLE_NOT_FOUND: strcpy(r->text,"ERR no article\r\n");break;
+        case ARTICLE_ADMIN_REQUIRED: strcpy(r->text,"ERR admin required\r\n");break;
+        case ARTICLE_MEMBER_STORAGE: strcpy(r->text,"ERR member storage unavailable\r\n");break;
+        case ARTICLE_MODERATION_STORAGE: strcpy(r->text,"ERR moderation storage unavailable\r\n");break;
+        case ARTICLE_POLICY_STORAGE: strcpy(r->text,"ERR board policy storage\r\n");break;
+        case ARTICLE_EXTRAS_STORAGE: strcpy(r->text,"ERR extras storage\r\n");break;
+        default: strcpy(r->text,"ERR article storage\r\n");break;
+        }
+    } else {
+        r->selected=view.id;
+        if(view.state==ARTICLE_WITHDRAWN)
+            snprintf(r->text,sizeof(r->text),"WITHDRAWN %u PARENT %u\r\n",view.id,view.parent);
+        else if(view.state==ARTICLE_CONCEALED)
+            snprintf(r->text,sizeof(r->text),"HIDDEN %u PARENT %u\r\n",view.id,view.parent);
+        else snprintf(r->text,sizeof(r->text),"ARTICLE %u PARENT %u AUTHOR %.32s%s\r\nTITLE %.80s\r\nBODY %zu\r\n%sEND\r\n",
+                      view.id,view.parent,*view.author?view.author:"guest",view.inspected_hidden?" HIDDEN 1":"",
+                      view.title,view.body_size,r->draft_body);
+    }
+    OPENSSL_cleanse(r->draft_body,sizeof(r->draft_body));
 }
 static uint32_t checksum(const unsigned char *p,size_t n) {
     uint32_t h=2166136261u;
@@ -337,6 +368,9 @@ static void extra_execute(const BoardRequest *q,BoardResult *r) {
         case ARTICLE_HIDDEN: strcpy(r->text,"ERR article hidden\r\n");break;
         case ARTICLE_POSTING_DENIED: strcpy(r->text,"ERR posting denied\r\n");break;
         case ARTICLE_INVALID_TITLE: strcpy(r->text,"ERR title 1..80 bytes, no controls\r\n");break;
+        case ARTICLE_STORAGE: case ARTICLE_BUFFER_TOO_SMALL: case ARTICLE_INVALID_READ:
+            strcpy(r->text,"ERR article storage\r\n");break;
+        case ARTICLE_ADMIN_REQUIRED: strcpy(r->text,"ERR admin required\r\n");break;
         }
         return;
     }
@@ -364,7 +398,7 @@ static void extra_execute(const BoardRequest *q,BoardResult *r) {
         if(q->action==4) {
             r->sequence=1;
             for(;id && id<=article_count;id=q->descending?id-1:id+1) { id=db_search_next(&article_db,id,q->title,q->descending);if(!id)break;if(matches(q,id)) {
-                display_article(id,r,0); r->board=(*article_at(id-1)).board; r->direct=1; r->sequence_next=q->descending?id-1:id<article_count?id+1:0; return;
+                display_article(q,id,r,0); r->board=(*article_at(id-1)).board; r->direct=1; r->sequence_next=q->descending?id-1:id<article_count?id+1:0; return;
             }
             }
             strcpy(r->text,"SCAN END\r\n"); return;
@@ -380,7 +414,7 @@ static void extra_execute(const BoardRequest *q,BoardResult *r) {
     }
     if(q->action==5) {
         if(!q->number || q->number>article_count || !catalog_read((*article_at(q->number-1)).board,q->user)) { strcpy(r->text,"ERR no article\r\n"); return; }
-        display_article(q->number,r,0); r->board=(*article_at(q->number-1)).board; r->direct=1; return;
+        display_article(q,q->number,r,0); r->board=(*article_at(q->number-1)).board; r->direct=1; return;
     }
     if(q->action==6) {
         uint32_t b=q->number?q->number:q->board;
@@ -945,7 +979,7 @@ static void execute(const BoardRequest *q,BoardResult *r) {
     }
     if(strchr("hri",q->op)) {
         if(!on_board(q->number,q->board)) { strcpy(r->text,"ERR no article\r\n"); return; }
-        if(q->op=='i') { display_article(q->number,r,1); return; }
+        if(q->op=='i') { display_article(q,q->number,r,1); return; }
         if(extras_removed(q->number)) { strcpy(r->text,"ERR article withdrawn\r\n"); return; }
         if((uint64_t)moderation_count()+extras_audit_count()>=UINT32_MAX) { strcpy(r->text,"ERR moderation storage uncertain\r\n"); return; }
         if(!moderation_set(q->number,q->board,q->user,q->op=='h')) { strcpy(r->text,"ERR moderation storage uncertain\r\n"); return; }
@@ -966,7 +1000,7 @@ static void execute(const BoardRequest *q,BoardResult *r) {
             uint32_t root=q->number?(*article_at(q->number-1)).root:0, total=0, first=0;
             for(uint32_t i=1;i<=article_count;i++) if(on_board(i,q->board) && !unavailable(i) && (!root || (*article_at(i-1)).root==root) && !members_seen(q->user,i)) { total++; if(!first) first=i; }
             if(q->op=='n') {
-                if(first) display_article(first,r,0); else strcpy(r->text,"NO UNREAD\r\n");
+                if(first) display_article(q,first,r,0); else strcpy(r->text,"NO UNREAD\r\n");
             } else {
                 size_t pos=(size_t)snprintf(r->text,sizeof(r->text),"UNREAD %u\r\n",total);
                 uint32_t i=q->cursor?q->cursor:1; int shown=0;
@@ -983,7 +1017,7 @@ static void execute(const BoardRequest *q,BoardResult *r) {
         post_article(q,r,NULL,0,0);
     } else if(q->op=='R') {
         if(q->number==0 || q->number>article_count) { strcpy(r->text,"ERR no article\r\n"); return; }
-        display_article(q->number,r,0);
+        display_article(q,q->number,r,0);
     } else if(q->op=='U' || q->op=='C' || q->op=='N' || q->op=='B') {
         if(!q->number || q->number>article_count) { strcpy(r->text,"ERR no current article\r\n"); return; }
         Article *a=&(*article_at(q->number-1));
@@ -993,7 +1027,7 @@ static void execute(const BoardRequest *q,BoardResult *r) {
             target=q->op=='U'?next->parent:q->op=='B'?next->prev:next->next;
         }
         if(!target) { strcpy(r->text,"ERR no neighbour\r\n"); return; }
-        display_article(target,r,0);
+        display_article(q,target,r,0);
     } else if(q->op=='T') {
         if(!q->number || q->number>article_count) { strcpy(r->text,"ERR no article\r\n"); return; }
         uint32_t root=(*article_at(q->number-1)).root, id=q->cursor?q->cursor:root;
