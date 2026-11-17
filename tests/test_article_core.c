@@ -149,6 +149,23 @@ int article_repository_body_contains(uint32_t id,const char *query) {
     return id==body_error?-1:strstr(page_bodies[id],query)!=NULL;
 }
 
+static ModerationEntry audit_rows[301];
+static uint32_t audit_mod_sequence[301],audit_extra_failure,audit_mod_failure;
+static unsigned audit_reads;static int audit_admin;
+static unsigned char audit_sigop[CATALOG_MAX+1];
+int moderation_admin(uint32_t user) { return user && audit_admin; }
+int catalog_sigop(uint32_t board,uint32_t user) { return user && board<=CATALOG_MAX && audit_sigop[board]; }
+int extras_audit_entry(uint32_t id,ModerationEntry *entry,uint32_t *mod_sequence) {
+    assert(id && id<=300);audit_reads++;
+    if(id==audit_extra_failure)return 0;
+    *entry=audit_rows[id];*mod_sequence=audit_mod_sequence[id];return 1;
+}
+int moderation_entry(uint32_t sequence,ModerationEntry *entry) {
+    if(sequence==audit_mod_failure)return 0;
+    for(unsigned i=1;i<=300;i++)if(audit_mod_sequence[i]==sequence) { *entry=audit_rows[i];return 1; }
+    return 0;
+}
+
 uint32_t moderation_count(void) { return moderation_entries; }
 uint32_t extras_audit_count(void) { return extras_entries; }
 int moderation_set(uint32_t id,uint32_t board,uint32_t actor,int hide) {
@@ -213,6 +230,7 @@ void article_repository_title_changed(uint32_t id,const char *title) {
     assert(!strcmp(title,journal_text));publications++;
 }
 static ArticleActor reset(void) {
+    audit_admin=0;memset(audit_sigop,0,sizeof(audit_sigop));
     discovery=0;entry_menu=entry_inherited=entry_lock_fault=0;entry_title_override=NULL;
     entry_description=entry_information="";entry_metadata_reads=0;
     paging=0;other_readable=0;probe_user=0;lookup_error=0;
@@ -1504,6 +1522,107 @@ static void entry_tests(void) {
     puts("PASS: board entry/INFO Core ACL, ancestor password challenge, revoked grants, menu destinations and owned bounded output");
 }
 
+static ArticleActor audit_reset(void) {
+    ArticleActor actor=discovery_reset();manager=1;audit_admin=1;
+    memset(audit_rows,0,sizeof(audit_rows));memset(audit_mod_sequence,0,sizeof(audit_mod_sequence));
+    audit_extra_failure=audit_mod_failure=audit_reads=0;
+    moderation_entries=5;extras_entries=7;audit_sigop[2]=1;
+    page_items[1].board=2;page_items[2].board=3;page_items[3].board=4;
+    for(uint32_t i=1;i<=12;i++)audit_rows[i]=(ModerationEntry){i,1,2,2,1700000000+i,'T',0};
+    audit_rows[1].kind='M';audit_rows[1].enabled=1;audit_rows[1].actor=1;audit_mod_sequence[1]=1;
+    audit_rows[2].kind='S';audit_rows[2].enabled=1;audit_rows[2].actor=1;audit_rows[2].target=2;audit_rows[2].board=0;audit_mod_sequence[2]=2;
+    audit_rows[3].kind='D';
+    audit_rows[4].kind='M';audit_rows[4].target=3;audit_rows[4].board=4;audit_mod_sequence[4]=3;
+    audit_rows[5].kind='A';audit_rows[5].target=3;
+    audit_rows[6].kind='K';audit_rows[6].enabled=1;audit_rows[6].actor=1;audit_rows[6].target=2;audit_rows[6].board=0;audit_mod_sequence[6]=4;
+    audit_rows[7].kind='S';audit_rows[7].actor=1;audit_rows[7].target=2;audit_rows[7].board=0;audit_mod_sequence[7]=5;
+    audit_rows[9].kind='D';audit_rows[9].target=2;
+    audit_rows[11].kind='A';audit_rows[11].actor=1;
+    audit_rows[12].target=3;
+    return actor;
+}
+static void audit_tests(void) {
+    ArticleActor actor=audit_reset();ArticleAuditPage page,by_id;
+    assert(article_audit(&actor,2,0,0,0,NULL,&page)==ARTICLE_OK);
+    uint32_t expected[]={12,11,10,8,7,6,5,4};
+    assert(page.start==12 && page.next==3 && page.count==8 && !context);
+    for(unsigned i=0;i<8;i++)assert(page.rows[i].sequence==expected[i]);
+    assert(page.rows[0].board==4 && page.rows[0].actor==2 && !strcmp(page.rows[0].actor_name,"bob"));
+    assert(page.rows[4].action==ARTICLE_AUDIT_RESUME && page.rows[5].action==ARTICLE_AUDIT_CHAT_KICK);
+    assert(page.rows[7].action==ARTICLE_AUDIT_RESTORE && page.rows[0].time==1700000012);
+    assert(article_audit(&actor,2,page.next,0,0,NULL,&page)==ARTICLE_OK && page.count==3 && !page.next);
+    assert(page.rows[0].action==ARTICLE_AUDIT_WITHDRAW && page.rows[1].action==ARTICLE_AUDIT_SUSPEND && page.rows[2].action==ARTICLE_AUDIT_HIDE);
+    assert(article_audit(&actor,2,0,1,0,"bob",&page)==ARTICLE_OK);
+    assert(page.count==3 && page.rows[0].sequence==10 && page.rows[1].sequence==8 && page.rows[2].sequence==3 && page.actor==2 && page.article==1);
+    assert(article_audit(&actor,2,0,1,2,NULL,&by_id)==ARTICLE_OK && !memcmp(&page,&by_id,sizeof(page)));
+    page_hidden[1]=1; /* Hidden/withdrawn events remain auditable. */
+    assert(article_audit(&actor,2,0,1,2,NULL,&page)==ARTICLE_OK && page.count==3);
+    assert(article_audit(&actor,2,0,2,0,NULL,&page)==ARTICLE_OK && !page.count && !page.next);
+    audit_admin=0;
+    assert(article_audit(&actor,2,0,0,0,NULL,&page)==ARTICLE_OK && page.count==5);
+    uint32_t own[]={11,10,8,3,1};for(unsigned i=0;i<5;i++)assert(page.rows[i].sequence==own[i]);
+    audit_sigop[4]=1; /* Effective inherited role is supplied by catalog. */
+    assert(article_audit(&actor,2,0,3,0,NULL,&page)==ARTICLE_OK && page.count==3);
+    audit_sigop[4]=0;
+    assert(article_audit(&actor,2,0,3,0,NULL,&page)==ARTICLE_OK && !page.count);
+    /* Managers bypass board passwords; administrator status does not bypass
+     * a board's independent read ACL. Do not model SIGOPs as password-blocked. */
+    audit_admin=1;board_readable[2]=0;
+    assert(article_audit(&actor,2,0,1,0,NULL,&page)==ARTICLE_OK && !page.count);
+    board_readable[2]=1;
+    assert(article_audit(&actor,2,0,1,0,NULL,&page)==ARTICLE_OK && page.count==5);
+    board_readable[2]=0;
+    assert(article_audit(&actor,2,0,1,0,NULL,&page)==ARTICLE_OK && !page.count);
+    manager=0;unsigned reads=audit_reads;
+    assert(article_audit(&actor,2,0,0,0,"unknown",&page)==ARTICLE_ADMIN_REQUIRED);discovery_cleared(&page,sizeof(page));
+    assert(audit_reads==reads);
+    assert(!body_reads && !mark_calls && !seen_calls && !commits && !publications);
+
+    actor=audit_reset();
+    for(unsigned which=0;which<3;which++) {
+        ArticleActor denied=actor;if(which==0)denied.user=0;else if(which==1)denied.epoch++;else denied.user=99;
+        assert(article_audit(&denied,2,0,0,0,NULL,&page)==(which?ARTICLE_REVOKED:ARTICLE_ADMIN_REQUIRED));
+        discovery_cleared(&page,sizeof(page));assert(!audit_reads);
+    }
+    assert(article_audit(&actor,3,0,0,0,NULL,&page)==ARTICLE_ADMIN_REQUIRED);
+    assert(article_audit(&actor,2,13,0,0,NULL,&page)==ARTICLE_INVALID_CURSOR);
+    assert(article_audit(&actor,2,0,0,99,NULL,&page)==ARTICLE_INVALID_QUERY);
+    assert(article_audit(&actor,2,0,0,0,"missing",&page)==ARTICLE_INVALID_QUERY);
+    assert(article_audit(&actor,2,0,0,2,"bob",&page)==ARTICLE_INVALID_QUERY);
+    discovery_cleared(&page,sizeof(page));assert(!audit_reads);
+    lookup_error=1;
+    assert(article_audit(&actor,2,0,0,0,"bob",&page)==ARTICLE_MEMBER_STORAGE);discovery_cleared(&page,sizeof(page));
+    actor=audit_reset();audit_extra_failure=10;
+    assert(article_audit(&actor,2,0,0,0,NULL,&page)==ARTICLE_EXTRAS_STORAGE);discovery_cleared(&page,sizeof(page));
+    actor=audit_reset();audit_mod_failure=5;
+    assert(article_audit(&actor,2,0,0,0,NULL,&page)==ARTICLE_MODERATION_STORAGE);discovery_cleared(&page,sizeof(page));
+    actor=audit_reset();audit_mod_sequence[10]=6;
+    assert(article_audit(&actor,2,0,0,0,NULL,&page)==ARTICLE_MODERATION_STORAGE);discovery_cleared(&page,sizeof(page));
+    actor=audit_reset();audit_rows[10].actor=99;
+    assert(article_audit(&actor,2,0,0,0,NULL,&page)==ARTICLE_MEMBER_STORAGE);discovery_cleared(&page,sizeof(page));
+    actor=audit_reset();audit_rows[10].kind='?';
+    assert(article_audit(&actor,2,0,0,0,NULL,&page)==ARTICLE_EXTRAS_STORAGE);discovery_cleared(&page,sizeof(page));
+    int *errors[]={&member_error,&moderation_error,&policy_error,&extras_error};
+    ArticleOutcome failures[]={ARTICLE_MEMBER_STORAGE,ARTICLE_MODERATION_STORAGE,ARTICLE_POLICY_STORAGE,ARTICLE_EXTRAS_STORAGE};
+    for(unsigned i=0;i<4;i++) {
+        actor=audit_reset();*errors[i]=1;
+        assert(article_audit(&actor,2,0,0,0,NULL,&page)==failures[i]);discovery_cleared(&page,sizeof(page));assert(!audit_reads);
+    }
+    actor=audit_reset();moderation_entries=UINT32_MAX;extras_entries=1;
+    assert(article_audit(&actor,2,0,0,0,NULL,&page)==ARTICLE_STORAGE);discovery_cleared(&page,sizeof(page));assert(!audit_reads);
+    actor=audit_reset();moderation_entries=extras_entries=0;
+    assert(article_audit(&actor,2,0,0,0,NULL,&page)==ARTICLE_OK);discovery_cleared(&page,sizeof(page));
+    /* Filtered sparse pages still stop at 256 scanned events, not 256 matches. */
+    actor=audit_reset();moderation_entries=0;extras_entries=300;memset(audit_mod_sequence,0,sizeof(audit_mod_sequence));
+    for(unsigned i=1;i<=300;i++)audit_rows[i]=(ModerationEntry){i,1,2,1,0,'T',0};
+    audit_rows[1].actor=2;
+    assert(article_audit(&actor,2,0,0,2,NULL,&page)==ARTICLE_OK && page.start==300 && !page.count && page.next==44 && audit_reads==256);
+    assert(article_audit(&actor,2,page.next,0,2,NULL,&page)==ARTICLE_OK && page.count==1 && page.rows[0].sequence==1 && !page.next && audit_reads==300);
+    assert(article_audit(&actor,2,0,0,0,NULL,NULL)==ARTICLE_INVALID_READ);
+    assert(!context);
+    puts("PASS: audit Core manager/SIGOP scope, merged ordering, actor/article filters, bounded paging and atomic failure clearing");
+}
+
 int main(void) {
     ArticleActor actor=reset();
     denied(article_withdraw(NULL,2,7,1),ARTICLE_LOGIN_REQUIRED);
@@ -1603,5 +1722,6 @@ int main(void) {
     posting_tests();
     draft_tests();
     entry_tests();
+    audit_tests();
     return 0;
 }
