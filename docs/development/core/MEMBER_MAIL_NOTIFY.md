@@ -61,3 +61,6 @@ parity are verified separately. No production access, deployment or release.
 
 The following [chat removal slice](MEMBER_CHAT_KICK.md) extracts a separate
 admin-authorized moderation order without changing notification preferences.
+
+The later [mail composition boundary](MAIL_COMPOSITION.md) extracts composition,
+draft/send/delete and attachment selection; MAIL NOTIFY remains Member Core.

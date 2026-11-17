@@ -1,6 +1,6 @@
 {
   "LICENSE": "fb981668c18a279e285fc4d83fba1e836cc84dd4daa73c9697d3cfd2d8aca6e0",
-  "Makefile": "f2731b2505dd4d23ab583e2398710d0758b7c355c3c9fba119ad5a64ac869621",
+  "Makefile": "96a305fb7ffca4c18e57d85e5d1c322d8a1b701918189e9df4bbeca249d3e13d",
   "boards.example.conf": "4bd1a17ecf3966d3829510e8495a1362fb8b922cd754badccc739f5e5ab0bde8",
   "ci/build-freebsd-package.sh": "4e62899471d1f1a6c44e00a783c1aff771332140704ae778da95a95048474108",
   "debian/changelog": "8f3574a094f5a3677a9a7188e530ecdbdc006138b082b57243ca8441c644114d",
@@ -23,7 +23,7 @@
   "help/ja/files.txt": "16892a21987318cc29acdc08a01056ee3c36f67376b5b2e92b96cce7be6c3c3f",
   "help/ja/gather.txt": "a7c3b48f9128aea8097b38bf5ed37c178ab9b54d8c44c0adb860332eea3d4a14",
   "help/ja/index.txt": "a654c7fc5651da4ecf74908ede0282b5bfad697a87ba2e1d8a1b8b110ddca94f",
-  "help/ja/mail.txt": "f0f3e08418a43fa4d2b2c16299619b52f6c8ecd938d1c9584306dc1a9d9a1fa2",
+  "help/ja/mail.txt": "c76761bd6adf059df19d22ed12267fbb36718f47ad9b2b86fca17f6a384f00cd",
   "help/ja/post.txt": "b533671d6ba7392fb9c52a187abb9f03cd4f7bf5d6f53cd807914c77d7dbeebe",
   "help/ja/profile.txt": "b3b2ed387eb3847d167aac980948b90044ff442bd733ad49e40693a223aba23a",
   "help/ja/read.txt": "3fdbaee55d8ba701337743f90dff0eb8999098ff1feec45d05df05de133c6890",
@@ -53,7 +53,7 @@
   "scripts/serial_connector.py": "3de6ad32005c5dff9b474d8f550a534232d88f4be73b59b5dcfc15cc11d0e670",
   "scripts/transfer_spool.py": "f7c590b73368c330da611d8ce41f0fd6fe5d8ad3b3e9ae9165e258d1e501db46",
   "scripts/vault_zmodem.py": "ace554ea5b6ab8d479ec39ad7daf7f5f7f34ca34ba13d5b9a73b115a0d63ef15",
-  "src/board.c": "cb30e08f12ccc7d6d94d0fe968cdfdeb15e8039f88e4fbd19cfb7e630c15d16f",
+  "src/board.c": "2b5a441792519337d66983a9d89e39f0b5a8308980ae7f15af27ea8eadd4c656",
   "src/board_link.inc": "95a85be0a6ca2d77380775b25befb51a72971908d266c6b72f76fc7ca94e1d4a",
   "src/board_policy.c": "0169bc17649ddc63599b43ca7ae49f6c1c756dac417bd030a79398229414165b",
   "src/catalog.c": "c96bab1f3042b7685cc27df9206ebfd63ad2c79b06ca92d3dd1ca219a0e2a361",
@@ -154,5 +154,9 @@
   "src/members.h": "b860c0aaf4ea15e027c8517758e161e3ae5ab74ad2194aec0982405f4f56d87d",
   "src/chat_preferences.h": "5ccd981f5282ab0e0161d923fba6935b543136e3fad5dacf78f91bba3859bdc0",
   "src/features64.inc": "9f06d34b34ac782984f09775db9dcc6e9f6f950d124dd6c770e6948219d8539b",
-  "src/application_repository.h": "44685017695e60734b4fac1f3470fdf3a08733553142031cea2f5dcc9cca4adb"
+  "src/application_repository.h": "44685017695e60734b4fac1f3470fdf3a08733553142031cea2f5dcc9cca4adb",
+  "src/mail_core.c": "cdfcba7631d604cdec482bd935e94e50193e5af85d6085a0b88841acc90f0578",
+  "src/mail_core.h": "4986250dc8a44404e31dc5ab19acb489741d06f9bb2c62699327246ac2fd6e8e",
+  "src/mail_repository.h": "2ed4895d6174248ec028dc47ea26c43298a7cec6db334bc1a253ccfb8d1549f5",
+  "help/en/mail.txt": "2cd15b2def11660f6b8566516d99b4637561590b4cea625eb489f193b9e4ba76"
 }

@@ -26,3 +26,4 @@ N asks for a date (empty: CHECK MAIL). MAIL NEXT reads unread; MAIL LATEST reads
 
 While reading: Enter next, P previous, L repeat, F nonstop from next, +/- or +N/-N changes direction/offset. MAIL LIST returns to the list. G imports into the common buffer; use /BUFFER in a later editor.
 MAILUPLOAD / MAILUPLOADBATCH / MAILDOWNLOAD / MAILDOWNLOADALL use PROTOCOL. Upload arguments: description (XMODEM/TEXT: name|bytes|description). Download arguments: file ID/message ID. Existing Z-prefixed commands remain ZMODEM-only. XMODEM/TEXT cannot batch. Sender/recipient authorization is identical for all protocols.
+Drafts belong to their author. Stale revisions after another connection updates the draft cannot be saved, sent or deleted. If a suspended recipient or deleted reply parent blocks resume, MAIL DRAFT still shows the revision for MAIL DRAFT DELETE revision.
