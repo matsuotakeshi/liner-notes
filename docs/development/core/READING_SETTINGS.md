@@ -78,3 +78,20 @@ monotonic completion behavior. This does not complete all Session/Core extractio
 - Local Python syntax, reviewed source fingerprints and diff checks passed.
   Canonical manual generation and validation passed: 42 pages, 2,812 local
   links, 172 legacy URLs, Markdown/HTML parity and offline ZIP.
+
+## Fixture initialization correction
+
+PR #97 head `5dc5b6f4c91ce14e1d956be16905fe280bbb82bf` failed in both
+Rocky 9 and AlmaLinux 9 before its first new socket test connection
+([Linux compatibility run](https://github.com/matsuotakeshi/liner-notes/actions/runs/44135538104),
+jobs `134224068334` and `134224068532`). Runtime exited with code 2 and
+`vault: requires initialized directory and board/member files` because the new
+fixture passed an uninitialized vault directory.
+
+The test now receives the already-built vaultctl from make check and runs
+`vaultctl init` inside its fresh TemporaryDirectory before starting the server,
+matching test_stage64.py. A failed initialization aborts the test. Runtime's
+startup guard, all scope/permission/storage assertions and timeouts are unchanged.
+Local fixture-order/failure checks, Python syntax and diff checks pass. Real
+socket execution remains pending corrected CI; prior success is not evidence
+for this new commit.

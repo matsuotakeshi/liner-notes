@@ -89,7 +89,7 @@ test: test-userlog test-chat runtime vaultctl test-adapters test-vault-core test
 	$(PYTHON) tests/test_mail_resources.py ./runtime
 	$(PYTHON) tests/test_mail_delivery.py ./runtime
 	$(PYTHON) tests/test_editor_documents.py ./runtime
-	$(PYTHON) tests/test_reading_settings.py ./runtime
+	$(PYTHON) tests/test_reading_settings.py ./runtime ./vaultctl
 	$(PYTHON) tests/test_mail_draft_notice.py ./runtime
 	$(PYTHON) tests/test_mail_arrival.py ./runtime
 	$(PYTHON) tests/test_mail_notify.py ./runtime

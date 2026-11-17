@@ -2,6 +2,7 @@
 from contextlib import closing, ExitStack
 from pathlib import Path
 import sqlite3
+import subprocess
 import sys
 import tempfile
 from test_board import Server, post
@@ -21,10 +22,12 @@ def check(client, command):
     raise AssertionError(response)
 
 
-def run(binary):
-    binary=str(Path(binary).resolve())
+def run(binary,vaultctl):
+    binary,vaultctl=(str(Path(path).resolve()) for path in (binary,vaultctl))
     with tempfile.TemporaryDirectory(prefix="reading-settings-") as directory:
         root=Path(directory);database=root/"liner.sqlite";admins=root/"admins"
+        # Runtime deliberately refuses a missing/uninitialized vault.
+        subprocess.run([vaultctl,"init",str(root/"vault")],check=True,capture_output=True)
         def start():
             return Server(binary,root/"notes",members=root/"members",language="en",vault=root/"vault",
                           admins=admins if admins.exists() else None,options=["--database",str(database)])
@@ -99,4 +102,4 @@ def run(binary):
     print("PASS private reading scopes/menu modes, cancel/disconnect, restart and failed-storage replies")
 
 
-if __name__=="__main__":run(sys.argv[1])
+if __name__=="__main__":run(sys.argv[1],sys.argv[2])
