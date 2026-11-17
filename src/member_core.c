@@ -291,3 +291,29 @@ MemberOutcome member_core_mail_notify(const MemberActor *actor,MemberNotifyActio
     else out->user=actor->user;
     return result;
 }
+
+MemberOutcome member_core_chat_kick(const MemberActor *actor,const char *login,MemberChatKick *out) {
+    if(!out)return MEMBER_CORE_INVALID;
+    memset(out,0,sizeof(*out));
+    MemberOutcome result=authorize(actor,1);
+    if(result!=MEMBER_CORE_OK)return result;
+    if(extras_broken())return MEMBER_CORE_EXTRAS_STORAGE;
+    if(!login)return MEMBER_CORE_INVALID;
+    size_t length=0;while(length<=32 && login[length])length++;
+    if(!length || length>32)return MEMBER_CORE_NOT_FOUND;
+    uint32_t total=members_count(),target=0;
+    if(total>MEMBER_MAX)return MEMBER_CORE_STORAGE;
+    for(uint32_t id=1;id<=total;id++) {
+        const char *name=members_name(id);
+        if(name && !strcmp(name,login)) { target=id;break; }
+    }
+    if(members_broken())return MEMBER_CORE_STORAGE;
+    if(moderation_broken())return MEMBER_CORE_MODERATION_STORAGE;
+    if(!target)return MEMBER_CORE_NOT_FOUND;
+    if(target==actor->user || moderation_protected(target))return MEMBER_CORE_PROTECTED;
+    if((uint64_t)moderation_count()+extras_audit_count()>=UINT32_MAX)
+        return MEMBER_CORE_MODERATION_UNCERTAIN;
+    if(!moderation_chat_kick(target,actor->user))return MEMBER_CORE_MODERATION_UNCERTAIN;
+    out->user=target;memcpy(out->name,login,length+1);
+    return MEMBER_CORE_OK;
+}

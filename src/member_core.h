@@ -89,4 +89,11 @@ MemberOutcome member_core_save_preferences(const MemberActor *,const MemberPrefe
 typedef enum { MEMBER_NOTIFY_QUERY, MEMBER_NOTIFY_ON, MEMBER_NOTIFY_OFF } MemberNotifyAction;
 typedef struct { uint32_t user,revision; int deny; } MemberMailNotify;
 MemberOutcome member_core_mail_notify(const MemberActor *,MemberNotifyAction,MemberMailNotify *out);
+/* Admin-only chat removal order, committed to moderation audit before output.
+ * login is borrowed (1..32 bytes, exact case); no pointer is retained. Existing
+ * named targets remain eligible regardless of connection/account status.
+ * Self/protected targets are denied. Caller applies the successful order only
+ * to chat connections; this does not suspend accounts or change epochs. */
+typedef struct { uint32_t user; char name[33]; } MemberChatKick;
+MemberOutcome member_core_chat_kick(const MemberActor *,const char *login,MemberChatKick *out);
 #endif
