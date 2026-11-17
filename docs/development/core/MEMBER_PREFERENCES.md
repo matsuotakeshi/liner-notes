@@ -62,3 +62,6 @@ Japanese/English settings HELP. Public behavior remains unchanged, so no stable
 manual claim/version is advanced. Internal contracts, CHANGELOG and reviewed
 source digests are updated; canonical generation/link/search/offline checks are
 run separately. No production access, deployment or release publication.
+
+The next [mail notification slice](MEMBER_MAIL_NOTIFY.md) extracts the separate
+arrival-notification preference and its live-session revision snapshot.

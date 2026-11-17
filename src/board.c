@@ -631,6 +631,7 @@ static void extra_execute(const BoardRequest *q,BoardResult *r) {
     strcpy(r->text,"ERR command\r\n");
 }
 static const char *mail_text(const BoardRequest *q,MessageId id,const char *raw) { return q->scope?message_text(q->scope==2?LANGUAGE_EN:LANGUAGE_JA,id):raw; }
+static void member_result(MemberOutcome result,BoardResult *r);
 static void mail_execute(const BoardRequest *q,BoardResult *r) {
     if((q->action=='S' || q->action=='W') && strlen(q->body)>ln_limit("BODY",BOARD_BODY)) { strcpy(r->text,"ERR body limit\r\n");return; }
     r->mail_action=q->action;
@@ -653,8 +654,11 @@ static void mail_execute(const BoardRequest *q,BoardResult *r) {
     }
     if(q->action=='U') {
         if(q->number>2)goto unavailable;
-        if(q->number && !members_set_mail_notify(q->user,q->number==2)) { strcpy(r->text,"ERR member storage unavailable\r\n");r->mail_action=0;return; }
-        r->mail_notify_user=q->user;members_mail_notify(q->user,&r->mail_notify_deny,&r->mail_notify_revision);
+        MemberActor actor={q->user,q->user_epoch};MemberMailNotify notification;
+        MemberNotifyAction action=q->number==0?MEMBER_NOTIFY_QUERY:q->number==1?MEMBER_NOTIFY_ON:MEMBER_NOTIFY_OFF;
+        MemberOutcome result=member_core_mail_notify(&actor,action,&notification);
+        if(result!=MEMBER_CORE_OK) { member_result(result,r);r->mail_action=0;return; }
+        r->mail_notify_user=notification.user;r->mail_notify_deny=notification.deny;r->mail_notify_revision=notification.revision;
         snprintf(r->text,sizeof(r->text),mail_text(q,MSG_MAIL_NOTIFY,"MAIL NOTIFY %s\r\n"),r->mail_notify_deny?"OFF":"ON");return;
     }
     if(q->action=='F' || q->action=='O') {

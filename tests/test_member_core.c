@@ -42,6 +42,22 @@ int members_save_ui_preferences(uint32_t user,int language,int pager,int editor,
     if(!commit_ok) { member_error=1;return 0; }
     saved_preferences[user]=value;prefs_writes++;return 1;
 }
+static int notify_deny[15],notify_read_failure;
+static uint32_t notify_revision[15];
+static unsigned notify_reads,notify_calls,notify_writes;
+void members_mail_notify(uint32_t user,int *deny,uint32_t *revision) {
+    assert(user && user<15 && members_active(user));notify_reads++;
+    *deny=notify_deny[user];*revision=notify_revision[user];
+    if(notify_read_failure==1)member_error=1;
+    if(notify_read_failure==2)moderation_error=1;
+}
+int members_set_mail_notify(uint32_t user,int deny) {
+    assert(user && user<15 && members_active(user) && (deny==0 || deny==1));notify_calls++;
+    if(notify_deny[user]==deny)return 1;
+    if(notify_revision[user]==UINT32_MAX)return 0;
+    if(!commit_ok) { member_error=1;return 0; }
+    notify_deny[user]=deny;notify_revision[user]++;notify_writes++;return 1;
+}
 static unsigned password_calls,reset_calls,password_writes;
 static const char *test_current="test-current-password",*test_new="test-new-password";
 int members_password(uint32_t user,const char *current,const char *replacement) {
@@ -148,6 +164,8 @@ int moderation_suspended(uint32_t id) { return id<15?(suspended[id] || pending[i
 uint32_t moderation_epoch(uint32_t id) { return epoch+(id<15?epoch_changes[id]:0); }
 int moderation_admin(uint32_t id) { return id==1 && admin; }
 static MemberActor reset(void) {
+    memset(notify_deny,0,sizeof(notify_deny));memset(notify_revision,0,sizeof(notify_revision));
+    notify_read_failure=0;notify_reads=notify_calls=notify_writes=0;
     count=14;epoch=9;admin=1;member_error=moderation_error=read_failure=0;
     count_calls=target_reads=0;approval_calls=approval_writes=credential_changes=0;
     memset(saved_preferences,0,sizeof(saved_preferences));prefs_reads=prefs_calls=prefs_writes=prefs_user=0;prefs_read_failure=0;
@@ -859,6 +877,71 @@ static void preference_failures(void) {
     assert(prefs_writes==1 && saved_preferences[1].present && !credential_changes);
     puts("PASS: preferences validation, failed writes/reads, cleared output and committed readback failure");
 }
+static void notification_roundtrip(void) {
+    MemberActor actor=reset();actor.user=2;MemberMailNotify out;
+    assert(member_core_mail_notify(&actor,MEMBER_NOTIFY_QUERY,&out)==MEMBER_CORE_OK);
+    assert(out.user==2 && !out.deny && !out.revision && !notify_calls);
+    assert(member_core_mail_notify(&actor,MEMBER_NOTIFY_ON,&out)==MEMBER_CORE_OK && !notify_writes);
+    assert(member_core_mail_notify(&actor,MEMBER_NOTIFY_OFF,&out)==MEMBER_CORE_OK);
+    assert(out.user==2 && out.deny && out.revision==1 && notify_writes==1);
+    MemberMailNotify first=out;
+    assert(member_core_mail_notify(&actor,MEMBER_NOTIFY_OFF,&out)==MEMBER_CORE_OK && out.revision==1 && notify_writes==1);
+    assert(member_core_mail_notify(&actor,MEMBER_NOTIFY_QUERY,&out)==MEMBER_CORE_OK && out.revision==1 && notify_writes==1);
+    assert(member_core_mail_notify(&actor,MEMBER_NOTIFY_ON,&out)==MEMBER_CORE_OK && !out.deny && out.revision==2 && notify_writes==2);
+    assert(first.deny && first.revision==1);
+    actor.user=4;
+    assert(member_core_mail_notify(&actor,MEMBER_NOTIFY_QUERY,&out)==MEMBER_CORE_OK && out.user==4 && !out.deny && !out.revision);
+    assert(!credential_changes && moderation_epoch(2)==9 && moderation_epoch(4)==9);
+    puts("PASS: own notification defaults, ON/OFF snapshots, duplicate/query no-write, isolation and stable auth epochs");
+}
+static void notification_authority(void) {
+    for(unsigned i=0;i<8;i++) {
+        MemberActor actor=reset();MemberOutcome want=MEMBER_CORE_REVOKED;MemberMailNotify out;
+        if(i==0) { actor.user=0;want=MEMBER_CORE_LOGIN_REQUIRED; }
+        else if(i==1)actor.epoch--;
+        else if(i==2)suspended[1]=1;
+        else if(i==3)pending[1]=1;
+        else if(i==4)retired[1]=1;
+        else if(i==5) { member_error=1;want=MEMBER_CORE_STORAGE; }
+        else if(i==6) { moderation_error=1;want=MEMBER_CORE_MODERATION_STORAGE; }
+        else actor.user=99;
+        for(unsigned action=0;action<3;action++) {
+            memset(&out,0x7f,sizeof(out));
+            assert(member_core_mail_notify(&actor,(MemberNotifyAction)action,&out)==want);cleared(&out,sizeof(out));
+        }
+        assert(!notify_reads && !notify_calls && !notify_writes);
+    }
+    MemberActor actor=reset();MemberMailNotify out;
+    assert(member_core_mail_notify(NULL,MEMBER_NOTIFY_OFF,&out)==MEMBER_CORE_LOGIN_REQUIRED);cleared(&out,sizeof(out));
+    assert(member_core_mail_notify(&actor,MEMBER_NOTIFY_OFF,NULL)==MEMBER_CORE_INVALID);
+    assert(member_core_mail_notify(&actor,(MemberNotifyAction)-1,&out)==MEMBER_CORE_INVALID);cleared(&out,sizeof(out));
+    assert(member_core_mail_notify(&actor,(MemberNotifyAction)3,&out)==MEMBER_CORE_INVALID);cleared(&out,sizeof(out));
+    assert(!notify_reads && !notify_calls);
+    puts("PASS: notification guest/revoked/store-health denial, invalid actions and zeroed outputs");
+}
+static void notification_failures(void) {
+    MemberActor actor=reset();MemberMailNotify out;notify_revision[1]=UINT32_MAX;
+    assert(member_core_mail_notify(&actor,MEMBER_NOTIFY_QUERY,&out)==MEMBER_CORE_OK && out.revision==UINT32_MAX);
+    assert(member_core_mail_notify(&actor,MEMBER_NOTIFY_ON,&out)==MEMBER_CORE_OK && out.revision==UINT32_MAX);
+    assert(member_core_mail_notify(&actor,MEMBER_NOTIFY_OFF,&out)==MEMBER_CORE_STORAGE);cleared(&out,sizeof(out));
+    assert(!notify_writes && !notify_deny[1] && notify_revision[1]==UINT32_MAX);
+    actor=reset();notify_revision[1]=UINT32_MAX-1;
+    assert(member_core_mail_notify(&actor,MEMBER_NOTIFY_OFF,&out)==MEMBER_CORE_OK && out.deny && out.revision==UINT32_MAX);
+    assert(member_core_mail_notify(&actor,MEMBER_NOTIFY_ON,&out)==MEMBER_CORE_STORAGE);cleared(&out,sizeof(out));
+    assert(notify_writes==1 && notify_deny[1]);
+    actor=reset();commit_ok=0;
+    assert(member_core_mail_notify(&actor,MEMBER_NOTIFY_OFF,&out)==MEMBER_CORE_STORAGE);cleared(&out,sizeof(out));
+    assert(!notify_reads && !notify_writes && !notify_deny[1] && !notify_revision[1]);
+    for(int failure=1;failure<=2;failure++) {
+        actor=reset();notify_deny[1]=1;notify_revision[1]=8;notify_read_failure=failure;
+        MemberOutcome want=failure==1?MEMBER_CORE_STORAGE:MEMBER_CORE_MODERATION_STORAGE;
+        assert(member_core_mail_notify(&actor,MEMBER_NOTIFY_QUERY,&out)==want);cleared(&out,sizeof(out));
+        actor=reset();notify_read_failure=failure;
+        assert(member_core_mail_notify(&actor,MEMBER_NOTIFY_OFF,&out)==want);cleared(&out,sizeof(out));
+        assert(notify_deny[1] && notify_revision[1]==1 && notify_writes==1 && !credential_changes);
+    }
+    puts("PASS: notification revision saturation, failed writes/partial reads and no failed completion publication");
+}
 int main(void) {
     role_tests();directory_tests();denial_tests();failure_tests();
     suspension_tests();suspension_denials();suspension_failures();
@@ -867,5 +950,6 @@ int main(void) {
     group_updates();delegated_groups();group_failures();
     lifecycle_success();lifecycle_denials();lifecycle_failures();
     password_updates();reset_authority();password_failures();
-    preference_roundtrip();preference_authority();preference_failures();return 0;
+    preference_roundtrip();preference_authority();preference_failures();
+    notification_roundtrip();notification_authority();notification_failures();return 0;
 }
