@@ -68,6 +68,24 @@ typedef struct { uint32_t id; size_t information_size; char title[81],descriptio
 ArticleOutcome article_board_info(const ArticleActor *,uint32_t board,ArticleBoardInfo *out,
                                   char *information,size_t capacity);
 
+/* Combined article/moderation audit history, newest first, 8 rows/256 entries.
+ * Requires manager rights on the current board. Per-row SIGOP/read ACL checks
+ * remain authoritative; hidden article events are intentionally auditable.
+ * start=0 selects latest; next is the next inclusive cursor, not a capability.
+ * Optional actor_id OR exact actor_name filters the operator, not the author.
+ * Owned metadata only: no event text/body, read marks or session mutations.
+ * Failed pages are entirely cleared. Worker-thread-only; inputs are borrowed. */
+typedef enum { ARTICLE_AUDIT_HIDE, ARTICLE_AUDIT_RESTORE, ARTICLE_AUDIT_WITHDRAW,
+               ARTICLE_AUDIT_RETITLE, ARTICLE_AUDIT_AUTHOR, ARTICLE_AUDIT_CHAT_KICK,
+               ARTICLE_AUDIT_SUSPEND, ARTICLE_AUDIT_RESUME } ArticleAuditAction;
+typedef struct {
+    uint32_t sequence,actor,target,board; uint64_t time;
+    ArticleAuditAction action; char actor_name[33];
+} ArticleAuditRow;
+typedef struct { uint32_t start,next,article,actor; unsigned count; ArticleAuditRow rows[8]; } ArticleAuditPage;
+ArticleOutcome article_audit(const ArticleActor *,uint32_t current_board,uint32_t start,
+                             uint32_t article,uint32_t actor_id,const char *actor_name,ArticleAuditPage *out);
+
 ArticleOutcome article_withdraw(const ArticleActor *,uint32_t board,
                                uint32_t article,int confirmed);
 ArticleOutcome article_retitle(const ArticleActor *,uint32_t board,

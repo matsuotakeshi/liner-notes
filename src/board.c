@@ -934,7 +934,7 @@ static void execute(const BoardRequest *q,BoardResult *r) {
     if(q->op=='z') {
         snprintf(r->text,sizeof(r->text),"ROLE %s\r\n",moderation_admin(q->user)?"admin":members_name(q->user)?"member":"guest"); return;
     }
-    if(((strchr("hriA",q->op) && !catalog_manage(q->board,q->user)) || (strchr("xylt",q->op) && !moderation_admin(q->user)))) { strcpy(r->text,"ERR admin required\r\n"); return; }
+    if(((strchr("hri",q->op) && !catalog_manage(q->board,q->user)) || (strchr("xylt",q->op) && !moderation_admin(q->user)))) { strcpy(r->text,"ERR admin required\r\n"); return; }
     if(moderation_broken()) { strcpy(r->text,"ERR moderation storage unavailable\r\n"); return; }
     if(q->op==BOARD_MAIL_TRANSFER) { if(!members_name(q->user)) { strcpy(r->text,"ERR login required\r\n");return; }mail_files_transfer(q->user,q->body,r->text,sizeof(r->text));return; }
     if(q->op=='m') { if(!members_name(q->user)) { strcpy(r->text,"ERR login required\r\n");return; }mail_execute(q,r);return; }
@@ -1053,40 +1053,28 @@ static void execute(const BoardRequest *q,BoardResult *r) {
         return;
     }
     if(q->op=='A') {
-        uint32_t actor=q->audit_actor;
-        if(q->title[0]) {
-            for(uint32_t user=1;user<=MEMBER_MAX;user++) {
-                const char *name=members_name(user);
-                if(name && !strcmp(name,q->title)) { actor=user; break; }
-            }
-            if(!actor) { strcpy(r->text,"ERR audit filter\r\n"); return; }
+        ArticleActor actor={q->user,q->user_epoch,q->board_grants};ArticleAuditPage page;
+        ArticleOutcome result=article_audit(&actor,q->board,q->number,q->audit_article,q->audit_actor,q->title,&page);
+        if(result!=ARTICLE_OK) {
+            if(result==ARTICLE_INVALID_QUERY)strcpy(r->text,"ERR audit filter\r\n");
+            else if(result==ARTICLE_INVALID_CURSOR)strcpy(r->text,"ERR audit cursor\r\n");
+            else if(result==ARTICLE_ADMIN_REQUIRED)strcpy(r->text,"ERR admin required\r\n");
+            else post_result(result,r);
+            return;
         }
-        if(actor && !members_name(actor)) { strcpy(r->text,"ERR audit filter\r\n"); return; }
-        uint32_t latest=moderation_count()+extras_audit_count(),id=q->number?q->number:latest;
-        if(q->number>latest) { strcpy(r->text,"ERR audit cursor\r\n"); return; }
-        size_t pos=(size_t)(q->audit_article || actor?
-            snprintf(r->text,sizeof(r->text),"AUDIT %u ARTICLE %u ACTORID %u\r\n",id,q->audit_article,actor):
-            snprintf(r->text,sizeof(r->text),"AUDIT %u\r\n",id));
-        unsigned shown=0,scanned=0;
-        for(;id && shown<8 && scanned<256;id--,scanned++) {
-            ModerationEntry e;
-            uint32_t mod_sequence;
-            if(!extras_audit_entry(id,&e,&mod_sequence)) { strcpy(r->text,"ERR extras storage\r\n"); return; }
-            if(mod_sequence && !moderation_entry(mod_sequence,&e)) { strcpy(r->text,"ERR moderation storage unavailable\r\n"); return; }
-            if(!mod_sequence) e.board=board_of(e.target);
-            if(!moderation_admin(q->user) && (!(e.kind=='M' || e.kind=='D' || e.kind=='T' || e.kind=='A') || !catalog_sigop(e.board,q->user)))continue;
-            if((e.kind=='M' || e.kind=='D' || e.kind=='T' || e.kind=='A') && !catalog_read(e.board,q->user)) continue;
-            if(q->audit_article && (!(e.kind=='M' || e.kind=='D' || e.kind=='T' || e.kind=='A') || e.target!=q->audit_article)) continue;
-            if(actor && e.actor!=actor) continue;
-            char date[32]="unknown"; time_t stamp=(time_t)e.time;
-            struct tm *tm=e.time?localtime(&stamp):NULL;
-            if(tm) strftime(date,sizeof(date),date_pattern(),tm);
-            const char *action=e.kind=='K'?"CHAT_KICK":e.kind=='D'?"WITHDRAW":e.kind=='T'?"RETITLE":e.kind=='A'?"AUTHOR":e.kind=='M'?(e.enabled?"HIDE":"RESTORE"):(e.enabled?"SUSPEND":"RESUME");
+        size_t pos=(size_t)(page.article || page.actor?
+            snprintf(r->text,sizeof(r->text),"AUDIT %u ARTICLE %u ACTORID %u\r\n",page.start,page.article,page.actor):
+            snprintf(r->text,sizeof(r->text),"AUDIT %u\r\n",page.start));
+        for(unsigned i=0;i<page.count;i++) {
+            const ArticleAuditRow *row=&page.rows[i];
+            char date[32]="unknown";time_t stamp=(time_t)row->time;
+            struct tm *tm=row->time?localtime(&stamp):NULL;
+            if(tm)strftime(date,sizeof(date),date_pattern(),tm);
+            const char *actions[]={"HIDE","RESTORE","WITHDRAW","RETITLE","AUTHOR","CHAT_KICK","SUSPEND","RESUME"};
             pos+=(size_t)snprintf(r->text+pos,sizeof(r->text)-pos,"EVENT %u %s %u %s %s %u %u\r\n",
-                id,date,e.actor,members_name(e.actor),action,e.target,e.board);
-            shown++;
+                row->sequence,date,row->actor,row->actor_name,actions[row->action],row->target,row->board);
         }
-        snprintf(r->text+pos,sizeof(r->text)-pos,"END NEXT %u\r\n",id); return;
+        snprintf(r->text+pos,sizeof(r->text)-pos,"END NEXT %u\r\n",page.next);return;
     }
     if(q->op=='l') {
         size_t pos=(size_t)snprintf(r->text,sizeof(r->text),"MEMBERS\r\n");

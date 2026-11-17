@@ -252,6 +252,71 @@ ArticleOutcome article_board_info(const ArticleActor *actor,uint32_t board,Artic
     return result;
 }
 
+static ArticleOutcome audit_page(const ArticleActor *actor,uint32_t board,uint32_t start,
+                                 uint32_t article,uint32_t operator_id,const char *operator_name,ArticleAuditPage *out) {
+    ArticleOutcome result=health();
+    if(result!=ARTICLE_OK)return result;
+    result=identity(actor,1);
+    if(result!=ARTICLE_OK)return result;
+    uint32_t user=actor?actor->user:0;
+    if(!user || !catalog_manage(board,user))return ARTICLE_ADMIN_REQUIRED;
+    if(operator_name && *operator_name) {
+        if(operator_id || post_length(operator_name,32)>32)return ARTICLE_INVALID_QUERY;
+        operator_id=members_find(operator_name);
+        if(members_broken())return ARTICLE_MEMBER_STORAGE;
+        if(!operator_id)return ARTICLE_INVALID_QUERY;
+    }
+    if(operator_id && !members_name(operator_id))return ARTICLE_INVALID_QUERY;
+    uint32_t mod_count=moderation_count();
+    uint64_t total=(uint64_t)mod_count+extras_audit_count();
+    if(total>UINT32_MAX)return ARTICLE_STORAGE;
+    if(start>total)return ARTICLE_INVALID_CURSOR;
+    uint32_t id=start?start:(uint32_t)total;
+    out->start=id;out->article=article;out->actor=operator_id;
+    int admin=moderation_admin(user);
+    for(unsigned scanned=0;id && out->count<8 && scanned<256;id--,scanned++) {
+        ModerationEntry entry={0};uint32_t mod_sequence=0;
+        if(!extras_audit_entry(id,&entry,&mod_sequence))return ARTICLE_EXTRAS_STORAGE;
+        if(mod_sequence && (mod_sequence>mod_count || !moderation_entry(mod_sequence,&entry)))
+            return ARTICLE_MODERATION_STORAGE;
+        if(!mod_sequence) {
+            ArticleMetadata metadata;
+            entry.board=article_repository_find(entry.target,&metadata)?metadata.board:0;
+        }
+        int article_event=entry.kind=='M' || entry.kind=='D' || entry.kind=='T' || entry.kind=='A';
+        if(!admin && (!article_event || !catalog_sigop(entry.board,user)))continue;
+        if(article_event && !catalog_read(entry.board,user))continue;
+        if(article && (!article_event || entry.target!=article))continue;
+        if(operator_id && entry.actor!=operator_id)continue;
+        ArticleAuditRow *row=&out->rows[out->count];
+        switch(entry.kind) {
+        case 'M': row->action=entry.enabled?ARTICLE_AUDIT_HIDE:ARTICLE_AUDIT_RESTORE;break;
+        case 'D': row->action=ARTICLE_AUDIT_WITHDRAW;break;
+        case 'T': row->action=ARTICLE_AUDIT_RETITLE;break;
+        case 'A': row->action=ARTICLE_AUDIT_AUTHOR;break;
+        case 'K': row->action=ARTICLE_AUDIT_CHAT_KICK;break;
+        case 'S': row->action=entry.enabled?ARTICLE_AUDIT_SUSPEND:ARTICLE_AUDIT_RESUME;break;
+        default: return mod_sequence?ARTICLE_MODERATION_STORAGE:ARTICLE_EXTRAS_STORAGE;
+        }
+        const char *name=members_name(entry.actor);
+        if(!name || post_length(name,32)>32)return ARTICLE_MEMBER_STORAGE;
+        row->sequence=id;row->actor=entry.actor;row->target=entry.target;row->board=entry.board;
+        row->time=entry.time;strcpy(row->actor_name,name);out->count++;
+    }
+    out->next=id;return ARTICLE_OK;
+}
+
+ArticleOutcome article_audit(const ArticleActor *actor,uint32_t current_board,uint32_t start,
+                             uint32_t article,uint32_t actor_id,const char *actor_name,ArticleAuditPage *out) {
+    if(!out)return ARTICLE_INVALID_READ;
+    memset(out,0,sizeof(*out));
+    policy_context(actor?actor->board_grants:NULL);
+    ArticleOutcome result=audit_page(actor,current_board,start,article,actor_id,actor_name,out);
+    policy_context(NULL);
+    if(result!=ARTICLE_OK)memset(out,0,sizeof(*out));
+    return result;
+}
+
 static ArticleOutcome authorize(const ArticleActor *actor,uint32_t board,uint32_t id) {
     ArticleOutcome result=health();
     if(result!=ARTICLE_OK)return result;
