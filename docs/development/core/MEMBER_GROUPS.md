@@ -4,6 +4,7 @@ Baseline: main `c9fff908b128c30cb4e2a485b181ed02e36a7e7e` (PR #78).
 This LN-23/24 slice extracts GROUP/UNGROUP. GROUPMOVE, BOARDGROUP recovery,
 SIGOP assignment and all other account/board operations retain their existing
 implementations. There is no new public command, privilege or storage format.
+The later [bulk migration slice](MEMBER_GROUP_MOVE.md) extracts GROUPMOVE.
 The next [account lifecycle slice](MEMBER_LIFECYCLE.md) extracts terminal account transitions.
 
 ## Authority and dependencies

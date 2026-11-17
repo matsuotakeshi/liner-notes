@@ -43,8 +43,24 @@ def run(binary,ctl):
    c.send(b'\\\nLunch Mixed\n');assert c.line().endswith(b'MEMO SAVED')
    c.send(b'd\n');until(c,b'CALL DELIVERED 1');until(a,b'CHAT SYSOP CALL')
    c.send(b'//\n');until(c,b'CHAT CLOSED')
+   unchanged=m.stat().st_size
+   assert cmd(c,'GROUPMOVE 100 99 CONFIRM')==b'ERR admin required'
+   assert cmd(a,'GROUPMOVE 100 100 CONFIRM')==b'ERR rights syntax'
+   assert m.stat().st_size==unchanged
+   assert cmd(g,'RIGHTS').startswith(b'RIGHTS 3 ')  # denied requests do not revoke peers
    assert cmd(a,'GROUP 2 100').startswith(b'RIGHTS');c.close()
-   assert cmd(a,'GROUPMOVE 100 99 CONFIRM')==b'GROUP MOVED'
+   duplicate=Client(s.port)
+   try:
+    auth(duplicate,'admin')
+    assert cmd(a,'GROUPMOVE 100 99 CONFIRM')==b'GROUP MOVED'
+    assert g.line()==b'ERR session revoked'  # even a member outside the source group
+    assert duplicate.line()==b'ERR session revoked'  # only the issuing connection survives
+    assert cmd(a,'RIGHTS').startswith(b'RIGHTS 1 ')
+    unchanged=m.stat().st_size
+    assert cmd(a,'GROUPMOVE 100 99 CONFIRM')==b'GROUP MOVED'  # empty source still commits
+    assert m.stat().st_size>unchanged
+    assert cmd(a,'RIGHTS').startswith(b'RIGHTS 1 ')
+   finally:duplicate.close()
    g.close();g=Client(s.port);auth(g,'bob');c=Client(s.port);auth(c,'alice')
    assert b'GROUPS 99 ' in cmd(c,'RIGHTS')
    assert cmd(a,'FILEBOARDSET -|member|member')==b'FILEBOARD UPDATED'

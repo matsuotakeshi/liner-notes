@@ -184,6 +184,21 @@ MemberOutcome member_core_group(const MemberActor *actor,uint32_t board,uint32_t
     return MEMBER_CORE_OK;
 }
 
+MemberOutcome member_core_group_move(const MemberActor *actor,unsigned from,unsigned to,MemberGroupMove *out) {
+    if(!out)return MEMBER_CORE_INVALID;
+    memset(out,0,sizeof(*out));
+    MemberOutcome result=authorize_member_admin(actor);
+    if(result!=MEMBER_CORE_OK)return result;
+    if(!from || from>100 || !to || to>100 || from==to)return MEMBER_CORE_RIGHTS_INVALID;
+    uint32_t total=members_count();
+    if(total>MEMBER_MAX)return MEMBER_CORE_STORAGE;
+    int saved=members_group_move(actor->user,from,to);
+    if(saved!=1)return saved<0?MEMBER_CORE_STORAGE:MEMBER_CORE_RIGHTS_INVALID;
+    for(uint32_t user=1;user<=total;user++)if(members_name(user))moderation_credentials_changed(user);
+    out->through=total;out->actor_epoch=moderation_epoch(actor->user);
+    return MEMBER_CORE_OK;
+}
+
 MemberOutcome member_core_remove(const MemberActor *actor,uint32_t target,unsigned kind,MemberChange *out) {
     if(!out)return MEMBER_CORE_INVALID;
     memset(out,0,sizeof(*out));

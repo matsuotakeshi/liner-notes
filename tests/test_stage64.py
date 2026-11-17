@@ -51,6 +51,9 @@ def run(binary,vaultctl):
    assert cmd(g,'GROUP 3 11')==b'ERR admin required'
    assert cmd(g,'GROUP 1 10')==b'ERR admin required'
    assert cmd(g,'UNGROUP 1 10')==b'ERR admin required'
+   unchanged=members.stat().st_size
+   assert cmd(g,'GROUPMOVE 10 11 CONFIRM')==b'ERR admin required'
+   assert members.stat().st_size==unchanged  # delegated membership is not global migration authority
    assert cmd(b,'BOARD 3').startswith(b'BOARD 3')
    first=post(b,'needle alpha','private article body')
    assert cmd(a,'BOARD 4').startswith(b'BOARD 4');other=post(a,'needle other','other article')
