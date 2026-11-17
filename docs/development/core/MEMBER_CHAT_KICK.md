@@ -63,3 +63,6 @@ connection HELP, were reviewed against runtime and persistence code. User behavi
 is unchanged; the stable manual/version is not advanced. CHANGELOG and reviewed
 source digests are updated. Canonical generation/link/search/offline validation
 runs separately. No production access, service changes, deployment or release.
+
+The next [chat settings slice](MEMBER_CHAT_SETTINGS.md) separates personal
+receive/mute controls and their structured storage boundary.

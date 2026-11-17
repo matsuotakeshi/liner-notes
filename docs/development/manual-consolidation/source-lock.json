@@ -53,13 +53,13 @@
   "scripts/serial_connector.py": "3de6ad32005c5dff9b474d8f550a534232d88f4be73b59b5dcfc15cc11d0e670",
   "scripts/transfer_spool.py": "f7c590b73368c330da611d8ce41f0fd6fe5d8ad3b3e9ae9165e258d1e501db46",
   "scripts/vault_zmodem.py": "ace554ea5b6ab8d479ec39ad7daf7f5f7f34ca34ba13d5b9a73b115a0d63ef15",
-  "src/board.c": "6f86949dbecbafaca58243745e2c6157053ebcffe2c41e84f9b9d99a7b792937",
+  "src/board.c": "0eaedae91d5b3b2d6ac8ddad0af67d32f5db9089aa1ba74fc28eb8b27acd9812",
   "src/board_link.inc": "95a85be0a6ca2d77380775b25befb51a72971908d266c6b72f76fc7ca94e1d4a",
   "src/board_policy.c": "0169bc17649ddc63599b43ca7ae49f6c1c756dac417bd030a79398229414165b",
   "src/catalog.c": "c96bab1f3042b7685cc27df9206ebfd63ad2c79b06ca92d3dd1ca219a0e2a361",
   "src/classic_commands.inc": "f39ecfe79522d5e05c7f5def00b0c05c1f9a68879288e88e08013d709eb08a9a",
   "src/doors.c": "560f9380f2623d8085e8e6edf8319a738e2aeaeff9461336760f56527c66bb04",
-  "src/members.c": "ede8f3eede2bd71ded85d02fc7aa05a0f77fab30c66596ef1b724d60f82f288f",
+  "src/members.c": "f0924ae6c2b72ab9cf33860c7f28e0be95b5c0401be4d6683fdf8f7c8866adbc",
   "src/profile_store.c": "9bd14cb1a44b9e117fb9465d036f2d5417bca8188a136a9162f91f8b46f33e2a",
   "src/runtime.c": "826887e0c17a1733b43d938c1469d28023417ead325c0ef819eaec1a6d9a375e",
   "src/runtime_limits.h": "82de34913914d0f81874789d473928e044225772c4db9d656bceac03920219a8",
@@ -149,6 +149,8 @@
   "src/article_core.c": "36eb515cd8ba3e94d4278586c2e02d28c1c18e4fd3279cc2058677f43032559c",
   "src/article_core.h": "6a1104692df4002322e23a3eec24ccfc3dc5552a8af22c43fdf92a6d349839d3",
   "src/article_repository.h": "29a1e2787c9c8ba534f01c53b6841a3f473f44f0fdb81c488b682b3b6545975a",
-  "src/member_core.c": "917e6aa07dac9de5ec83bdf8891e414ef25402da8467dc93c4246c0b8c045d8a",
-  "src/member_core.h": "ef6b793e0bc67833af3e4cea7d6f38332fe31610b3e7b444d61036c3b40acb69"
+  "src/member_core.c": "6b03449f77be8e835541af05eced9f08ae76fb4e12018b8216b863b7b35665ba",
+  "src/member_core.h": "3151d4bd66d8ff70888ea7a704c92ad33f8bc51927731fd582172f196f95d4e1",
+  "src/members.h": "b860c0aaf4ea15e027c8517758e161e3ae5ab74ad2194aec0982405f4f56d87d",
+  "src/chat_preferences.h": "5ccd981f5282ab0e0161d923fba6935b543136e3fad5dacf78f91bba3859bdc0"
 }
