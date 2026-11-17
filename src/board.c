@@ -657,8 +657,10 @@ static void mail_result(const BoardRequest *q,MailOutcome result,BoardResult *r)
     }
 }
 static void mail_execute(const BoardRequest *q,BoardResult *r) {
-    if((q->action=='S' || q->action=='W') && strlen(q->body)>ln_limit("BODY",BOARD_BODY)) { strcpy(r->text,"ERR body limit\r\n");return; }
+    /* Preserve the completion kind even on quota refusal so a failed send
+     * returns to the editor with its unsent text and draft revision intact. */
     r->mail_action=q->action;
+    if((q->action=='S' || q->action=='W') && strlen(q->body)>ln_limit("BODY",BOARD_BODY)) { strcpy(r->text,"ERR body limit\r\n");return; }
     MailActor actor={q->user,q->user_epoch};
     if(mailbox_broken()) { snprintf(r->text,sizeof(r->text),"%s",mail_text(q,MSG_MAIL_STORAGE,"MAIL ERROR storage\r\n"));return; }
     uint32_t id=q->number;

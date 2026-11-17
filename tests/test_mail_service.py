@@ -69,8 +69,10 @@ def run(binary):
                 # Existing content remains resumable, but new writes obey the
                 # current quota without consuming the durable draft on refusal.
                 assert cmd(alice, "MAIL RESUME").startswith(b"MAIL DRAFT ")
-                assert cmd(alice, ".") == b"ERR body limit"
-                assert cmd(alice, "/SAVE") == b"ERR body limit"
+                response = cmd(alice, ".")
+                assert response == b"ERR body limit", response
+                response = cmd(alice, "/SAVE")
+                assert response == b"ERR body limit", response
                 assert cmd(alice, "/CANCEL") == b"CANCELLED"
                 assert info(alice) == revision
         finally:

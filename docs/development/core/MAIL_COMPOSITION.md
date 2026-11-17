@@ -93,3 +93,25 @@ retain strict C11/warnings-as-errors and all existing tests. Mail behavior, quot
 and environment loading are unchanged. The correction's local targeted checks
 are supplemental; POSIX/runtime results await the new PR CI commit, not the old
 successful main commit. No CI rerun of the known-bad SHA is requested.
+
+## Quota refusal completion correction
+
+At head 623e05ac03b664c0171a4a0e048175faa73afaec the POSIX builds passed;
+Rocky/Alma Linux compatibility jobs 134048246236 and 134048246184 then failed
+in test_mail_service.py on /SAVE after an over-quota send. mail_execute returned
+ERR body limit before setting mail_action. The session stops editing while send
+is pending and restores it only for an S completion without mail_id. Consequently
+the quota error failed to restore editing, unlike the other rejected send paths.
+The same early-return ordering existed before the Core extraction.
+
+Set the completion action before the quota guard. Keep quota rejection and the
+existing assertions unchanged; capture actual socket responses in assertion
+messages. The test still checks failed send AND save, cancellation, unchanged
+durable revision, restart and eventual delivery of the retained body.
+
+A local C11/warnings-as-errors harness compiled the actual mail_execute prefix
+from before/after sources: old returned 3 for missing completion kind; corrected
+code returned 0 for both S/W quota rejection and normal paths. Files and result
+are under build/mail-quota-reproduction/. This isolated contract reproduction
+is not a full runtime/socket pass. Socket-test syntax and diff checks passed;
+new hosted CI must execute the full regression. No test was disabled or relaxed.
