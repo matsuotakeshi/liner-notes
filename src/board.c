@@ -224,9 +224,6 @@ int article_repository_body_contains(uint32_t id,const char *query) {
     if(failed || body_read_failed)return -1;
     return strstr(body,query)!=NULL;
 }
-static const char *mail_body(const MailMessage *m) {
-    const char *body=mailbox_body(m);if(mailbox_broken())body_read_failed=1;return body;
-}
 static void display_article_page(const BoardRequest *q,BoardResult *r,int search) {
     ArticleActor actor={q->user,q->user_epoch,q->board_grants};ArticlePage page;
     ArticleOutcome result=search?article_search(&actor,q->board,q->cursor,q->title,&page):
@@ -652,6 +649,7 @@ static void mail_result(const BoardRequest *q,MailOutcome result,BoardResult *r)
     case MAIL_CORE_MODERATION_STORAGE:strcpy(r->text,"ERR moderation storage unavailable\r\n");break;
     case MAIL_CORE_DISABLED:strcpy(r->text,"ERR feature disabled\r\n");break;
     case MAIL_CORE_BODY_LIMIT:strcpy(r->text,"ERR body limit\r\n");break;
+    case MAIL_CORE_BODY_STORAGE:body_read_failed=1;strcpy(r->text,"ERR storage unavailable\r\n");break;
     case MAIL_CORE_STORAGE:snprintf(r->text,sizeof(r->text),"%s",mail_text(q,MSG_MAIL_STORAGE,"MAIL ERROR storage\r\n"));break;
     default:snprintf(r->text,sizeof(r->text),"%s",mail_text(q,MSG_MAIL_UNAVAILABLE,"MAIL ERROR unavailable\r\n"));break;
     }
@@ -712,39 +710,31 @@ static void mail_execute(const BoardRequest *q,BoardResult *r) {
         snprintf(r->text,sizeof(r->text),"%s",mail_text(q,MSG_MAIL_EDIT,"MAIL EDIT end with . or /CANCEL\r\n"));return;
     }
     if(q->action=='L') {
-        if(q->number>5 || q->cursor>CONTENT_ID_MAX || (q->number==4 && !extra_text(q->title,80,0)))goto unavailable;
         uint64_t since=0;if(q->number==5 && (q->until?(since=q->since,0):!date_filter(q->title,&since)))goto unavailable;
-        size_t pos=(size_t)snprintf(r->text,sizeof(r->text),mail_text(q,MSG_MAIL_LIST,"MAIL LIST UNREAD %u\r\n"),mailbox_unread(q->user));unsigned shown=0;
-        if(q->number==4)pos=(size_t)snprintf(r->text,sizeof(r->text),mail_text(q,MSG_MAIL_SEARCH,"MAIL SEARCH %s UNREAD %u\r\n"),q->title,mailbox_unread(q->user));
-        for(uint32_t i=q->cursor+1;i<=mailbox_count();i++) {
-            if(q->number==4) { i=mailbox_search_next(i,q->title);if(!i)break; }
-            const MailMessage *m=mailbox_get(i,q->user);if(!m)continue;
-            if((q->number==1 && m->sender!=q->user) || (q->number==2 && (m->recipient!=q->user || m->read)) || (q->number==3 && m->recipient!=q->user))continue;
-            if(q->number==5 && (m->recipient!=q->user || m->time<since || (q->until && m->time>q->until)))continue;
-            if(q->number==4 && !strstr(mail_body(m),q->title) && !strstr(m->title,q->title))continue;
-            if(shown==8) { r->mail_next=i-1;break; }
-            pos+=(size_t)snprintf(r->text+pos,sizeof(r->text)-pos,mail_text(q,MSG_MAIL_ROW,"MAIL ROW %u %s %s %u %s\r\n"),m->id,(m->sender?members_name(m->sender):"guest"),members_name(m->recipient),(unsigned)m->read,m->title);shown++;
+        MailQuery query={(MailListMode)q->number,q->cursor,q->title,since,q->until};MailPage page;
+        MailOutcome result=mail_core_list(&actor,&query,&page);
+        if(result!=MAIL_CORE_OK) { mail_result(q,result,r);return; }
+        size_t pos=(size_t)snprintf(r->text,sizeof(r->text),mail_text(q,MSG_MAIL_LIST,"MAIL LIST UNREAD %u\r\n"),page.unread);
+        if(q->number==4)pos=(size_t)snprintf(r->text,sizeof(r->text),mail_text(q,MSG_MAIL_SEARCH,"MAIL SEARCH %s UNREAD %u\r\n"),q->title,page.unread);
+        for(unsigned i=0;i<page.count;i++) {
+            const MailSummary *m=&page.rows[i];
+            pos+=(size_t)snprintf(r->text+pos,sizeof(r->text)-pos,mail_text(q,MSG_MAIL_ROW,"MAIL ROW %u %s %s %u %s\r\n"),m->id,m->from,m->to,(unsigned)m->read,m->title);
         }
+        r->mail_next=page.next;
         snprintf(r->text+pos,sizeof(r->text)-pos,mail_text(q,MSG_MAIL_END,"MAIL END NEXT %u\r\n"),r->mail_next);return;
     }
-    if(q->action=='f') {
-        uint32_t total=mailbox_count(),i=q->cursor;if(q->descending && i>total)i=total;
-        for(;i && i<=total;i=q->descending?i-1:i+1)if(mailbox_get(i,q->user)) { BoardRequest next=*q;next.action='R';next.number=i;mail_execute(&next,r);r->sequence=1;r->sequence_next=q->descending?i-1:i<total?i+1:0;return; }
-        r->sequence=1;strcpy(r->text,"MAIL SCAN END\r\n");return;
-    }
-    if(q->action=='N' || q->action=='T') {
-        id=0;for(uint32_t i=1;i<=mailbox_count();i++) {
-            const MailMessage *m=mailbox_get(i,q->user);if(!m)continue;
-            if(q->action=='T')id=i;
-            else if(!m->read && m->recipient==q->user) { id=i;break; }
-        }
-    }
-    if(q->action=='R' || q->action=='N' || q->action=='T') {
-        const MailMessage *m=mailbox_get(id,q->user);if(!m)goto unavailable;
-        if(!mailbox_mark(id,q->user))goto storage;
-        r->mail_id=id;
-        size_t offset=0;for(unsigned i=0;i<m->attachments.count;i++)offset+=mail_files_describe(q->user,m->attachments.ids[i],q->scope,r->text+offset,sizeof(r->text)-offset);
-        snprintf(r->text+offset,sizeof(r->text)-offset,mail_text(q,MSG_MAIL_ITEM,"MAIL ITEM %u FROM %s TO %s READ %u REPLY %u\r\nTITLE %s\r\nBODY\r\n%sMAIL END\r\n"),m->id,(m->sender?members_name(m->sender):"guest"),members_name(m->recipient),(unsigned)m->read,m->parent,m->title,mail_body(m));return;
+    if(q->action=='R' || q->action=='N' || q->action=='T' || q->action=='f') {
+        MailReadMode mode=q->action=='R'?MAIL_READ_ID:q->action=='N'?MAIL_READ_UNREAD:q->action=='T'?MAIL_READ_LATEST:MAIL_READ_SEQUENCE;
+        MailRead item;
+        MailOutcome result=mail_core_read(&actor,mode,q->action=='f'?q->cursor:id,!!q->descending,&item,r->draft_body,sizeof(r->draft_body));
+        if(result!=MAIL_CORE_OK) { mail_result(q,result,r);return; }
+        r->sequence=item.sequence;r->sequence_next=item.next;
+        if(item.sequence && !item.message.id) { strcpy(r->text,"MAIL SCAN END\r\n");return; }
+        if(q->action=='f')r->mail_action='R';
+        r->mail_id=item.message.id;
+        const MailSummary *m=&item.message;
+        size_t offset=0;for(unsigned i=0;i<item.attachments.count;i++)offset+=mail_files_describe(q->user,item.attachments.ids[i],q->scope,r->text+offset,sizeof(r->text)-offset);
+        snprintf(r->text+offset,sizeof(r->text)-offset,mail_text(q,MSG_MAIL_ITEM,"MAIL ITEM %u FROM %s TO %s READ %u REPLY %u\r\nTITLE %s\r\nBODY\r\n%sMAIL END\r\n"),m->id,m->from,m->to,(unsigned)m->read,m->parent,m->title,r->draft_body);return;
     }
     if(q->action=='D') {
         MailOutcome result=mail_core_delete(&actor,id);
@@ -759,7 +749,6 @@ static void mail_execute(const BoardRequest *q,BoardResult *r) {
         snprintf(r->text,sizeof(r->text),mail_text(q,MSG_MAIL_SENT,"MAIL SENT %u\r\n"),id);return;
     }
 unavailable:snprintf(r->text,sizeof(r->text),"%s",mail_text(q,MSG_MAIL_UNAVAILABLE,"MAIL ERROR unavailable\r\n"));return;
-storage:snprintf(r->text,sizeof(r->text),"%s",mail_text(q,MSG_MAIL_STORAGE,"MAIL ERROR storage\r\n"));
 }
 #include "link_schema.h"
 #include "features64.inc"

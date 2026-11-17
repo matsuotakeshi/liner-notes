@@ -7,6 +7,7 @@
 #include "moderation.h"
 #include "app_limits.h"
 #include "runtime_limits.h"
+#include "store_limits.h"
 #include <string.h>
 
 static MailOutcome authorize(const MailActor *actor) {
@@ -141,4 +142,103 @@ MailOutcome mail_core_attachment_select(const MailActor *actor,const MailAttachm
 MailOutcome mail_core_attachment_drop(const MailActor *actor,uint32_t id) {
     MailOutcome result=authorize(actor);if(result!=MAIL_CORE_OK)return result;
     return mail_files_drop(actor->user,id)?MAIL_CORE_OK:MAIL_CORE_UNAVAILABLE;
+}
+
+
+static MailOutcome summary(const MailMessage *m,MailSummary *out) {
+    if(!copy(out->from,sizeof(out->from),m->sender?members_name(m->sender):"guest") ||
+       !copy(out->to,sizeof(out->to),members_name(m->recipient)) ||
+       !copy(out->title,sizeof(out->title),m->title))return MAIL_CORE_STORAGE;
+    out->id=m->id;out->sender=m->sender;out->recipient=m->recipient;
+    out->parent=m->parent;out->time=m->time;out->read=m->read;
+    return MAIL_CORE_OK;
+}
+static int search_text(const char *text) {
+    if(!bounded(text,80) || !*text)return 0;
+    for(const unsigned char *p=(const unsigned char *)text;*p;p++)if(*p<32 || *p==127)return 0;
+    return 1;
+}
+MailOutcome mail_core_list(const MailActor *actor,const MailQuery *query,MailPage *out) {
+    if(!out)return MAIL_CORE_UNAVAILABLE;
+    memset(out,0,sizeof(*out));
+    MailOutcome result=authorize(actor);if(result!=MAIL_CORE_OK)return result;
+    if(!query || query->mode<MAIL_LIST_ALL || query->mode>MAIL_LIST_NEWS || query->cursor>CONTENT_ID_MAX ||
+       (query->mode==MAIL_LIST_SEARCH && !search_text(query->query)))return MAIL_CORE_UNAVAILABLE;
+    uint32_t total=mailbox_count();if(total>CONTENT_ID_MAX)return MAIL_CORE_STORAGE;
+    out->unread=mailbox_unread(actor->user);
+    for(uint32_t i=query->cursor+1;i<=total;i++) {
+        if(query->mode==MAIL_LIST_SEARCH) {
+            uint32_t candidate=mailbox_search_next(i,query->query);
+            if(!candidate)break;
+            if(candidate<i || candidate>total) { result=MAIL_CORE_STORAGE;break; }
+            i=candidate;
+        }
+        const MailMessage *stored=mailbox_get(i,actor->user);if(!stored)continue;
+        MailMessage m=*stored;
+        if((query->mode==MAIL_LIST_SENT && m.sender!=actor->user) ||
+           (query->mode==MAIL_LIST_UNREAD && (m.recipient!=actor->user || m.read)) ||
+           (query->mode==MAIL_LIST_INBOX && m.recipient!=actor->user))continue;
+        if(query->mode==MAIL_LIST_NEWS && (m.recipient!=actor->user || m.time<query->since ||
+           (query->until && m.time>query->until)))continue;
+        if(query->mode==MAIL_LIST_SEARCH) {
+            const char *body=mailbox_body(&m);
+            if(mailbox_broken() || !body) { result=MAIL_CORE_BODY_STORAGE;break; }
+            if(!strstr(body,query->query) && !strstr(m.title,query->query))continue;
+        }
+        if(out->count==8) { out->next=i-1;break; }
+        result=summary(&m,&out->rows[out->count]);if(result!=MAIL_CORE_OK)break;
+        out->count++;
+    }
+    if(result==MAIL_CORE_OK && mailbox_broken())result=MAIL_CORE_STORAGE;
+    if(result!=MAIL_CORE_OK)memset(out,0,sizeof(*out));
+    return result;
+}
+MailOutcome mail_core_read(const MailActor *actor,MailReadMode mode,uint32_t start,int descending,
+                          MailRead *out,char *body,size_t capacity) {
+    if(body && capacity)memset(body,0,capacity);
+    if(!out)return MAIL_CORE_UNAVAILABLE;
+    memset(out,0,sizeof(*out));
+    MailOutcome result=authorize(actor);if(result!=MAIL_CORE_OK)return result;
+    if(mode<MAIL_READ_ID || mode>MAIL_READ_SEQUENCE || (descending!=0 && descending!=1) ||
+       !body || !capacity)return MAIL_CORE_UNAVAILABLE;
+    uint32_t total=mailbox_count(),id=start;
+    if(total>CONTENT_ID_MAX)return MAIL_CORE_STORAGE;
+    if(mode==MAIL_READ_UNREAD || mode==MAIL_READ_LATEST) {
+        id=0;
+        for(uint32_t i=1;i<=total;i++) {
+            const MailMessage *m=mailbox_get(i,actor->user);if(!m)continue;
+            if(mode==MAIL_READ_LATEST)id=i;
+            else if(!m->read && m->recipient==actor->user) { id=i;break; }
+        }
+    } else if(mode==MAIL_READ_SEQUENCE) {
+        uint32_t i=start;if(descending && i>total)i=total;
+        id=0;
+        for(;i && i<=total;i=descending?i-1:i+1)
+            if(mailbox_get(i,actor->user)) { id=i;break; }
+        if(!id) {
+            if(mailbox_broken())return MAIL_CORE_STORAGE;
+            out->sequence=1;return MAIL_CORE_OK;
+        }
+    }
+    const MailMessage *stored=mailbox_get(id,actor->user);if(!stored)return store_failure();
+    MailMessage m=*stored;
+    if(m.attachments.count>MAIL_ATTACH_MAX || m.body_size>CONTENT_BODY)return MAIL_CORE_STORAGE;
+    if((size_t)m.body_size>=capacity)return MAIL_CORE_UNAVAILABLE;
+    if(!mailbox_mark(id,actor->user))return MAIL_CORE_STORAGE;
+    /* Marking may invalidate cached metadata; do not reuse the borrowed row. */
+    stored=mailbox_get(id,actor->user);
+    if(!stored)return MAIL_CORE_STORAGE;
+    m=*stored;
+    result=summary(&m,&out->message);
+    if(result==MAIL_CORE_OK) {
+        const char *value=mailbox_body(&m);
+        if(mailbox_broken() || !value)result=MAIL_CORE_BODY_STORAGE;
+        else if(!copy(body,capacity,value))result=MAIL_CORE_STORAGE;
+    }
+    if(result!=MAIL_CORE_OK) {
+        memset(out,0,sizeof(*out));memset(body,0,capacity);return result;
+    }
+    out->attachments=m.attachments;
+    if(mode==MAIL_READ_SEQUENCE) { out->sequence=1;out->next=descending?id-1:id<total?id+1:0; }
+    return MAIL_CORE_OK;
 }
