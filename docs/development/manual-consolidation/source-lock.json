@@ -1,6 +1,6 @@
 {
   "LICENSE": "fb981668c18a279e285fc4d83fba1e836cc84dd4daa73c9697d3cfd2d8aca6e0",
-  "Makefile": "c3369dce55e993c1b5c11ac49924930c6bbbe7fc7334910041d21baac5270433",
+  "Makefile": "582c08db96650a6033294a5de61998f6f23c1d3ff6dbf1f79698a658e2eede71",
   "boards.example.conf": "4bd1a17ecf3966d3829510e8495a1362fb8b922cd754badccc739f5e5ab0bde8",
   "ci/build-freebsd-package.sh": "4e62899471d1f1a6c44e00a783c1aff771332140704ae778da95a95048474108",
   "debian/changelog": "8f3574a094f5a3677a9a7188e530ecdbdc006138b082b57243ca8441c644114d",
@@ -56,7 +56,7 @@
   "src/board.c": "341378e56381fe2cbbe3bd4245df651672e35613cfc071db0f9137eed29bcc5e",
   "src/board_link.inc": "95a85be0a6ca2d77380775b25befb51a72971908d266c6b72f76fc7ca94e1d4a",
   "src/board_policy.c": "0169bc17649ddc63599b43ca7ae49f6c1c756dac417bd030a79398229414165b",
-  "src/catalog.c": "c96bab1f3042b7685cc27df9206ebfd63ad2c79b06ca92d3dd1ca219a0e2a361",
+  "src/catalog.c": "49ed8eff1efe2ace300b92d20e1c91491523ba6e896bed270457afbccd865d68",
   "src/classic_commands.inc": "f39ecfe79522d5e05c7f5def00b0c05c1f9a68879288e88e08013d709eb08a9a",
   "src/doors.c": "560f9380f2623d8085e8e6edf8319a738e2aeaeff9461336760f56527c66bb04",
   "src/members.c": "f0924ae6c2b72ab9cf33860c7f28e0be95b5c0401be4d6683fdf8f7c8866adbc",
@@ -162,5 +162,8 @@
   "src/mail_files.c": "1862da20d276b1c9c369e2441fa189439785858522981e67c15510cb3b633cc6",
   "src/mail_files.h": "10082134d5a8cbf96df27ad7641a4baf5b972f33133e739eed99b911db7ee531",
   "src/member_settings_repository.h": "00d652c65d31166ae5105f1df5214b7b0d7c53b6b6d2f6dc038c33abf2ff3f13",
-  "src/member_settings_store.inc": "85fe1336fca4d63d2d326b222dc941d5281cfcf372db12f9c46dda1426ae1d15"
+  "src/member_settings_store.inc": "85fe1336fca4d63d2d326b222dc941d5281cfcf372db12f9c46dda1426ae1d15",
+  "src/catalog.h": "5c0c6f1f32460dd62f5f87d5f73fc2df96abe645182dc19369a151dd9a6e4e44",
+  "src/catalog_core.c": "79ee4ef1fd193416a8795dc8e80dc3878574768de725b5fb02d28931e454c197",
+  "src/catalog_core.h": "d3dbaa84b96da50629147c1d43e81859f9774b72a8f48c9f1b1421cf8b07ce55"
 }

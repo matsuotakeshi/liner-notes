@@ -172,11 +172,12 @@ int catalog_role_set(uint32_t id,uint32_t user,uint32_t actor,uint32_t *previous
     if(!dj_append(&roles,&row))return -1;
     return role_apply(NULL,&row)?1:-1;
 }
-void catalog_roles(uint32_t user,char *out,size_t size) {
-    size_t used=(size_t)snprintf(out,size,"SIGOPS\r\n");
-    for(uint32_t id=1;id<=CATALOG_MAX;id++)if(catalog_exists(id) && (moderation_admin(user) || catalog_sigop(id,user)))
-        used+=(size_t)snprintf(out+used,size-used,"SIGOP %u %u\r\n",id,sigops[id]);
-    snprintf(out+used,size-used,"END SIGOPS\r\n");
+int catalog_storage_broken(void) { return changes.broken || roles.broken; }
+int catalog_role_get(uint32_t board,uint32_t *user) {
+    if(!user)return 0;
+    *user=0;
+    if(catalog_storage_broken() || !catalog_exists(board))return 0;
+    *user=sigops[board];return 1;
 }
 int catalog_open_changes(const char *base) {
     char path[4096];int n=snprintf(path,sizeof(path),"%s.catalog",base);
@@ -199,25 +200,40 @@ int catalog_set(uint32_t actor,const char *text,uint32_t *id) {
     if(!dj_append(&changes,&row))return -1;
     return change_apply(NULL,&row)?1:-1;
 }
-void catalog_settings(uint32_t id,char *out,size_t size) {
-    if(!catalog_exists(id)) { snprintf(out,size,"ERR no board\r\n");return; }
-    Board *b=&boards[id];snprintf(out,size,"BOARDSETTING %u|%u|%s|%s|%s|%s\r\n",id,b->parent,b->read_text,b->write_text,b->title,b->description);
+int catalog_config(uint32_t id,CatalogConfig *out) {
+    if(!out)return 0;
+    memset(out,0,sizeof(*out));
+    if(catalog_storage_broken() || !catalog_exists(id))return 0;
+    const Board *b=&boards[id];out->id=id;out->parent=b->parent;
+    strcpy(out->read_acl,b->read_text);strcpy(out->write_acl,b->write_text);
+    strcpy(out->title,b->title);strcpy(out->description,b->description);return 1;
 }
-void catalog_history(uint32_t user,uint32_t cursor,char *out,size_t size) {
-    if(changes.broken) { snprintf(out,size,"ERR catalog storage\r\n");return; }
-    uint32_t index=cursor?cursor-1:changes.sequence;
-    if(index>changes.sequence) { snprintf(out,size,"ERR command\r\n");return; }
-    size_t used=(size_t)snprintf(out,size,"BOARDLOG\r\n");unsigned shown=0,scanned=0;
-    while(index && shown<8 && scanned++<256) {
-        unsigned char bytes[DJ_ROW];
-        if(DJ_SEEK(changes.fd,8+(int64_t)(index-1)*DJ_ROW,SEEK_SET)<0 || dj_io(changes.fd,bytes,DJ_ROW,0)!=DJ_ROW || dj_sum(bytes)!=dj_get(bytes+DJ_ROW-4) || dj_get(bytes+4)!=index || dj_get(bytes+24)>1023) {
-            changes.broken=1;snprintf(out,size,"ERR catalog storage\r\n");return;
-        }
-        if(!catalog_manage(dj_get(bytes+12),user)) { index--;continue; }
-        shown++;char text[1024];uint32_t len=dj_get(bytes+24);memcpy(text,bytes+28,len);text[len]=0;
-        used+=(size_t)snprintf(out+used,size-used,"BOARDCHANGE %u %u %llu %s\r\n",index,dj_get(bytes+8),(unsigned long long)(dj_get(bytes+16)|((uint64_t)dj_get(bytes+20)<<32)),text);index--;
+int catalog_decode(const char *specification,CatalogConfig *out) {
+    if(!out)return 0;
+    memset(out,0,sizeof(*out));
+    uint32_t id=0;
+    if(!specification || !update(specification,0,&id))return 0;
+    char copy[1024];strcpy(copy,specification);char *part[6]={copy};
+    for(unsigned i=1;i<6;i++) { char *sep=strchr(part[i-1],'|');*sep=0;part[i]=sep+1; }
+    out->id=id;out->parent=(uint32_t)strtoul(part[1],NULL,10);
+    strcpy(out->read_acl,part[2]);strcpy(out->write_acl,part[3]);
+    strcpy(out->title,part[4]);strcpy(out->description,part[5]);return 1;
+}
+uint32_t catalog_change_count(void) { return changes.sequence; }
+int catalog_change_get(uint32_t sequence,CatalogChange *out) {
+    if(!out)return 0;
+    memset(out,0,sizeof(*out));
+    if(catalog_storage_broken() || !sequence || sequence>changes.sequence)return 0;
+    unsigned char bytes[DJ_ROW];
+    if(DJ_SEEK(changes.fd,8+(int64_t)(sequence-1)*DJ_ROW,SEEK_SET)<0 ||
+       dj_io(changes.fd,bytes,DJ_ROW,0)!=DJ_ROW || dj_sum(bytes)!=dj_get(bytes+DJ_ROW-4) ||
+       dj_get(bytes+4)!=sequence || dj_get(bytes+24)>1023 || bytes[0]!='B') {
+        changes.broken=1;return 0;
     }
-    snprintf(out+used,size-used,"END NEXT %u\r\n",index?index+1:0);
+    out->sequence=sequence;out->actor=dj_get(bytes+8);out->board=dj_get(bytes+12);
+    out->time=dj_get(bytes+16)|((uint64_t)dj_get(bytes+20)<<32);
+    uint32_t len=dj_get(bytes+24);memcpy(out->specification,bytes+28,len);
+    out->specification[len]=0;return 1;
 }
 
 int catalog_replace_group(uint32_t b,uint32_t actor,unsigned from,unsigned to) {
