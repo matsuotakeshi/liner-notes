@@ -346,7 +346,7 @@ check: test-article-core
 # Account Core tests: no terminal, credentials or live database.
 .PHONY: test-member-core
 runtime test-adapters: src/member_core.h
-test-member-core: tests/test_member_core.c src/member_core.c src/member_core.h src/catalog.h src/members.h src/moderation.h src/extras.h src/app_limits.h src/content_limits.h src/chat_preferences.h
+test-member-core: tests/test_member_core.c src/member_core.c src/member_core.h src/profile_store.h src/catalog.h src/members.h src/moderation.h src/extras.h src/app_limits.h src/content_limits.h src/chat_preferences.h
 	$(CC) $(CPPFLAGS) $(CFLAGS) $(LDFLAGS) -std=c11 -Wall -Wextra -Werror -Isrc tests/test_member_core.c src/member_core.c -o test-member-core
 	./test-member-core
 check: test-member-core

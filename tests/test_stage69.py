@@ -75,8 +75,15 @@ def run(binary,ctl):
   s=start(True);a,g,u=[Client(s.port) for _ in range(3)]
   try:
    for c,name in zip((a,g,u),('admin','sigop','alice')):auth(c,name)
+   journal=Path(str(users)+'.profile');unchanged=journal.stat().st_size
    assert cmd(u,'PROFILESET ADDRESS changed').startswith(b'ERR profile administrator')
    assert cmd(u,'PROFILESET BIRTHDAY 2001-01-02').startswith(b'ERR profile administrator')
+   assert journal.stat().st_size==unchanged
+   assert cmd(u,'PROFILEVIS BIRTHDAY MONTHDAY')==b'PROFILE SAVED'
+   data=rows(g,'PROFILEID 3',b'END PROFILE')
+   assert b'BIRTHDAY 01-02' in data and not any(b'2000-01-02' in row for row in data)
+   assert cmd(u,'PROFILEVIS BIRTHDAY PRIVATE')==b'PROFILE SAVED'
+   assert not any(row.startswith(b'BIRTHDAY ') for row in rows(g,'PROFILEID 3',b'END PROFILE'))
    assert cmd(u,'PROFILEFIND GROUP 10')==b'ERR profile search permission'
    assert cmd(g,'PROFILEFIND ADDRESS private')==b'ERR profile search permission'
    assert any(b'alice' in x for x in rows(g,'PROFILEFIND GROUP 10'))

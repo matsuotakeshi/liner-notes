@@ -12,7 +12,8 @@ typedef enum { MEMBER_CORE_OK, MEMBER_CORE_REVOKED, MEMBER_CORE_STORAGE,
                MEMBER_CORE_MODERATION_STORAGE, MEMBER_CORE_ADMIN_REQUIRED,
                MEMBER_CORE_NOT_FOUND, MEMBER_CORE_INVALID, MEMBER_CORE_PROTECTED,
                MEMBER_CORE_EXTRAS_STORAGE, MEMBER_CORE_MODERATION_UNCERTAIN,
-               MEMBER_CORE_LOGIN_REQUIRED, MEMBER_CORE_RIGHTS_INVALID, MEMBER_CORE_STATE, MEMBER_CORE_PASSWORD, MEMBER_CORE_PREFERENCES } MemberOutcome;
+               MEMBER_CORE_LOGIN_REQUIRED, MEMBER_CORE_RIGHTS_INVALID, MEMBER_CORE_STATE, MEMBER_CORE_PASSWORD, MEMBER_CORE_PREFERENCES,
+               MEMBER_CORE_PROFILE_TEXT, MEMBER_CORE_PROFILE_ADMINISTRATOR } MemberOutcome;
 typedef enum { MEMBER_ROLE_NONE, MEMBER_ROLE_GUEST, MEMBER_ROLE_MEMBER, MEMBER_ROLE_ADMIN } MemberRole;
 typedef enum { MEMBER_STATE_ACTIVE, MEMBER_STATE_PENDING, MEMBER_STATE_SUSPENDED } MemberState;
 typedef struct { uint32_t id; char name[33]; MemberState state; } MemberSummary;
@@ -109,4 +110,13 @@ MemberOutcome member_core_chat_kick(const MemberActor *,const char *login,Member
  * require an exact 1..32-byte login. Output owns the complete 32-slot snapshot.
  * Failures clear output; settings revisions never alter credential epochs. */
 MemberOutcome member_core_chat_preferences(const MemberActor *,ChatPreferenceAction,const char *login,ChatPreferences *out);
+/* Own profile mutations: no target or caller-provided policy/role flag. Current
+ * actor and live compatibility policy are checked for each write. Text is a
+ * borrowed NUL-terminated string; field validation/UTF-8, durable journal and
+ * audit attribution remain in profile_store. No private text is returned.
+ * Profile fields and the shared buffer use profile_store.h field identifiers.
+ * Visibility excludes the buffer; mode 0=private, 1=members, 2=birthday month/day.
+ * Only successful visibility updates require the adapter's board refresh. */
+MemberOutcome member_core_profile_set(const MemberActor *,unsigned field,const char *text);
+MemberOutcome member_core_profile_visibility(const MemberActor *,unsigned field,unsigned mode);
 #endif
