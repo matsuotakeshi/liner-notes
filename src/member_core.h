@@ -11,7 +11,7 @@ typedef enum { MEMBER_CORE_OK, MEMBER_CORE_REVOKED, MEMBER_CORE_STORAGE,
                MEMBER_CORE_MODERATION_STORAGE, MEMBER_CORE_ADMIN_REQUIRED,
                MEMBER_CORE_NOT_FOUND, MEMBER_CORE_INVALID, MEMBER_CORE_PROTECTED,
                MEMBER_CORE_EXTRAS_STORAGE, MEMBER_CORE_MODERATION_UNCERTAIN,
-               MEMBER_CORE_LOGIN_REQUIRED, MEMBER_CORE_RIGHTS_INVALID, MEMBER_CORE_STATE, MEMBER_CORE_PASSWORD } MemberOutcome;
+               MEMBER_CORE_LOGIN_REQUIRED, MEMBER_CORE_RIGHTS_INVALID, MEMBER_CORE_STATE, MEMBER_CORE_PASSWORD, MEMBER_CORE_PREFERENCES } MemberOutcome;
 typedef enum { MEMBER_ROLE_NONE, MEMBER_ROLE_GUEST, MEMBER_ROLE_MEMBER, MEMBER_ROLE_ADMIN } MemberRole;
 typedef enum { MEMBER_STATE_ACTIVE, MEMBER_STATE_PENDING, MEMBER_STATE_SUSPENDED } MemberState;
 typedef struct { uint32_t id; char name[33]; MemberState state; } MemberSummary;
@@ -75,4 +75,11 @@ MemberOutcome member_core_remove(const MemberActor *,uint32_t target,unsigned ki
 MemberOutcome member_core_reset_check(const MemberActor *,uint32_t target);
 MemberOutcome member_core_reset_password(const MemberActor *,uint32_t target,const char *replacement,MemberChange *out);
 MemberOutcome member_core_password(const MemberActor *,const char *current,const char *replacement,MemberChange *out);
+/* Actor-owned display preferences; no target parameter or credential changes.
+ * present=0 is a successful missing record. Legacy zero dimensions are kept.
+ * Save ignores input.present and returns the persisted snapshot. Inputs/outputs
+ * must not overlap. Store owns auxiliary bounds and duplicate suppression. */
+typedef struct { int present,language,pager,editor; unsigned columns,rows,aux; } MemberPreferences;
+MemberOutcome member_core_preferences(const MemberActor *,MemberPreferences *out);
+MemberOutcome member_core_save_preferences(const MemberActor *,const MemberPreferences *input,MemberPreferences *out);
 #endif

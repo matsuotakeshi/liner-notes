@@ -64,3 +64,6 @@ account HELP. Existing public descriptions remain accurate. CHANGELOG, internal
 contracts and reviewed implementation digests are updated. Canonical manual
 generation, links, search and offline parity are verified separately.
 No production access, deployment or release publication.
+
+The following [Member preferences slice](MEMBER_PREFERENCES.md) extracts
+actor-owned PREFS operations without changing credential epochs.

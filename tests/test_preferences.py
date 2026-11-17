@@ -17,10 +17,14 @@ def run(binary):
             expect(a,'PREFS','PREFS NONE'); expect(a,'PREFS LOAD','PREFS NONE')
             a.send(b'LANG en\n'); assert b'en' in a.line()
             expect(a,'PAGER ON','PAGER ON'); expect(a,'PREFS SAVE','PREFS SAVED en ON')
+            saved_size=users.stat().st_size
             expect(a,'PREFS SAVE','PREFS SAVED en ON')
+            assert users.stat().st_size==saved_size
             expect(b,'PREFS SAVE','PREFS SAVED ja OFF')
             expect(a,'PAGER OFF','PAGER OFF'); expect(a,'PREFS','PREFS STORED en ON')
+            saved_size=users.stat().st_size
             expect(a,'PREFS LOAD','PREFS LOADED en ON'); expect(a,'PAGER','PAGER ON')
+            assert users.stat().st_size==saved_size
             auth(g,'alice'); expect(g,'PAGER','PAGER ON')
             expect(g,'PAGER OFF','PAGER OFF'); expect(g,'PREFS SAVE','PREFS SAVED en OFF')
             expect(a,'PAGER','PAGER ON'); expect(a,'PREFS LOAD','PREFS LOADED en OFF')

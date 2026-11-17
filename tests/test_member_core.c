@@ -20,6 +20,28 @@ static unsigned suspend_calls,durable_writes;
 static int extras_error,commit_ok,changed_flag;
 static unsigned approval_calls,approval_writes,credential_changes;
 static unsigned level_calls,level_writes;
+static MemberPreferences saved_preferences[15];
+static unsigned prefs_reads,prefs_calls,prefs_writes,prefs_user;
+static int prefs_read_failure;
+int members_preferences(uint32_t user,int *language,int *pager) {
+    assert(user && user<15);prefs_reads++;prefs_user=user;
+    if(prefs_read_failure==1) { member_error=1;return 0; }
+    *language=saved_preferences[user].language;*pager=saved_preferences[user].pager;
+    return saved_preferences[user].present;
+}
+void members_ui_preferences(uint32_t user,int *editor,unsigned *columns,unsigned *rows,unsigned *aux) {
+    assert(user && user<15);MemberPreferences *p=&saved_preferences[user];
+    *editor=p->editor;*columns=p->columns;*rows=p->rows;*aux=p->aux;
+    if(prefs_read_failure==2)member_error=1;
+}
+int members_save_ui_preferences(uint32_t user,int language,int pager,int editor,unsigned columns,unsigned rows,unsigned aux) {
+    assert(user && user<15 && members_active(user));prefs_calls++;prefs_user=user;
+    if(language<0 || language>1 || pager<0 || pager>1 || editor<0 || editor>1 || columns<20 || columns>240 || rows<5 || rows>100 || aux>15)return 0;
+    MemberPreferences value={1,language,pager,editor,columns,rows,aux};
+    if(!memcmp(&saved_preferences[user],&value,sizeof(value)))return 1;
+    if(!commit_ok) { member_error=1;return 0; }
+    saved_preferences[user]=value;prefs_writes++;return 1;
+}
 static unsigned password_calls,reset_calls,password_writes;
 static const char *test_current="test-current-password",*test_new="test-new-password";
 int members_password(uint32_t user,const char *current,const char *replacement) {
@@ -128,6 +150,7 @@ int moderation_admin(uint32_t id) { return id==1 && admin; }
 static MemberActor reset(void) {
     count=14;epoch=9;admin=1;member_error=moderation_error=read_failure=0;
     count_calls=target_reads=0;approval_calls=approval_writes=credential_changes=0;
+    memset(saved_preferences,0,sizeof(saved_preferences));prefs_reads=prefs_calls=prefs_writes=prefs_user=0;prefs_read_failure=0;
     level_calls=level_writes=0;password_calls=reset_calls=password_writes=0;remove_calls=remove_writes=removed_kind=0;memset(group_words,0,sizeof(group_words));
     group_calls=group_writes=delegation_checks=group_checks=0;sigop_enabled=group_enabled=1;seen_board=seen_user=0;
     for(unsigned i=0;i<15;i++)levels[i]=2;
@@ -758,6 +781,84 @@ static void password_failures(void) {
     }
     puts("PASS: password null/bounds contracts, revoked actors and failed stores without epoch publication");
 }
+static void preference_roundtrip(void) {
+    MemberActor actor=reset();actor.user=2;MemberPreferences out;
+    assert(member_core_preferences(&actor,&out)==MEMBER_CORE_OK);cleared(&out,sizeof(out));
+    MemberPreferences input={0,1,1,1,100,35,15};
+    assert(member_core_save_preferences(&actor,&input,&out)==MEMBER_CORE_OK);
+    assert(out.present && out.language==1 && out.pager==1 && out.editor==1 && out.columns==100 && out.rows==35 && out.aux==15);
+    assert(prefs_user==2 && prefs_writes==1 && !saved_preferences[1].present && !input.present);
+    assert(member_core_save_preferences(&actor,&input,&out)==MEMBER_CORE_OK && prefs_writes==1);
+    input.language=0;input.pager=0;input.editor=0;input.columns=20;input.rows=5;input.aux=0;
+    assert(member_core_save_preferences(&actor,&input,&out)==MEMBER_CORE_OK && prefs_writes==2);
+    assert(out.columns==20 && out.rows==5 && !out.language && !out.pager && !out.editor && !out.aux);
+    input.columns=240;input.rows=100;input.aux=15;
+    assert(member_core_save_preferences(&actor,&input,&out)==MEMBER_CORE_OK && out.columns==240 && out.rows==100);
+    MemberPreferences copy=out;saved_preferences[2].rows=25;assert(out.rows==copy.rows);
+    actor.user=4;
+    assert(member_core_preferences(&actor,&out)==MEMBER_CORE_OK);cleared(&out,sizeof(out));
+    saved_preferences[4]=(MemberPreferences){1,1,0,0,0,0,0};
+    assert(member_core_preferences(&actor,&out)==MEMBER_CORE_OK && out.present && out.language==1 && !out.columns && !out.rows);
+    assert(!credential_changes && moderation_epoch(2)==9 && moderation_epoch(4)==9);
+    puts("PASS: own preference roundtrip, missing/legacy records, full fields, bounds, no-op and session isolation");
+}
+static void preference_authority(void) {
+    MemberPreferences input={0,0,1,0,80,24,0},out;
+    for(unsigned i=0;i<7;i++) {
+        MemberActor actor=reset();MemberOutcome want=MEMBER_CORE_REVOKED;
+        if(i==0) { actor.user=0;want=MEMBER_CORE_LOGIN_REQUIRED; }
+        else if(i==1)actor.epoch--;
+        else if(i==2)suspended[1]=1;
+        else if(i==3)pending[1]=1;
+        else if(i==4)retired[1]=1;
+        else if(i==5) { member_error=1;want=MEMBER_CORE_STORAGE; }
+        else { moderation_error=1;want=MEMBER_CORE_MODERATION_STORAGE; }
+        memset(&out,0x7f,sizeof(out));
+        assert(member_core_preferences(&actor,&out)==want);cleared(&out,sizeof(out));
+        assert(member_core_save_preferences(&actor,&input,&out)==want);cleared(&out,sizeof(out));
+        assert(!prefs_reads && !prefs_calls && !prefs_writes);
+    }
+    MemberActor actor=reset();actor.user=99;
+    assert(member_core_preferences(&actor,&out)==MEMBER_CORE_REVOKED);
+    assert(member_core_save_preferences(&actor,&input,&out)==MEMBER_CORE_REVOKED);
+    assert(member_core_preferences(NULL,&out)==MEMBER_CORE_LOGIN_REQUIRED);
+    assert(member_core_save_preferences(NULL,&input,&out)==MEMBER_CORE_LOGIN_REQUIRED);
+    assert(member_core_preferences(&actor,NULL)==MEMBER_CORE_INVALID);
+    assert(member_core_save_preferences(&actor,&input,NULL)==MEMBER_CORE_INVALID);
+    assert(!prefs_reads && !prefs_calls);
+    puts("PASS: preferences guest/revoked/deleted actor denial without private data access");
+}
+static void preference_failures(void) {
+    MemberActor actor=reset();MemberPreferences out,input={0,0,0,0,80,24,0};
+    assert(member_core_save_preferences(&actor,NULL,&out)==MEMBER_CORE_PREFERENCES);cleared(&out,sizeof(out));
+    for(int value=-1;value<=2;value+=3) {
+        input.language=value;
+        assert(member_core_save_preferences(&actor,&input,&out)==MEMBER_CORE_PREFERENCES);
+        input.language=0;input.pager=value;
+        assert(member_core_save_preferences(&actor,&input,&out)==MEMBER_CORE_PREFERENCES);
+        input.pager=0;
+    }
+    assert(!prefs_calls);cleared(&out,sizeof(out));
+    for(unsigned i=0;i<7;i++) {
+        input=(MemberPreferences){0,0,0,0,80,24,0};
+        if(i==0)input.editor=-1;else if(i==1)input.editor=2;
+        else if(i==2)input.columns=19;else if(i==3)input.columns=241;
+        else if(i==4)input.rows=4;else if(i==5)input.rows=101;else input.aux=16;
+        assert(member_core_save_preferences(&actor,&input,&out)==MEMBER_CORE_STORAGE);cleared(&out,sizeof(out));
+    }
+    assert(!prefs_writes);
+    actor=reset();input=(MemberPreferences){0,1,1,1,80,24,15};commit_ok=0;
+    assert(member_core_save_preferences(&actor,&input,&out)==MEMBER_CORE_STORAGE);cleared(&out,sizeof(out));
+    assert(!saved_preferences[1].present && !prefs_writes && !credential_changes);
+    for(int failure=1;failure<=2;failure++) {
+        actor=reset();saved_preferences[1]=(MemberPreferences){1,1,1,1,80,24,15};prefs_read_failure=failure;
+        assert(member_core_preferences(&actor,&out)==MEMBER_CORE_STORAGE);cleared(&out,sizeof(out));
+    }
+    actor=reset();prefs_read_failure=2;
+    assert(member_core_save_preferences(&actor,&input,&out)==MEMBER_CORE_STORAGE);cleared(&out,sizeof(out));
+    assert(prefs_writes==1 && saved_preferences[1].present && !credential_changes);
+    puts("PASS: preferences validation, failed writes/reads, cleared output and committed readback failure");
+}
 int main(void) {
     role_tests();directory_tests();denial_tests();failure_tests();
     suspension_tests();suspension_denials();suspension_failures();
@@ -765,5 +866,6 @@ int main(void) {
     rights_queries();rights_failures();level_updates();level_denials();
     group_updates();delegated_groups();group_failures();
     lifecycle_success();lifecycle_denials();lifecycle_failures();
-    password_updates();reset_authority();password_failures();return 0;
+    password_updates();reset_authority();password_failures();
+    preference_roundtrip();preference_authority();preference_failures();return 0;
 }

@@ -242,3 +242,34 @@ MemberOutcome member_core_password(const MemberActor *actor,const char *current,
     out->user=actor->user;out->epoch=moderation_epoch(actor->user);
     return MEMBER_CORE_OK;
 }
+
+static MemberOutcome preferences_read(uint32_t user,MemberPreferences *out) {
+    out->present=members_preferences(user,&out->language,&out->pager);
+    if(out->present)members_ui_preferences(user,&out->editor,&out->columns,&out->rows,&out->aux);
+    MemberOutcome result=members_broken()?MEMBER_CORE_STORAGE:
+                         moderation_broken()?MEMBER_CORE_MODERATION_STORAGE:MEMBER_CORE_OK;
+    if(result!=MEMBER_CORE_OK || !out->present)memset(out,0,sizeof(*out));
+    return result;
+}
+
+MemberOutcome member_core_preferences(const MemberActor *actor,MemberPreferences *out) {
+    if(!out)return MEMBER_CORE_INVALID;
+    memset(out,0,sizeof(*out));
+    MemberOutcome result=authorize(actor,0);
+    if(result!=MEMBER_CORE_OK)return result;
+    if(!actor || !actor->user)return MEMBER_CORE_LOGIN_REQUIRED;
+    return preferences_read(actor->user,out);
+}
+
+MemberOutcome member_core_save_preferences(const MemberActor *actor,const MemberPreferences *input,MemberPreferences *out) {
+    if(!out)return MEMBER_CORE_INVALID;
+    memset(out,0,sizeof(*out));
+    MemberOutcome result=authorize(actor,0);
+    if(result!=MEMBER_CORE_OK)return result;
+    if(!actor || !actor->user)return MEMBER_CORE_LOGIN_REQUIRED;
+    if(!input || input->language<0 || input->language>1 || input->pager<0 || input->pager>1)
+        return MEMBER_CORE_PREFERENCES;
+    if(!members_save_ui_preferences(actor->user,input->language,input->pager,input->editor,input->columns,input->rows,input->aux))
+        return MEMBER_CORE_STORAGE;
+    return preferences_read(actor->user,out);
+}
