@@ -1,6 +1,6 @@
 """Real terminal batch upload and interrupted upload/download wire resumption."""
 from test_zmodem_workflows import spool_contents
-import hashlib,os,pathlib,select,shlex,socket,subprocess,sys,tempfile,time
+import errno,hashlib,os,pathlib,select,shlex,socket,subprocess,sys,tempfile,time
 sys.path.insert(0,str(pathlib.Path(__file__).resolve().parents[1]/'scripts'))
 from test_board import Server
 from test_runtime import Client
@@ -8,6 +8,7 @@ from test_members import auth,PASSWORD
 from test_telnet import Client as Telnet
 from test_zmodem_menu import transfer
 from transfer_connectors import LineConnector
+from posix_locks import file_lock
 
 def interrupt(c,sender,source,name,cut=1400000):
  left,right=socket.socketpair();proc=subprocess.Popen([sender,'--binary','--quiet','--escape','--syslog=off','--']+([name] if isinstance(name,str) else name),cwd=source,stdin=right,stdout=right,stderr=subprocess.DEVNULL);right.close()
@@ -25,6 +26,27 @@ def interrupt(c,sender,source,name,cut=1400000):
   c.close()  # Actual TCP interruption while the runtime helper owns the wire.
  finally:
   left.close();proc.terminate();proc.wait(timeout=5)
+
+def wait_for_partials(spool,names,timeout=30):
+ # The receiver may still be draining buffered data after the TCP interruption.
+ # Keep exact file expectations and wait for its existing lease to be released.
+ deadline=time.monotonic()+timeout;expected=sorted(names);state='not ready'
+ while True:
+  files=sorted(spool.glob('pending-*/data/*'));sizes=[]
+  try:
+   sizes=[(str(p.relative_to(spool)),p.stat().st_size) for p in files]
+   if sorted(p.name for p in files)==expected and len({p.parent for p in files})==1:
+    with file_lock(files[0].parents[1]/'lock',create=False):
+     current=sorted(spool.glob('pending-*/data/*'))
+     if current==files:return files
+     state='file set changed'
+   else:state='file set mismatch'
+  except OSError as error:
+   if error.errno not in (errno.EACCES,errno.EAGAIN,errno.ENOENT):raise
+   state='lock/file unavailable: errno '+str(error.errno)
+  remaining=deadline-time.monotonic()
+  assert remaining>0, f'interrupted upload cleanup timed out after {timeout}s: expected={expected}, observed={sizes}, state={state}'
+  time.sleep(min(.1,remaining))
 
 def run(binary,ctl,receiver,sender):
  binary,ctl,receiver,sender=[str(pathlib.Path(x).resolve()) for x in (binary,ctl,receiver,sender)]
@@ -56,8 +78,7 @@ def run(binary,ctl,receiver,sender):
    c.cmd('ZUPLOADBATCH private|denied',b'16 GiB total.\r\n');assert b'failed or cancelled' in c.until();assert not spool_contents(spool)
    payload=bytes(range(256))*8192;name='resume.bin';(source/name).write_bytes(payload)
    c.cmd('ZUPLOADIN open|resume description',b'1 GiB.\r\n');interrupt(c,sender,source,name)
-   time.sleep(1.5)
-   pending=list(spool.glob('pending-*/data/resume.bin'));assert len(pending)==1 and 1024<pending[0].stat().st_size<len(payload)
+   pending=wait_for_partials(spool,[name]);assert len(pending)==1 and 1024<pending[0].stat().st_size<len(payload)
    retained=pending[0].stat().st_size
    c=Telnet(s.port);c.until();c.cmd('LOGIN alice',b'> ');c.cmd(PASSWORD)
    c.cmd('ZRESUME open|resume description',b'1 GiB.\r\n')
@@ -71,7 +92,7 @@ def run(binary,ctl,receiver,sender):
    assert not spool_contents(spool)
    # Batch retry includes the completed first file and interrupted second file.
    c.cmd('ZUPLOADBATCH open|resume batch',b'16 GiB total.\r\n');interrupt(c,sender,source,['one.bin',name])
-   time.sleep(1.5);assert len(list(spool.glob('pending-*/data/*')))==2
+   assert len(wait_for_partials(spool,['one.bin',name]))==2
    c=Telnet(s.port);c.until();c.cmd('LOGIN alice',b'> ');c.cmd(PASSWORD)
    c.cmd('ZUPLOADBATCHRESUME open|resume batch',b'16 GiB total.\r\n')
    code,out,err=transfer(c,sender,['--','one.bin',name],source);assert code==0 and b'Uploaded 2 files' in out,(code,out,err)
