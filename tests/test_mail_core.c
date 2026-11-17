@@ -25,8 +25,15 @@ static uint32_t body_fail_id,get_fail_id,total_override;
 static int search_backwards;
 static MailAttachments committed_attachments;
 static MailWrite input;
+static unsigned file_reads,buffer_writes;
+static int file_failure,buffer_failure;
+static MailFilePage file_page;
+static char common_buffer[CONTENT_BODY+1];
+static const char *body_override;
 static void reset(void) {
     member_error=moderation_error=mail_error=failure=body_failure=0;enabled=1;
+    file_reads=buffer_writes=0;file_failure=buffer_failure=0;body_override=NULL;
+    memset(&file_page,0,sizeof(file_page));strcpy(common_buffer,"old buffer");
     reads=writes=cleanup=ownership_checks=drop_calls=body_reads=0;last_user=0;
     memset(blocked,0,sizeof(blocked));blocked[4]=blocked[5]=blocked[6]=1;
     marks=search_calls=body_fail_id=get_fail_id=total_override=0;search_backwards=0;memset(letter_bodies,0,sizeof(letter_bodies));
@@ -77,6 +84,7 @@ int mailbox_mark(uint32_t id,uint32_t user) {
 }
 const char *mailbox_body(const MailMessage *message) {
     body_reads++;
+    if(body_override)return body_override;
     if(body_failure || (body_fail_id && message->id==body_fail_id))mail_error=1;
     for(unsigned i=0;i<32;i++)if(letters[i].id==message->id) {
         memset(&cache,0,sizeof(cache));return letter_bodies[i];
@@ -117,6 +125,21 @@ int mail_files_owned(uint32_t user,uint32_t id) {
 void mail_files_cleanup(void) { cleanup++; }
 int mail_files_drop(uint32_t user,uint32_t id) {
     drop_calls++;last_user=user;return id!=102 && mail_files_owned(user,id);
+}
+int mail_files_info(uint32_t user,uint32_t id,MailFileInfo *out) {
+    file_reads++;last_user=user;memset(out,0xa5,sizeof(*out));
+    if(file_failure || id!=101 || (user!=1 && user!=2))return 0;
+    *out=(MailFileInfo){.id=id,.size=1024,.name="private.bin"};return 1;
+}
+int mail_files_page(uint32_t user,uint32_t cursor,MailFilePage *out) {
+    file_reads++;last_user=user;memset(out,0xa5,sizeof(*out));
+    if(file_failure || cursor>0x7ffffffeu)return 0;
+    *out=file_page;return 1;
+}
+int mail_repository_buffer_save(uint32_t user,const char *body) {
+    buffer_writes++;last_user=user;
+    if(buffer_failure)return 0;
+    strcpy(common_buffer,body);return 1;
 }
 static int zero(const void *p,size_t n) { const unsigned char *b=p;for(size_t i=0;i<n;i++)if(b[i])return 0;return 1; }
 static void seed(void) { drafts[1]=(MailMessage){.id=7,.sender=1,.recipient=2,.parent=10,.title="draft"}; }
@@ -372,8 +395,87 @@ static void reading_authority_bounds(void) {
     assert(mail_core_read(&alice,MAIL_READ_ID,2,0,&out,body,sizeof(body))==MAIL_CORE_STORAGE && zero(&out,sizeof(out)));
     assert(!marks);puts("PASS read/list actor and feature gates, query/cursor/mode/body buffer bounds");
 }
+static void attachment_views(void) {
+    reset();MailFileInfo info;MailFilePage page;
+    file_page.count=2;file_page.next=8;
+    file_page.rows[0]=(MailFileInfo){.id=4,.size=4096,.active=1,.name="-"};
+    file_page.rows[1]=(MailFileInfo){.id=7,.size=1024,.name="private.bin"};
+    assert(mail_core_files(&alice,0,&page)==MAIL_CORE_OK && last_user==1);
+    assert(page.count==2 && page.next==8 && page.rows[0].active && !page.rows[1].active);
+    memset(&file_page,0,sizeof(file_page));assert(!strcmp(page.rows[1].name,"private.bin"));
+    assert(mail_core_attachment_info(&bob,101,&info)==MAIL_CORE_OK && last_user==2 && info.size==1024);
+    assert(mail_core_attachment_info(&admin,101,&info)==MAIL_CORE_UNAVAILABLE && zero(&info,sizeof(info)));
+    assert(mail_core_attachment_info(&alice,0,&info)==MAIL_CORE_UNAVAILABLE && zero(&info,sizeof(info)));
+    assert(mail_core_files(&alice,UINT32_MAX,&page)==MAIL_CORE_STORAGE && zero(&page,sizeof(page)));
+    file_failure=1;
+    assert(mail_core_files(&alice,0,&page)==MAIL_CORE_STORAGE && zero(&page,sizeof(page)));
+    assert(mail_core_attachment_info(&alice,101,&info)==MAIL_CORE_UNAVAILABLE && zero(&info,sizeof(info)));
+    file_failure=0;file_page.count=9;
+    assert(mail_core_files(&alice,0,&page)==MAIL_CORE_STORAGE && zero(&page,sizeof(page)));
+    file_page.count=1;memset(file_page.rows[0].name,'x',sizeof(file_page.rows[0].name));
+    assert(mail_core_files(&alice,0,&page)==MAIL_CORE_STORAGE && zero(&page,sizeof(page)));
+    assert(!marks && !writes && !body_reads);
+    puts("PASS owned attachment views, recipient info, admin denial and partial failure clearing");
+}
+static void attachment_batches(void) {
+    reset();MailAttachments out;
+    letters[0].attachments.count=MAIL_ATTACH_MAX;
+    for(unsigned i=0;i<MAIL_ATTACH_MAX;i++)letters[0].attachments.ids[i]=200-i;
+    assert(mail_core_attachment_batch(&alice,10,&out)==MAIL_CORE_OK);
+    assert(out.count==MAIL_ATTACH_MAX && out.ids[0]==200 && out.ids[15]==185);
+    assert(mail_core_attachment_batch(&bob,10,&out)==MAIL_CORE_OK);
+    assert(mail_core_attachment_batch(&admin,10,&out)==MAIL_CORE_UNAVAILABLE && zero(&out,sizeof(out)));
+    assert(mail_core_attachment_batch(&alice,11,&out)==MAIL_CORE_UNAVAILABLE && zero(&out,sizeof(out)));
+    letters[0].attachments.count=MAIL_ATTACH_MAX+1;
+    assert(mail_core_attachment_batch(&alice,10,&out)==MAIL_CORE_STORAGE && zero(&out,sizeof(out)));
+    letters[0].deleted=1;
+    assert(mail_core_attachment_batch(&alice,10,&out)==MAIL_CORE_UNAVAILABLE && zero(&out,sizeof(out)));
+    assert(!marks && !writes && !body_reads && !file_reads);
+    puts("PASS attachment batches preserve 16 IDs/order and participant ACL without read marking");
+}
+static void buffer_imports(void) {
+    reset();strcpy(letter_bodies[0],"private body\r\nsecond line\r\n");seed();
+    assert(mail_core_import(&alice,10)==MAIL_CORE_OK && last_user==1 && buffer_writes==1);
+    assert(!strcmp(common_buffer,letter_bodies[0]) && drafts[1].id==7);
+    assert(mail_core_import(&bob,10)==MAIL_CORE_OK && last_user==2);
+    unsigned before=body_reads;
+    assert(mail_core_import(&admin,10)==MAIL_CORE_UNAVAILABLE && body_reads==before && buffer_writes==2);
+    strcpy(common_buffer,"keep on failure");buffer_failure=1;
+    assert(mail_core_import(&alice,10)==MAIL_CORE_BUFFER_STORAGE && !strcmp(common_buffer,"keep on failure"));
+    buffer_failure=0;body_failure=1;before=buffer_writes;
+    assert(mail_core_import(&alice,10)==MAIL_CORE_BODY_STORAGE && buffer_writes==before && !strcmp(common_buffer,"keep on failure"));
+    assert(!marks && !writes && !cleanup);
+    reset();memset(saved_body,'x',CONTENT_BODY);saved_body[CONTENT_BODY]=0;body_override=saved_body;
+    assert(mail_core_import(&alice,10)==MAIL_CORE_OK && strlen(common_buffer)==CONTENT_BODY);
+    assert(!marks && !writes);
+    puts("PASS common buffer imports preserve unread/drafts, participant ACL and failure ordering");
+}
+static void attachment_authority(void) {
+    MailActor denied[]={{0,0},{1,8},{4,9},{5,9},{6,9},{99,9}};
+    for(unsigned i=0;i<sizeof(denied)/sizeof(*denied)+4;i++) {
+        reset();const MailActor *actor=&alice;MailOutcome expected;
+        if(i<6) { actor=&denied[i];expected=i?MAIL_CORE_REVOKED:MAIL_CORE_LOGIN_REQUIRED; }
+        else if(i==6) { member_error=1;expected=MAIL_CORE_MEMBER_STORAGE; }
+        else if(i==7) { moderation_error=1;expected=MAIL_CORE_MODERATION_STORAGE; }
+        else if(i==8) { enabled=0;expected=MAIL_CORE_DISABLED; }
+        else { mail_error=1;expected=MAIL_CORE_STORAGE; }
+        MailFilePage page;MailFileInfo info;MailAttachments out;
+        assert(mail_core_files(actor,0,&page)==expected && zero(&page,sizeof(page)));
+        assert(mail_core_attachment_info(actor,101,&info)==expected && zero(&info,sizeof(info)));
+        assert(mail_core_attachment_batch(actor,10,&out)==expected && zero(&out,sizeof(out)));
+        assert(mail_core_import(actor,10)==expected);
+        assert(!reads && !file_reads && !body_reads && !buffer_writes);
+    }
+    reset();
+    assert(mail_core_files(&alice,0,NULL)==MAIL_CORE_UNAVAILABLE);
+    assert(mail_core_attachment_info(&alice,101,NULL)==MAIL_CORE_UNAVAILABLE);
+    assert(mail_core_attachment_batch(&alice,10,NULL)==MAIL_CORE_UNAVAILABLE);
+    assert(mail_core_import(NULL,10)==MAIL_CORE_LOGIN_REQUIRED && !reads);
+    puts("PASS attachment/import identity, epoch, store and feature gates before any private I/O");
+}
 int main(void) {
     authority();health();prepare();draft_views();draft_failures();lifecycle();attachment_selection();
     attachment_writes();failures();delete_private();boundaries();body_limits();
-    list_pages();list_filters();search_privacy();reads_and_sequences();reading_failures();reading_authority_bounds();return 0;
+    list_pages();list_filters();search_privacy();reads_and_sequences();reading_failures();reading_authority_bounds();
+    attachment_views();attachment_batches();buffer_imports();attachment_authority();return 0;
 }

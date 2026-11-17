@@ -5,7 +5,6 @@
 #include "vault.h"
 #include "store_limits.h"
 #include "transfer_line.h"
-#include "messages.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -71,21 +70,30 @@ void mail_files_transfer(uint32_t user,const char *line,char *out,size_t size) {
     }
     Principal p=member(user);TransferBackend backend={&user,transfer};transfer_line_execute(backend,&p,line,out,size);
 }
-static const char *text(int language,MessageId id,const char *raw) { return language?message_text(language==2?LANGUAGE_EN:LANGUAGE_JA,id):raw; }
-size_t mail_files_describe(uint32_t user,uint32_t id,int language,char *out,size_t size) {
-    VaultEntry e;
-    if(entry(user,id,&e,0)!=VAULT_OK)return (size_t)snprintf(out,size,"%s",text(language,MSG_MAIL_ATTACHMENT_MISSING,"MAIL ATTACHMENT unavailable\r\n"));
-    return (size_t)snprintf(out,size,text(language,MSG_MAIL_ATTACHMENT_INFO,"MAIL ATTACHMENT %u SIZE %u NAME %s\r\n"),id,e.size,e.name);
+int mail_files_info(uint32_t user,uint32_t id,MailFileInfo *out) {
+    if(!out)return 0;
+    memset(out,0,sizeof(*out));VaultEntry e;
+    if(entry(user,id,&e,0)!=VAULT_OK)return 0;
+    out->id=e.id;out->size=e.size;memcpy(out->name,e.name,sizeof(out->name));return 1;
 }
-void mail_files_list(uint32_t user,uint32_t cursor,int language,char *out,size_t size,uint32_t *next) {
-    *next=0;if(!user || cursor>VAULT_ID_MAX || !ready()) { snprintf(out,size,"%s",text(language,MSG_MAIL_STORAGE,"MAIL ERROR storage\r\n"));return; }
-    Principal p=member(user);size_t used=(size_t)snprintf(out,size,"%s",text(language,MSG_MAIL_FILES,"MAIL FILES\r\n"));unsigned shown=0;uint32_t id=cursor?cursor:1;
-    for(;id<=vault_last_id(files) && shown<8;id++) {
+int mail_files_page(uint32_t user,uint32_t cursor,MailFilePage *out) {
+    if(!out)return 0;
+    memset(out,0,sizeof(*out));
+    if(!user || cursor>VAULT_ID_MAX || !ready())return 0;
+    Principal p=member(user);MailFilePage page={0};uint32_t id=cursor?cursor:1;
+    for(;id<=vault_last_id(files) && page.count<8;id++) {
         VaultUpload upload;VaultResult r=vault_upload_status(files,&p,id,&upload);
+        if(r==VAULT_STORAGE) return 0;
         if(r!=VAULT_OK || upload.state==VAULT_UPLOAD_CANCELLED)continue;
-        VaultEntry e;const char *name="-";
-        if(upload.state==VAULT_UPLOAD_COMMITTED) { if(entry(user,id,&e,1)!=VAULT_OK)continue;name=e.name; }
-        used+=(size_t)snprintf(out+used,size-used,text(language,MSG_MAIL_FILE_ROW,"MAILFILE %u SIZE %u STATE %s NAME %s\r\n"),id,upload.size,upload.state==VAULT_UPLOAD_ACTIVE?text(language,MSG_MAIL_FILE_ACTIVE,"ACTIVE"):text(language,MSG_MAIL_FILE_READY,"READY"),name);shown++;
+        MailFileInfo item={.id=id,.size=upload.size,.active=upload.state==VAULT_UPLOAD_ACTIVE};
+        strcpy(item.name,"-");
+        if(upload.state==VAULT_UPLOAD_COMMITTED) {
+            VaultEntry e;r=entry(user,id,&e,1);
+            if(r==VAULT_STORAGE)return 0;
+            if(r!=VAULT_OK)continue;
+            memcpy(item.name,e.name,sizeof(item.name));
+        }
+        page.rows[page.count++]=item;
     }
-    *next=id<=vault_last_id(files)?id:0;snprintf(out+used,size-used,text(language,MSG_MAIL_FILES_END,"END MAILFILES NEXT %u\r\n"),*next);
+    page.next=id<=vault_last_id(files)?id:0;*out=page;return 1;
 }

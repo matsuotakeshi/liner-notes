@@ -56,8 +56,9 @@ ERR storage unavailable completion clearing. The earlier quota-refusal editor
 completion fix remains intact. Read action labels N/T/R and sequence action
 translation are preserved; recursion through mail_execute is removed.
 
-Attachment description/transfer, guest SYSOPMAIL, login notices and common-buffer
-import remain on their existing paths. MAIL NOTIFY remains Member Core. This does
+Attachment metadata, batch selection and common-buffer import are subsequently
+covered by [Mail resources](MAIL_RESOURCES.md). Transfer protocol handling, guest
+SYSOPMAIL and login notices remain on their existing paths. MAIL NOTIFY remains Member Core. This does
 not claim completion of all Core separation or a new structured Web endpoint.
 
 ## Validation
