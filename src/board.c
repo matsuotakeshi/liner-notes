@@ -836,6 +836,7 @@ static void member_result(MemberOutcome result,BoardResult *r) {
     case MEMBER_CORE_NOT_FOUND:strcpy(r->text,"ERR no member\r\n");break;
     case MEMBER_CORE_LOGIN_REQUIRED:strcpy(r->text,"ERR login required\r\n");break;
     case MEMBER_CORE_RIGHTS_INVALID:strcpy(r->text,"ERR rights syntax\r\n");break;
+    case MEMBER_CORE_STATE:strcpy(r->text,"ERR member state\r\n");break;
     case MEMBER_CORE_PROTECTED:strcpy(r->text,"ERR protected member\r\n");break;
     case MEMBER_CORE_EXTRAS_STORAGE:strcpy(r->text,"ERR extras storage\r\n");break;
     case MEMBER_CORE_MODERATION_UNCERTAIN:strcpy(r->text,"ERR moderation storage uncertain\r\n");break;
@@ -905,14 +906,11 @@ static void execute(const BoardRequest *q,BoardResult *r) {
     if(q->op=='}') { advanced_execute(q,r);return; }
     if(q->op==BOARD_LINK) { link_execute(q,r);return; }
     if(q->op==BOARD_MEMBER_LIFECYCLE) {
-        uint32_t target=q->action==3?q->user:q->number;
-        if(q->action!=3 && !moderation_admin(q->user)) { strcpy(r->text,"ERR admin required\r\n");return; }
-        if(!q->user || !members_active(target)) { strcpy(r->text,"ERR no member\r\n");return; }
-        if(moderation_protected(target) || (target==q->user && q->action!=3)) { strcpy(r->text,"ERR protected member\r\n");return; }
-        int ok=members_remove(target,q->user,(unsigned)q->action);
-        if(ok<=0) { strcpy(r->text,ok<0?"ERR member storage unavailable\r\n":"ERR member state\r\n");return; }
-        moderation_credentials_changed(target);r->account_user=target;r->account_epoch=moderation_epoch(target);
-        snprintf(r->text,sizeof(r->text),"MEMBER REMOVED %u KIND %d\r\n",target,q->action);return;
+        MemberActor actor={q->user,q->user_epoch};MemberChange change;
+        MemberOutcome result=member_core_remove(&actor,q->number,(unsigned)q->action,&change);
+        if(result!=MEMBER_CORE_OK) { member_result(result,r);return; }
+        r->account_user=change.user;r->account_epoch=change.epoch;
+        snprintf(r->text,sizeof(r->text),"MEMBER REMOVED %u KIND %d\r\n",change.user,q->action);return;
     }
     if(q->op=='(') { board_features(q,r);return; }
     if(q->op=='?' && q->action=='M') {

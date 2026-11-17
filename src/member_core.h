@@ -11,7 +11,7 @@ typedef enum { MEMBER_CORE_OK, MEMBER_CORE_REVOKED, MEMBER_CORE_STORAGE,
                MEMBER_CORE_MODERATION_STORAGE, MEMBER_CORE_ADMIN_REQUIRED,
                MEMBER_CORE_NOT_FOUND, MEMBER_CORE_INVALID, MEMBER_CORE_PROTECTED,
                MEMBER_CORE_EXTRAS_STORAGE, MEMBER_CORE_MODERATION_UNCERTAIN,
-               MEMBER_CORE_LOGIN_REQUIRED, MEMBER_CORE_RIGHTS_INVALID } MemberOutcome;
+               MEMBER_CORE_LOGIN_REQUIRED, MEMBER_CORE_RIGHTS_INVALID, MEMBER_CORE_STATE } MemberOutcome;
 typedef enum { MEMBER_ROLE_NONE, MEMBER_ROLE_GUEST, MEMBER_ROLE_MEMBER, MEMBER_ROLE_ADMIN } MemberRole;
 typedef enum { MEMBER_STATE_ACTIVE, MEMBER_STATE_PENDING, MEMBER_STATE_SUSPENDED } MemberState;
 typedef struct { uint32_t id; char name[33]; MemberState state; } MemberSummary;
@@ -56,4 +56,13 @@ MemberOutcome member_core_level(const MemberActor *,uint32_t target,unsigned lev
  * no caller-provided delegation flag. add must be 0/1, group 1..100.
  * Only changed durable writes publish a new epoch; no-ops return zero change. */
 MemberOutcome member_core_group(const MemberActor *,uint32_t board,uint32_t target,unsigned group,int add,MemberChange *out);
+/* Durable terminal account transitions, retaining IDs/names. Only RETIRE is
+ * available to a non-admin and always targets the authenticated actor (the
+ * supplied target is ignored). Other kinds require global admin authority.
+ * Protected accounts cannot be removed; admins cannot delete themselves via
+ * non-retirement operations. Store validates pending/nonpending state.
+ * Successful completion advances one epoch and returns its notification. */
+typedef enum { MEMBER_REJECT=1, MEMBER_DELETE_APPLICATION=2,
+               MEMBER_RETIRE=3, MEMBER_DELETE=4 } MemberRemoval;
+MemberOutcome member_core_remove(const MemberActor *,uint32_t target,unsigned kind,MemberChange *out);
 #endif
