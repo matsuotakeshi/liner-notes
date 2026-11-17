@@ -9,6 +9,7 @@
 #include "member_core.h"
 #include "mail_core.h"
 #include "mail_repository.h"
+#include "transfer_line.h"
 #include "article_repository.h"
 #include "date_filter.h"
 #include "vault_bridge.h"
@@ -656,11 +657,34 @@ static void mail_result(const BoardRequest *q,MailOutcome result,BoardResult *r)
     case MAIL_CORE_MODERATION_STORAGE:strcpy(r->text,"ERR moderation storage unavailable\r\n");break;
     case MAIL_CORE_DISABLED:strcpy(r->text,"ERR feature disabled\r\n");break;
     case MAIL_CORE_BODY_LIMIT:strcpy(r->text,"ERR body limit\r\n");break;
+    case MAIL_CORE_SYSOP_UNAVAILABLE:strcpy(r->text,"ERR SYSOP unavailable\r\n");break;
     case MAIL_CORE_BUFFER_STORAGE:strcpy(r->text,"ERR storage unavailable\r\n");break;
     case MAIL_CORE_BODY_STORAGE:body_read_failed=1;strcpy(r->text,"ERR storage unavailable\r\n");break;
     case MAIL_CORE_STORAGE:snprintf(r->text,sizeof(r->text),"%s",mail_text(q,MSG_MAIL_STORAGE,"MAIL ERROR storage\r\n"));break;
     default:snprintf(r->text,sizeof(r->text),"%s",mail_text(q,MSG_MAIL_UNAVAILABLE,"MAIL ERROR unavailable\r\n"));break;
     }
+}
+typedef struct { MailActor actor; MailOutcome outcome; } MailTransferContext;
+static VaultResult mail_transfer_request(void *context,const Principal *unused,const TransferRequest *q,TransferReply *reply) {
+    (void)unused;MailTransferContext *c=context;VaultResult status=VAULT_DENIED;
+    c->outcome=mail_core_transfer(&c->actor,q,reply,&status);return status;
+}
+static void mail_transfer_execute(const BoardRequest *q,BoardResult *r) {
+    MailTransferContext context={{q->user,q->user_epoch},MAIL_CORE_OK};
+    if(!strncmp(q->body,"FILE ",5)) {
+        char *end;unsigned long id=strtoul(q->body+5,&end,10);
+        if(end==q->body+5 || *end || !id || id>VAULT_ID_MAX) { strcpy(r->text,"ERR no file\r\n");return; }
+        TransferRequest request={.operation=TRANSFER_INFO,.id=(uint32_t)id};TransferReply reply;VaultResult status;
+        MailOutcome result=mail_core_transfer(&context.actor,&request,&reply,&status);
+        if(result!=MAIL_CORE_OK) { if(result==MAIL_CORE_STORAGE)strcpy(r->text,"ERR no file\r\n");else mail_result(q,result,r);return; }
+        if(status!=VAULT_OK) { strcpy(r->text,"ERR no file\r\n");return; }
+        const VaultEntry *e=&reply.entry;char hash[65];vault_hex(e->sha256,hash);
+        snprintf(r->text,sizeof(r->text),"FILE %u %u %s\r\nNAME %s\r\nDESCRIPTION %s\r\nEND FILE\r\n",e->id,e->size,hash,e->name,e->description);return;
+    }
+    TransferBackend backend={&context,mail_transfer_request};
+    transfer_line_execute(backend,NULL,q->body,r->text,sizeof(r->text));
+    if(context.outcome==MAIL_CORE_STORAGE)strcpy(r->text,"ERR vault storage\r\n");
+    else if(context.outcome!=MAIL_CORE_OK)mail_result(q,context.outcome,r);
 }
 static void mail_execute(const BoardRequest *q,BoardResult *r) {
     /* Preserve the completion kind even on quota refusal so a failed send
@@ -907,10 +931,11 @@ static void execute(const BoardRequest *q,BoardResult *r) {
         if(id && moderation_suspended((uint32_t)id)) id=0;
         if(id) {
             r->user_epoch=moderation_epoch((uint32_t)id);
-            r->mail_notice=board_feature_enabled("mail")?mailbox_unread((uint32_t)id):0;
+            MailActor mail_actor={(uint32_t)id,r->user_epoch};MailNotice mail_notice;
+            if(mail_core_notice(&mail_actor,&mail_notice)==MAIL_CORE_OK) {
+                r->mail_notice=mail_notice.unread;r->mail_draft_notice=mail_notice.draft_revision;
+            }
             r->mail_notify_user=(uint32_t)id;members_mail_notify((uint32_t)id,&r->mail_notify_deny,&r->mail_notify_revision);
-            const MailMessage *mail_draft=mailbox_draft((uint32_t)id);
-            if(mail_draft && board_feature_enabled("mail"))r->mail_draft_notice=mail_draft->id;
             r->chat_admin=moderation_admin((uint32_t)id);r->chat_user=(uint32_t)id;members_chat_preferences((uint32_t)id,&r->chat_preferences);
             snprintf(r->chat_login,sizeof(r->chat_login),"%s",members_name((uint32_t)id));
             snprintf(r->chat_name,sizeof(r->chat_name),"%s",*profile_value((uint32_t)id,0)?profile_value((uint32_t)id,0):members_name((uint32_t)id));
@@ -955,12 +980,15 @@ static void execute(const BoardRequest *q,BoardResult *r) {
     }
     if(q->op=='(') { board_features(q,r);return; }
     if(q->op=='?' && q->action=='M') {
-        if(strlen(q->body)>ln_limit("BODY",BOARD_BODY)) { strcpy(r->text,"ERR body limit\r\n");return; }
-        if(!board_feature_enabled("mail")) { strcpy(r->text,"ERR feature disabled\r\n");return; }
-        uint32_t to=0,id=0;for(uint32_t i=1;i<=members_count();i++)if(moderation_admin(i) && !moderation_suspended(i)) { to=i;break; }
-        if(!to) { strcpy(r->text,"ERR SYSOP unavailable\r\n");return; }
-        if(!mailbox_send(q->user,to,0,q->title,q->body,0,0,&id)) { strcpy(r->text,"ERR mail storage or limit\r\n");return; }
-        r->service_action='M';r->mail_delivery=to;snprintf(r->text,sizeof(r->text),"SYSOP MAIL SENT %u\r\n",id);return;
+        MailActor actor={q->user,q->user_epoch};MailDelivery delivery;
+        MailOutcome result=mail_core_sysop_send(&actor,q->title,q->body,&delivery);
+        if(result!=MAIL_CORE_OK) {
+            if(result==MAIL_CORE_STORAGE || result==MAIL_CORE_UNAVAILABLE)strcpy(r->text,"ERR mail storage or limit\r\n");
+            else mail_result(q,result,r);
+            return;
+        }
+        r->service_action='M';r->mail_delivery=delivery.recipient;
+        snprintf(r->text,sizeof(r->text),"SYSOP MAIL SENT %u\r\n",delivery.id);return;
     }
     if(q->op=='!') { activity_execute(q,r);return; }
     if(q->op=='%') {
@@ -1007,7 +1035,7 @@ static void execute(const BoardRequest *q,BoardResult *r) {
     }
     if(strchr("hri",q->op) && !catalog_manage(q->board,q->user)) { strcpy(r->text,"ERR admin required\r\n"); return; }
     if(moderation_broken()) { strcpy(r->text,"ERR moderation storage unavailable\r\n"); return; }
-    if(q->op==BOARD_MAIL_TRANSFER) { if(!members_name(q->user)) { strcpy(r->text,"ERR login required\r\n");return; }mail_files_transfer(q->user,q->body,r->text,sizeof(r->text));return; }
+    if(q->op==BOARD_MAIL_TRANSFER) { if(!members_name(q->user)) { strcpy(r->text,"ERR login required\r\n");return; }mail_transfer_execute(q,r);return; }
     if(q->op=='m') { if(!members_name(q->user)) { strcpy(r->text,"ERR login required\r\n");return; }mail_execute(q,r);return; }
     if(q->op=='&') {
         Principal p={0};IdentityProvider identity=identity_legacy_provider();

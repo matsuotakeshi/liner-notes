@@ -4,7 +4,6 @@
 #include "mailbox.h"
 #include "vault.h"
 #include "store_limits.h"
-#include "transfer_line.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -51,24 +50,20 @@ int mail_files_drop(uint32_t user,uint32_t id) {
     if(r==VAULT_NOT_FOUND)r=vault_upload_cancel(files,&p,id);
     return r==VAULT_OK;
 }
-static VaultResult transfer(void *context,const Principal *p,const TransferRequest *q,TransferReply *r) {
-    uint32_t user=*(uint32_t *)context;
+VaultResult mail_files_execute(uint32_t user,const TransferRequest *q,TransferReply *r) {
+    if(!r)return VAULT_INVALID;
+    memset(r,0,sizeof(*r));
+    if(!user || !q)return VAULT_DENIED;
     if(!ready())return VAULT_STORAGE;
     if(q->operation==TRANSFER_CHECK)return *q->category?VAULT_INVALID:VAULT_OK;
     if(q->operation==TRANSFER_START && *q->category)return VAULT_INVALID;
     if(q->operation==TRANSFER_READ || q->operation==TRANSFER_INFO) {
         VaultEntry e;VaultResult result=entry(user,q->id,&e,0);if(result!=VAULT_OK)return result;
     }
-    TransferBackend backend=vault_transfer_backend(files);return backend.execute(backend.context,p,q,r);
-}
-void mail_files_transfer(uint32_t user,const char *line,char *out,size_t size) {
-    if(!user) { snprintf(out,size,"ERR login required\r\n");return; }
-    if(!strncmp(line,"FILE ",5)) {
-        char *end;unsigned long id=strtoul(line+5,&end,10);VaultEntry e;
-        if(end==line+5 || *end || !id || id>VAULT_ID_MAX || entry(user,(uint32_t)id,&e,0)!=VAULT_OK) { snprintf(out,size,"ERR no file\r\n");return; }
-        char hash[65];vault_hex(e.sha256,hash);snprintf(out,size,"FILE %u %u %s\r\nNAME %s\r\nDESCRIPTION %s\r\nEND FILE\r\n",e.id,e.size,hash,e.name,e.description);return;
-    }
-    Principal p=member(user);TransferBackend backend={&user,transfer};transfer_line_execute(backend,&p,line,out,size);
+    Principal p=member(user);TransferBackend backend=vault_transfer_backend(files);
+    VaultResult result=backend.execute(backend.context,&p,q,r);
+    if(result!=VAULT_OK)memset(r,0,sizeof(*r));
+    return result;
 }
 int mail_files_info(uint32_t user,uint32_t id,MailFileInfo *out) {
     if(!out)return 0;

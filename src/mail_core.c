@@ -10,16 +10,18 @@
 #include "store_limits.h"
 #include <string.h>
 
-static MailOutcome authorize(const MailActor *actor) {
+static MailOutcome authorize_sender(const MailActor *actor,int guest) {
     if(members_broken())return MAIL_CORE_MEMBER_STORAGE;
     if(moderation_broken())return MAIL_CORE_MODERATION_STORAGE;
-    if(!actor || !actor->user)return MAIL_CORE_LOGIN_REQUIRED;
-    if(actor->user>MEMBER_MAX || !members_name(actor->user) ||
-       moderation_suspended(actor->user) || moderation_epoch(actor->user)!=actor->epoch)
+    if(!actor || (!actor->user && !guest))return MAIL_CORE_LOGIN_REQUIRED;
+    if(!actor->user) { if(actor->epoch)return MAIL_CORE_REVOKED; }
+    else if(actor->user>MEMBER_MAX || !members_name(actor->user) ||
+            moderation_suspended(actor->user) || moderation_epoch(actor->user)!=actor->epoch)
         return MAIL_CORE_REVOKED;
     if(!mail_repository_enabled())return MAIL_CORE_DISABLED;
     return mailbox_broken()?MAIL_CORE_STORAGE:MAIL_CORE_OK;
 }
+static MailOutcome authorize(const MailActor *actor) { return authorize_sender(actor,0); }
 static int bounded(const char *text,size_t maximum) {
     if(!text)return 0;
     size_t n=0;while(n<=maximum && text[n])n++;
@@ -279,4 +281,50 @@ MailOutcome mail_core_import(const MailActor *actor,uint32_t id) {
     const char *body=mailbox_body(&message);
     if(mailbox_broken() || !body || !bounded(body,CONTENT_BODY))return MAIL_CORE_BODY_STORAGE;
     return mail_repository_buffer_save(actor->user,body)?MAIL_CORE_OK:MAIL_CORE_BUFFER_STORAGE;
+}
+
+MailOutcome mail_core_sysop_send(const MailActor *actor,const char *title,const char *body,MailDelivery *out) {
+    if(!out)return MAIL_CORE_UNAVAILABLE;
+    memset(out,0,sizeof(*out));
+    MailOutcome result=authorize_sender(actor,1);if(result!=MAIL_CORE_OK)return result;
+    if(!bounded(title,80) || !*title || !body || !*body)return MAIL_CORE_UNAVAILABLE;
+    if(!bounded(body,(size_t)ln_limit("BODY",CONTENT_BODY)))return MAIL_CORE_BODY_LIMIT;
+    uint32_t count=members_count(),to=0,id=0;
+    if(count>MEMBER_MAX)return MAIL_CORE_MEMBER_STORAGE;
+    for(uint32_t i=1;i<=count;i++)if(moderation_admin(i) && recipient(i)) { to=i;break; }
+    if(!to)return MAIL_CORE_SYSOP_UNAVAILABLE;
+    if(!mailbox_send(actor->user,to,0,title,body,NULL,0,&id))return store_failure();
+    out->id=id;out->recipient=to;return MAIL_CORE_OK;
+}
+MailOutcome mail_core_notice(const MailActor *actor,MailNotice *out) {
+    if(!out)return MAIL_CORE_UNAVAILABLE;
+    memset(out,0,sizeof(*out));
+    MailOutcome result=authorize(actor);if(result!=MAIL_CORE_OK)return result;
+    unsigned unread=mailbox_unread(actor->user);
+    if(mailbox_broken())return MAIL_CORE_STORAGE;
+    const MailMessage *draft=mailbox_draft(actor->user);
+    if(mailbox_broken())return MAIL_CORE_STORAGE;
+    out->unread=unread;out->draft_revision=draft?draft->id:0;return MAIL_CORE_OK;
+}
+MailOutcome mail_core_transfer(const MailActor *actor,const TransferRequest *q,TransferReply *out,VaultResult *status) {
+    if(out)memset(out,0,sizeof(*out));
+    if(status)*status=VAULT_DENIED;
+    if(!out || !status)return MAIL_CORE_UNAVAILABLE;
+    MailOutcome result=authorize(actor);if(result!=MAIL_CORE_OK)return result;
+    *status=VAULT_INVALID;
+    if(!q || q->operation<TRANSFER_INFO || q->operation>TRANSFER_CHECK)return MAIL_CORE_OK;
+    if(q->operation==TRANSFER_CHECK || q->operation==TRANSFER_START) {
+        if(!bounded(q->category,sizeof(q->category)-1) || *q->category)return MAIL_CORE_OK;
+        if(q->operation==TRANSFER_START && (q->size>VAULT_MAX_BYTES ||
+            !bounded(q->name,100) || !*q->name || !bounded(q->description,240)))return MAIL_CORE_OK;
+    } else {
+        if(!q->id || q->id>VAULT_ID_MAX)return MAIL_CORE_OK;
+        if((q->operation==TRANSFER_READ || q->operation==TRANSFER_WRITE) &&
+           (q->offset>VAULT_MAX_BYTES || q->count>VAULT_BLOCK ||
+            (q->operation==TRANSFER_WRITE && !q->count)))return MAIL_CORE_OK;
+    }
+    *status=mail_files_execute(actor->user,q,out);
+    if(*status==VAULT_OK && q->operation==TRANSFER_READ && out->count>VAULT_BLOCK)*status=VAULT_STORAGE;
+    if(*status!=VAULT_OK)memset(out,0,sizeof(*out));
+    return MAIL_CORE_OK;
 }
