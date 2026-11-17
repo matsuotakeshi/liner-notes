@@ -1,6 +1,7 @@
 #define _POSIX_C_SOURCE 200809L
 #include "date_filter.h"
 #include "activity.h"
+#include "article_core.h"
 #include "durable.h"
 #include "members.h"
 #include "moderation.h"
@@ -82,12 +83,23 @@ void activity_execute(const BoardRequest *q,BoardResult *r) {
     if(q->action=='v') { if(!members_name(q->user)) { error="ERR login required\r\n";goto fail; }catalog_roles(q->user,r->text,sizeof(r->text));return; }
     if(q->action!='b' && q->action!='s' && !moderation_admin(q->user)) { error="ERR admin required\r\n";goto fail; }
     if(q->action=='s') {
-        uint32_t previous=0;int ok=catalog_role_set(q->number,q->cursor,q->user,&previous);
-        if(ok<=0) { error=ok<0?"ERR catalog storage\r\n":"ERR catalog syntax\r\n";goto fail; }
-        if(ok==1) {
-            if(previous) { moderation_credentials_changed(previous);r->account_user2=previous;r->account_epoch2=moderation_epoch(previous); }
-            if(q->cursor) { moderation_credentials_changed(q->cursor);r->account_user=q->cursor;r->account_epoch=moderation_epoch(q->cursor); }
+        ArticleActor actor={q->user,q->user_epoch,q->board_grants};ArticleRoleChange change;
+        ArticleOutcome result=article_sigop_set(&actor,q->number,q->cursor,&change);
+        if(result!=ARTICLE_OK) {
+            switch(result) {
+            case ARTICLE_REVOKED:r->revoked=1;error="ERR session revoked\r\n";break;
+            case ARTICLE_LOGIN_REQUIRED:error="ERR login required\r\n";break;
+            case ARTICLE_MEMBER_STORAGE:error="ERR member storage unavailable\r\n";break;
+            case ARTICLE_MODERATION_STORAGE:error="ERR moderation storage unavailable\r\n";break;
+            case ARTICLE_POLICY_STORAGE:error="ERR board policy storage\r\n";break;
+            case ARTICLE_EXTRAS_STORAGE:error="ERR extras storage\r\n";break;
+            case ARTICLE_CATALOG_STORAGE:error="ERR catalog storage\r\n";break;
+            default:error="ERR catalog syntax\r\n";break;
+            }
+            goto fail;
         }
+        r->account_user2=change.previous;r->account_epoch2=change.previous_epoch;
+        r->account_user=change.current;r->account_epoch=change.current_epoch;
         snprintf(r->text,sizeof(r->text),"SIGOP SET %u %u\r\n",q->number,q->cursor);return;
     }
     if(q->action=='b') {

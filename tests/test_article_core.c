@@ -238,7 +238,28 @@ void article_repository_title_changed(uint32_t id,const char *title) {
     assert(id==7 && commits && commit_ok && journal_kind=='T');
     assert(!strcmp(title,journal_text));publications++;
 }
+static uint32_t pending_target,disabled_target,role_previous;
+static int role_ok,guest_ok;
+static unsigned role_calls,epoch_changes,guest_saves,guest_publications,author_publications;
+int members_active(uint32_t user) { return members_name(user) && user!=disabled_target; }
+int members_pending(uint32_t user) { return user && user==pending_target; }
+void moderation_credentials_changed(uint32_t user) { assert(user);epoch_changes++; }
+int catalog_role_set(uint32_t board,uint32_t user,uint32_t actor,uint32_t *previous) {
+    assert(board==2 && actor==1 && user<=3);role_calls++;*previous=role_previous;return role_ok;
+}
+int article_repository_guest_save(uint32_t board,unsigned enabled) {
+    assert(board==2 && enabled<=1);guest_saves++;return guest_ok;
+}
+void catalog_guest(uint32_t board,int enabled) {
+    assert(board==2 && enabled>=0 && enabled<=1 && guest_saves && guest_ok);guest_publications++;
+}
+void article_repository_author_changed(uint32_t id,uint32_t user,const char *name) {
+    assert(id==7 && commits && commit_ok && journal_kind=='A');
+    assert(!strcmp(name,members_name(user)) && !strcmp(name,journal_text));author_publications++;
+}
 static ArticleActor reset(void) {
+    pending_target=disabled_target=0;role_previous=3;role_ok=guest_ok=1;
+    role_calls=epoch_changes=guest_saves=guest_publications=author_publications=0;
     profile_error=0;buffer_result=1;buffer_calls=buffer_owner=0;strcpy(saved_buffer,"preserved");
     audit_admin=0;memset(audit_sigop,0,sizeof(audit_sigop));
     discovery=0;entry_menu=entry_inherited=entry_lock_fault=0;entry_title_override=NULL;
@@ -1676,6 +1697,81 @@ static void import_tests(void) {
     assert(article_import_buffer(&actor,2,7,NULL,0)==ARTICLE_BUFFER_TOO_SMALL);
     puts("PASS: article import body/store failure, invalid scratch and preserved former buffer");
 }
+static void management_tests(void) {
+    ArticleActor actor=reset();manager=1;
+    assert(article_author_set(&actor,7,2)==ARTICLE_OK);
+    assert(author_publications==1 && journal_actor==1 && journal_kind=='A' && !strcmp(journal_text,"bob"));
+    actor=reset();manager=1;commit_ok=0;
+    assert(article_author_set(&actor,7,2)==ARTICLE_SETTINGS_STORAGE && !author_publications);
+    actor=reset();manager=1;pending_target=2;
+    denied(article_author_set(&actor,7,2),ARTICLE_MANAGEMENT_INVALID);
+    pending_target=0;disabled_target=2;
+    denied(article_author_set(&actor,7,2),ARTICLE_MANAGEMENT_INVALID);
+    denied(article_author_set(&actor,7,99),ARTICLE_MANAGEMENT_INVALID);
+    actor=reset();manager=1;hidden=1;
+    denied(article_author_set(&actor,7,2),ARTICLE_ADMIN_REQUIRED);
+    hidden=-1;denied(article_author_set(&actor,7,2),ARTICLE_STORAGE);
+    actor=reset();denied(article_author_set(&actor,7,2),ARTICLE_ADMIN_REQUIRED);
+    manager=1;denied(article_author_set(&actor,99,2),ARTICLE_ADMIN_REQUIRED);
+    actor=reset();manager=1;imported=1;
+    assert(article_author_set(&actor,7,2)==ARTICLE_OK && journal_kind=='A');
+    puts("PASS: author ownership validates target/actual board and publishes after journal only");
+
+    actor=reset();manager=1;
+    assert(article_guest_set(&actor,2,1)==ARTICLE_OK && guest_publications==1);
+    assert(article_guest_set(&actor,2,0)==ARTICLE_OK && guest_publications==2);
+    actor=reset();manager=1;guest_ok=0;
+    assert(article_guest_set(&actor,2,1)==ARTICLE_SETTINGS_STORAGE && !guest_publications);
+    actor=reset();manager=1;
+    denied(article_guest_set(&actor,2,2),ARTICLE_MANAGEMENT_INVALID);
+    denied(article_guest_set(&actor,3,1),ARTICLE_ADMIN_REQUIRED);
+    manager=0;denied(article_guest_set(&actor,2,1),ARTICLE_ADMIN_REQUIRED);
+    assert(!guest_saves);
+    puts("PASS: guest posting policy enforces scope and durable-before-visible ordering");
+
+    ArticleRoleChange change;
+    actor=reset();board_present[2]=1;board_parent[2]=1;audit_sigop[2]=1;
+    memset(&change,0xff,sizeof(change));
+    assert(article_sigop_set(&actor,2,2,&change)==ARTICLE_MANAGEMENT_INVALID);
+    assert(!role_calls && !epoch_changes && !change.changed && !change.previous && !change.current);
+    audit_sigop[1]=1;
+    assert(article_sigop_set(&actor,2,2,&change)==ARTICLE_OK);
+    assert(role_calls==1 && epoch_changes==2 && change.changed && change.previous==3 && change.current==2);
+    assert(change.previous_epoch==epoch && change.current_epoch==epoch);
+    role_ok=2;epoch_changes=0;
+    assert(article_sigop_set(&actor,2,2,&change)==ARTICLE_OK && !epoch_changes && !change.changed);
+    role_ok=-1;
+    assert(article_sigop_set(&actor,2,2,&change)==ARTICLE_CATALOG_STORAGE && !epoch_changes && !change.current);
+    role_ok=0;
+    assert(article_sigop_set(&actor,2,2,&change)==ARTICLE_MANAGEMENT_INVALID && !epoch_changes);
+    actor=reset();audit_admin=1;board_present[2]=1;
+    assert(article_sigop_set(&actor,2,0,&change)==ARTICLE_OK && change.previous==3 && !change.current && epoch_changes==1);
+    actor=reset();audit_admin=1;pending_target=2;
+    assert(article_sigop_set(&actor,2,2,&change)==ARTICLE_MANAGEMENT_INVALID && !role_calls);
+    pending_target=0;
+    assert(article_sigop_set(&actor,0,2,&change)==ARTICLE_MANAGEMENT_INVALID && !role_calls);
+    puts("PASS: SIGOP delegation requires ancestor authority, with owned epoch changes and cleared failures");
+
+    for(unsigned mode=0;mode<7;mode++) {
+        actor=reset();manager=1;audit_admin=1;
+        ArticleOutcome wanted=ARTICLE_REVOKED;
+        if(mode==0)actor.user=0,wanted=ARTICLE_LOGIN_REQUIRED;
+        if(mode==1)actor.epoch--;
+        if(mode==2)suspended=1;
+        if(mode==3)member_error=1,wanted=ARTICLE_MEMBER_STORAGE;
+        if(mode==4)moderation_error=1,wanted=ARTICLE_MODERATION_STORAGE;
+        if(mode==5)policy_error=1,wanted=ARTICLE_POLICY_STORAGE;
+        if(mode==6)extras_error=1,wanted=ARTICLE_EXTRAS_STORAGE;
+        assert(article_author_set(&actor,7,2)==wanted);
+        assert(article_guest_set(&actor,2,1)==wanted);
+        memset(&change,0xff,sizeof(change));
+        assert(article_sigop_set(&actor,2,2,&change)==wanted);
+        assert(!commits && !author_publications && !guest_saves && !role_calls && !epoch_changes);
+        assert(!change.changed && !change.previous && !change.current && !change.previous_epoch && !change.current_epoch);
+    }
+    puts("PASS: management rejects stale/guest/suspended actors and broken stores before mutation");
+}
+
 int main(void) {
     import_tests();
     ArticleActor actor=reset();
@@ -1777,5 +1873,6 @@ int main(void) {
     draft_tests();
     entry_tests();
     audit_tests();
+    management_tests();
     return 0;
 }

@@ -25,7 +25,8 @@ typedef enum {
     ARTICLE_READ_STATE_STORAGE,
     ARTICLE_LEGACY_BOARDS, ARTICLE_LEGACY_MEMBERS, ARTICLE_BODY_LIMIT,
     ARTICLE_FULL, ARTICLE_INVALID_DRAFT, ARTICLE_LEGACY_BODY,
-    ARTICLE_POST_UNAVAILABLE, ARTICLE_POST_UNCERTAIN, ARTICLE_DRAFT_CONFLICT
+    ARTICLE_POST_UNAVAILABLE, ARTICLE_POST_UNCERTAIN, ARTICLE_DRAFT_CONFLICT,
+    ARTICLE_MANAGEMENT_INVALID, ARTICLE_CATALOG_STORAGE, ARTICLE_SETTINGS_STORAGE
 } ArticleOutcome;
 
 /* Local editing admission and posting. Preparation grants no durable authority:
@@ -85,6 +86,21 @@ typedef struct {
 typedef struct { uint32_t start,next,article,actor; unsigned count; ArticleAuditRow rows[8]; } ArticleAuditPage;
 ArticleOutcome article_audit(const ArticleActor *,uint32_t current_board,uint32_t start,
                              uint32_t article,uint32_t actor_id,const char *actor_name,ArticleAuditPage *out);
+
+/* Worker-only management, independent of the displayed/current board.
+ * Reauthorize actor and actual target on every call. No session mutation.
+ * Author changes preserve local/imported behavior and emit only the existing
+ * A journal record. Guest policy is published only after durable save.
+ * SIGOP assignment requires administrator or an ancestor's SIGOP authority;
+ * a direct SIGOP alone cannot replace itself. target=0 removes assignment.
+ * Epoch notifications are owned values, empty for no-op/error. */
+typedef struct {
+    uint32_t previous,previous_epoch,current,current_epoch;
+    int changed;
+} ArticleRoleChange;
+ArticleOutcome article_author_set(const ArticleActor *,uint32_t article,uint32_t target);
+ArticleOutcome article_guest_set(const ArticleActor *,uint32_t board,unsigned enabled);
+ArticleOutcome article_sigop_set(const ArticleActor *,uint32_t board,uint32_t target,ArticleRoleChange *out);
 
 ArticleOutcome article_withdraw(const ArticleActor *,uint32_t board,
                                uint32_t article,int confirmed);
