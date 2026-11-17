@@ -32,7 +32,9 @@ def run(binary):
             expect(g,'PASSWD','ERR login required')
             auth(a,'alice',True); auth(b,'alice')
             assert post(a,'kept note','kept body')==1; mark(a,1)
+            unchanged_size=users.stat().st_size
             change(a,'incorrect-current',result='ERR password change')
+            assert users.stat().st_size==unchanged_size
             expect(b,'ACCOUNT','ACCOUNT 1 alice')
             change(a,PASSWORD,confirm='different-confirmation',result='ERR password mismatch')
             time.sleep(1.05); expect(a,'PASSWD','CURRENT PASSWORD'); expect(a,PASSWORD,'NEW PASSWORD')

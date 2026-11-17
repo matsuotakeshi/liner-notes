@@ -201,3 +201,44 @@ MemberOutcome member_core_remove(const MemberActor *actor,uint32_t target,unsign
     out->user=target;out->epoch=moderation_epoch(target);
     return MEMBER_CORE_OK;
 }
+
+static int password_length(const char *value) {
+    if(!value)return 0;
+    size_t n=0;while(n<=128 && value[n])n++;
+    return n>=8 && n<=128;
+}
+
+MemberOutcome member_core_reset_check(const MemberActor *actor,uint32_t target) {
+    MemberOutcome result=authorize(actor,1);
+    if(result!=MEMBER_CORE_OK)return result;
+    if(!members_name(target))return MEMBER_CORE_NOT_FOUND;
+    if(target==actor->user || moderation_protected(target))return MEMBER_CORE_PROTECTED;
+    return MEMBER_CORE_OK;
+}
+
+MemberOutcome member_core_reset_password(const MemberActor *actor,uint32_t target,const char *replacement,MemberChange *out) {
+    if(!out)return MEMBER_CORE_INVALID;
+    memset(out,0,sizeof(*out));
+    MemberOutcome result=member_core_reset_check(actor,target);
+    if(result!=MEMBER_CORE_OK)return result;
+    if(!password_length(replacement))return MEMBER_CORE_PASSWORD;
+    int changed=members_reset_password(target,actor->user,replacement);
+    if(changed!=1)return changed<0?MEMBER_CORE_STORAGE:MEMBER_CORE_PASSWORD;
+    moderation_credentials_changed(target);
+    out->user=target;out->epoch=moderation_epoch(target);
+    return MEMBER_CORE_OK;
+}
+
+MemberOutcome member_core_password(const MemberActor *actor,const char *current,const char *replacement,MemberChange *out) {
+    if(!out)return MEMBER_CORE_INVALID;
+    memset(out,0,sizeof(*out));
+    MemberOutcome result=authorize(actor,0);
+    if(result!=MEMBER_CORE_OK)return result;
+    if(!actor || !actor->user)return MEMBER_CORE_LOGIN_REQUIRED;
+    if(!password_length(current) || !password_length(replacement))return MEMBER_CORE_PASSWORD;
+    int changed=members_password(actor->user,current,replacement);
+    if(changed!=1)return changed<0?MEMBER_CORE_STORAGE:MEMBER_CORE_PASSWORD;
+    moderation_credentials_changed(actor->user);
+    out->user=actor->user;out->epoch=moderation_epoch(actor->user);
+    return MEMBER_CORE_OK;
+}

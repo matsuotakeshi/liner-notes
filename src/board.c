@@ -836,6 +836,7 @@ static void member_result(MemberOutcome result,BoardResult *r) {
     case MEMBER_CORE_NOT_FOUND:strcpy(r->text,"ERR no member\r\n");break;
     case MEMBER_CORE_LOGIN_REQUIRED:strcpy(r->text,"ERR login required\r\n");break;
     case MEMBER_CORE_RIGHTS_INVALID:strcpy(r->text,"ERR rights syntax\r\n");break;
+    case MEMBER_CORE_PASSWORD:strcpy(r->text,"ERR password change\r\n");break;
     case MEMBER_CORE_STATE:strcpy(r->text,"ERR member state\r\n");break;
     case MEMBER_CORE_PROTECTED:strcpy(r->text,"ERR protected member\r\n");break;
     case MEMBER_CORE_EXTRAS_STORAGE:strcpy(r->text,"ERR extras storage\r\n");break;
@@ -1063,24 +1064,23 @@ static void execute(const BoardRequest *q,BoardResult *r) {
         snprintf(r->text,sizeof(r->text),"PREFS %s %s %s\r\n",q->number==1?"SAVED":q->number==2?"LOADED":"STORED",language?"en":"ja",pager?"ON":"OFF"); return;
     }
     if(q->op=='~') {
-        if(!moderation_admin(q->user)) { strcpy(r->text,"ERR admin required\r\n");return; }
-        if(!members_name(q->number)) { strcpy(r->text,"ERR no member\r\n");return; }
-        if(q->number==q->user || moderation_protected(q->number)) { strcpy(r->text,"ERR protected member\r\n");return; }
-        if(!q->action) { r->service_action='p';r->service_number=q->number;strcpy(r->text,"NEW PASSWORD\r\n");return; }
-        int changed=members_reset_password(q->number,q->user,q->new_password);
-        if(changed==1) { moderation_credentials_changed(q->number);r->account_user=q->number;r->account_epoch=moderation_epoch(q->number);snprintf(r->text,sizeof(r->text),"PASSWORD RESET %u\r\n",q->number); }
-        else strcpy(r->text,changed<0?"ERR member storage unavailable\r\n":"ERR password change\r\n");
-        return;
+        MemberActor actor={q->user,q->user_epoch};MemberChange change;
+        if(!q->action) {
+            MemberOutcome result=member_core_reset_check(&actor,q->number);
+            if(result!=MEMBER_CORE_OK) { member_result(result,r);return; }
+            r->service_action='p';r->service_number=q->number;strcpy(r->text,"NEW PASSWORD\r\n");return;
+        }
+        MemberOutcome result=member_core_reset_password(&actor,q->number,q->new_password,&change);
+        if(result!=MEMBER_CORE_OK) { member_result(result,r);return; }
+        r->account_user=change.user;r->account_epoch=change.epoch;
+        snprintf(r->text,sizeof(r->text),"PASSWORD RESET %u\r\n",change.user);return;
     }
     if(q->op=='k') {
-        if(!q->user) { strcpy(r->text,"ERR login required\r\n"); return; }
-        int changed=members_password(q->user,q->password,q->new_password);
-        if(changed==1) {
-            moderation_credentials_changed(q->user);
-            r->password_changed=1; r->account_user=q->user; r->account_epoch=moderation_epoch(q->user);
-            strcpy(r->text,"PASSWORD CHANGED\r\n");
-        } else strcpy(r->text,changed<0?"ERR member storage unavailable\r\n":"ERR password change\r\n");
-        return;
+        MemberActor actor={q->user,q->user_epoch};MemberChange change;
+        MemberOutcome result=member_core_password(&actor,q->password,q->new_password,&change);
+        if(result!=MEMBER_CORE_OK) { member_result(result,r);return; }
+        r->password_changed=1;r->account_user=change.user;r->account_epoch=change.epoch;
+        strcpy(r->text,"PASSWORD CHANGED\r\n");return;
     }
     if(q->op=='A') {
         ArticleActor actor={q->user,q->user_epoch,q->board_grants};ArticleAuditPage page;

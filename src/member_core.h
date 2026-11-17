@@ -11,7 +11,7 @@ typedef enum { MEMBER_CORE_OK, MEMBER_CORE_REVOKED, MEMBER_CORE_STORAGE,
                MEMBER_CORE_MODERATION_STORAGE, MEMBER_CORE_ADMIN_REQUIRED,
                MEMBER_CORE_NOT_FOUND, MEMBER_CORE_INVALID, MEMBER_CORE_PROTECTED,
                MEMBER_CORE_EXTRAS_STORAGE, MEMBER_CORE_MODERATION_UNCERTAIN,
-               MEMBER_CORE_LOGIN_REQUIRED, MEMBER_CORE_RIGHTS_INVALID, MEMBER_CORE_STATE } MemberOutcome;
+               MEMBER_CORE_LOGIN_REQUIRED, MEMBER_CORE_RIGHTS_INVALID, MEMBER_CORE_STATE, MEMBER_CORE_PASSWORD } MemberOutcome;
 typedef enum { MEMBER_ROLE_NONE, MEMBER_ROLE_GUEST, MEMBER_ROLE_MEMBER, MEMBER_ROLE_ADMIN } MemberRole;
 typedef enum { MEMBER_STATE_ACTIVE, MEMBER_STATE_PENDING, MEMBER_STATE_SUSPENDED } MemberState;
 typedef struct { uint32_t id; char name[33]; MemberState state; } MemberSummary;
@@ -65,4 +65,14 @@ MemberOutcome member_core_group(const MemberActor *,uint32_t board,uint32_t targ
 typedef enum { MEMBER_REJECT=1, MEMBER_DELETE_APPLICATION=2,
                MEMBER_RETIRE=3, MEMBER_DELETE=4 } MemberRemoval;
 MemberOutcome member_core_remove(const MemberActor *,uint32_t target,unsigned kind,MemberChange *out);
+/* Reset prompt authorization is read-only, and is repeated on commit. Existing
+ * name/protected-target policy is preserved; the store owns target eligibility.
+ * Password arguments are borrowed NUL-terminated strings, never copied/retained
+ * or logged here. Caller owns secure cleanup on every path; output cannot alias
+ * inputs. Store retains current-password verification, hashing and durable sync.
+ * Only success publishes an epoch. Own-password caller keeps its connection via
+ * the existing adapter flag; reset revokes the target's old connections. */
+MemberOutcome member_core_reset_check(const MemberActor *,uint32_t target);
+MemberOutcome member_core_reset_password(const MemberActor *,uint32_t target,const char *replacement,MemberChange *out);
+MemberOutcome member_core_password(const MemberActor *,const char *current,const char *replacement,MemberChange *out);
 #endif

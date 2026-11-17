@@ -4,6 +4,7 @@ Baseline: main `3663a2a8f553d5b38da97f4ee03730d8d1595a73` (PR #79).
 This LN-23/24 slice extracts REJECT, DELETEAPPLICATION, RETIRE and DELETEUSER.
 Registration, authentication, password changes, application editing, physical
 compaction and other member operations keep their existing implementations.
+The subsequent [password service](MEMBER_PASSWORD.md) extracts password changes and resets.
 
 ## Authorization and operation kinds
 
