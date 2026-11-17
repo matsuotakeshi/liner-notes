@@ -84,3 +84,47 @@ MemberOutcome member_core_suspend(const MemberActor *actor,uint32_t target,int s
     out->user=target;out->epoch=moderation_epoch(target);
     return MEMBER_CORE_OK;
 }
+
+static MemberOutcome authorize_applications(const MemberActor *actor) {
+    MemberOutcome result=authorize(actor,0);
+    if(result!=MEMBER_CORE_OK)return result;
+    if(!actor || !actor->user)return MEMBER_CORE_LOGIN_REQUIRED;
+    return moderation_admin(actor->user)?MEMBER_CORE_OK:MEMBER_CORE_ADMIN_REQUIRED;
+}
+
+MemberOutcome member_core_applications(const MemberActor *actor,uint32_t start,MemberPage *out) {
+    if(!out)return MEMBER_CORE_INVALID;
+    memset(out,0,sizeof(*out));
+    MemberOutcome result=authorize_applications(actor);
+    if(result!=MEMBER_CORE_OK)return result;
+    uint32_t total=members_count();
+    if(total>MEMBER_MAX)return MEMBER_CORE_STORAGE;
+    uint32_t id=start?start:1;
+    for(;id<=total;id++) {
+        if(!members_pending(id))continue;
+        if(out->count==8)break;
+        result=summary(id,&out->rows[out->count]);
+        if(result!=MEMBER_CORE_OK)break;
+        out->count++;
+    }
+    if(members_broken())result=MEMBER_CORE_STORAGE;
+    else if(moderation_broken())result=MEMBER_CORE_MODERATION_STORAGE;
+    if(result!=MEMBER_CORE_OK)memset(out,0,sizeof(*out));
+    else out->next=id<=total?id:0;
+    return result;
+}
+
+MemberOutcome member_core_approve(const MemberActor *actor,uint32_t target,MemberChange *out) {
+    if(!out)return MEMBER_CORE_INVALID;
+    memset(out,0,sizeof(*out));
+    MemberOutcome result=authorize_applications(actor);
+    if(result!=MEMBER_CORE_OK)return result;
+    if(!members_active(target))return MEMBER_CORE_NOT_FOUND;
+    int saved=members_approve(target,actor->user);
+    if(saved<=0)return saved<0?MEMBER_CORE_STORAGE:MEMBER_CORE_RIGHTS_INVALID;
+    if(saved==1) {
+        moderation_credentials_changed(target);
+        out->user=target;out->epoch=moderation_epoch(target);
+    }
+    return MEMBER_CORE_OK;
+}

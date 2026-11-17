@@ -834,6 +834,8 @@ static void member_result(MemberOutcome result,BoardResult *r) {
     case MEMBER_CORE_REVOKED:r->revoked=1;strcpy(r->text,"ERR session revoked\r\n");break;
     case MEMBER_CORE_ADMIN_REQUIRED:strcpy(r->text,"ERR admin required\r\n");break;
     case MEMBER_CORE_NOT_FOUND:strcpy(r->text,"ERR no member\r\n");break;
+    case MEMBER_CORE_LOGIN_REQUIRED:strcpy(r->text,"ERR login required\r\n");break;
+    case MEMBER_CORE_RIGHTS_INVALID:strcpy(r->text,"ERR rights syntax\r\n");break;
     case MEMBER_CORE_PROTECTED:strcpy(r->text,"ERR protected member\r\n");break;
     case MEMBER_CORE_EXTRAS_STORAGE:strcpy(r->text,"ERR extras storage\r\n");break;
     case MEMBER_CORE_MODERATION_UNCERTAIN:strcpy(r->text,"ERR moderation storage uncertain\r\n");break;
@@ -924,24 +926,30 @@ static void execute(const BoardRequest *q,BoardResult *r) {
     if(q->op=='!') { activity_execute(q,r);return; }
     if(q->op=='%') {
         uint32_t target=q->number?q->number:q->user;
-        if(!members_name(q->user)) { strcpy(r->text,"ERR login required\r\n");return; }
-        if((q->action || target!=q->user) && !moderation_admin(q->user) && !((q->action=='G' || q->action=='D') && group_delegated(q->board,q->user,q->cursor) && !moderation_protected(target))) { strcpy(r->text,"ERR admin required\r\n");return; }
         if(q->action=='P') {
-            size_t used=0;unsigned shown=0;uint32_t i=q->cursor?q->cursor:1;
-            used=(size_t)snprintf(r->text,sizeof(r->text),"APPLICATIONS\r\n");
-            for(;i<=members_count();i++)if(members_pending(i)) {
-                if(shown++==8)break;
-                used+=(size_t)snprintf(r->text+used,sizeof(r->text)-used,"APPLICATION %u %s\r\n",i,members_name(i));
-            }
-            snprintf(r->text+used,sizeof(r->text)-used,"END NEXT %u\r\n",i<=members_count()?i:0);return;
+            MemberActor actor={q->user,q->user_epoch};MemberPage page;
+            MemberOutcome outcome=member_core_applications(&actor,q->cursor,&page);
+            if(outcome!=MEMBER_CORE_OK) { member_result(outcome,r);return; }
+            size_t used=(size_t)snprintf(r->text,sizeof(r->text),"APPLICATIONS\r\n");
+            for(unsigned i=0;i<page.count;i++)
+                used+=(size_t)snprintf(r->text+used,sizeof(r->text)-used,"APPLICATION %u %s\r\n",page.rows[i].id,page.rows[i].name);
+            snprintf(r->text+used,sizeof(r->text)-used,"END NEXT %u\r\n",page.next);return;
         }
-        if(!members_active(target)) { strcpy(r->text,"ERR no member\r\n");return; }
+        if(q->action=='A') {
+            MemberActor actor={q->user,q->user_epoch};MemberChange change;
+            MemberOutcome outcome=member_core_approve(&actor,target,&change);
+            if(outcome!=MEMBER_CORE_OK) { member_result(outcome,r);return; }
+            r->account_user=change.user;r->account_epoch=change.epoch;
+        } else {
+            if(!members_name(q->user)) { strcpy(r->text,"ERR login required\r\n");return; }
+            if((q->action || target!=q->user) && !moderation_admin(q->user) && !((q->action=='G' || q->action=='D') && group_delegated(q->board,q->user,q->cursor) && !moderation_protected(target))) { strcpy(r->text,"ERR admin required\r\n");return; }
+            if(!members_active(target)) { strcpy(r->text,"ERR no member\r\n");return; }
+        }
         int result=2;
         if(q->action=='L')result=members_rights(target,q->user,(int)q->cursor,members_groups(target));
         if(q->action=='G' || q->action=='D') {
             result=members_group_change(target,q->user,q->cursor,q->action=='G');
         }
-        if(q->action=='A')result=members_approve(target,q->user);
         if(result<=0) { strcpy(r->text,result<0?"ERR member storage unavailable\r\n":"ERR rights syntax\r\n");return; }
         if(result==1) { moderation_credentials_changed(target);r->account_user=target;r->account_epoch=moderation_epoch(target); }
         char groups[401]="";size_t used=0;

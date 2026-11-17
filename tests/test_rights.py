@@ -47,7 +47,16 @@ def run(binary):
             cmd(c,'ACCOUNT',b'ERR login required');c.close();c=Client(s.port)
             cmd(c,'LOGIN charlie',b'PASSWORD');cmd(c,PASSWORD,b'ERR authentication')
             cmd(a,'APPLICATIONS',b'APPLICATIONS');a.expect(b'APPLICATION 3 charlie');a.expect(b'END NEXT 0')
+            cmd(c,'APPLICATIONS',b'ERR login required');cmd(c,'APPROVE 3',b'ERR login required')
+            member=Client(s.port)
+            try:
+                auth(member,'bob')
+                cmd(member,'APPLICATIONS',b'ERR admin required');cmd(member,'APPROVE 3',b'ERR admin required')
+            finally:member.close()
             cmd(a,'APPROVE 3',b'RIGHTS 3 LEVEL 2 GROUPS - STATUS active');c.close();c=Client(s.port);auth(c,'charlie')
+            approved_size=users.stat().st_size
+            cmd(a,'APPROVE 3',b'ERR rights syntax');assert users.stat().st_size==approved_size
+            cmd(a,'APPLICATIONS',b'APPLICATIONS');a.expect(b'END NEXT 0')
             cmd(c,'RIGHTS',b'RIGHTS 3 LEVEL 2 GROUPS - STATUS active')
             cmd(a,'RIGHTS 2',b'RIGHTS 2 LEVEL 5 GROUPS 32')
         finally:a.close();c.close();s.close()

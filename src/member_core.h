@@ -10,7 +10,8 @@ typedef struct { uint32_t user,epoch; } MemberActor;
 typedef enum { MEMBER_CORE_OK, MEMBER_CORE_REVOKED, MEMBER_CORE_STORAGE,
                MEMBER_CORE_MODERATION_STORAGE, MEMBER_CORE_ADMIN_REQUIRED,
                MEMBER_CORE_NOT_FOUND, MEMBER_CORE_INVALID, MEMBER_CORE_PROTECTED,
-               MEMBER_CORE_EXTRAS_STORAGE, MEMBER_CORE_MODERATION_UNCERTAIN } MemberOutcome;
+               MEMBER_CORE_EXTRAS_STORAGE, MEMBER_CORE_MODERATION_UNCERTAIN,
+               MEMBER_CORE_LOGIN_REQUIRED, MEMBER_CORE_RIGHTS_INVALID } MemberOutcome;
 typedef enum { MEMBER_ROLE_NONE, MEMBER_ROLE_GUEST, MEMBER_ROLE_MEMBER, MEMBER_ROLE_ADMIN } MemberRole;
 typedef enum { MEMBER_STATE_ACTIVE, MEMBER_STATE_PENDING, MEMBER_STATE_SUSPENDED } MemberState;
 typedef struct { uint32_t id; char name[33]; MemberState state; } MemberSummary;
@@ -32,4 +33,12 @@ MemberOutcome member_core_get(const MemberActor *,uint32_t target,MemberSummary 
  * Resume clears the suspension flag, not pending/deleted-account restrictions. */
 typedef struct { uint32_t user,epoch; } MemberChange;
 MemberOutcome member_core_suspend(const MemberActor *,uint32_t target,int suspend,MemberChange *out);
+/* Admin-only pending applications, with the same inclusive paging contract.
+ * Guests receive LOGIN_REQUIRED; only active pending accounts are returned. */
+MemberOutcome member_core_applications(const MemberActor *,uint32_t start,MemberPage *out);
+/* Approve an active pending account. The member store owns durable publication;
+ * Core advances the credential epoch only after a changed result. Repeated
+ * approval is a state error, not a successful no-op. Forward MemberChange via
+ * the existing runtime notification path. No other rights are modified. */
+MemberOutcome member_core_approve(const MemberActor *,uint32_t target,MemberChange *out);
 #endif
