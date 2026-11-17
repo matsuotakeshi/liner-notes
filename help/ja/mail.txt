@@ -28,3 +28,4 @@ Nは日付入力（空入力はCHECK MAIL）。次の未読はMAIL NEXT、最新
 通常の本文表示中もEnter:次、P:前、L:再表示、F:次から無停止、+/-や+N/-N:方向・相対移動。MAIL LISTで一覧へ戻ります。Gは共通バッファへ取り込み、次の編集で/BUFFERを使用。
 MAILUPLOAD / MAILUPLOADBATCH / MAILDOWNLOAD / MAILDOWNLOADALLはPROTOCOLで選んだ方式を使用。UPLOAD側の引数は説明（XMODEM/TEXTは名前|サイズ|説明）、DOWNLOAD側はファイル番号／メール番号。Zで始まる従来コマンドはZMODEM固定。XMODEM/TEXTの一括転送は不可。送受信者限定は全方式共通。
 下書きは本人専用です。別接続が更新した古い版では保存・送信・削除できません。宛先停止・返信先削除で再開できない下書きも、MAIL DRAFTで版確認しMAIL DRAFT DELETE 版番号で削除できます。
+一覧は最大8件ずつ、+で同じ条件の続きを表示します。一覧・検索や送信者自身の読書では受信者の既読状態は変わりません。

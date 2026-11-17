@@ -115,3 +115,6 @@ code returned 0 for both S/W quota rejection and normal paths. Files and result
 are under build/mail-quota-reproduction/. This isolated contract reproduction
 is not a full runtime/socket pass. Socket-test syntax and diff checks passed;
 new hosted CI must execute the full regression. No test was disabled or relaxed.
+
+The follow-up [mail reading boundary](MAIL_READING.md) extracts list/search and
+read/navigation operations; the composition contracts above are retained.

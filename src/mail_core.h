@@ -10,7 +10,7 @@
 typedef struct { uint32_t user,epoch; } MailActor;
 typedef enum { MAIL_CORE_OK, MAIL_CORE_LOGIN_REQUIRED, MAIL_CORE_REVOKED,
     MAIL_CORE_MEMBER_STORAGE, MAIL_CORE_MODERATION_STORAGE, MAIL_CORE_DISABLED,
-    MAIL_CORE_STORAGE, MAIL_CORE_UNAVAILABLE, MAIL_CORE_BODY_LIMIT } MailOutcome;
+    MAIL_CORE_STORAGE, MAIL_CORE_UNAVAILABLE, MAIL_CORE_BODY_LIMIT, MAIL_CORE_BODY_STORAGE } MailOutcome;
 typedef struct { uint32_t to,parent; char title[81]; } MailCompose;
 typedef struct {
     uint32_t revision,to,parent;
@@ -40,4 +40,37 @@ MailOutcome mail_core_delete(const MailActor *,uint32_t id);
 MailOutcome mail_core_attachment_select(const MailActor *,const MailAttachments *,
                                         uint32_t id,int detach,MailAttachments *out);
 MailOutcome mail_core_attachment_drop(const MailActor *,uint32_t id);
+
+/* Owned read models. Names are copied, sender=0 renders as guest. Read/list
+ * authorization is participant-only, including for administrators. */
+typedef struct {
+    uint32_t id,sender,recipient,parent;
+    uint64_t time;
+    int read;
+    char from[33],to[33],title[81];
+} MailSummary;
+typedef enum { MAIL_LIST_ALL, MAIL_LIST_SENT, MAIL_LIST_UNREAD, MAIL_LIST_INBOX,
+               MAIL_LIST_SEARCH, MAIL_LIST_NEWS } MailListMode;
+typedef struct {
+    MailListMode mode;
+    uint32_t cursor; /* exclusive; next is the last ID before the next match */
+    const char *query; /* nonempty <=80 bytes for SEARCH; ignored otherwise */
+    uint64_t since,until; /* NEWS: inclusive bounds; until=0 means no upper bound */
+} MailQuery;
+typedef struct { unsigned count,unread; uint32_t next; MailSummary rows[8]; } MailPage;
+MailOutcome mail_core_list(const MailActor *,const MailQuery *,MailPage *out);
+typedef enum { MAIL_READ_ID, MAIL_READ_UNREAD, MAIL_READ_LATEST, MAIL_READ_SEQUENCE } MailReadMode;
+typedef struct {
+    MailSummary message;
+    MailAttachments attachments;
+    uint32_t next;
+    int sequence; /* success + sequence + message.id=0 means end, not denial */
+} MailRead;
+/* ID uses start; SEQUENCE uses inclusive start and direction. Descending starts
+ * beyond the store clamp to its last ID; start=0 ends the sequence. Read marks
+ * recipient mail before loading the body, preserving durable existing ordering.
+ * A later body failure can therefore leave mail read, but exposes no payload.
+ * List/search never marks mail. All failed outputs/body buffers are cleared. */
+MailOutcome mail_core_read(const MailActor *,MailReadMode,uint32_t start,int descending,
+                          MailRead *out,char *body,size_t capacity);
 #endif
