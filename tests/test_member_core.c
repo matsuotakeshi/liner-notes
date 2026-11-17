@@ -9,14 +9,15 @@
 #include <assert.h>
 #include <stdio.h>
 #include <string.h>
+#include <stdlib.h>
 
 int members_rtbbs_policy;
-static const char *profile_values[15][PROFILE_FIELDS];
+static const char *profile_values[15][PROFILE_BUFFER+1];
 static unsigned profile_access[15][PROFILE_FIELDS],profile_read_count,profile_match_count,profile_admin_calls;
 static unsigned profile_read_failure;
 static int profile_error;
 static uint32_t profile_admin_actor;
-static char profile_scratch[8194];
+static char profile_scratch[CONTENT_BODY+2];
 static ApplicationNotes application_notes[15];
 static unsigned application_reads,application_saves;
 static int application_load_ok,application_save_ok;
@@ -33,8 +34,9 @@ int application_repository_save(uint32_t user,ApplicationNoteField field,const c
     application_notes[user].present[field]=1;strcpy(application_notes[user].values[field],value);return 1;
 }
 const char *profile_value(uint32_t owner,unsigned field) {
-    assert(owner>0 && owner<15 && field<PROFILE_FIELDS);
+    assert(owner>0 && owner<15 && field<=PROFILE_BUFFER);
     profile_read_count++;if(field+1==profile_read_failure)profile_error=1;
+    if(!profile_values[owner][field])return NULL;
     snprintf(profile_scratch,sizeof(profile_scratch),"%s",profile_values[owner][field]);return profile_scratch;
 }
 const char *profile_visible(uint32_t owner,uint32_t viewer,unsigned field,char scratch[16]) {
@@ -283,6 +285,7 @@ int moderation_suspended(uint32_t id) { return id<15?(suspended[id] || pending[i
 uint32_t moderation_epoch(uint32_t id) { return epoch+(id<15?epoch_changes[id]:0); }
 int moderation_admin(uint32_t id) { return id==1 && admin; }
 static MemberActor reset(void) {
+    for(unsigned u=0;u<15;u++)profile_values[u][PROFILE_BUFFER]="";
     memset(application_notes,0,sizeof(application_notes));application_reads=application_saves=application_target=0;
     application_load_ok=application_save_ok=1;
     for(unsigned u=0;u<15;u++)for(unsigned f=0;f<PROFILE_FIELDS;f++) {
@@ -1625,7 +1628,70 @@ static void application_review_failures(void) {
     assert(member_core_application_get(&actor,5,NULL)==MEMBER_CORE_INVALID);
     puts("PASS: broken/partial application reads clear all private output; failed notes do not publish a state change");
 }
+static void document_views(void) {
+    MemberActor actor=reset();actor.user=2;
+    char body[128];profile_values[2][1]="self intro\nsecond line";
+    profile_values[2][PROFILE_BUFFER]="private draft\n";
+    profile_values[1][PROFILE_BUFFER]="administrator buffer";
+    assert(member_core_document_get(&actor,MEMBER_DOCUMENT_BIO,body,sizeof(body))==MEMBER_CORE_OK);
+    assert(!strcmp(body,"self intro\nsecond line"));
+    assert(member_core_document_get(&actor,MEMBER_DOCUMENT_BUFFER,body,sizeof(body))==MEMBER_CORE_OK);
+    assert(!strcmp(body,"private draft\n"));memset(profile_scratch,'x',32);
+    assert(!strcmp(body,"private draft\n"));
+    assert(member_core_document_save(&actor,MEMBER_DOCUMENT_BUFFER,body)==MEMBER_CORE_OK);
+    assert(profile_owner==2 && profile_field_seen==PROFILE_BUFFER && profile_borrowed==body);
+    assert(member_core_document_save(&actor,MEMBER_DOCUMENT_BIO,"bio")==MEMBER_CORE_OK && profile_field_seen==1);
+    assert(member_core_document_save(&actor,MEMBER_DOCUMENT_BUFFER,"")==MEMBER_CORE_OK && !*profile_borrowed);
+    assert(profile_writes==3 && !profile_modes && !credential_changes);
+    puts("PASS: owned BIO/buffer snapshots and save/clear isolation without profile visibility or auth changes");
+}
+static void document_bounds(void) {
+    MemberActor actor=reset();char *body=malloc(CONTENT_BODY+2);assert(body);
+    memset(body,'x',CONTENT_BODY+1);body[CONTENT_BODY+1]=0;
+    assert(member_core_document_save(&actor,MEMBER_DOCUMENT_BUFFER,body)==MEMBER_CORE_PROFILE_TEXT && !profile_sets);
+    body[CONTENT_BODY]=0;
+    assert(member_core_document_save(&actor,MEMBER_DOCUMENT_BUFFER,body)==MEMBER_CORE_OK);
+    profile_values[1][PROFILE_BUFFER]=body;
+    char *out=malloc(CONTENT_BODY+2);assert(out);
+    assert(member_core_document_get(&actor,MEMBER_DOCUMENT_BUFFER,out,CONTENT_BODY+1)==MEMBER_CORE_OK && !strcmp(body,out));
+    assert(member_core_document_get(&actor,MEMBER_DOCUMENT_BUFFER,out,CONTENT_BODY)==MEMBER_CORE_PROFILE_TEXT);cleared(out,CONTENT_BODY);
+    body[CONTENT_BODY]='x';
+    assert(member_core_document_get(&actor,MEMBER_DOCUMENT_BUFFER,out,CONTENT_BODY+2)==MEMBER_CORE_EXTRAS_STORAGE);cleared(out,CONTENT_BODY+2);
+    body[8193]=0;assert(member_core_document_save(&actor,MEMBER_DOCUMENT_BIO,body)==MEMBER_CORE_PROFILE_TEXT);
+    body[8192]=0;assert(member_core_document_save(&actor,MEMBER_DOCUMENT_BIO,body)==MEMBER_CORE_OK);
+    assert(member_core_document_get(&actor,(MemberDocument)99,out,20)==MEMBER_CORE_INVALID);cleared(out,20);
+    assert(member_core_document_save(&actor,(MemberDocument)99,"")==MEMBER_CORE_INVALID);
+    assert(member_core_document_save(&actor,MEMBER_DOCUMENT_BUFFER,NULL)==MEMBER_CORE_PROFILE_TEXT);
+    profile_values[1][PROFILE_BUFFER]=NULL;
+    assert(member_core_document_get(&actor,MEMBER_DOCUMENT_BUFFER,out,20)==MEMBER_CORE_EXTRAS_STORAGE);cleared(out,20);
+    free(body);free(out);puts("PASS: document byte limits, owned capacity, invalid kind and corrupt/null storage values");
+}
+static void document_denials(void) {
+    for(unsigned i=0;i<7;i++) {
+        MemberActor actor=reset();MemberOutcome expected=MEMBER_CORE_REVOKED;char body[64];
+        if(i==0) { actor.user=0;expected=MEMBER_CORE_LOGIN_REQUIRED; }
+        else if(i==1)actor.epoch++;
+        else if(i==2)suspended[1]=1;
+        else if(i==3) { member_error=1;expected=MEMBER_CORE_STORAGE; }
+        else if(i==4) { moderation_error=1;expected=MEMBER_CORE_MODERATION_STORAGE; }
+        else if(i==5) { profile_error=1;expected=MEMBER_CORE_EXTRAS_STORAGE; }
+        else { extras_error=1;expected=MEMBER_CORE_EXTRAS_STORAGE; }
+        memset(body,'x',sizeof(body));
+        assert(member_core_document_get(&actor,MEMBER_DOCUMENT_BUFFER,body,sizeof(body))==expected);cleared(body,sizeof(body));
+        assert(member_core_document_save(&actor,MEMBER_DOCUMENT_BIO,"bio")==expected && !profile_sets && !profile_read_count);
+    }
+    MemberActor actor=reset();char body[64];profile_values[1][1]="partial private text";profile_read_failure=2;
+    assert(member_core_document_get(&actor,MEMBER_DOCUMENT_BIO,body,sizeof(body))==MEMBER_CORE_EXTRAS_STORAGE);cleared(body,sizeof(body));
+    for(int saved=-1;saved<=0;saved++) {
+        actor=reset();profile_result=saved;
+        assert(member_core_document_save(&actor,MEMBER_DOCUMENT_BUFFER,"kept")== (saved<0?MEMBER_CORE_PROFILE_TEXT:MEMBER_CORE_EXTRAS_STORAGE));
+        assert(!profile_writes);
+    }
+    assert(member_core_document_get(NULL,MEMBER_DOCUMENT_BUFFER,body,sizeof(body))==MEMBER_CORE_LOGIN_REQUIRED);
+    puts("PASS: direct document auth/epoch/health gates, partial read clearing and failed saves");
+}
 int main(void) {
+    document_views();document_bounds();document_denials();
     application_review_views();application_review_authority();application_note_edits();application_review_failures();
     profile_snapshots();profile_search_pages();profile_search_policy();profile_service_failures();
     profile_admin_edits();profile_admin_denials();

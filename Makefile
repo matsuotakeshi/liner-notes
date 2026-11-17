@@ -88,6 +88,7 @@ test: test-userlog test-chat runtime vaultctl test-adapters test-vault-core test
 	$(PYTHON) tests/test_mail_reading.py ./runtime
 	$(PYTHON) tests/test_mail_resources.py ./runtime
 	$(PYTHON) tests/test_mail_delivery.py ./runtime
+	$(PYTHON) tests/test_editor_documents.py ./runtime
 	$(PYTHON) tests/test_mail_draft_notice.py ./runtime
 	$(PYTHON) tests/test_mail_arrival.py ./runtime
 	$(PYTHON) tests/test_mail_notify.py ./runtime
@@ -344,7 +345,7 @@ test-stage74-scale: runtime generate-scale
 # Typed Core service tests run without a terminal, socket or live database.
 .PHONY: test-article-core
 runtime test-adapters: src/article_core.h src/article_repository.h
-test-article-core: src/content_limits.h src/store_limits.h tests/test_article_core.c src/article_core.c src/article_core.h src/article_repository.h src/members.h src/catalog.h src/moderation.h src/board_policy.h src/extras.h
+test-article-core: src/profile_store.h src/content_limits.h src/store_limits.h tests/test_article_core.c src/article_core.c src/article_core.h src/article_repository.h src/members.h src/catalog.h src/moderation.h src/board_policy.h src/extras.h
 	$(CC) $(CPPFLAGS) $(CFLAGS) $(LDFLAGS) -std=c11 -Wall -Wextra -Werror -Isrc tests/test_article_core.c src/article_core.c -o test-article-core
 	./test-article-core
 check: test-article-core

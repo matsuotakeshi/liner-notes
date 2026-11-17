@@ -125,9 +125,14 @@ static void board_features(const BoardRequest *q,BoardResult *r) {
         r->board_grant=q->cursor;r->board_revision=revision;r->service_action='2';r->service_number=b;return;
     }
     if(q->action=='G') {
-        if(!on_board(q->number,q->board) || unavailable(q->number) || !catalog_read(q->board,q->user)) { strcpy(r->text,"ERR no article\r\n");return; }
-        if(members_enabled() && !q->user) { strcpy(r->text,"ERR login required\r\n");return; }
-        const char *body=article_body(article_at(q->number-1));if(failed || profile_set(q->user,PROFILE_BUFFER,body)!=1) { strcpy(r->text,"ERR article storage\r\n");return; }strcpy(r->text,"ARTICLE IMPORTED TO BUFFER\r\n");return;
+        ArticleActor actor={q->user,q->user_epoch,q->board_grants};
+        ArticleOutcome result=article_import_buffer(&actor,q->board,q->number,r->draft_body,sizeof(r->draft_body));
+        if(result==ARTICLE_OK)strcpy(r->text,"ARTICLE IMPORTED TO BUFFER\r\n");
+        else if(result==ARTICLE_NOT_FOUND)strcpy(r->text,"ERR no article\r\n");
+        else if(result==ARTICLE_LOGIN_REQUIRED)strcpy(r->text,"ERR login required\r\n");
+        else if(result==ARTICLE_REVOKED) { r->revoked=1;strcpy(r->text,"ERR session revoked\r\n"); }
+        else strcpy(r->text,"ERR article storage\r\n");
+        return;
     }
     if(!catalog_manage(b,q->user)) { strcpy(r->text,"ERR admin required\r\n");return; }
     if((strchr("SCWDMB",q->action) || (q->action=='O' && *q->body)) && !require_v5()) { strcpy(r->text,"ERR board policy storage\r\n");return; }

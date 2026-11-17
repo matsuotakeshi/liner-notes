@@ -508,3 +508,36 @@ MemberOutcome member_core_application_set(const MemberActor *actor,uint32_t targ
     if(n>320)return MEMBER_CORE_APPLICATION_INVALID;
     return application_repository_save(target,field,value)?MEMBER_CORE_OK:MEMBER_CORE_SETTINGS_STORAGE;
 }
+
+static int document_field(MemberDocument kind,unsigned *field,size_t *limit) {
+    if(kind==MEMBER_DOCUMENT_BIO) { *field=1;*limit=8192;return 1; }
+    if(kind==MEMBER_DOCUMENT_BUFFER) { *field=PROFILE_BUFFER;*limit=CONTENT_BODY;return 1; }
+    return 0;
+}
+MemberOutcome member_core_document_get(const MemberActor *actor,MemberDocument kind,char *body,size_t capacity) {
+    if(body && capacity)memset(body,0,capacity);
+    MemberOutcome result=authorize_profile(actor);if(result!=MEMBER_CORE_OK)return result;
+    unsigned field;size_t limit;
+    if(!body || !capacity || !document_field(kind,&field,&limit))return MEMBER_CORE_INVALID;
+    const char *value=profile_value(actor->user,field);
+    result=profile_health();
+    if(result==MEMBER_CORE_OK) {
+        size_t n=0;if(value)while(n<=limit && value[n])n++;
+        if(!value || n>limit)result=MEMBER_CORE_EXTRAS_STORAGE;
+        else if(n>=capacity)result=MEMBER_CORE_PROFILE_TEXT;
+        else memcpy(body,value,n+1);
+    }
+    if(result!=MEMBER_CORE_OK)memset(body,0,capacity);
+    return result;
+}
+MemberOutcome member_core_document_save(const MemberActor *actor,MemberDocument kind,const char *body) {
+    MemberOutcome result=authorize_profile(actor);if(result!=MEMBER_CORE_OK)return result;
+    unsigned field;size_t limit;
+    if(!document_field(kind,&field,&limit))return MEMBER_CORE_INVALID;
+    if(!body)return MEMBER_CORE_PROFILE_TEXT;
+    size_t n=0;while(n<=limit && body[n])n++;
+    if(n>limit)return MEMBER_CORE_PROFILE_TEXT;
+    int saved=profile_set(actor->user,field,body);
+    if(saved!=1)return saved<0?MEMBER_CORE_PROFILE_TEXT:MEMBER_CORE_EXTRAS_STORAGE;
+    return profile_health();
+}
