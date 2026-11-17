@@ -3,7 +3,9 @@
 Baseline: main `f748a5d94662adf6d01e34c5ea5efc3c96f88b7b` (PR #74).
 This LN-23/24 slice starts an independent member_core module for ROLE, MEMBERS
 and MEMBER status queries. Account mutations, authentication, profile disclosure,
-RIGHTS and lifecycle operations remain in their existing paths.
+RIGHTS and lifecycle operations remain in their existing paths. At this baseline
+only queries were extracted; the subsequent [suspension service](MEMBER_SUSPENSION.md)
+adds the explicit durable mutation API while keeping these queries read-only.
 
 ## Responsibilities and trust
 

@@ -62,6 +62,8 @@ def run(binary):
             size=journal.stat().st_size; expect(a,'SUSPEND 2','SUSPENDED 2'); assert journal.stat().st_size==size
             # Resume BEFORE the victims read: old sessions must not come back.
             expect(a,'RESUME 2','RESUMED 2')
+            resumed_size=journal.stat().st_size
+            expect(a,'RESUME 2','RESUMED 2'); assert journal.stat().st_size==resumed_size
             for victim in [b,c,t]:
                 output=closed(victim); assert b'SAVED' not in output and b'AWAKE' not in output
             b.close(); b=Client(s.port); auth(b,'bob')

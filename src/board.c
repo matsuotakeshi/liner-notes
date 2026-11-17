@@ -834,6 +834,9 @@ static void member_result(MemberOutcome result,BoardResult *r) {
     case MEMBER_CORE_REVOKED:r->revoked=1;strcpy(r->text,"ERR session revoked\r\n");break;
     case MEMBER_CORE_ADMIN_REQUIRED:strcpy(r->text,"ERR admin required\r\n");break;
     case MEMBER_CORE_NOT_FOUND:strcpy(r->text,"ERR no member\r\n");break;
+    case MEMBER_CORE_PROTECTED:strcpy(r->text,"ERR protected member\r\n");break;
+    case MEMBER_CORE_EXTRAS_STORAGE:strcpy(r->text,"ERR extras storage\r\n");break;
+    case MEMBER_CORE_MODERATION_UNCERTAIN:strcpy(r->text,"ERR moderation storage uncertain\r\n");break;
     case MEMBER_CORE_MODERATION_STORAGE:strcpy(r->text,"ERR moderation storage unavailable\r\n");break;
     default:strcpy(r->text,"ERR member storage unavailable\r\n");break;
     }
@@ -951,7 +954,7 @@ static void execute(const BoardRequest *q,BoardResult *r) {
         if(result!=MEMBER_CORE_OK) { member_result(result,r);return; }
         snprintf(r->text,sizeof(r->text),"ROLE %s\r\n",role==MEMBER_ROLE_ADMIN?"admin":role==MEMBER_ROLE_MEMBER?"member":"guest");return;
     }
-    if(((strchr("hri",q->op) && !catalog_manage(q->board,q->user)) || (strchr("xy",q->op) && !moderation_admin(q->user)))) { strcpy(r->text,"ERR admin required\r\n"); return; }
+    if(strchr("hri",q->op) && !catalog_manage(q->board,q->user)) { strcpy(r->text,"ERR admin required\r\n"); return; }
     if(moderation_broken()) { strcpy(r->text,"ERR moderation storage unavailable\r\n"); return; }
     if(q->op==BOARD_MAIL_TRANSFER) { if(!members_name(q->user)) { strcpy(r->text,"ERR login required\r\n");return; }mail_files_transfer(q->user,q->body,r->text,sizeof(r->text));return; }
     if(q->op=='m') { if(!members_name(q->user)) { strcpy(r->text,"ERR login required\r\n");return; }mail_execute(q,r);return; }
@@ -1110,12 +1113,11 @@ static void execute(const BoardRequest *q,BoardResult *r) {
         snprintf(r->text+pos,sizeof(r->text)-pos,"END NEXT %u\r\n",page.next);return;
     }
     if(q->op=='x' || q->op=='y') {
-        if(!members_name(q->number)) { strcpy(r->text,"ERR no member\r\n"); return; }
-        if(q->number==q->user || moderation_protected(q->number)) { strcpy(r->text,"ERR protected member\r\n"); return; }
-        if((uint64_t)moderation_count()+extras_audit_count()>=UINT32_MAX) { strcpy(r->text,"ERR moderation storage uncertain\r\n"); return; }
-        if(!moderation_suspend(q->number,q->user,q->op=='x')) { strcpy(r->text,"ERR moderation storage uncertain\r\n"); return; }
-        r->account_user=q->number; r->account_epoch=moderation_epoch(q->number);
-        snprintf(r->text,sizeof(r->text),"%s %u\r\n",q->op=='x'?"SUSPENDED":"RESUMED",q->number); return;
+        MemberActor actor={q->user,q->user_epoch};MemberChange change;
+        MemberOutcome result=member_core_suspend(&actor,q->number,q->op=='x',&change);
+        if(result!=MEMBER_CORE_OK) { member_result(result,r);return; }
+        r->account_user=change.user;r->account_epoch=change.epoch;
+        snprintf(r->text,sizeof(r->text),"%s %u\r\n",q->op=='x'?"SUSPENDED":"RESUMED",change.user);return;
     }
     if(q->op=='b' || q->op=='J') {
         ArticleActor actor={q->user,q->user_epoch,q->board_grants};

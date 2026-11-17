@@ -2,14 +2,15 @@
 #define MEMBER_CORE_H
 #include <stdint.h>
 
-/* Internal, worker-owned account query service. Trusted session supplies its
+/* Internal, worker-owned account service. Trusted session supplies its
  * authenticated ID/epoch; no caller admin flag or cached authorization. No
- * socket/UI dependency or writes. Outputs own their data and clear on failure.
+ * socket/UI dependency. Outputs own their data and clear on failure.
  * Input/output storage must not overlap; no pointer is retained. */
 typedef struct { uint32_t user,epoch; } MemberActor;
 typedef enum { MEMBER_CORE_OK, MEMBER_CORE_REVOKED, MEMBER_CORE_STORAGE,
                MEMBER_CORE_MODERATION_STORAGE, MEMBER_CORE_ADMIN_REQUIRED,
-               MEMBER_CORE_NOT_FOUND, MEMBER_CORE_INVALID } MemberOutcome;
+               MEMBER_CORE_NOT_FOUND, MEMBER_CORE_INVALID, MEMBER_CORE_PROTECTED,
+               MEMBER_CORE_EXTRAS_STORAGE, MEMBER_CORE_MODERATION_UNCERTAIN } MemberOutcome;
 typedef enum { MEMBER_ROLE_NONE, MEMBER_ROLE_GUEST, MEMBER_ROLE_MEMBER, MEMBER_ROLE_ADMIN } MemberRole;
 typedef enum { MEMBER_STATE_ACTIVE, MEMBER_STATE_PENDING, MEMBER_STATE_SUSPENDED } MemberState;
 typedef struct { uint32_t id; char name[33]; MemberState state; } MemberSummary;
@@ -23,4 +24,12 @@ MemberOutcome member_core_role(const MemberActor *,MemberRole *out);
  * these summaries do not assert login eligibility or expose private profiles. */
 MemberOutcome member_core_list(const MemberActor *,uint32_t start,MemberPage *out);
 MemberOutcome member_core_get(const MemberActor *,uint32_t target,MemberSummary *out);
+/* Admin-only durable suspend/resume. suspend must be 0 or 1. Self/protected
+ * targets are rejected, and combined audit capacity is checked before append.
+ * Existing store owns idempotence, audit publication and credential epochs.
+ * On success forward the committed target/epoch to existing connection
+ * invalidation. No success data is returned on failure; no socket is touched.
+ * Resume clears the suspension flag, not pending/deleted-account restrictions. */
+typedef struct { uint32_t user,epoch; } MemberChange;
+MemberOutcome member_core_suspend(const MemberActor *,uint32_t target,int suspend,MemberChange *out);
 #endif
