@@ -8,6 +8,8 @@
 
 `APPLICATIONS` → `APPLICATION 会員番号` で内容を確認し、必要なら `APPLICATIONSET 会員番号 項目 値` で修正して `APPROVE 会員番号` で承認します。却下は `REJECT 番号 CONFIRM`、申請削除は `DELETEAPPLICATION 番号 CONFIRM`。利用停止とは別の処理です。
 
+申請詳細の閲覧と `FROMBBS`（紹介元BBS）・`SYSOPNOTE`（管理者宛てメモ）の修正は、管理者が申請中の会員に対して行います。通常のプロフィール公開とは別の管理操作です。承認・却下後は申請詳細の対象から外れます。`APPLICATIONSET` でプロフィール項目を指定した場合は管理者のプロフィール編集として扱うため、承認後の修正も可能です。
+
 ## 会員管理コマンド
 
 | 命令 | 用途 |

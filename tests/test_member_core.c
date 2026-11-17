@@ -17,6 +17,26 @@ static unsigned profile_read_failure;
 static int profile_error;
 static uint32_t profile_admin_actor;
 static char profile_scratch[8194];
+static ApplicationNotes application_notes[15];
+static unsigned application_reads,application_saves;
+static int application_load_ok,application_save_ok;
+static uint32_t application_target;
+int application_repository_load(uint32_t user,ApplicationNotes *out) {
+    assert(user>0 && user<15);application_reads++;application_target=user;
+    *out=application_notes[user]; /* May expose a partial result when reporting failure. */
+    return application_load_ok;
+}
+int application_repository_save(uint32_t user,ApplicationNoteField field,const char *value) {
+    assert(user>0 && user<15 && field>=APPLICATION_FROM_BBS && field<=APPLICATION_SYSOP_NOTE);
+    assert(value && strlen(value)<=320);application_saves++;application_target=user;
+    if(!application_save_ok)return 0;
+    application_notes[user].present[field]=1;strcpy(application_notes[user].values[field],value);return 1;
+}
+const char *profile_value(uint32_t owner,unsigned field) {
+    assert(owner>0 && owner<15 && field<PROFILE_FIELDS);
+    profile_read_count++;if(field+1==profile_read_failure)profile_error=1;
+    snprintf(profile_scratch,sizeof(profile_scratch),"%s",profile_values[owner][field]);return profile_scratch;
+}
 const char *profile_visible(uint32_t owner,uint32_t viewer,unsigned field,char scratch[16]) {
     assert(owner>0 && owner<15 && viewer>0 && viewer<15 && field<PROFILE_FIELDS);
     profile_read_count++;if(field+1==profile_read_failure)profile_error=1;
@@ -263,6 +283,8 @@ int moderation_suspended(uint32_t id) { return id<15?(suspended[id] || pending[i
 uint32_t moderation_epoch(uint32_t id) { return epoch+(id<15?epoch_changes[id]:0); }
 int moderation_admin(uint32_t id) { return id==1 && admin; }
 static MemberActor reset(void) {
+    memset(application_notes,0,sizeof(application_notes));application_reads=application_saves=application_target=0;
+    application_load_ok=application_save_ok=1;
     for(unsigned u=0;u<15;u++)for(unsigned f=0;f<PROFILE_FIELDS;f++) {
         profile_values[u][f]="";profile_access[u][f]=f<7;
     }
@@ -1493,7 +1515,118 @@ static void profile_admin_denials(void) {
     }
     puts("PASS: admin profile edit denials, buffer exclusion and store rejection/failure without state publication");
 }
+static void application_review_views(void) {
+    MemberActor actor=reset();MemberApplication out;MemberProfile public_view;
+    profile_values[5][8]="2000-02-29";profile_access[5][8]=2;
+    profile_values[5][9]="Private Name";profile_values[5][11]="Private Address";
+    application_notes[5].present[APPLICATION_FROM_BBS]=1;
+    strcpy(application_notes[5].values[APPLICATION_FROM_BBS],"Origin BBS");
+    application_notes[5].present[APPLICATION_SYSOP_NOTE]=1;
+    strcpy(application_notes[5].values[APPLICATION_SYSOP_NOTE],"Private Note");
+    assert(member_core_profile_get(&actor,5,NULL,&public_view)==MEMBER_CORE_PROFILE_UNAVAILABLE);
+    assert(member_core_application_get(&actor,5,&out)==MEMBER_CORE_OK);
+    assert(out.profile.user==5 && !strcmp(out.profile.name,"user5") && application_target==5);
+    assert(!strcmp(member_profile_value(&out.profile,8),"2000-02-29"));
+    assert(!strcmp(member_profile_value(&out.profile,9),"Private Name"));
+    assert(!strcmp(member_profile_value(&out.profile,11),"Private Address"));
+    assert(!strcmp(out.notes.values[APPLICATION_SYSOP_NOTE],"Private Note"));
+    memset(profile_scratch,'x',100);profile_scratch[100]=0;
+    strcpy(application_notes[5].values[APPLICATION_SYSOP_NOTE],"Changed");
+    assert(!strcmp(out.notes.values[APPLICATION_SYSOP_NOTE],"Private Note"));
+    assert(!strcmp(member_profile_value(&out.profile,11),"Private Address"));
+    suspended[5]=1;protected_target=5;
+    assert(member_core_application_get(&actor,5,&out)==MEMBER_CORE_OK); /* Pending still reviewable. */
+    application_notes[5].present[0]=0;application_notes[5].values[0][0]=0;
+    application_notes[5].present[1]=1;application_notes[5].values[1][0]=0;
+    assert(member_core_application_get(&actor,5,&out)==MEMBER_CORE_OK);
+    assert(!out.notes.present[0] && out.notes.present[1] && !*out.notes.values[1]);
+    assert(!profile_writes && !application_saves && !credential_changes);
+    puts("PASS: admin-only full pending review, owned private fields/notes and missing versus empty notes");
+}
+static void application_review_authority(void) {
+    MemberApplication out;
+    for(unsigned state=0;state<8;state++) {
+        MemberActor actor=reset();MemberOutcome expected=MEMBER_CORE_REVOKED;
+        if(state==0) { actor.user=0;expected=MEMBER_CORE_LOGIN_REQUIRED; }
+        if(state==1) { actor.user=2;expected=MEMBER_CORE_ADMIN_REQUIRED; }
+        if(state==2) { admin=0;expected=MEMBER_CORE_ADMIN_REQUIRED; }
+        if(state==3)actor.epoch--;
+        if(state==4)pending[1]=1;
+        if(state==5)suspended[1]=1;
+        if(state==6)retired[1]=1;
+        if(state==7)present[1]=0;
+        memset(&out,0x7f,sizeof(out));
+        assert(member_core_application_get(&actor,5,&out)==expected);cleared(&out,sizeof(out));
+        assert(member_core_application_set(&actor,5,APPLICATION_SYSOP_NOTE,"x")==expected);
+        assert(!application_reads && !application_saves && !profile_read_count);
+    }
+    MemberActor actor=reset();
+    assert(member_core_application_get(NULL,5,&out)==MEMBER_CORE_LOGIN_REQUIRED);
+    assert(member_core_application_set(NULL,5,APPLICATION_SYSOP_NOTE,"x")==MEMBER_CORE_LOGIN_REQUIRED);
+    const uint32_t invalid[]={0,2,3,MEMBER_MAX,UINT32_MAX};
+    for(unsigned i=0;i<sizeof(invalid)/sizeof(*invalid);i++) {
+        assert(member_core_application_get(&actor,invalid[i],&out)==MEMBER_CORE_APPLICATION_INVALID);cleared(&out,sizeof(out));
+        assert(member_core_application_set(&actor,invalid[i],APPLICATION_FROM_BBS,"x")==MEMBER_CORE_APPLICATION_INVALID);
+    }
+    retired[5]=1;assert(member_core_application_get(&actor,5,&out)==MEMBER_CORE_APPLICATION_INVALID);
+    assert(!application_reads && !application_saves && !profile_read_count);
+    puts("PASS: application review has no guest/SIGOP/stale-session path and rejects ineligible targets before private reads");
+}
+static void application_note_edits(void) {
+    MemberActor actor=reset();MemberApplication out;char max[321],too_long[322];
+    memset(max,'x',320);max[320]=0;memset(too_long,'y',321);too_long[321]=0;
+    for(unsigned field=0;field<2;field++) {
+        assert(member_core_application_set(&actor,5,(ApplicationNoteField)field,max)==MEMBER_CORE_OK);
+        assert(member_core_application_get(&actor,5,&out)==MEMBER_CORE_OK);
+        assert(out.notes.present[field] && !strcmp(out.notes.values[field],max));
+        assert(member_core_application_set(&actor,5,(ApplicationNoteField)field,"")==MEMBER_CORE_OK);
+        assert(member_core_application_get(&actor,5,&out)==MEMBER_CORE_OK);
+        assert(out.notes.present[field] && !*out.notes.values[field]);
+    }
+    unsigned writes=application_saves;
+    assert(member_core_application_set(&actor,5,APPLICATION_FROM_BBS,too_long)==MEMBER_CORE_APPLICATION_INVALID);
+    assert(member_core_application_set(&actor,5,APPLICATION_FROM_BBS,NULL)==MEMBER_CORE_APPLICATION_INVALID);
+    assert(member_core_application_set(&actor,5,(ApplicationNoteField)-1,"")==MEMBER_CORE_APPLICATION_INVALID);
+    assert(member_core_application_set(&actor,5,(ApplicationNoteField)2,"")==MEMBER_CORE_APPLICATION_INVALID);
+    assert(application_saves==writes && pending[5] && !profile_writes && !credential_changes);
+    MemberChange change;
+    assert(member_core_approve(&actor,5,&change)==MEMBER_CORE_OK);
+    assert(member_core_application_get(&actor,5,&out)==MEMBER_CORE_APPLICATION_INVALID);cleared(&out,sizeof(out));
+    assert(member_core_application_set(&actor,5,APPLICATION_SYSOP_NOTE,"late")==MEMBER_CORE_APPLICATION_INVALID);
+    assert(application_saves==writes);
+    actor=reset();assert(member_core_remove(&actor,5,MEMBER_REJECT,&change)==MEMBER_CORE_OK);
+    assert(member_core_application_get(&actor,5,&out)==MEMBER_CORE_APPLICATION_INVALID);cleared(&out,sizeof(out));
+    assert(member_core_application_set(&actor,5,APPLICATION_FROM_BBS,"late")==MEMBER_CORE_APPLICATION_INVALID);
+    puts("PASS: application note limits/empty values and immediate approval/rejection eligibility rechecks");
+}
+static void application_review_failures(void) {
+    MemberApplication out;
+    for(unsigned store=0;store<4;store++) {
+        MemberActor actor=reset();MemberOutcome expected=MEMBER_CORE_EXTRAS_STORAGE;
+        if(store==0) { member_error=1;expected=MEMBER_CORE_STORAGE; }
+        if(store==1) { moderation_error=1;expected=MEMBER_CORE_MODERATION_STORAGE; }
+        if(store==2)extras_error=1;
+        if(store==3)profile_error=1;
+        memset(&out,0x7f,sizeof(out));
+        assert(member_core_application_get(&actor,5,&out)==expected);cleared(&out,sizeof(out));
+        assert(member_core_application_set(&actor,5,APPLICATION_SYSOP_NOTE,"x")==expected);
+        assert(!application_reads && !application_saves && !profile_read_count);
+    }
+    MemberActor actor=reset();profile_values[5][9]="secret";
+    application_notes[5].present[1]=1;strcpy(application_notes[5].values[1],"private note");application_load_ok=0;
+    assert(member_core_application_get(&actor,5,&out)==MEMBER_CORE_SETTINGS_STORAGE);cleared(&out,sizeof(out));
+    assert(application_reads==1);
+    application_save_ok=0;
+    assert(member_core_application_set(&actor,5,APPLICATION_SYSOP_NOTE,"failure")==MEMBER_CORE_SETTINGS_STORAGE);
+    assert(!strcmp(application_notes[5].values[1],"private note") && !credential_changes);
+    actor=reset();profile_read_failure=13;
+    assert(member_core_application_get(&actor,5,&out)==MEMBER_CORE_EXTRAS_STORAGE);cleared(&out,sizeof(out));
+    assert(!application_reads);
+    assert(member_core_application_get(&actor,5,NULL)==MEMBER_CORE_INVALID);
+    puts("PASS: broken/partial application reads clear all private output; failed notes do not publish a state change");
+}
 int main(void) {
+    application_review_views();application_review_authority();application_note_edits();application_review_failures();
     profile_snapshots();profile_search_pages();profile_search_policy();profile_service_failures();
     profile_admin_edits();profile_admin_denials();
     profile_owned_updates();profile_authority();profile_failures();

@@ -71,9 +71,38 @@ static int features_open(const char *base) {
     sqlite3_busy_timeout(features_db,5000);
     return feature_exec(storage_database()?"PRAGMA journal_mode=WAL":"PRAGMA journal_mode=DELETE") && feature_exec("PRAGMA synchronous=FULL;CREATE TABLE IF NOT EXISTS board_deletions(board INTEGER PRIMARY KEY,actor INTEGER,depth INTEGER,done INTEGER);CREATE TABLE IF NOT EXISTS menu_preferences(id INTEGER PRIMARY KEY,value INTEGER);CREATE TABLE IF NOT EXISTS guest_boards(id INTEGER PRIMARY KEY,value INTEGER);CREATE TABLE IF NOT EXISTS news_scoped(user INTEGER,kind INTEGER,scope TEXT,stamp INTEGER NOT NULL,PRIMARY KEY(user,kind,scope));CREATE TABLE IF NOT EXISTS news(user INTEGER,kind INTEGER,stamp INTEGER NOT NULL,PRIMARY KEY(user,kind));CREATE TABLE IF NOT EXISTS delegated(board INTEGER,gid INTEGER,PRIMARY KEY(board,gid));CREATE TABLE IF NOT EXISTS group_moves(board INTEGER PRIMARY KEY,actor INTEGER,source INTEGER,destination INTEGER,done INTEGER);CREATE TABLE IF NOT EXISTS applications(user INTEGER,field TEXT,value TEXT,PRIMARY KEY(user,field));") && feature_exec(LINK_ARTICLES_SCHEMA) && features_import(base) && feature_groups_recover() && delete_recover();
 }
-static int application_value(uint32_t user,const char *field,const char *value) {
+int application_repository_load(uint32_t user,ApplicationNotes *out) {
+    if(!out)return 0;
+    memset(out,0,sizeof(*out));
+    if(!features_db || features_broken || !user || user>MEMBER_MAX)return 0;
+    sqlite3_stmt *s=feature_stmt("SELECT field,value FROM applications WHERE user=? ORDER BY field");if(!s)return 0;
+    int ok=sqlite3_bind_int(s,1,(int)user)==SQLITE_OK,rc=SQLITE_DONE;
+    while(ok && (rc=sqlite3_step(s))==SQLITE_ROW) {
+        if(sqlite3_column_type(s,0)!=SQLITE_TEXT || sqlite3_column_type(s,1)!=SQLITE_TEXT) { ok=0;break; }
+        const char *key=(const char *)sqlite3_column_text(s,0),*value=(const char *)sqlite3_column_text(s,1);
+        int keys=sqlite3_column_bytes(s,0),bytes=sqlite3_column_bytes(s,1),field=-1;
+        if(key && keys==7 && !memcmp(key,"FROMBBS",7))field=APPLICATION_FROM_BBS;
+        if(key && keys==9 && !memcmp(key,"SYSOPNOTE",9))field=APPLICATION_SYSOP_NOTE;
+        if(field<0 || !value || bytes<0 || bytes>320 || strlen(value)!=(size_t)bytes || out->present[field]) { ok=0;break; }
+        memcpy(out->values[field],value,(size_t)bytes+1);out->present[field]=1;
+    }
+    ok=ok && rc==SQLITE_DONE;sqlite3_finalize(s);
+    if(!ok)memset(out,0,sizeof(*out));
+    return ok;
+}
+int application_repository_save(uint32_t user,ApplicationNoteField field,const char *value) {
+    if(!features_db || features_broken || !user || user>MEMBER_MAX ||
+       field<APPLICATION_FROM_BBS || field>APPLICATION_SYSOP_NOTE || !value || strlen(value)>320)return 0;
+    const char *key=field==APPLICATION_FROM_BBS?"FROMBBS":"SYSOPNOTE";
     sqlite3_stmt *s=feature_stmt("INSERT INTO applications VALUES(?,?,?) ON CONFLICT(user,field) DO UPDATE SET value=excluded.value");if(!s)return 0;
-    sqlite3_bind_int(s,1,(int)user);sqlite3_bind_text(s,2,field,-1,SQLITE_STATIC);sqlite3_bind_text(s,3,value,-1,SQLITE_STATIC);int ok=sqlite3_step(s)==SQLITE_DONE;sqlite3_finalize(s);return ok;
+    int ok=sqlite3_bind_int(s,1,(int)user)==SQLITE_OK && sqlite3_bind_text(s,2,key,-1,SQLITE_STATIC)==SQLITE_OK &&
+           sqlite3_bind_text(s,3,value,-1,SQLITE_STATIC)==SQLITE_OK && sqlite3_step(s)==SQLITE_DONE;
+    sqlite3_finalize(s);return ok;
+}
+static int application_value(uint32_t user,const char *field,const char *value) {
+    if(!strcmp(field,"FROMBBS"))return application_repository_save(user,APPLICATION_FROM_BBS,value);
+    if(!strcmp(field,"SYSOPNOTE"))return application_repository_save(user,APPLICATION_SYSOP_NOTE,value);
+    return 0;
 }
 static int registration_details(uint32_t user,const char *body) {
     char copy[8193];if(strlen(body)>=sizeof(copy))return 0;strcpy(copy,body);char *line=copy;
@@ -149,14 +178,23 @@ static void advanced_execute(const BoardRequest *q,BoardResult *r) {
         r->all_accounts_changed=1;r->board_refresh=1;r->password_changed=1;r->account_epoch=moderation_epoch(q->user);strcpy(r->text,"BOARD GROUP MOVED\r\n");return;
     }
     if(q->action=='A') {
-        if(!members_pending(q->number))goto invalid;
-        size_t n=(size_t)snprintf(r->text,sizeof(r->text),"APPLICATION %u %s\r\n",q->number,members_name(q->number));
-        for(unsigned f=0;f<PROFILE_FIELDS;f++)n+=(size_t)snprintf(r->text+n,sizeof(r->text)-n,"%s %s\r\n",profile_key(f),profile_value(q->number,f));
-        sqlite3_stmt *s=feature_stmt("SELECT field,value FROM applications WHERE user=? ORDER BY field");if(!s)goto storage;sqlite3_bind_int(s,1,(int)q->number);while(sqlite3_step(s)==SQLITE_ROW)n+=(size_t)snprintf(r->text+n,sizeof(r->text)-n,"%s %s\r\n",sqlite3_column_text(s,0),sqlite3_column_text(s,1));sqlite3_finalize(s);snprintf(r->text+n,sizeof(r->text)-n,"END APPLICATION\r\n");return;
+        MemberActor actor={q->user,q->user_epoch};MemberApplication application;
+        MemberOutcome result=member_core_application_get(&actor,q->number,&application);
+        if(result!=MEMBER_CORE_OK) { member_result(result,r);return; }
+        size_t n=(size_t)snprintf(r->text,sizeof(r->text),"APPLICATION %u %s\r\n",application.profile.user,application.profile.name);
+        for(unsigned f=0;f<PROFILE_FIELDS;f++)n+=(size_t)snprintf(r->text+n,sizeof(r->text)-n,"%s %s\r\n",profile_key(f),member_profile_value(&application.profile,f));
+        const char *keys[]={"FROMBBS","SYSOPNOTE"};
+        for(unsigned f=0;f<2;f++)if(application.notes.present[f])
+            n+=(size_t)snprintf(r->text+n,sizeof(r->text)-n,"%s %s\r\n",keys[f],application.notes.values[f]);
+        snprintf(r->text+n,sizeof(r->text)-n,"END APPLICATION\r\n");return;
     }
     if(q->action=='a') {
-        if(!members_pending(q->number) || (strcmp(q->title,"FROMBBS") && strcmp(q->title,"SYSOPNOTE")) || strlen(q->body)>320)goto invalid;
-        strcpy(r->text,application_value(q->number,q->title,q->body)?"APPLICATION SAVED\r\n":"ERR settings storage\r\n");return;
+        MemberActor actor={q->user,q->user_epoch};
+        ApplicationNoteField field=!strcmp(q->title,"FROMBBS")?APPLICATION_FROM_BBS:
+                                   !strcmp(q->title,"SYSOPNOTE")?APPLICATION_SYSOP_NOTE:(ApplicationNoteField)-1;
+        MemberOutcome result=member_core_application_set(&actor,q->number,field,q->body);
+        if(result!=MEMBER_CORE_OK)member_result(result,r);else strcpy(r->text,"APPLICATION SAVED\r\n");
+        return;
     }
 invalid:strcpy(r->text,"ERR command\r\n");return;
 storage:strcpy(r->text,"ERR settings storage\r\n");

@@ -3,6 +3,7 @@
 #include <stdint.h>
 #include "chat_preferences.h"
 #include "profile_store.h"
+#include "application_repository.h"
 
 /* Internal, worker-owned account service. Trusted session supplies its
  * authenticated ID/epoch; no caller admin flag or cached authorization. No
@@ -15,7 +16,8 @@ typedef enum { MEMBER_CORE_OK, MEMBER_CORE_REVOKED, MEMBER_CORE_STORAGE,
                MEMBER_CORE_EXTRAS_STORAGE, MEMBER_CORE_MODERATION_UNCERTAIN,
                MEMBER_CORE_LOGIN_REQUIRED, MEMBER_CORE_RIGHTS_INVALID, MEMBER_CORE_STATE, MEMBER_CORE_PASSWORD, MEMBER_CORE_PREFERENCES,
                MEMBER_CORE_PROFILE_TEXT, MEMBER_CORE_PROFILE_ADMINISTRATOR,
-               MEMBER_CORE_PROFILE_UNAVAILABLE, MEMBER_CORE_PROFILE_SEARCH_DENIED, MEMBER_CORE_PROFILE_EDIT } MemberOutcome;
+               MEMBER_CORE_PROFILE_UNAVAILABLE, MEMBER_CORE_PROFILE_SEARCH_DENIED, MEMBER_CORE_PROFILE_EDIT,
+               MEMBER_CORE_APPLICATION_INVALID, MEMBER_CORE_SETTINGS_STORAGE } MemberOutcome;
 typedef enum { MEMBER_ROLE_NONE, MEMBER_ROLE_GUEST, MEMBER_ROLE_MEMBER, MEMBER_ROLE_ADMIN } MemberRole;
 typedef enum { MEMBER_STATE_ACTIVE, MEMBER_STATE_PENDING, MEMBER_STATE_SUSPENDED } MemberState;
 typedef struct { uint32_t id; char name[33]; MemberState state; } MemberSummary;
@@ -146,4 +148,12 @@ MemberOutcome member_core_profile_search(const MemberActor *,const MemberProfile
 /* Global-admin editing, including own/protected/pending/suspended active accounts.
  * No shared-buffer edit or epoch change. Store retains validation and actor audit. */
 MemberOutcome member_core_profile_admin_set(const MemberActor *,uint32_t target,unsigned field,const char *text);
+/* Full pending-application view is a separate administrator-only operation.
+ * It includes private profile fields and optional FROMBBS/SYSOPNOTE; never use
+ * this result as an ordinary member profile. Approval/removal invalidates review
+ * eligibility immediately. Results own their memory and clear on every failure.
+ * Notes edits preserve profile visibility, membership state and auth epochs. */
+typedef struct { MemberProfile profile; ApplicationNotes notes; } MemberApplication;
+MemberOutcome member_core_application_get(const MemberActor *,uint32_t target,MemberApplication *out);
+MemberOutcome member_core_application_set(const MemberActor *,uint32_t target,ApplicationNoteField,const char *value);
 #endif

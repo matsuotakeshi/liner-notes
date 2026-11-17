@@ -404,6 +404,22 @@ const char *member_profile_value(const MemberProfile *profile,unsigned field) {
     return field==0?profile->handle:field==1?profile->bio:profile->fields[field-2];
 }
 
+static MemberOutcome profile_snapshot(uint32_t target,uint32_t viewer,int review,MemberProfile *out) {
+    MemberOutcome result=MEMBER_CORE_OK;
+    const char *name=members_name(target);
+    if(!profile_copy(out->name,sizeof(out->name),name))result=MEMBER_CORE_STORAGE;
+    for(unsigned field=0;result==MEMBER_CORE_OK && field<PROFILE_FIELDS;field++) {
+        char scratch[16];const char *value=review?profile_value(target,field):profile_visible(target,viewer,field,scratch);
+        char *dest=field==0?out->handle:field==1?out->bio:out->fields[field-2];
+        size_t size=field==0?sizeof(out->handle):field==1?sizeof(out->bio):sizeof(out->fields[0]);
+        if(!profile_copy(dest,size,value))result=MEMBER_CORE_EXTRAS_STORAGE;
+    }
+    if(result==MEMBER_CORE_OK)result=profile_health();
+    if(result!=MEMBER_CORE_OK)memset(out,0,sizeof(*out));
+    else out->user=target;
+    return result;
+}
+
 MemberOutcome member_core_profile_get(const MemberActor *actor,uint32_t target,const char *login,MemberProfile *out) {
     if(!out)return MEMBER_CORE_INVALID;
     memset(out,0,sizeof(*out));
@@ -414,19 +430,8 @@ MemberOutcome member_core_profile_get(const MemberActor *actor,uint32_t target,c
         if(target || !n || n>32)return MEMBER_CORE_PROFILE_UNAVAILABLE;
         target=members_find(login);
     } else if(!target)target=actor->user;
-    const char *name=members_name(target);
-    if(!name || moderation_suspended(target))return MEMBER_CORE_PROFILE_UNAVAILABLE;
-    if(!profile_copy(out->name,sizeof(out->name),name))result=MEMBER_CORE_STORAGE;
-    for(unsigned field=0;result==MEMBER_CORE_OK && field<PROFILE_FIELDS;field++) {
-        char scratch[16];const char *value=profile_visible(target,actor->user,field,scratch);
-        char *dest=field==0?out->handle:field==1?out->bio:out->fields[field-2];
-        size_t size=field==0?sizeof(out->handle):field==1?sizeof(out->bio):sizeof(out->fields[0]);
-        if(!profile_copy(dest,size,value))result=MEMBER_CORE_EXTRAS_STORAGE;
-    }
-    if(result==MEMBER_CORE_OK)result=profile_health();
-    if(result!=MEMBER_CORE_OK)memset(out,0,sizeof(*out));
-    else out->user=target;
-    return result;
+    if(!members_name(target) || moderation_suspended(target))return MEMBER_CORE_PROFILE_UNAVAILABLE;
+    return profile_snapshot(target,actor->user,0,out);
 }
 
 MemberOutcome member_core_profile_search(const MemberActor *actor,const MemberProfileQuery *query,MemberProfilePage *out) {
@@ -477,4 +482,29 @@ MemberOutcome member_core_profile_admin_set(const MemberActor *actor,uint32_t ta
         return MEMBER_CORE_PROFILE_EDIT;
     int saved=profile_admin_set(actor->user,target,field,text);
     return saved==1?MEMBER_CORE_OK:saved<0?MEMBER_CORE_PROFILE_EDIT:MEMBER_CORE_EXTRAS_STORAGE;
+}
+
+MemberOutcome member_core_application_get(const MemberActor *actor,uint32_t target,MemberApplication *out) {
+    if(!out)return MEMBER_CORE_INVALID;
+    memset(out,0,sizeof(*out));
+    MemberOutcome result=authorize_member_admin(actor);
+    if(result!=MEMBER_CORE_OK)return result;
+    result=profile_health();if(result!=MEMBER_CORE_OK)return result;
+    if(!target || target>MEMBER_MAX || !members_pending(target))return MEMBER_CORE_APPLICATION_INVALID;
+    result=profile_snapshot(target,actor->user,1,&out->profile);
+    if(result==MEMBER_CORE_OK && !application_repository_load(target,&out->notes))result=MEMBER_CORE_SETTINGS_STORAGE;
+    if(result==MEMBER_CORE_OK)result=profile_health();
+    if(result!=MEMBER_CORE_OK)memset(out,0,sizeof(*out));
+    return result;
+}
+
+MemberOutcome member_core_application_set(const MemberActor *actor,uint32_t target,ApplicationNoteField field,const char *value) {
+    MemberOutcome result=authorize_member_admin(actor);
+    if(result!=MEMBER_CORE_OK)return result;
+    result=profile_health();if(result!=MEMBER_CORE_OK)return result;
+    if(!target || target>MEMBER_MAX || !members_pending(target) || field<APPLICATION_FROM_BBS || field>APPLICATION_SYSOP_NOTE || !value)
+        return MEMBER_CORE_APPLICATION_INVALID;
+    size_t n=0;while(n<=320 && value[n])n++;
+    if(n>320)return MEMBER_CORE_APPLICATION_INVALID;
+    return application_repository_save(target,field,value)?MEMBER_CORE_OK:MEMBER_CORE_SETTINGS_STORAGE;
 }
