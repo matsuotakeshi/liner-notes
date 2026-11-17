@@ -57,6 +57,14 @@ MemberOutcome member_core_level(const MemberActor *,uint32_t target,unsigned lev
  * no caller-provided delegation flag. add must be 0/1, group 1..100.
  * Only changed durable writes publish a new epoch; no-ops return zero change. */
 MemberOutcome member_core_group(const MemberActor *,uint32_t board,uint32_t target,unsigned group,int add,MemberChange *out);
+/* Global-admin bulk group migration, groups 1..100 and distinct. Store commits
+ * one record even with no source memberships. Then all named account epochs
+ * advance, including pending/suspended/retired/protected accounts. Caller
+ * publishes vault notifications through the inclusive bound and revokes other
+ * connections; actor_epoch keeps this administrator's current connection alive.
+ * Worker serializes the commit and publication; this result is not reusable. */
+typedef struct { uint32_t through,actor_epoch; } MemberGroupMove;
+MemberOutcome member_core_group_move(const MemberActor *,unsigned from,unsigned to,MemberGroupMove *out);
 /* Durable terminal account transitions, retaining IDs/names. Only RETIRE is
  * available to a non-admin and always targets the authenticated actor (the
  * supplied target is ignored). Other kinds require global admin authority.

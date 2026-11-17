@@ -1028,11 +1028,11 @@ static void execute(const BoardRequest *q,BoardResult *r) {
     if(q->op==')') {
         if(!q->user) { strcpy(r->text,"ERR login required\r\n");return; }
         if(q->action=='G') {
-            if(!moderation_admin(q->user)) { strcpy(r->text,"ERR admin required\r\n");return; }
-            int ok=members_group_move(q->user,q->number,q->cursor);
-            if(ok==1) { for(uint32_t u=1;u<=MEMBER_MAX;u++)if(members_name(u)) { moderation_credentials_changed(u);vault_worker_account(u,moderation_epoch(u)); }
-                r->all_accounts_changed=1;r->password_changed=1;r->account_epoch=moderation_epoch(q->user);strcpy(r->text,"GROUP MOVED\r\n"); }
-            else strcpy(r->text,ok<0?"ERR member storage unavailable\r\n":"ERR rights syntax\r\n");
+            MemberActor actor={q->user,q->user_epoch};MemberGroupMove change;
+            MemberOutcome outcome=member_core_group_move(&actor,q->number,q->cursor,&change);
+            if(outcome!=MEMBER_CORE_OK) { member_result(outcome,r);return; }
+            for(uint32_t u=1;u<=change.through;u++)if(members_name(u))vault_worker_account(u,moderation_epoch(u));
+            r->all_accounts_changed=1;r->password_changed=1;r->account_epoch=change.actor_epoch;strcpy(r->text,"GROUP MOVED\r\n");
             return;
         }
         if(q->action=='A') { int ok=profile_admin_set(q->user,q->cursor,q->number,q->body);strcpy(r->text,ok==1?"PROFILE SAVED\r\n":"ERR profile permission or value\r\n");return; }

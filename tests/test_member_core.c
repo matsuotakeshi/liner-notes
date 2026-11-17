@@ -111,6 +111,20 @@ static int levels[15];
 static uint32_t group_words[15][4];
 static unsigned group_calls,group_writes,delegation_checks,group_checks;
 static int sigop_enabled,group_enabled;
+static unsigned move_calls,move_writes;
+static int move_result;
+int members_group_move(uint32_t actor,unsigned from,unsigned to) {
+    assert(actor==1 && admin && !moderation_suspended(actor));
+    assert(from && from<=100 && to && to<=100 && from!=to);move_calls++;
+    if(move_result!=1)return move_result;
+    if(!commit_ok) { member_error=1;return -1; }
+    move_writes++;changed_actor=actor;
+    for(uint32_t user=1;user<=count && user<15;user++)if(members_in_group(user,from)) {
+        group_words[user][(from-1)/32]&=~(1u<<((from-1)%32));
+        group_words[user][(to-1)/32]|=1u<<((to-1)%32);
+    }
+    return 1;
+}
 static uint32_t seen_board,seen_user;
 int catalog_sigop(uint32_t board,uint32_t user) {
     delegation_checks++;seen_board=board;seen_user=user;
@@ -156,7 +170,7 @@ int members_approve(uint32_t user,uint32_t actor) {
     pending[user]=0;approval_writes++;changed_user=user;changed_actor=actor;return 1;
 }
 void moderation_credentials_changed(uint32_t user) {
-    assert(user && user<15 && (approval_writes || level_writes || group_writes || remove_writes || password_writes));
+    assert(user && user<15 && (approval_writes || level_writes || group_writes || move_writes || remove_writes || password_writes));
     credential_changes++;epoch_changes[user]++;
 }
 int extras_broken(void) { return extras_error; }
@@ -198,6 +212,7 @@ static MemberActor reset(void) {
     count_calls=target_reads=0;approval_calls=approval_writes=credential_changes=0;
     memset(saved_preferences,0,sizeof(saved_preferences));prefs_reads=prefs_calls=prefs_writes=prefs_user=0;prefs_read_failure=0;
     level_calls=level_writes=0;password_calls=reset_calls=password_writes=0;remove_calls=remove_writes=removed_kind=0;memset(group_words,0,sizeof(group_words));
+    move_calls=move_writes=0;move_result=1;
     group_calls=group_writes=delegation_checks=group_checks=0;sigop_enabled=group_enabled=1;seen_board=seen_user=0;
     for(unsigned i=0;i<15;i++)levels[i]=2;
     memset(retired,0,sizeof(retired));
@@ -1107,12 +1122,85 @@ static void chat_settings_failures(void) {
     }
     puts("PASS: rejected/failed chat updates and partial-read clearing without successful publication");
 }
+static void group_move_success(void) {
+    for(unsigned from=1;from<=100;from++) {
+        MemberActor actor=reset();MemberGroupMove out;
+        unsigned to=from==100?1:from+1,other=to==100?1:to+1;
+        retired[8]=1;
+        for(unsigned user=1;user<15;user++) {
+            group_words[user][(other-1)/32]|=1u<<((other-1)%32);
+            if(user!=9)group_words[user][(from-1)/32]|=1u<<((from-1)%32);
+        }
+        assert(member_core_group_move(&actor,from,to,&out)==MEMBER_CORE_OK);
+        assert(out.through==14 && out.actor_epoch==10 && move_writes==1 && changed_actor==1);
+        assert(credential_changes==12 && !delegation_checks && !group_checks);
+        for(unsigned user=1;user<15;user++) {
+            assert(!members_in_group(user,from) && members_in_group(user,other));
+            assert(members_in_group(user,to)==(user!=9));
+            assert(epoch_changes[user]==present[user]);
+            assert(levels[user]==2);
+        }
+        assert(pending[5] && suspended[6] && retired[8] && protected_target==7);
+        assert(member_core_group_move(&actor,from,to,&out)==MEMBER_CORE_REVOKED);
+        cleared(&out,sizeof(out));assert(move_writes==1);
+        actor.epoch=moderation_epoch(actor.user);
+        assert(member_core_group_move(&actor,from,to,&out)==MEMBER_CORE_OK);
+        assert(out.actor_epoch==11 && move_writes==2 && credential_changes==24);
+    }
+    puts("PASS: bulk migration across all group words, account states, epochs and empty-source repetition");
+}
+static void group_move_denials(void) {
+    MemberActor actor=reset();MemberGroupMove out;
+    assert(member_core_group_move(NULL,100,99,&out)==MEMBER_CORE_LOGIN_REQUIRED);
+    cleared(&out,sizeof(out));assert(!move_calls && !count_calls);
+    actor.user=2;assert(member_core_group_move(&actor,100,99,&out)==MEMBER_CORE_ADMIN_REQUIRED);
+    actor.user=1;admin=0;assert(member_core_group_move(&actor,100,99,&out)==MEMBER_CORE_ADMIN_REQUIRED);
+    assert(!move_calls && !count_calls && !delegation_checks);
+    for(unsigned state=0;state<5;state++) {
+        actor=reset();
+        if(state==0)actor.epoch--;
+        if(state==1)suspended[1]=1;
+        if(state==2)pending[1]=1;
+        if(state==3)retired[1]=1;
+        if(state==4)present[1]=0;
+        memset(&out,0x7f,sizeof(out));
+        assert(member_core_group_move(&actor,100,99,&out)==MEMBER_CORE_REVOKED);
+        cleared(&out,sizeof(out));assert(!move_calls && !count_calls && !credential_changes);
+    }
+    actor=reset();
+    const unsigned invalid[][2]={{0,1},{1,0},{101,1},{1,101},{100,100},{UINT32_MAX,1}};
+    for(unsigned i=0;i<sizeof(invalid)/sizeof(*invalid);i++) {
+        assert(member_core_group_move(&actor,invalid[i][0],invalid[i][1],&out)==MEMBER_CORE_RIGHTS_INVALID);
+        cleared(&out,sizeof(out));
+    }
+    assert(member_core_group_move(&actor,100,99,NULL)==MEMBER_CORE_INVALID);
+    assert(!move_calls && !count_calls && !credential_changes);
+    puts("PASS: bulk migration requires current global admin and distinct valid groups");
+}
+static void group_move_failures(void) {
+    for(unsigned failure=0;failure<6;failure++) {
+        MemberActor actor=reset();MemberGroupMove out;MemberOutcome expected=MEMBER_CORE_STORAGE;
+        group_words[2][3]=8;
+        if(failure==0)member_error=1;
+        if(failure==1) { moderation_error=1;expected=MEMBER_CORE_MODERATION_STORAGE; }
+        if(failure==2)count=MEMBER_MAX+1;
+        if(failure==3)commit_ok=0;
+        if(failure==4) { move_result=0;expected=MEMBER_CORE_RIGHTS_INVALID; }
+        if(failure==5)move_result=-1;
+        memset(&out,0x7f,sizeof(out));
+        assert(member_core_group_move(&actor,100,99,&out)==expected);
+        cleared(&out,sizeof(out));assert(!move_writes && !credential_changes && group_words[2][3]==8);
+        assert(move_calls==(failure>=3));
+    }
+    puts("PASS: failed bulk writes/storage bounds publish no epoch or notification result");
+}
 int main(void) {
     role_tests();directory_tests();denial_tests();failure_tests();
     suspension_tests();suspension_denials();suspension_failures();
     application_pages();approval_tests();application_denials();
     rights_queries();rights_failures();level_updates();level_denials();
     group_updates();delegated_groups();group_failures();
+    group_move_success();group_move_denials();group_move_failures();
     lifecycle_success();lifecycle_denials();lifecycle_failures();
     password_updates();reset_authority();password_failures();
     preference_roundtrip();preference_authority();preference_failures();
