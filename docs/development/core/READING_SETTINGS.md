@@ -95,3 +95,17 @@ startup guard, all scope/permission/storage assertions and timeouts are unchange
 Local fixture-order/failure checks, Python syntax and diff checks pass. Real
 socket execution remains pending corrected CI; prior success is not evidence
 for this new commit.
+
+The next run on `6c83be1e8f0e592ea4616ed4acebbf816f9a5869` passed startup
+but failed at FILEBOARDSET in both Linux jobs
+([run](https://github.com/matsuotakeshi/liner-notes/actions/runs/44139551819),
+jobs `134238455127` and `134238455038`). The assertion did not include the actual
+reply. Source review identified a second fixture omission: vault.c policy_parse
+requires a registered parent for every non-root board, but the fixture created
+files before the root policy. test_stage64.py creates root first.
+
+The fixture now creates `-`, `files`, `files/child` in that order and includes
+the path and actual response in failed assertions. The exact success assertion
+is retained; production ACLs and parent checks are unchanged. Local scripted
+checks validate parent-first order and rejection of unexpected replies; Python
+syntax/diff checks pass. The corrected socket run remains pending CI.

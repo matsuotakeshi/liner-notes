@@ -53,8 +53,10 @@ def run(binary,vaultctl):
             assert sql("SELECT id,value FROM menu_preferences ORDER BY id")==[(2,2),(3,0)]
             for board,parent in ((2,1),(3,2)):
                 assert cmd(admin,f"BOARDSET {board}|{parent}|all|member|Board{board}|scope")==f"BOARD UPDATED {board}".encode()
-            for path in ("files","files/child"):
-                assert cmd(admin,f"FILEBOARDSET {path}|member|member")==b"FILEBOARD UPDATED"
+            # Explicit policies require each parent to exist, including root.
+            for path in ("-","files","files/child"):
+                response=cmd(admin,f"FILEBOARDSET {path}|member|member")
+                assert response==b"FILEBOARD UPDATED", (path,response)
             assert cmd(alice,"BOARD 2").startswith(b"BOARD 2")
             post(alice,"checkpoint source","preserve article")
             assert sql("SELECT * FROM news")==[]
