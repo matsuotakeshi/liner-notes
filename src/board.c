@@ -507,6 +507,9 @@ static void extra_execute(const BoardRequest *q,BoardResult *r) {
         case ARTICLE_INVALID_QUERY: strcpy(r->text,"ERR search query\r\n");break;
         case ARTICLE_INVALID_CURSOR: strcpy(r->text,"ERR search cursor\r\n");break;
         case ARTICLE_READ_STATE_STORAGE: strcpy(r->text,"ERR read-state storage\r\n");break;
+        case ARTICLE_MANAGEMENT_INVALID: strcpy(r->text,"ERR command\r\n");break;
+        case ARTICLE_CATALOG_STORAGE: strcpy(r->text,"ERR catalog storage\r\n");break;
+        case ARTICLE_SETTINGS_STORAGE: strcpy(r->text,"ERR settings storage\r\n");break;
         }
         return;
     }

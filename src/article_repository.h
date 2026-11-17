@@ -14,6 +14,10 @@ int article_repository_unavailable(uint32_t article);
 /* -1 storage uncertainty, 0 local origin, 1 imported origin. */
 int article_repository_imported(uint32_t article);
 /* Called only after the title journal has been durably committed. */
+/* Called only after the durable A record; adjusts old/new author post totals. */
+void article_repository_author_changed(uint32_t article,uint32_t user,const char *name);
+/* Persist guest policy; Core publishes catalog state after success only. */
+int article_repository_guest_save(uint32_t board,unsigned enabled);
 void article_repository_title_changed(uint32_t article,const char *title);
 /* Copy a complete NUL-terminated body, or return 0 without claiming success. */
 int article_repository_body(uint32_t article,char *body,size_t capacity);

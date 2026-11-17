@@ -114,6 +114,29 @@ static int feature_setting_save(const char *table,uint32_t id,unsigned value) {
     char sql[160];snprintf(sql,sizeof(sql),"INSERT INTO %s VALUES(?,?) ON CONFLICT(id) DO UPDATE SET value=excluded.value",table);sqlite3_stmt *s=feature_stmt(sql);if(!s)return 0;
     sqlite3_bind_int(s,1,(int)id);sqlite3_bind_int(s,2,(int)value);int ok=sqlite3_step(s)==SQLITE_DONE;sqlite3_finalize(s);return ok;
 }
+int article_repository_guest_save(uint32_t board,unsigned enabled) {
+    return features_db && !features_broken && feature_setting_save("guest_boards",board,enabled);
+}
+void article_repository_author_changed(uint32_t id,uint32_t user,const char *name) {
+    Article *a=article_at(id-1);uint32_t old=user_named(a->author);
+    strcpy(a->author,name);
+    if(old && user_posts[old])user_posts[old]--;
+    user_posts[user]++;
+}
+static void article_management_result(ArticleOutcome result,BoardResult *r) {
+    switch(result) {
+    case ARTICLE_REVOKED:r->revoked=1;strcpy(r->text,"ERR session revoked\r\n");break;
+    case ARTICLE_LOGIN_REQUIRED:strcpy(r->text,"ERR login required\r\n");break;
+    case ARTICLE_ADMIN_REQUIRED:strcpy(r->text,"ERR admin required\r\n");break;
+    case ARTICLE_MANAGEMENT_INVALID:strcpy(r->text,"ERR command\r\n");break;
+    case ARTICLE_MEMBER_STORAGE:strcpy(r->text,"ERR member storage unavailable\r\n");break;
+    case ARTICLE_MODERATION_STORAGE:strcpy(r->text,"ERR moderation storage unavailable\r\n");break;
+    case ARTICLE_POLICY_STORAGE:strcpy(r->text,"ERR board policy storage\r\n");break;
+    case ARTICLE_EXTRAS_STORAGE:strcpy(r->text,"ERR extras storage\r\n");break;
+    case ARTICLE_SETTINGS_STORAGE:strcpy(r->text,"ERR settings storage\r\n");break;
+    default:strcpy(r->text,"ERR article storage\r\n");break;
+    }
+}
 static void advanced_execute(const BoardRequest *q,BoardResult *r) {
     if(!q->user) { strcpy(r->text,"ERR login required\r\n");return; }
     if(q->action=='J') { r->service_action='J';r->service_number=q->number;r->service_next=(unsigned)members_level(q->user);return; }
@@ -124,19 +147,14 @@ static void advanced_execute(const BoardRequest *q,BoardResult *r) {
         if(result!=MEMBER_CORE_OK) { member_result(result,r);return; }
         strcpy(r->text,"MENU MODE SAVED\r\n");return;
     }
-    if(q->action=='p') {
-        if(!catalog_manage(q->number,q->user)) { strcpy(r->text,"ERR admin required\r\n");return; }
-        if(q->cursor>1)goto invalid;
-        if(!feature_setting_save("guest_boards",q->number,q->cursor))goto storage;
-        catalog_guest(q->number,(int)q->cursor);r->board_refresh=1;strcpy(r->text,"BOARD GUEST SAVED\r\n");return;
-    }
-    if(q->action=='o') {
-        if(!q->number || q->number>article_count || unavailable(q->number) || !catalog_manage(board_of(q->number),q->user)) { strcpy(r->text,"ERR admin required\r\n");return; }
-        if(!members_active(q->cursor) || members_pending(q->cursor) || moderation_suspended(q->cursor))goto invalid;
-        Article *a=article_at(q->number-1);uint32_t old=user_named(a->author);const char *name=members_name(q->cursor);
-        if(!extras_set('A',q->number,q->user,name))goto storage;
-        strcpy(a->author,name);if(old && user_posts[old])user_posts[old]--;user_posts[q->cursor]++;
-        snprintf(r->text,sizeof(r->text),"AUTHOR CHANGED %u %u\r\n",q->number,q->cursor);return;
+    if(q->action=='p' || q->action=='o') {
+        ArticleActor actor={q->user,q->user_epoch,q->board_grants};
+        ArticleOutcome result=q->action=='p'?article_guest_set(&actor,q->number,q->cursor):
+            article_author_set(&actor,q->number,q->cursor);
+        if(result!=ARTICLE_OK) { article_management_result(result,r);return; }
+        if(q->action=='p') { r->board_refresh=1;strcpy(r->text,"BOARD GUEST SAVED\r\n"); }
+        else snprintf(r->text,sizeof(r->text),"AUTHOR CHANGED %u %u\r\n",q->number,q->cursor);
+        return;
     }
     if(q->action=='N' || q->action=='n') {
         MemberActor actor={q->user,q->user_epoch};MemberCheckWindow window;

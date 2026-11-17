@@ -1009,3 +1009,64 @@ ArticleOutcome article_import_buffer(const ArticleActor *actor,uint32_t board,ui
     if(scratch && capacity)memset(scratch,0,capacity);
     return result;
 }
+
+static ArticleOutcome management_identity(const ArticleActor *actor) {
+    ArticleOutcome result=health();
+    return result==ARTICLE_OK?identity(actor,0):result;
+}
+
+ArticleOutcome article_author_set(const ArticleActor *actor,uint32_t id,uint32_t target) {
+    ArticleOutcome result=management_identity(actor);
+    if(result!=ARTICLE_OK)return result;
+    ArticleMetadata article;
+    if(!id || !article_repository_find(id,&article))return ARTICLE_ADMIN_REQUIRED;
+    int hidden=article_repository_unavailable(id);
+    if(hidden<0)return ARTICLE_STORAGE;
+    if(hidden || !catalog_manage(article.board,actor->user))return ARTICLE_ADMIN_REQUIRED;
+    if(!members_active(target) || members_pending(target) || moderation_suspended(target))
+        return ARTICLE_MANAGEMENT_INVALID;
+    const char *name=members_name(target);
+    if(!name || !*name || strlen(name)>32)return ARTICLE_MANAGEMENT_INVALID;
+    /* Copy metadata before publication: no repository cache pointer survives. */
+    char author[33];strcpy(author,name);
+    if(!extras_set('A',id,actor->user,author))return ARTICLE_SETTINGS_STORAGE;
+    article_repository_author_changed(id,target,author);
+    return ARTICLE_OK;
+}
+
+ArticleOutcome article_guest_set(const ArticleActor *actor,uint32_t board,unsigned enabled) {
+    ArticleOutcome result=management_identity(actor);
+    if(result!=ARTICLE_OK)return result;
+    if(!catalog_manage(board,actor->user))return ARTICLE_ADMIN_REQUIRED;
+    if(enabled>1)return ARTICLE_MANAGEMENT_INVALID;
+    if(!article_repository_guest_save(board,enabled))return ARTICLE_SETTINGS_STORAGE;
+    catalog_guest(board,(int)enabled);
+    return ARTICLE_OK;
+}
+
+ArticleOutcome article_sigop_set(const ArticleActor *actor,uint32_t board,uint32_t target,ArticleRoleChange *out) {
+    if(!out)return ARTICLE_MANAGEMENT_INVALID;
+    memset(out,0,sizeof(*out));
+    ArticleOutcome result=management_identity(actor);
+    if(result!=ARTICLE_OK)return result;
+    if(!catalog_exists(board) || (!moderation_admin(actor->user) &&
+       !catalog_sigop(catalog_parent(board),actor->user)) ||
+       (target && (!members_name(target) || members_pending(target) || moderation_suspended(target))))
+        return ARTICLE_MANAGEMENT_INVALID;
+    uint32_t previous=0;
+    int ok=catalog_role_set(board,target,actor->user,&previous);
+    if(ok<0)return ARTICLE_CATALOG_STORAGE;
+    if(!ok)return ARTICLE_MANAGEMENT_INVALID;
+    if(ok==1) {
+        out->changed=1;
+        if(previous) {
+            moderation_credentials_changed(previous);
+            out->previous=previous;out->previous_epoch=moderation_epoch(previous);
+        }
+        if(target) {
+            moderation_credentials_changed(target);
+            out->current=target;out->current_epoch=moderation_epoch(target);
+        }
+    }
+    return ARTICLE_OK;
+}

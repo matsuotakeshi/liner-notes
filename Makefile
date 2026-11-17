@@ -245,6 +245,7 @@ test-stage64-zmodem: runtime vaultctl test-zhost
 # Native door and stage65 persistence/UI regression checks.
 test-stage65: runtime vaultctl memberctl
 	$(PYTHON) tests/test_stage65.py ./runtime
+	$(PYTHON) tests/test_board_ownership.py ./runtime
 	$(PYTHON) tests/test_stage65_delete_recovery.py ./runtime
 	$(PYTHON) tests/test_stage65_doors.py ./runtime
 	$(PYTHON) tests/test_door_resize.py ./runtime
