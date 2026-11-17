@@ -384,3 +384,97 @@ MemberOutcome member_core_profile_visibility(const MemberActor *actor,unsigned f
     int saved=profile_visibility(actor->user,field,mode);
     return saved==1?MEMBER_CORE_OK:saved<0?MEMBER_CORE_PROFILE_TEXT:MEMBER_CORE_EXTRAS_STORAGE;
 }
+
+static MemberOutcome profile_health(void) {
+    if(members_broken())return MEMBER_CORE_STORAGE;
+    if(moderation_broken())return MEMBER_CORE_MODERATION_STORAGE;
+    if(extras_broken() || profile_store_broken())return MEMBER_CORE_EXTRAS_STORAGE;
+    return MEMBER_CORE_OK;
+}
+
+static int profile_copy(char *out,size_t size,const char *value) {
+    if(!value)return 0;
+    size_t n=0;while(n<size && value[n])n++;
+    if(n==size)return 0;
+    memcpy(out,value,n+1);return 1;
+}
+
+const char *member_profile_value(const MemberProfile *profile,unsigned field) {
+    if(!profile || field>=PROFILE_FIELDS)return "";
+    return field==0?profile->handle:field==1?profile->bio:profile->fields[field-2];
+}
+
+MemberOutcome member_core_profile_get(const MemberActor *actor,uint32_t target,const char *login,MemberProfile *out) {
+    if(!out)return MEMBER_CORE_INVALID;
+    memset(out,0,sizeof(*out));
+    MemberOutcome result=authorize_profile(actor);
+    if(result!=MEMBER_CORE_OK)return result;
+    if(login) {
+        size_t n=0;while(n<=32 && login[n])n++;
+        if(target || !n || n>32)return MEMBER_CORE_PROFILE_UNAVAILABLE;
+        target=members_find(login);
+    } else if(!target)target=actor->user;
+    const char *name=members_name(target);
+    if(!name || moderation_suspended(target))return MEMBER_CORE_PROFILE_UNAVAILABLE;
+    if(!profile_copy(out->name,sizeof(out->name),name))result=MEMBER_CORE_STORAGE;
+    for(unsigned field=0;result==MEMBER_CORE_OK && field<PROFILE_FIELDS;field++) {
+        char scratch[16];const char *value=profile_visible(target,actor->user,field,scratch);
+        char *dest=field==0?out->handle:field==1?out->bio:out->fields[field-2];
+        size_t size=field==0?sizeof(out->handle):field==1?sizeof(out->bio):sizeof(out->fields[0]);
+        if(!profile_copy(dest,size,value))result=MEMBER_CORE_EXTRAS_STORAGE;
+    }
+    if(result==MEMBER_CORE_OK)result=profile_health();
+    if(result!=MEMBER_CORE_OK)memset(out,0,sizeof(*out));
+    else out->user=target;
+    return result;
+}
+
+MemberOutcome member_core_profile_search(const MemberActor *actor,const MemberProfileQuery *query,MemberProfilePage *out) {
+    if(!out)return MEMBER_CORE_INVALID;
+    memset(out,0,sizeof(*out));
+    MemberOutcome result=authorize_profile(actor);
+    if(result!=MEMBER_CORE_OK)return result;
+    if(!query || query->scope<MEMBER_PROFILE_ALL || query->scope>MEMBER_PROFILE_GROUP ||
+       !query->limit || query->limit>8 || (query->scope==MEMBER_PROFILE_FIELD && query->field>=PROFILE_FIELDS) ||
+       (query->scope==MEMBER_PROFILE_GROUP && (!query->group || query->group>100)))return MEMBER_CORE_PROFILE_TEXT;
+    if(members_rtbbs_policy && !moderation_admin(actor->user)) {
+        if(query->scope==MEMBER_PROFILE_FIELD && query->field>=9)return MEMBER_CORE_PROFILE_SEARCH_DENIED;
+        if(query->scope==MEMBER_PROFILE_GROUP) {
+            int sigop=0;for(uint32_t b=1;b<=CATALOG_MAX;b++)if(catalog_sigop(b,actor->user)) { sigop=1;break; }
+            if(!sigop)return MEMBER_CORE_PROFILE_SEARCH_DENIED;
+        }
+    }
+    if(!query->text)return MEMBER_CORE_PROFILE_TEXT;
+    size_t n=0;while(n<=80 && query->text[n]) {
+        unsigned char c=(unsigned char)query->text[n++];
+        if(c<32 || c==127)return MEMBER_CORE_PROFILE_TEXT;
+    }
+    if(!n || n>80)return MEMBER_CORE_PROFILE_TEXT;
+    uint32_t total=members_count();if(total>MEMBER_MAX)return MEMBER_CORE_STORAGE;
+    uint32_t id=query->start?query->start:1;
+    for(;id<=total && out->count<query->limit;id++) {
+        const char *name=members_name(id);if(!name || moderation_suspended(id))continue;
+        if(query->scope==MEMBER_PROFILE_GROUP) { if(!members_in_group(id,query->group))continue; }
+        else if(query->scope==MEMBER_PROFILE_FIELD) { if(!profile_match(id,actor->user,(int)query->field,query->text))continue; }
+        else if(strcmp(query->text,"*") && !strstr(name,query->text) && !profile_match(id,actor->user,-1,query->text))continue;
+        MemberProfileRow *row=&out->rows[out->count];char scratch[16];
+        if(!profile_copy(row->name,sizeof(row->name),name) ||
+           !profile_copy(row->handle,sizeof(row->handle),profile_visible(id,actor->user,0,scratch))) {
+            result=MEMBER_CORE_EXTRAS_STORAGE;break;
+        }
+        row->user=id;out->count++;
+    }
+    if(result==MEMBER_CORE_OK)result=profile_health();
+    if(result!=MEMBER_CORE_OK)memset(out,0,sizeof(*out));
+    else out->next=id<=total?id:0;
+    return result;
+}
+
+MemberOutcome member_core_profile_admin_set(const MemberActor *actor,uint32_t target,unsigned field,const char *text) {
+    MemberOutcome result=authorize_profile(actor);
+    if(result!=MEMBER_CORE_OK)return result;
+    if(!moderation_admin(actor->user) || !members_active(target) || field>=PROFILE_FIELDS || !text)
+        return MEMBER_CORE_PROFILE_EDIT;
+    int saved=profile_admin_set(actor->user,target,field,text);
+    return saved==1?MEMBER_CORE_OK:saved<0?MEMBER_CORE_PROFILE_EDIT:MEMBER_CORE_EXTRAS_STORAGE;
+}

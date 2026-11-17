@@ -126,6 +126,7 @@ test: test-userlog test-chat runtime vaultctl test-adapters test-vault-core test
 	$(PYTHON) tests/test_help.py ./runtime
 	$(PYTHON) tests/test_help_release.py ./runtime
 	$(PYTHON) tests/test_extended.py ./runtime
+	$(PYTHON) tests/test_profile_service.py ./runtime
 
 vaultctl: src/vaultctl.c src/vault.c src/vault.h src/principal.h
 	$(CC) $(CPPFLAGS) $(SQLITE_CFLAGS) $(CFLAGS) $(LDFLAGS) -std=c11 -Wall -Wextra -Werror src/vaultctl.c src/vault.c -lcrypto $(SQLITE_LIBS) $(LDLIBS) src/storage_sqlite.c $(SQLITE_CFLAGS) -pthread -lcrypto $(SQLITE_LIBS) -o vaultctl
