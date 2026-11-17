@@ -20,6 +20,21 @@ static unsigned suspend_calls,durable_writes;
 static int extras_error,commit_ok,changed_flag;
 static unsigned approval_calls,approval_writes,credential_changes;
 static unsigned level_calls,level_writes;
+static unsigned password_calls,reset_calls,password_writes;
+static const char *test_current="test-current-password",*test_new="test-new-password";
+int members_password(uint32_t user,const char *current,const char *replacement) {
+    assert(members_active(user) && !moderation_suspended(user));password_calls++;
+    if(strcmp(current,test_current) || !strcmp(current,replacement))return 0;
+    if(!commit_ok) { member_error=1;return -1; }
+    password_writes++;changed_user=changed_actor=user;return 1;
+}
+int members_reset_password(uint32_t user,uint32_t actor,const char *replacement) {
+    assert(actor==1 && admin && !moderation_suspended(actor) && user!=actor && !moderation_protected(user));
+    assert(strlen(replacement)>=8 && strlen(replacement)<=128);reset_calls++;
+    if(!members_active(user))return -1;
+    if(!commit_ok) { member_error=1;return -1; }
+    password_writes++;changed_user=user;changed_actor=actor;return 1;
+}
 static unsigned remove_calls,remove_writes,removed_kind;
 int members_remove(uint32_t user,uint32_t actor,unsigned kind) {
     assert(members_active(actor) && members_active(user));
@@ -79,7 +94,7 @@ int members_approve(uint32_t user,uint32_t actor) {
     pending[user]=0;approval_writes++;changed_user=user;changed_actor=actor;return 1;
 }
 void moderation_credentials_changed(uint32_t user) {
-    assert(user && user<15 && (approval_writes || level_writes || group_writes || remove_writes));
+    assert(user && user<15 && (approval_writes || level_writes || group_writes || remove_writes || password_writes));
     credential_changes++;epoch_changes[user]++;
 }
 int extras_broken(void) { return extras_error; }
@@ -113,7 +128,7 @@ int moderation_admin(uint32_t id) { return id==1 && admin; }
 static MemberActor reset(void) {
     count=14;epoch=9;admin=1;member_error=moderation_error=read_failure=0;
     count_calls=target_reads=0;approval_calls=approval_writes=credential_changes=0;
-    level_calls=level_writes=0;remove_calls=remove_writes=removed_kind=0;memset(group_words,0,sizeof(group_words));
+    level_calls=level_writes=0;password_calls=reset_calls=password_writes=0;remove_calls=remove_writes=removed_kind=0;memset(group_words,0,sizeof(group_words));
     group_calls=group_writes=delegation_checks=group_checks=0;sigop_enabled=group_enabled=1;seen_board=seen_user=0;
     for(unsigned i=0;i<15;i++)levels[i]=2;
     memset(retired,0,sizeof(retired));
@@ -649,11 +664,106 @@ static void lifecycle_failures(void) {
     }
     puts("PASS: lifecycle store failures retain state and publish no epoch/change result");
 }
+static void password_updates(void) {
+    MemberActor actor=reset();actor.user=2;MemberChange change;MemberRole role;
+    char current[129],replacement[129];strcpy(current,test_current);strcpy(replacement,test_new);
+    assert(member_core_password(&actor,current,replacement,&change)==MEMBER_CORE_OK);
+    assert(change.user==2 && change.epoch==10 && password_writes==1 && credential_changes==1);
+    assert(changed_user==2 && changed_actor==2 && !strcmp(current,test_current) && !strcmp(replacement,test_new));
+    assert(member_core_role(&actor,&role)==MEMBER_CORE_REVOKED);
+    actor.epoch=change.epoch;
+    assert(member_core_role(&actor,&role)==MEMBER_CORE_OK && role==MEMBER_ROLE_MEMBER);
+    assert(!reset_calls);
+    actor=reset();
+    assert(member_core_password(&actor,test_current,"incorrect",&change)==MEMBER_CORE_OK && change.user==1);
+    /* Store verifies current secret; Core does not invent a second verifier. */
+    actor=reset();
+    assert(member_core_password(&actor,"wrong-current",test_new,&change)==MEMBER_CORE_PASSWORD);
+    assert(member_core_password(&actor,test_current,test_current,&change)==MEMBER_CORE_PASSWORD);
+    cleared(&change,sizeof(change));assert(password_calls==2 && !password_writes && !credential_changes);
+    char limit[129];memset(limit,'x',128);limit[128]=0;
+    assert(member_core_password(&actor,test_current,limit,&change)==MEMBER_CORE_OK && change.epoch==10);
+    actor=reset();
+    assert(member_core_password(&actor,test_current,"12345678",&change)==MEMBER_CORE_OK);
+    puts("PASS: own password change, borrowed inputs, current/unchanged checks, length boundaries and epochs");
+}
+static void reset_authority(void) {
+    MemberChange change;
+    for(unsigned i=0;i<8;i++) {
+        MemberActor actor=reset();assert(member_core_reset_check(&actor,4)==MEMBER_CORE_OK);
+        MemberOutcome want=MEMBER_CORE_ADMIN_REQUIRED;
+        if(i==0)actor.user=0;
+        else if(i==1)actor.user=2;
+        else if(i==2)admin=0;
+        else if(i==3) { actor.epoch--;want=MEMBER_CORE_REVOKED; }
+        else if(i==4) { suspended[1]=1;want=MEMBER_CORE_REVOKED; }
+        else if(i==5) { protected_target=4;want=MEMBER_CORE_PROTECTED; }
+        else if(i==6) { present[4]=0;want=MEMBER_CORE_NOT_FOUND; }
+        else { actor.user=99;want=MEMBER_CORE_REVOKED; }
+        assert(member_core_reset_check(&actor,4)==want);
+        assert(member_core_reset_password(&actor,4,test_new,&change)==want);cleared(&change,sizeof(change));
+        assert(!reset_calls && !password_writes && !credential_changes);
+    }
+    MemberActor actor=reset();
+    assert(member_core_reset_check(&actor,1)==MEMBER_CORE_PROTECTED);
+    assert(member_core_reset_check(&actor,7)==MEMBER_CORE_PROTECTED);
+    assert(member_core_reset_check(&actor,0)==MEMBER_CORE_NOT_FOUND);
+    assert(member_core_reset_check(&actor,UINT32_MAX)==MEMBER_CORE_NOT_FOUND);
+    assert(member_core_reset_check(NULL,4)==MEMBER_CORE_ADMIN_REQUIRED);
+    assert(!reset_calls);
+    assert(member_core_reset_password(&actor,4,test_new,&change)==MEMBER_CORE_OK);
+    assert(change.user==4 && change.epoch==10 && changed_actor==1 && changed_user==4);
+    assert(password_writes==1 && credential_changes==1 && moderation_epoch(1)==9);
+    /* Reset accepts the same supplied password: durable salt refresh remains a change. */
+    assert(member_core_reset_password(&actor,4,test_new,&change)==MEMBER_CORE_OK && change.epoch==11);
+    assert(password_writes==2 && credential_changes==2);
+    suspended[5]=1;
+    assert(member_core_reset_password(&actor,5,test_new,&change)==MEMBER_CORE_OK && pending[5] && suspended[5]);
+    retired[4]=1;
+    assert(member_core_reset_check(&actor,4)==MEMBER_CORE_OK); /* existing name-based prompt policy */
+    assert(member_core_reset_password(&actor,4,test_new,&change)==MEMBER_CORE_STORAGE);cleared(&change,sizeof(change));
+    assert(password_writes==3 && credential_changes==3);
+    puts("PASS: reset prompt/commit reauthorization, protected targets, durable attribution and target state preservation");
+}
+static void password_failures(void) {
+    MemberChange change;
+    char too_long[130];memset(too_long,'x',129);too_long[129]=0;
+    const char *invalid[]={NULL,"","short",too_long};
+    MemberActor actor=reset();
+    for(unsigned i=0;i<4;i++) {
+        assert(member_core_password(&actor,invalid[i],test_new,&change)==MEMBER_CORE_PASSWORD);cleared(&change,sizeof(change));
+        assert(member_core_password(&actor,test_current,invalid[i],&change)==MEMBER_CORE_PASSWORD);cleared(&change,sizeof(change));
+        assert(member_core_reset_password(&actor,4,invalid[i],&change)==MEMBER_CORE_PASSWORD);cleared(&change,sizeof(change));
+    }
+    assert(!password_calls && !reset_calls);
+    assert(member_core_password(NULL,test_current,test_new,&change)==MEMBER_CORE_LOGIN_REQUIRED);
+    assert(member_core_password(&actor,test_current,test_new,NULL)==MEMBER_CORE_INVALID);
+    assert(member_core_reset_password(&actor,4,test_new,NULL)==MEMBER_CORE_INVALID);
+    for(unsigned i=0;i<5;i++) {
+        actor=reset();MemberOutcome want=MEMBER_CORE_REVOKED;
+        if(i==0) { member_error=1;want=MEMBER_CORE_STORAGE; }
+        else if(i==1) { moderation_error=1;want=MEMBER_CORE_MODERATION_STORAGE; }
+        else if(i==2)actor.epoch--;
+        else if(i==3)retired[1]=1;
+        else pending[1]=1;
+        assert(member_core_password(&actor,test_current,test_new,&change)==want);cleared(&change,sizeof(change));
+        assert(member_core_reset_password(&actor,4,test_new,&change)==want);cleared(&change,sizeof(change));
+        assert(!password_calls && !reset_calls);
+    }
+    for(unsigned reset_mode=0;reset_mode<2;reset_mode++) {
+        actor=reset();commit_ok=0;
+        MemberOutcome result=reset_mode?member_core_reset_password(&actor,4,test_new,&change):member_core_password(&actor,test_current,test_new,&change);
+        assert(result==MEMBER_CORE_STORAGE);cleared(&change,sizeof(change));
+        assert(!password_writes && !credential_changes && moderation_epoch(1)==9 && moderation_epoch(4)==9);
+    }
+    puts("PASS: password null/bounds contracts, revoked actors and failed stores without epoch publication");
+}
 int main(void) {
     role_tests();directory_tests();denial_tests();failure_tests();
     suspension_tests();suspension_denials();suspension_failures();
     application_pages();approval_tests();application_denials();
     rights_queries();rights_failures();level_updates();level_denials();
     group_updates();delegated_groups();group_failures();
-    lifecycle_success();lifecycle_denials();lifecycle_failures();return 0;
+    lifecycle_success();lifecycle_denials();lifecycle_failures();
+    password_updates();reset_authority();password_failures();return 0;
 }

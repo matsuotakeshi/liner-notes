@@ -82,9 +82,13 @@ def run(binary,ctl):
             # post-login credential throttle. Test authorization after it.
             time.sleep(1.05)
             reply=cmd(a,'RESETPASS 1');assert reply==b'ERR protected member',reply
+            unchanged_size=members.stat().st_size
             assert cmd(a,'RESETPASS 3')==b'NEW PASSWORD'
             assert cmd(a,NEW)==b'CONFIRM PASSWORD';assert cmd(a,'wrong-confirmation')==b'ERR password mismatch'
+            assert members.stat().st_size==unchanged_size
             time.sleep(1.05);assert cmd(a,'RESETPASS 3')==b'NEW PASSWORD';assert cmd(a,'/CANCEL')==b'CANCELLED'
+            assert members.stat().st_size==unchanged_size
+            assert cmd(c,'ACCOUNT')==b'ACCOUNT 3 owner'
             time.sleep(1.05);assert cmd(a,'RESETPASS 3')==b'NEW PASSWORD'
             assert cmd(a,NEW)==b'CONFIRM PASSWORD';assert cmd(a,NEW)==b'PASSWORD RESET 3';closed(c)
             c.close();c=Client(s.port);auth(c,'owner',password=NEW)
