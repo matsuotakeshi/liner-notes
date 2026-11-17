@@ -1,6 +1,7 @@
 #include "member_core.h"
 #include "members.h"
 #include "moderation.h"
+#include "extras.h"
 #include "app_limits.h"
 #include <string.h>
 
@@ -66,4 +67,20 @@ MemberOutcome member_core_list(const MemberActor *actor,uint32_t start,MemberPag
     if(result!=MEMBER_CORE_OK)memset(out,0,sizeof(*out));
     else out->next=id<=total?id:0;
     return result;
+}
+
+MemberOutcome member_core_suspend(const MemberActor *actor,uint32_t target,int suspend,MemberChange *out) {
+    if(!out)return MEMBER_CORE_INVALID;
+    memset(out,0,sizeof(*out));
+    MemberOutcome result=authorize(actor,1);
+    if(result!=MEMBER_CORE_OK)return result;
+    if(extras_broken())return MEMBER_CORE_EXTRAS_STORAGE;
+    if(suspend!=0 && suspend!=1)return MEMBER_CORE_INVALID;
+    if(!members_name(target))return MEMBER_CORE_NOT_FOUND;
+    if(target==actor->user || moderation_protected(target))return MEMBER_CORE_PROTECTED;
+    if((uint64_t)moderation_count()+extras_audit_count()>=UINT32_MAX)
+        return MEMBER_CORE_MODERATION_UNCERTAIN;
+    if(!moderation_suspend(target,actor->user,suspend))return MEMBER_CORE_MODERATION_UNCERTAIN;
+    out->user=target;out->epoch=moderation_epoch(target);
+    return MEMBER_CORE_OK;
 }
