@@ -66,6 +66,22 @@ int moderation_chat_kick(uint32_t user,uint32_t actor) {
     if(!commit_ok) { moderation_error=1;return 0; }
     kick_writes++;mod_count++;changed_user=user;changed_actor=actor;return 1;
 }
+static ChatPreferences chat_saved[15];
+static unsigned chat_reads,chat_updates;
+static int chat_update_result,chat_read_failure;
+static uint32_t chat_owner;
+static ChatPreferenceAction chat_action;
+static char chat_login[33];
+void members_chat_preferences(uint32_t user,ChatPreferences *out) {
+    assert(user && user<15);chat_reads++;chat_owner=user;*out=chat_saved[user];
+    if(chat_read_failure==1)member_error=1;
+    if(chat_read_failure==2)moderation_error=1;
+}
+int members_chat_update(uint32_t user,ChatPreferenceAction action,const char *login) {
+    assert(user && user<15);chat_updates++;chat_owner=user;chat_action=action;
+    if(login)strcpy(chat_login,login);else chat_login[0]=0;
+    return chat_update_result;
+}
 static unsigned password_calls,reset_calls,password_writes;
 static const char *test_current="test-current-password",*test_new="test-new-password";
 int members_password(uint32_t user,const char *current,const char *replacement) {
@@ -175,6 +191,8 @@ int moderation_admin(uint32_t id) { return id==1 && admin; }
 static MemberActor reset(void) {
     memset(notify_deny,0,sizeof(notify_deny));memset(notify_revision,0,sizeof(notify_revision));
     notify_read_failure=0;notify_reads=notify_calls=notify_writes=0;
+    memset(chat_saved,0,sizeof(chat_saved));chat_reads=chat_updates=chat_owner=0;
+    chat_update_result=1;chat_read_failure=0;chat_action=CHAT_PREF_QUERY;chat_login[0]=0;
     kick_calls=kick_writes=0;kick_read_failure=0;
     count=14;epoch=9;admin=1;member_error=moderation_error=read_failure=0;
     count_calls=target_reads=0;approval_calls=approval_writes=credential_changes=0;
@@ -1019,6 +1037,76 @@ static void chat_kick_failures(void) {
     assert(kick_calls==1 && kick_writes==1 && !credential_changes);
     puts("PASS: chat removal failed stores/lookups, combined audit capacity and no failed order publication");
 }
+static void chat_settings_snapshots(void) {
+    MemberActor actor=reset();actor.user=2;ChatPreferences out;
+    assert(member_core_chat_preferences(&actor,CHAT_PREF_QUERY,NULL,&out)==MEMBER_CORE_OK);
+    cleared(&out,sizeof(out));assert(chat_owner==2 && !chat_updates);
+    chat_saved[2].deny=1;chat_saved[2].revision=UINT32_MAX;
+    for(unsigned i=0;i<32;i++)snprintf(chat_saved[2].muted[i],33,"muted%u",i);
+    assert(member_core_chat_preferences(&actor,CHAT_PREF_QUERY,NULL,&out)==MEMBER_CORE_OK);
+    assert(out.deny && out.revision==UINT32_MAX && !chat_updates);
+    for(unsigned i=0;i<32;i++)assert(!strcmp(out.muted[i],chat_saved[2].muted[i]));
+    chat_saved[2].muted[31][0]='X';assert(!strcmp(out.muted[31],"muted31"));
+    for(unsigned a=CHAT_PREF_RECEIVE_ON;a<=CHAT_PREF_UNMUTE;a++) {
+        const char *login=a>=CHAT_PREF_MUTE?"user4":NULL;
+        assert(member_core_chat_preferences(&actor,(ChatPreferenceAction)a,login,&out)==MEMBER_CORE_OK);
+        assert(chat_owner==2 && chat_action==(ChatPreferenceAction)a && !strcmp(chat_login,login?login:""));
+        assert(out.revision==UINT32_MAX && out.deny);
+    }
+    char maximum[33];memset(maximum,'a',32);maximum[32]=0;
+    assert(member_core_chat_preferences(&actor,CHAT_PREF_MUTE,maximum,&out)==MEMBER_CORE_OK && !strcmp(chat_login,maximum));
+    actor.user=4;
+    assert(member_core_chat_preferences(&actor,CHAT_PREF_QUERY,NULL,&out)==MEMBER_CORE_OK);cleared(&out,sizeof(out));
+    assert(!credential_changes && moderation_epoch(2)==9);
+    puts("PASS: own chat setting snapshots, all 32 slots, structured action/target delegation and stable epochs");
+}
+static void chat_settings_authority(void) {
+    for(unsigned i=0;i<8;i++) {
+        MemberActor actor=reset();MemberOutcome want=MEMBER_CORE_REVOKED;ChatPreferences out;
+        if(i==0) { actor.user=0;want=MEMBER_CORE_LOGIN_REQUIRED; }
+        else if(i==1)actor.epoch--;
+        else if(i==2)suspended[1]=1;
+        else if(i==3)pending[1]=1;
+        else if(i==4)retired[1]=1;
+        else if(i==5) { member_error=1;want=MEMBER_CORE_STORAGE; }
+        else if(i==6) { moderation_error=1;want=MEMBER_CORE_MODERATION_STORAGE; }
+        else actor.user=99;
+        for(unsigned a=CHAT_PREF_QUERY;a<=CHAT_PREF_UNMUTE;a++) {
+            memset(&out,0x7f,sizeof(out));
+            assert(member_core_chat_preferences(&actor,(ChatPreferenceAction)a,a>=CHAT_PREF_MUTE?"user4":NULL,&out)==want);
+            cleared(&out,sizeof(out));
+        }
+        assert(!chat_reads && !chat_updates);
+    }
+    MemberActor actor=reset();ChatPreferences out;char long_name[34];memset(long_name,'x',33);long_name[33]=0;
+    assert(member_core_chat_preferences(NULL,CHAT_PREF_QUERY,NULL,&out)==MEMBER_CORE_LOGIN_REQUIRED);
+    assert(member_core_chat_preferences(&actor,CHAT_PREF_QUERY,NULL,NULL)==MEMBER_CORE_INVALID);
+    assert(member_core_chat_preferences(&actor,(ChatPreferenceAction)-1,NULL,&out)==MEMBER_CORE_INVALID);
+    assert(member_core_chat_preferences(&actor,(ChatPreferenceAction)5,NULL,&out)==MEMBER_CORE_INVALID);
+    assert(member_core_chat_preferences(&actor,CHAT_PREF_QUERY,"user4",&out)==MEMBER_CORE_INVALID);
+    assert(member_core_chat_preferences(&actor,CHAT_PREF_RECEIVE_ON,"user4",&out)==MEMBER_CORE_INVALID);
+    assert(member_core_chat_preferences(&actor,CHAT_PREF_MUTE,NULL,&out)==MEMBER_CORE_INVALID);
+    assert(member_core_chat_preferences(&actor,CHAT_PREF_MUTE,"",&out)==MEMBER_CORE_INVALID);
+    assert(member_core_chat_preferences(&actor,CHAT_PREF_UNMUTE,long_name,&out)==MEMBER_CORE_INVALID);cleared(&out,sizeof(out));
+    assert(!chat_reads && !chat_updates);
+    puts("PASS: chat settings owner/current-actor checks, enum/target bounds and no unauthorized store access");
+}
+static void chat_settings_failures(void) {
+    for(int store_result=-1;store_result<=0;store_result++) {
+        MemberActor actor=reset();ChatPreferences out;chat_update_result=store_result;
+        memset(&out,0x7f,sizeof(out));
+        assert(member_core_chat_preferences(&actor,CHAT_PREF_MUTE,"user4",&out)==(store_result<0?MEMBER_CORE_STORAGE:MEMBER_CORE_INVALID));
+        cleared(&out,sizeof(out));assert(chat_updates==1 && !chat_reads && !credential_changes);
+    }
+    for(int failure=1;failure<=2;failure++)for(unsigned a=0;a<2;a++) {
+        MemberActor actor=reset();ChatPreferences out;chat_read_failure=failure;
+        chat_saved[1].deny=1;chat_saved[1].revision=7;strcpy(chat_saved[1].muted[0],"private-target");
+        assert(member_core_chat_preferences(&actor,a?CHAT_PREF_RECEIVE_OFF:CHAT_PREF_QUERY,NULL,&out)==
+               (failure==1?MEMBER_CORE_STORAGE:MEMBER_CORE_MODERATION_STORAGE));
+        cleared(&out,sizeof(out));assert(chat_updates==a && !credential_changes);
+    }
+    puts("PASS: rejected/failed chat updates and partial-read clearing without successful publication");
+}
 int main(void) {
     role_tests();directory_tests();denial_tests();failure_tests();
     suspension_tests();suspension_denials();suspension_failures();
@@ -1029,5 +1117,6 @@ int main(void) {
     password_updates();reset_authority();password_failures();
     preference_roundtrip();preference_authority();preference_failures();
     notification_roundtrip();notification_authority();notification_failures();
-    chat_kick_success();chat_kick_authority();chat_kick_failures();return 0;
+    chat_kick_success();chat_kick_authority();chat_kick_failures();
+    chat_settings_snapshots();chat_settings_authority();chat_settings_failures();return 0;
 }

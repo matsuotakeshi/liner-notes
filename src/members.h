@@ -24,7 +24,7 @@ int members_preferences(uint32_t user,int *language,int *pager);
 int members_save_preferences(uint32_t user,int language,int pager);
 void members_chat_preferences(uint32_t,ChatPreferences *);
 /* 1 saved/no change, 0 invalid target/capacity, -1 storage failure. */
-int members_chat_control(uint32_t,const char *);
+int members_chat_update(uint32_t,ChatPreferenceAction,const char *);
 void members_mail_notify(uint32_t user,int *deny,uint32_t *revision);
 int members_set_mail_notify(uint32_t user,int deny);
 int members_broken(void);

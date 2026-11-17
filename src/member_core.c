@@ -317,3 +317,27 @@ MemberOutcome member_core_chat_kick(const MemberActor *actor,const char *login,M
     out->user=target;memcpy(out->name,login,length+1);
     return MEMBER_CORE_OK;
 }
+
+MemberOutcome member_core_chat_preferences(const MemberActor *actor,ChatPreferenceAction action,const char *login,ChatPreferences *out) {
+    if(!out)return MEMBER_CORE_INVALID;
+    memset(out,0,sizeof(*out));
+    MemberOutcome result=authorize(actor,0);
+    if(result!=MEMBER_CORE_OK)return result;
+    if(!actor || !actor->user)return MEMBER_CORE_LOGIN_REQUIRED;
+    if(action<CHAT_PREF_QUERY || action>CHAT_PREF_UNMUTE)return MEMBER_CORE_INVALID;
+    if(action==CHAT_PREF_MUTE || action==CHAT_PREF_UNMUTE) {
+        if(!login)return MEMBER_CORE_INVALID;
+        size_t length=0;while(length<=32 && login[length])length++;
+        if(!length || length>32)return MEMBER_CORE_INVALID;
+    } else if(login)return MEMBER_CORE_INVALID;
+    if(action!=CHAT_PREF_QUERY) {
+        int ok=members_chat_update(actor->user,action,login);
+        if(ok<0)return MEMBER_CORE_STORAGE;
+        if(!ok)return MEMBER_CORE_INVALID;
+    }
+    members_chat_preferences(actor->user,out);
+    result=members_broken()?MEMBER_CORE_STORAGE:
+           moderation_broken()?MEMBER_CORE_MODERATION_STORAGE:MEMBER_CORE_OK;
+    if(result!=MEMBER_CORE_OK)memset(out,0,sizeof(*out));
+    return result;
+}

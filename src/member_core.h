@@ -1,6 +1,7 @@
 #ifndef MEMBER_CORE_H
 #define MEMBER_CORE_H
 #include <stdint.h>
+#include "chat_preferences.h"
 
 /* Internal, worker-owned account service. Trusted session supplies its
  * authenticated ID/epoch; no caller admin flag or cached authorization. No
@@ -96,4 +97,8 @@ MemberOutcome member_core_mail_notify(const MemberActor *,MemberNotifyAction,Mem
  * to chat connections; this does not suspend accounts or change epochs. */
 typedef struct { uint32_t user; char name[33]; } MemberChatKick;
 MemberOutcome member_core_chat_kick(const MemberActor *,const char *login,MemberChatKick *out);
+/* Own chat preferences. QUERY/receive actions require NULL login; mute actions
+ * require an exact 1..32-byte login. Output owns the complete 32-slot snapshot.
+ * Failures clear output; settings revisions never alter credential epochs. */
+MemberOutcome member_core_chat_preferences(const MemberActor *,ChatPreferenceAction,const char *login,ChatPreferences *out);
 #endif

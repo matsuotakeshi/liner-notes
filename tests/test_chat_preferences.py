@@ -24,6 +24,8 @@ def run(binary):
             settings(b,'/TALK OFF');assert b'CHAT RECEIVE OFF' in settings(b2,'/MUTES')
             # Duplicate operations must not append to the account journal.
             size=users.stat().st_size;settings(b2,'/TALK OFF');settings(b2,'/MUTE alice');assert users.stat().st_size==size
+            settings(b2,'/MUTES');assert users.stat().st_size==size
+            command(b2,'/MUTE missing',b'CHAT ERROR mute');assert users.stat().st_size==size
             command(a,'T '+b2id,b'CHAT TALK OPEN ');command(a,'blocked-peer',b'CHAT ERROR refused');roster(b2,b'blocked-peer')
             # Changes from either connection are incremental, not stale whole-list replacements.
             settings(b2,'/UNMUTE carol');v=settings(b,'/MUTES');assert b'CHAT MUTED alice' in v and b'CHAT MUTED carol' not in v

@@ -347,18 +347,18 @@ void members_chat_preferences(uint32_t user,ChatPreferences *out) {
     out->revision=(*user_at(user-1)).chat_revision;out->deny=(*user_at(user-1)).chat_deny;
     for(int i=0;i<32;i++)if((*user_at(user-1)).muted[i])strcpy(out->muted[i],members_name((*user_at(user-1)).muted[i]));
 }
-int members_chat_control(uint32_t user,const char *command) {
+int members_chat_update(uint32_t user,ChatPreferenceAction action,const char *name) {
     if(fd<0 || broken || !members_name(user))return -1;
-    if(!strcmp(command,"/MUTES"))return 1;
+    if(action<CHAT_PREF_QUERY || action>CHAT_PREF_UNMUTE)return 0;
+    int target_action=action==CHAT_PREF_MUTE || action==CHAT_PREF_UNMUTE;
+    if(target_action?!name:name!=NULL)return 0;
+    if(action==CHAT_PREF_QUERY)return 1;
     unsigned char row[128]={0};put32(row+4,user);int slot=-1,enabled=0;
-    if(!strcmp(command,"/TALK ON") || !strcmp(command,"/TALK OFF")) {
-        int deny=!strcmp(command,"/TALK OFF");if((*user_at(user-1)).chat_deny==deny)return 1;
+    if(action==CHAT_PREF_RECEIVE_ON || action==CHAT_PREF_RECEIVE_OFF) {
+        int deny=action==CHAT_PREF_RECEIVE_OFF;if((*user_at(user-1)).chat_deny==deny)return 1;
         row[0]='C';row[8]=(unsigned char)deny;
     } else {
-        const char *name;
-        if(!strncmp(command,"/MUTE ",6)) { enabled=1;name=command+6; }
-        else if(!strncmp(command,"/UNMUTE ",8))name=command+8;
-        else return 0;
+        enabled=action==CHAT_PREF_MUTE;
         uint32_t target=0;for(uint32_t i=0;i<count;i++)if(!strcmp(name,(*user_at(i)).name))target=i+1;
         if(!target || target==user)return 0;
         int empty=-1;

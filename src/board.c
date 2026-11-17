@@ -988,12 +988,22 @@ static void execute(const BoardRequest *q,BoardResult *r) {
             }
             r->chat_action='K';r->chat_kick_user=removal.user;strcpy(r->text,removal.name);return;
         }
+        ChatPreferenceAction action=CHAT_PREF_QUERY;const char *login=NULL;
         if(q->action=='P') {
-            int ok=members_chat_control(q->user,q->body);
-            if(ok<0) { strcpy(r->text,"ERR member storage unavailable\r\n");return; }
-            if(!ok) { r->chat_action='E';return; }
+            if(!strcmp(q->body,"/MUTES"))action=CHAT_PREF_QUERY;
+            else if(!strcmp(q->body,"/TALK ON"))action=CHAT_PREF_RECEIVE_ON;
+            else if(!strcmp(q->body,"/TALK OFF"))action=CHAT_PREF_RECEIVE_OFF;
+            else if(!strncmp(q->body,"/MUTE ",6)) { action=CHAT_PREF_MUTE;login=q->body+6; }
+            else if(!strncmp(q->body,"/UNMUTE ",8)) { action=CHAT_PREF_UNMUTE;login=q->body+8; }
+            else { r->chat_action='E';return; }
         }
-        r->chat_user=q->user;members_chat_preferences(q->user,&r->chat_preferences);
+        MemberActor actor={q->user,q->user_epoch};
+        MemberOutcome result=member_core_chat_preferences(&actor,action,login,&r->chat_preferences);
+        if(result!=MEMBER_CORE_OK) {
+            if(result==MEMBER_CORE_INVALID)r->chat_action='E';else member_result(result,r);
+            return;
+        }
+        r->chat_user=q->user;
         r->chat_action=q->action;r->chat_target=q->chat_target;
         snprintf(r->chat_login,sizeof(r->chat_login),"%s",members_name(q->user));
         const char *name=profile_value(q->user,0);
