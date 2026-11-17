@@ -853,6 +853,8 @@ static void member_result(MemberOutcome result,BoardResult *r) {
     case MEMBER_CORE_PROFILE_TEXT:strcpy(r->text,"ERR profile text\r\n");break;
     case MEMBER_CORE_PROFILE_UNAVAILABLE:strcpy(r->text,"ERR profile unavailable\r\n");break;
     case MEMBER_CORE_PROFILE_SEARCH_DENIED:strcpy(r->text,"ERR profile search permission\r\n");break;
+    case MEMBER_CORE_APPLICATION_INVALID:strcpy(r->text,"ERR command\r\n");break;
+    case MEMBER_CORE_SETTINGS_STORAGE:strcpy(r->text,"ERR settings storage\r\n");break;
     case MEMBER_CORE_PROFILE_EDIT:strcpy(r->text,"ERR profile permission or value\r\n");break;
     case MEMBER_CORE_PROFILE_ADMINISTRATOR:strcpy(r->text,"ERR profile administrator required\r\n");break;
     case MEMBER_CORE_PASSWORD:strcpy(r->text,"ERR password change\r\n");break;

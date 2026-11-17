@@ -127,6 +127,7 @@ test: test-userlog test-chat runtime vaultctl test-adapters test-vault-core test
 	$(PYTHON) tests/test_help_release.py ./runtime
 	$(PYTHON) tests/test_extended.py ./runtime
 	$(PYTHON) tests/test_profile_service.py ./runtime
+	$(PYTHON) tests/test_application_review.py ./runtime
 
 vaultctl: src/vaultctl.c src/vault.c src/vault.h src/principal.h
 	$(CC) $(CPPFLAGS) $(SQLITE_CFLAGS) $(CFLAGS) $(LDFLAGS) -std=c11 -Wall -Wextra -Werror src/vaultctl.c src/vault.c -lcrypto $(SQLITE_LIBS) $(LDLIBS) src/storage_sqlite.c $(SQLITE_CFLAGS) -pthread -lcrypto $(SQLITE_LIBS) -o vaultctl
@@ -346,8 +347,8 @@ check: test-article-core
 
 # Account Core tests: no terminal, credentials or live database.
 .PHONY: test-member-core
-runtime test-adapters: src/member_core.h
-test-member-core: tests/test_member_core.c src/member_core.c src/member_core.h src/profile_store.h src/catalog.h src/members.h src/moderation.h src/extras.h src/app_limits.h src/content_limits.h src/chat_preferences.h
+runtime test-adapters: src/member_core.h src/application_repository.h
+test-member-core: tests/test_member_core.c src/member_core.c src/member_core.h src/application_repository.h src/profile_store.h src/catalog.h src/members.h src/moderation.h src/extras.h src/app_limits.h src/content_limits.h src/chat_preferences.h
 	$(CC) $(CPPFLAGS) $(CFLAGS) $(LDFLAGS) -std=c11 -Wall -Wextra -Werror -Isrc tests/test_member_core.c src/member_core.c -o test-member-core
 	./test-member-core
 check: test-member-core

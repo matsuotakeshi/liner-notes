@@ -116,3 +116,6 @@ Public behavior is unchanged; the canonical manual remains on released 0.74.1.
 CHANGELOG and this development contract describe the internal refactor. Only
 reviewed source-lock hashes are refreshed; generation, internal/legacy links,
 search and Markdown/HTML/offline parity are validated before PR publication.
+
+The follow-up [application review boundary](MEMBER_APPLICATION_REVIEW.md) covers
+pending-account private review and notes without widening ordinary profile access.
