@@ -70,6 +70,9 @@ def run(binary, vaultctl, memberctl):
             assert cmd(a,'DELETEUSER 3 CONFIRM')==b'ERR admin required'
             assert cmd(admin,'DELETEAPPLICATION 3 CONFIRM')==b'ERR member state'
             assert cmd(admin,'DELETEUSER 5 CONFIRM')==b'MEMBER REMOVED 5 KIND 4'
+            removed_size=(root/'members').stat().st_size
+            assert cmd(admin,'DELETEUSER 5 CONFIRM')==b'ERR no member'
+            assert (root/'members').stat().st_size==removed_size
             # Every subsequent operation from the old session is rejected/disconnected.
             try:
                 deleted.send(b'POST forbidden\n');reply=deleted.line()
@@ -108,6 +111,9 @@ def run(binary, vaultctl, memberctl):
                 finally:c.close()
                 result=cmd(admin,f'{action} {ident} CONFIRM')
                 assert result==f'MEMBER REMOVED {ident} KIND {1 if action=="REJECT" else 2}'.encode(),result
+                removed_size=(root/'members').stat().st_size
+                assert cmd(admin,f'{action} {ident} CONFIRM')==b'ERR no member'
+                assert (root/'members').stat().st_size==removed_size
             assert not any(line.startswith(b'APPLICATION ') for line in rows(admin,'APPLICATIONS'))
         finally:admin.close();s.close()
         s=start(root);a=Client(s.port);b=Client(s.port);admin=Client(s.port)

@@ -20,6 +20,16 @@ static unsigned suspend_calls,durable_writes;
 static int extras_error,commit_ok,changed_flag;
 static unsigned approval_calls,approval_writes,credential_changes;
 static unsigned level_calls,level_writes;
+static unsigned remove_calls,remove_writes,removed_kind;
+int members_remove(uint32_t user,uint32_t actor,unsigned kind) {
+    assert(members_active(actor) && members_active(user));
+    assert(!moderation_protected(user) && ((kind==MEMBER_RETIRE && user==actor) || (actor==1 && admin && user!=actor)));
+    remove_calls++;
+    if(kind<1 || kind>4 || (kind<=2?!pending[user]:pending[user]))return 0;
+    if(!commit_ok) { member_error=1;return -1; }
+    retired[user]=(unsigned char)kind;remove_writes++;removed_kind=kind;
+    changed_user=user;changed_actor=actor;return 1;
+}
 static int levels[15];
 static uint32_t group_words[15][4];
 static unsigned group_calls,group_writes,delegation_checks,group_checks;
@@ -69,7 +79,7 @@ int members_approve(uint32_t user,uint32_t actor) {
     pending[user]=0;approval_writes++;changed_user=user;changed_actor=actor;return 1;
 }
 void moderation_credentials_changed(uint32_t user) {
-    assert(user && user<15 && (approval_writes || level_writes || group_writes));
+    assert(user && user<15 && (approval_writes || level_writes || group_writes || remove_writes));
     credential_changes++;epoch_changes[user]++;
 }
 int extras_broken(void) { return extras_error; }
@@ -97,13 +107,13 @@ int members_pending(uint32_t id) {
     if(id==(uint32_t)read_failure)member_error=1;
     return members_active(id)?pending[id]:0;
 }
-int moderation_suspended(uint32_t id) { return id<15?(suspended[id] || pending[id]):0; }
+int moderation_suspended(uint32_t id) { return id<15?(suspended[id] || pending[id] || retired[id]):0; }
 uint32_t moderation_epoch(uint32_t id) { return epoch+(id<15?epoch_changes[id]:0); }
 int moderation_admin(uint32_t id) { return id==1 && admin; }
 static MemberActor reset(void) {
     count=14;epoch=9;admin=1;member_error=moderation_error=read_failure=0;
     count_calls=target_reads=0;approval_calls=approval_writes=credential_changes=0;
-    level_calls=level_writes=0;memset(group_words,0,sizeof(group_words));
+    level_calls=level_writes=0;remove_calls=remove_writes=removed_kind=0;memset(group_words,0,sizeof(group_words));
     group_calls=group_writes=delegation_checks=group_checks=0;sigop_enabled=group_enabled=1;seen_board=seen_user=0;
     for(unsigned i=0;i<15;i++)levels[i]=2;
     memset(retired,0,sizeof(retired));
@@ -560,10 +570,90 @@ static void group_failures(void) {
     }
     puts("PASS: group authorization, invalid arguments and failed add/remove without epoch publication");
 }
+static void lifecycle_success(void) {
+    for(unsigned kind=1;kind<=4;kind++) {
+        MemberActor actor=reset();MemberChange change;MemberRole role;
+        uint32_t target=kind<=2?5:4;
+        if(kind==MEMBER_RETIRE)actor.user=target;
+        /* RETIRE ignores a supplied other-member target, even a protected ID. */
+        uint32_t supplied=kind==MEMBER_RETIRE?7:target;
+        char original[34];memcpy(original,names[target],sizeof(original));
+        uint32_t old_count=count;
+        assert(member_core_remove(&actor,supplied,kind,&change)==MEMBER_CORE_OK);
+        assert(change.user==target && change.epoch==10 && retired[target]==kind && removed_kind==kind);
+        assert(remove_calls==1 && remove_writes==1 && credential_changes==1);
+        assert(changed_user==target && changed_actor==actor.user && count==old_count);
+        assert(!strcmp(members_name(target),original) && !members_active(target) && !retired[7]);
+        assert(levels[target]==2 && members_groups(target)==0);
+        MemberActor removed={target,change.epoch};
+        assert(member_core_role(&removed,&role)==MEMBER_CORE_REVOKED && role==MEMBER_ROLE_NONE);
+        assert(member_core_remove(&actor,supplied,kind,&change)==(kind==MEMBER_RETIRE?MEMBER_CORE_REVOKED:MEMBER_CORE_NOT_FOUND));
+        cleared(&change,sizeof(change));assert(remove_writes==1 && credential_changes==1);
+    }
+    puts("PASS: all four terminal transitions, reserved identity, self-only retirement and single epoch publication");
+}
+static void lifecycle_denials(void) {
+    MemberChange change;
+    for(unsigned kind=1;kind<=4;kind++) {
+        MemberActor actor=reset();actor.user=0;
+        assert(member_core_remove(&actor,5,kind,&change)==(kind==MEMBER_RETIRE?MEMBER_CORE_NOT_FOUND:MEMBER_CORE_ADMIN_REQUIRED));
+        assert(member_core_remove(NULL,5,kind,&change)==(kind==MEMBER_RETIRE?MEMBER_CORE_NOT_FOUND:MEMBER_CORE_ADMIN_REQUIRED));
+        actor.user=2;
+        if(kind!=MEMBER_RETIRE)assert(member_core_remove(&actor,5,kind,&change)==MEMBER_CORE_ADMIN_REQUIRED);
+        actor.user=1;actor.epoch--;
+        assert(member_core_remove(&actor,5,kind,&change)==MEMBER_CORE_REVOKED);
+        actor.epoch=epoch;suspended[1]=1;
+        assert(member_core_remove(&actor,5,kind,&change)==MEMBER_CORE_REVOKED);
+        assert(!remove_calls);cleared(&change,sizeof(change));
+        actor=reset();
+        if(kind!=MEMBER_RETIRE) {
+            assert(member_core_remove(&actor,1,kind,&change)==MEMBER_CORE_PROTECTED);
+            assert(member_core_remove(&actor,7,kind,&change)==MEMBER_CORE_PROTECTED);
+            assert(member_core_remove(&actor,0,kind,&change)==MEMBER_CORE_NOT_FOUND);
+            assert(member_core_remove(&actor,UINT32_MAX,kind,&change)==MEMBER_CORE_NOT_FOUND);
+            retired[5]=1;
+            assert(member_core_remove(&actor,5,kind,&change)==MEMBER_CORE_NOT_FOUND);
+        } else {
+            protected_target=1;
+            assert(member_core_remove(&actor,0,kind,&change)==MEMBER_CORE_PROTECTED);
+            actor.user=5;
+            assert(member_core_remove(&actor,0,kind,&change)==MEMBER_CORE_REVOKED);
+        }
+        assert(!remove_calls);cleared(&change,sizeof(change));
+    }
+    MemberActor actor=reset();
+    assert(member_core_remove(&actor,4,0,&change)==MEMBER_CORE_STATE);
+    assert(member_core_remove(&actor,4,5,&change)==MEMBER_CORE_STATE);
+    assert(member_core_remove(&actor,4,UINT32_MAX,&change)==MEMBER_CORE_STATE);
+    assert(member_core_remove(&actor,4,MEMBER_DELETE,NULL)==MEMBER_CORE_INVALID);
+    assert(!remove_calls);
+    for(unsigned kind=1;kind<=2;kind++)assert(member_core_remove(&actor,4,kind,&change)==MEMBER_CORE_STATE);
+    assert(member_core_remove(&actor,5,MEMBER_DELETE,&change)==MEMBER_CORE_STATE);
+    assert(!remove_writes && !credential_changes && !retired[4] && !retired[5]);cleared(&change,sizeof(change));
+    puts("PASS: lifecycle authority, protected/self targets, state mismatches and invalid kinds");
+}
+static void lifecycle_failures(void) {
+    for(unsigned kind=1;kind<=4;kind++) {
+        MemberActor actor=reset();MemberChange change;uint32_t target=kind<=2?5:4;
+        if(kind==MEMBER_RETIRE)actor.user=target;
+        member_error=1;
+        assert(member_core_remove(&actor,target,kind,&change)==MEMBER_CORE_STORAGE);
+        member_error=0;moderation_error=1;
+        assert(member_core_remove(&actor,target,kind,&change)==MEMBER_CORE_MODERATION_STORAGE);
+        assert(!remove_calls);moderation_error=0;commit_ok=0;
+        memset(&change,0x7f,sizeof(change));
+        assert(member_core_remove(&actor,target,kind,&change)==MEMBER_CORE_STORAGE);cleared(&change,sizeof(change));
+        assert(remove_calls==1 && !remove_writes && !credential_changes && members_active(target));
+        assert(moderation_epoch(target)==9 && pending[target]==(kind<=2));
+        assert(member_core_remove(&actor,target,kind,&change)==MEMBER_CORE_STORAGE && remove_calls==1);
+    }
+    puts("PASS: lifecycle store failures retain state and publish no epoch/change result");
+}
 int main(void) {
     role_tests();directory_tests();denial_tests();failure_tests();
     suspension_tests();suspension_denials();suspension_failures();
     application_pages();approval_tests();application_denials();
     rights_queries();rights_failures();level_updates();level_denials();
-    group_updates();delegated_groups();group_failures();return 0;
+    group_updates();delegated_groups();group_failures();
+    lifecycle_success();lifecycle_denials();lifecycle_failures();return 0;
 }

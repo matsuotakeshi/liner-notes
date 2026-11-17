@@ -183,3 +183,21 @@ MemberOutcome member_core_group(const MemberActor *actor,uint32_t board,uint32_t
     }
     return MEMBER_CORE_OK;
 }
+
+MemberOutcome member_core_remove(const MemberActor *actor,uint32_t target,unsigned kind,MemberChange *out) {
+    if(!out)return MEMBER_CORE_INVALID;
+    memset(out,0,sizeof(*out));
+    MemberOutcome result=authorize(actor,0);
+    if(result!=MEMBER_CORE_OK)return result;
+    uint32_t user=actor?actor->user:0;
+    if(kind!=MEMBER_RETIRE && (!user || !moderation_admin(user)))return MEMBER_CORE_ADMIN_REQUIRED;
+    if(kind==MEMBER_RETIRE)target=user;
+    if(!user || !members_active(target))return MEMBER_CORE_NOT_FOUND;
+    if(moderation_protected(target) || (target==user && kind!=MEMBER_RETIRE))return MEMBER_CORE_PROTECTED;
+    if(kind<MEMBER_REJECT || kind>MEMBER_DELETE)return MEMBER_CORE_STATE;
+    int saved=members_remove(target,user,kind);
+    if(saved<=0)return saved<0?MEMBER_CORE_STORAGE:MEMBER_CORE_STATE;
+    moderation_credentials_changed(target);
+    out->user=target;out->epoch=moderation_epoch(target);
+    return MEMBER_CORE_OK;
+}
