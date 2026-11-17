@@ -1,5 +1,6 @@
 /* Direct account Core tests; persistence and catalog authority are stubbed. */
 #include "member_core.h"
+#include "member_settings_repository.h"
 #include "members.h"
 #include "moderation.h"
 #include "extras.h"
@@ -11,6 +12,26 @@
 #include <string.h>
 #include <stdlib.h>
 
+static int settings_ready,settings_get_ok,settings_save_ok,settings_clock_ok;
+static unsigned settings_reads,settings_writes,settings_mode,settings_kind;
+static uint32_t settings_user;static uint64_t settings_stamp,settings_now;
+static char settings_scope[81];
+int member_settings_repository_ready(void) { return settings_ready; }
+int member_settings_repository_now(uint64_t *out) { *out=settings_now;return settings_clock_ok; }
+int member_settings_repository_menu_get(uint32_t user,unsigned *out) {
+    settings_reads++;settings_user=user;*out=settings_mode;return settings_get_ok;
+}
+int member_settings_repository_menu_save(uint32_t user,unsigned mode) {
+    settings_user=user;if(!settings_save_ok)return 0;settings_mode=mode;settings_writes++;return 1;
+}
+int member_settings_repository_check_get(uint32_t user,unsigned kind,const char *scope,uint64_t *out) {
+    settings_reads++;settings_user=user;settings_kind=kind;strcpy(settings_scope,scope);*out=settings_stamp;return settings_get_ok;
+}
+int member_settings_repository_check_save(uint32_t user,unsigned kind,const char *scope,uint64_t stamp) {
+    settings_user=user;settings_kind=kind;strcpy(settings_scope,scope);if(!settings_save_ok)return 0;
+    if(stamp>settings_stamp)settings_stamp=stamp;
+    settings_writes++;return 1;
+}
 int members_rtbbs_policy;
 static const char *profile_values[15][PROFILE_BUFFER+1];
 static unsigned profile_access[15][PROFILE_FIELDS],profile_read_count,profile_match_count,profile_admin_calls;
@@ -285,6 +306,8 @@ int moderation_suspended(uint32_t id) { return id<15?(suspended[id] || pending[i
 uint32_t moderation_epoch(uint32_t id) { return epoch+(id<15?epoch_changes[id]:0); }
 int moderation_admin(uint32_t id) { return id==1 && admin; }
 static MemberActor reset(void) {
+    settings_ready=settings_get_ok=settings_save_ok=settings_clock_ok=1;settings_mode=1;
+    settings_reads=settings_writes=settings_kind=settings_user=0;settings_stamp=0;settings_now=1000;settings_scope[0]=0;
     for(unsigned u=0;u<15;u++)profile_values[u][PROFILE_BUFFER]="";
     memset(application_notes,0,sizeof(application_notes));application_reads=application_saves=application_target=0;
     application_load_ok=application_save_ok=1;
@@ -1690,7 +1713,87 @@ static void document_denials(void) {
     assert(member_core_document_get(NULL,MEMBER_DOCUMENT_BUFFER,body,sizeof(body))==MEMBER_CORE_LOGIN_REQUIRED);
     puts("PASS: direct document auth/epoch/health gates, partial read clearing and failed saves");
 }
+static void checkpoint_windows(void) {
+    MemberActor actor=reset();actor.user=2;MemberCheckWindow out;
+    const char *scopes[]={"","2:0","1024:2","","","archive/tools","日本語"};
+    MemberCheckKind kinds[]={MEMBER_CHECK_ARTICLES,MEMBER_CHECK_ARTICLES,MEMBER_CHECK_ARTICLES,MEMBER_CHECK_MAIL,MEMBER_CHECK_FILES,MEMBER_CHECK_FILES,MEMBER_CHECK_FILES};
+    for(unsigned i=0;i<7;i++) {
+        settings_stamp=100;
+        assert(member_core_check_begin(&actor,kinds[i],scopes[i],&out)==MEMBER_CORE_OK);
+        assert(out.since==100 && out.until==1000 && settings_user==2 && settings_kind==(unsigned)kinds[i] && !strcmp(settings_scope,scopes[i]));
+    }
+    assert(!settings_writes && !credential_changes);
+    assert(member_core_check_commit(&actor,MEMBER_CHECK_ARTICLES,"2:0",1000)==MEMBER_CORE_OK && settings_stamp==1000);
+    assert(member_core_check_commit(&actor,MEMBER_CHECK_ARTICLES,"2:0",500)==MEMBER_CORE_OK && settings_stamp==1000);
+    settings_now=900; /* Clock rollback retains the checkpoint, never silently resets it. */
+    assert(member_core_check_begin(&actor,MEMBER_CHECK_ARTICLES,"2:0",&out)==MEMBER_CORE_OK && out.since==1000 && out.until==900);
+    assert(member_core_check_commit(&actor,MEMBER_CHECK_ARTICLES,"2:0",1000)==MEMBER_CORE_INVALID);
+    puts("PASS: own typed checkpoint kinds/scopes, frozen begin window, explicit monotonic commit and clock rollback");
+}
+static void checkpoint_validation(void) {
+    MemberActor actor=reset();MemberCheckWindow out;
+    const char *invalid[]={"0:0","01:0","1025:0","2:1","2:2x","2:","2:00","999999999999:0","-1:0"};
+    for(unsigned i=0;i<sizeof(invalid)/sizeof(invalid[0]);i++) {
+        assert(member_core_check_begin(&actor,MEMBER_CHECK_ARTICLES,invalid[i],&out)==MEMBER_CORE_INVALID);cleared(&out,sizeof(out));
+        assert(member_core_check_commit(&actor,MEMBER_CHECK_ARTICLES,invalid[i],0)==MEMBER_CORE_INVALID);
+    }
+    assert(member_core_check_begin(&actor,MEMBER_CHECK_MAIL,"private",&out)==MEMBER_CORE_INVALID);
+    assert(member_core_check_begin(&actor,(MemberCheckKind)3,"",&out)==MEMBER_CORE_INVALID);
+    assert(member_core_check_begin(&actor,MEMBER_CHECK_FILES,NULL,&out)==MEMBER_CORE_INVALID);
+    assert(member_core_check_begin(&actor,MEMBER_CHECK_FILES,"a|b",&out)==MEMBER_CORE_INVALID);
+    assert(member_core_check_begin(&actor,MEMBER_CHECK_FILES,"a\nb",&out)==MEMBER_CORE_INVALID);
+    char path[50];memset(path,'x',49);path[49]=0;
+    assert(member_core_check_begin(&actor,MEMBER_CHECK_FILES,path,&out)==MEMBER_CORE_INVALID);
+    assert(!settings_reads && !settings_writes);
+    path[48]=0;assert(member_core_check_begin(&actor,MEMBER_CHECK_FILES,path,&out)==MEMBER_CORE_OK);
+    assert(member_core_check_commit(&actor,MEMBER_CHECK_MAIL,"",1001)==MEMBER_CORE_INVALID);
+    assert(member_core_check_commit(&actor,MEMBER_CHECK_MAIL,"",UINT64_MAX)==MEMBER_CORE_INVALID);
+    assert(member_core_check_begin(&actor,MEMBER_CHECK_MAIL,"",NULL)==MEMBER_CORE_INVALID);
+    assert(!settings_writes);puts("PASS: checkpoint key/enum/path/timestamp bounds before persistence");
+}
+static void reading_settings_authority(void) {
+    for(unsigned i=0;i<7;i++) {
+        MemberActor actor=reset();MemberOutcome want=MEMBER_CORE_REVOKED;
+        if(i==0) { actor.user=0;want=MEMBER_CORE_LOGIN_REQUIRED; }
+        else if(i==1)actor.epoch++;
+        else if(i==2)suspended[1]=1;
+        else if(i==3) { member_error=1;want=MEMBER_CORE_STORAGE; }
+        else if(i==4) { moderation_error=1;want=MEMBER_CORE_MODERATION_STORAGE; }
+        else if(i==5) { settings_ready=0;want=MEMBER_CORE_SETTINGS_STORAGE; }
+        else actor.user=99;
+        MemberCheckWindow window;MemberMenuMode mode=MEMBER_MENU_EXPERT;
+        assert(member_core_check_begin(&actor,MEMBER_CHECK_MAIL,"",&window)==want);cleared(&window,sizeof(window));
+        assert(member_core_check_commit(&actor,MEMBER_CHECK_MAIL,"",100)==want);
+        assert(member_core_menu_get(&actor,&mode)==want && mode==0);
+        assert(member_core_menu_save(&actor,MEMBER_MENU_BEGINNER)==want);
+        assert(!settings_reads && !settings_writes);
+    }
+    MemberCheckWindow window;assert(member_core_check_begin(NULL,MEMBER_CHECK_MAIL,"",&window)==MEMBER_CORE_LOGIN_REQUIRED);
+    puts("PASS: direct checkpoint/menu auth, suspension, credential and settings-health gates");
+}
+static void reading_settings_failures(void) {
+    MemberActor actor=reset();MemberCheckWindow out;MemberMenuMode mode;
+    for(unsigned i=0;i<3;i++) {
+        assert(member_core_menu_save(&actor,(MemberMenuMode)i)==MEMBER_CORE_OK);
+        assert(member_core_menu_get(&actor,&mode)==MEMBER_CORE_OK && (unsigned)mode==i);
+    }
+    assert(member_core_menu_save(&actor,(MemberMenuMode)3)==MEMBER_CORE_INVALID);
+    settings_mode=3;assert(member_core_menu_get(&actor,&mode)==MEMBER_CORE_SETTINGS_STORAGE && !mode);
+    settings_mode=2;settings_get_ok=0;settings_stamp=123;
+    assert(member_core_menu_get(&actor,&mode)==MEMBER_CORE_SETTINGS_STORAGE && !mode);
+    assert(member_core_check_begin(&actor,MEMBER_CHECK_MAIL,"",&out)==MEMBER_CORE_SETTINGS_STORAGE);cleared(&out,sizeof(out));
+    settings_get_ok=1;settings_clock_ok=0;
+    assert(member_core_check_begin(&actor,MEMBER_CHECK_MAIL,"",&out)==MEMBER_CORE_SETTINGS_STORAGE);cleared(&out,sizeof(out));
+    assert(member_core_check_commit(&actor,MEMBER_CHECK_MAIL,"",123)==MEMBER_CORE_SETTINGS_STORAGE);
+    settings_clock_ok=1;settings_stamp=UINT64_MAX;
+    assert(member_core_check_begin(&actor,MEMBER_CHECK_MAIL,"",&out)==MEMBER_CORE_SETTINGS_STORAGE);cleared(&out,sizeof(out));
+    settings_stamp=123;settings_save_ok=0;unsigned writes=settings_writes;
+    assert(member_core_check_commit(&actor,MEMBER_CHECK_MAIL,"",1000)==MEMBER_CORE_SETTINGS_STORAGE && settings_stamp==123);
+    assert(member_core_menu_save(&actor,MEMBER_MENU_BEGINNER)==MEMBER_CORE_SETTINGS_STORAGE && settings_writes==writes);
+    puts("PASS: menu modes, dirty-output clearing, clock/store failures and no failed-save acknowledgement");
+}
 int main(void) {
+    checkpoint_windows();checkpoint_validation();reading_settings_authority();reading_settings_failures();
     document_views();document_bounds();document_denials();
     application_review_views();application_review_authority();application_note_edits();application_review_failures();
     profile_snapshots();profile_search_pages();profile_search_policy();profile_service_failures();

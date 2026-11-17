@@ -1,4 +1,5 @@
 #include "member_core.h"
+#include "member_settings_repository.h"
 #include "members.h"
 #include "moderation.h"
 #include "extras.h"
@@ -540,4 +541,53 @@ MemberOutcome member_core_document_save(const MemberActor *actor,MemberDocument 
     int saved=profile_set(actor->user,field,body);
     if(saved!=1)return saved<0?MEMBER_CORE_PROFILE_TEXT:MEMBER_CORE_EXTRAS_STORAGE;
     return profile_health();
+}
+
+static MemberOutcome settings_authorize(const MemberActor *actor) {
+    MemberOutcome result=authorize(actor,0);if(result!=MEMBER_CORE_OK)return result;
+    if(!actor || !actor->user)return MEMBER_CORE_LOGIN_REQUIRED;
+    return member_settings_repository_ready()?MEMBER_CORE_OK:MEMBER_CORE_SETTINGS_STORAGE;
+}
+MemberOutcome member_core_menu_get(const MemberActor *actor,MemberMenuMode *out) {
+    if(!out)return MEMBER_CORE_INVALID;
+    *out=0;MemberOutcome result=settings_authorize(actor);if(result!=MEMBER_CORE_OK)return result;
+    unsigned mode=0;
+    if(!member_settings_repository_menu_get(actor->user,&mode) || mode>2)return MEMBER_CORE_SETTINGS_STORAGE;
+    *out=(MemberMenuMode)mode;return MEMBER_CORE_OK;
+}
+MemberOutcome member_core_menu_save(const MemberActor *actor,MemberMenuMode mode) {
+    MemberOutcome result=settings_authorize(actor);if(result!=MEMBER_CORE_OK)return result;
+    if(mode<MEMBER_MENU_BEGINNER || mode>MEMBER_MENU_EXPERT)return MEMBER_CORE_INVALID;
+    return member_settings_repository_menu_save(actor->user,(unsigned)mode)?MEMBER_CORE_OK:MEMBER_CORE_SETTINGS_STORAGE;
+}
+static int check_scope(MemberCheckKind kind,const char *scope) {
+    if(kind<MEMBER_CHECK_ARTICLES || kind>MEMBER_CHECK_FILES || !scope)return 0;
+    if(!*scope)return 1;
+    if(kind==MEMBER_CHECK_MAIL)return 0;
+    if(kind==MEMBER_CHECK_FILES) {
+        size_t n=0;while(n<=48 && scope[n]) {
+            unsigned char c=(unsigned char)scope[n++];if(c<32 || c==127 || c=='|')return 0;
+        }
+        return n<=48;
+    }
+    if(*scope<'1' || *scope>'9')return 0;
+    uint32_t board=0;const char *p=scope;
+    while(*p>='0' && *p<='9') { board=board*10+(unsigned)(*p++-'0');if(board>CATALOG_MAX)return 0; }
+    return *p==':' && (p[1]=='0' || p[1]=='2') && !p[2];
+}
+MemberOutcome member_core_check_begin(const MemberActor *actor,MemberCheckKind kind,const char *scope,MemberCheckWindow *out) {
+    if(!out)return MEMBER_CORE_INVALID;
+    memset(out,0,sizeof(*out));MemberOutcome result=settings_authorize(actor);if(result!=MEMBER_CORE_OK)return result;
+    if(!check_scope(kind,scope))return MEMBER_CORE_INVALID;
+    uint64_t since=0,until=0;
+    if(!member_settings_repository_check_get(actor->user,(unsigned)kind,scope,&since) || since>INT64_MAX ||
+       !member_settings_repository_now(&until) || until>INT64_MAX)return MEMBER_CORE_SETTINGS_STORAGE;
+    out->since=since;out->until=until;return MEMBER_CORE_OK;
+}
+MemberOutcome member_core_check_commit(const MemberActor *actor,MemberCheckKind kind,const char *scope,uint64_t until) {
+    MemberOutcome result=settings_authorize(actor);if(result!=MEMBER_CORE_OK)return result;
+    if(!check_scope(kind,scope) || until>INT64_MAX)return MEMBER_CORE_INVALID;
+    uint64_t now=0;if(!member_settings_repository_now(&now) || now>INT64_MAX)return MEMBER_CORE_SETTINGS_STORAGE;
+    if(until>now)return MEMBER_CORE_INVALID;
+    return member_settings_repository_check_save(actor->user,(unsigned)kind,scope,until)?MEMBER_CORE_OK:MEMBER_CORE_SETTINGS_STORAGE;
 }

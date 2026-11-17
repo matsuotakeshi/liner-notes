@@ -4,14 +4,7 @@ static sqlite3 *features_db;
 static int features_broken;
 static int feature_exec(const char *sql) { return sqlite3_exec(features_db,sql,NULL,NULL,NULL)==SQLITE_OK; }
 static sqlite3_stmt *feature_stmt(const char *sql) { sqlite3_stmt *s=NULL;if(sqlite3_prepare_v2(features_db,sql,-1,&s,NULL)!=SQLITE_OK)return NULL;return s; }
-static uint64_t checked_time(uint32_t user,unsigned kind,const char *scope) {
-    sqlite3_stmt *s=feature_stmt(*scope?"SELECT stamp FROM news_scoped WHERE user=? AND kind=? AND scope=?":"SELECT stamp FROM news WHERE user=? AND kind=?");if(!s)return 0;
-    sqlite3_bind_int(s,1,(int)user);sqlite3_bind_int(s,2,(int)kind);if(*scope)sqlite3_bind_text(s,3,scope,-1,SQLITE_TRANSIENT);uint64_t value=sqlite3_step(s)==SQLITE_ROW?(uint64_t)sqlite3_column_int64(s,0):0;sqlite3_finalize(s);return value;
-}
-static int save_checked(uint32_t user,unsigned kind,uint64_t stamp,const char *scope) {
-    sqlite3_stmt *s=feature_stmt(*scope?"INSERT INTO news_scoped(user,kind,stamp,scope) VALUES(?,?,?,?) ON CONFLICT(user,kind,scope) DO UPDATE SET stamp=max(stamp,excluded.stamp)":"INSERT INTO news VALUES(?,?,?) ON CONFLICT(user,kind) DO UPDATE SET stamp=max(stamp,excluded.stamp)");if(!s)return 0;
-    sqlite3_bind_int(s,1,(int)user);sqlite3_bind_int(s,2,(int)kind);sqlite3_bind_int64(s,3,(sqlite3_int64)stamp);if(*scope)sqlite3_bind_text(s,4,scope,-1,SQLITE_TRANSIENT);int ok=sqlite3_step(s)==SQLITE_DONE;sqlite3_finalize(s);return ok;
-}
+#include "member_settings_store.inc"
 static int feature_groups_recover(void) {
     for(;;) {
         sqlite3_stmt *s=feature_stmt("SELECT board,actor,source,destination FROM group_moves WHERE done=0 LIMIT 1");if(!s)return 0;
@@ -124,7 +117,13 @@ static int feature_setting_save(const char *table,uint32_t id,unsigned value) {
 static void advanced_execute(const BoardRequest *q,BoardResult *r) {
     if(!q->user) { strcpy(r->text,"ERR login required\r\n");return; }
     if(q->action=='J') { r->service_action='J';r->service_number=q->number;r->service_next=(unsigned)members_level(q->user);return; }
-    if(q->action=='v') { if(q->number>2)goto invalid;strcpy(r->text,feature_setting_save("menu_preferences",q->user,q->number)?"MENU MODE SAVED\r\n":"ERR settings storage\r\n");return; }
+    if(q->action=='v') {
+        MemberActor actor={q->user,q->user_epoch};
+        MemberOutcome result=member_core_menu_save(&actor,(MemberMenuMode)q->number);
+        if(result==MEMBER_CORE_INVALID)goto invalid;
+        if(result!=MEMBER_CORE_OK) { member_result(result,r);return; }
+        strcpy(r->text,"MENU MODE SAVED\r\n");return;
+    }
     if(q->action=='p') {
         if(!catalog_manage(q->number,q->user)) { strcpy(r->text,"ERR admin required\r\n");return; }
         if(q->cursor>1)goto invalid;
@@ -139,8 +138,16 @@ static void advanced_execute(const BoardRequest *q,BoardResult *r) {
         strcpy(a->author,name);if(old && user_posts[old])user_posts[old]--;user_posts[q->cursor]++;
         snprintf(r->text,sizeof(r->text),"AUTHOR CHANGED %u %u\r\n",q->number,q->cursor);return;
     }
-    if(q->action=='N') { if(q->number>2)goto invalid;r->service_action='n';r->service_number=q->number;r->since=checked_time(q->user,q->number,q->title);r->until=(uint64_t)time(NULL);return; }
-    if(q->action=='n') { if(q->number>2 || q->until>(uint64_t)time(NULL))goto invalid;strcpy(r->text,save_checked(q->user,q->number,q->until,q->title)?"CHECKPOINT SAVED\r\n":"ERR settings storage\r\n");return; }
+    if(q->action=='N' || q->action=='n') {
+        MemberActor actor={q->user,q->user_epoch};MemberCheckWindow window;
+        MemberOutcome result=q->action=='N'?member_core_check_begin(&actor,(MemberCheckKind)q->number,q->title,&window):
+            member_core_check_commit(&actor,(MemberCheckKind)q->number,q->title,q->until);
+        if(result==MEMBER_CORE_INVALID)goto invalid;
+        if(result!=MEMBER_CORE_OK) { member_result(result,r);return; }
+        if(q->action=='N') { r->service_action='n';r->service_number=q->number;r->since=window.since;r->until=window.until; }
+        else strcpy(r->text,"CHECKPOINT SAVED\r\n");
+        return;
+    }
     if(q->action=='M') {
         if(!board_feature_enabled("mail"))goto invalid;
         MailActor actor={q->user,q->user_epoch};MailOutcome result=mail_core_import(&actor,q->number);
