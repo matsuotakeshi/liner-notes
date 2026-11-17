@@ -82,4 +82,11 @@ MemberOutcome member_core_password(const MemberActor *,const char *current,const
 typedef struct { int present,language,pager,editor; unsigned columns,rows,aux; } MemberPreferences;
 MemberOutcome member_core_preferences(const MemberActor *,MemberPreferences *out);
 MemberOutcome member_core_save_preferences(const MemberActor *,const MemberPreferences *input,MemberPreferences *out);
+/* Own-account mail arrival setting. Query is read-only; ON/OFF retain store
+ * duplicate suppression and revision-overflow handling. Only success returns
+ * a user/revision snapshot for the caller to publish to live sessions. Core
+ * retains no connection and never changes credential epochs. */
+typedef enum { MEMBER_NOTIFY_QUERY, MEMBER_NOTIFY_ON, MEMBER_NOTIFY_OFF } MemberNotifyAction;
+typedef struct { uint32_t user,revision; int deny; } MemberMailNotify;
+MemberOutcome member_core_mail_notify(const MemberActor *,MemberNotifyAction,MemberMailNotify *out);
 #endif

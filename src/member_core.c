@@ -273,3 +273,21 @@ MemberOutcome member_core_save_preferences(const MemberActor *actor,const Member
         return MEMBER_CORE_STORAGE;
     return preferences_read(actor->user,out);
 }
+
+MemberOutcome member_core_mail_notify(const MemberActor *actor,MemberNotifyAction action,MemberMailNotify *out) {
+    if(!out)return MEMBER_CORE_INVALID;
+    memset(out,0,sizeof(*out));
+    MemberOutcome result=authorize(actor,0);
+    if(result!=MEMBER_CORE_OK)return result;
+    if(!actor || !actor->user)return MEMBER_CORE_LOGIN_REQUIRED;
+    if(action!=MEMBER_NOTIFY_QUERY && action!=MEMBER_NOTIFY_ON && action!=MEMBER_NOTIFY_OFF)
+        return MEMBER_CORE_INVALID;
+    if(action!=MEMBER_NOTIFY_QUERY && !members_set_mail_notify(actor->user,action==MEMBER_NOTIFY_OFF))
+        return MEMBER_CORE_STORAGE;
+    members_mail_notify(actor->user,&out->deny,&out->revision);
+    result=members_broken()?MEMBER_CORE_STORAGE:
+           moderation_broken()?MEMBER_CORE_MODERATION_STORAGE:MEMBER_CORE_OK;
+    if(result!=MEMBER_CORE_OK)memset(out,0,sizeof(*out));
+    else out->user=actor->user;
+    return result;
+}

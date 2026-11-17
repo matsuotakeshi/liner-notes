@@ -18,6 +18,7 @@ def run(binary):
             command(b,'MAIL NOTIFY OFF',b'MAIL NOTIFY OFF');assert members.stat().st_size==before+128
             before=members.stat().st_size;command(b,'MAIL NOTIFY OFF',b'MAIL NOTIFY OFF');assert members.stat().st_size==before
             command(a,'MAIL NOTIFY',b'MAIL NOTIFY ON')
+            command(b,'MAIL NOTIFY',b'MAIL NOTIFY OFF');assert members.stat().st_size==before
         finally:a.close();b.close();g.close();s.close()
         s=Server(binary,data,members=members,menu=True,telnet=True,language='en');a,b,b2=[Telnet(s.port) for _ in range(3)]
         try:
