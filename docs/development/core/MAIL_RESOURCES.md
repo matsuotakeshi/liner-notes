@@ -70,3 +70,19 @@ still separate work; this does not claim complete mail/Core or Web API separatio
   WebUI and storage regressions remain enabled. PR checks are hosted; exact-main
   native CI follows merge. No PR is run on home VMs or production hosts, and no
   duplicate local full regression is run.
+
+## Initial-page test correction
+
+PR #94 head `183975cd1cee311c5d3ddb0123fc6f856d8fa79d` failed in both
+Rocky 9 and AlmaLinux 9 at the new socket test's first attachment-list header
+([Linux compatibility run](https://github.com/matsuotakeshi/liner-notes/actions/runs/44111974797),
+jobs `134139860319` and `134139860475`). The test sent `MAIL FILES 0`.
+The existing `session.c` number_arg rejects zero: the initial text request is
+`MAIL FILES`; only continuation requests include the positive next ID. This is
+distinct from the Core API's initial zero cursor. Production parsing is unchanged.
+
+The helper now omits the initial cursor and retains exact header assertions,
+including the request and actual header in a failure report. Local scripted-client
+checks cover two-page continuation, an empty list and rejection of an error
+header. Python syntax and diff checks pass. Real socket verification remains
+pending the corrected PR CI; prior successes do not validate the new SHA.

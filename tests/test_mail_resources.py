@@ -20,8 +20,12 @@ from transfer_connectors import MailConnector, RemoteError
 def files(client):
     rows, cursor = [], 0
     for _ in range(8):
-        client.send(f"MAIL FILES {cursor}\n".encode())
-        assert client.line() == b"MAIL FILES"
+        # The Core accepts an initial zero cursor, but the text command's
+        # explicit number argument must be positive. Omit it on the first page.
+        request = f"MAIL FILES {cursor}" if cursor else "MAIL FILES"
+        client.send((request + "\n").encode())
+        header = client.line()
+        assert header == b"MAIL FILES", (request, header)
         while True:
             line = client.line()
             if line.startswith(b"END MAILFILES NEXT "):
