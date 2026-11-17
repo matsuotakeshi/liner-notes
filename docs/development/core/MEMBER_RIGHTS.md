@@ -4,6 +4,7 @@ Baseline: main `5b96203d448834bd80261c18c6afb6b214d724eb` (PR #77).
 This LN-23/24 slice extracts RIGHTS queries and LEVEL updates. GROUP/UNGROUP,
 delegated SIGOP management, application details, lifecycle and authentication
 remain in their existing paths. No new public command or storage format.
+The subsequent [group membership service](MEMBER_GROUPS.md) extracts GROUP/UNGROUP.
 
 ## Queries and authorization
 

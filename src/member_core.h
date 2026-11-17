@@ -50,4 +50,10 @@ MemberOutcome member_core_rights(const MemberActor *,uint32_t target,MemberRight
  * state. Same level succeeds with a zero change result and no epoch update;
  * changed results advance the epoch once, after durable member-store success. */
 MemberOutcome member_core_level(const MemberActor *,uint32_t target,unsigned level,MemberChange *out);
+/* GROUP/UNGROUP on the caller's board context. Global admins may manage any
+ * active target; a SIGOP needs catalog authority on this board and a group in
+ * this board's ACL, and cannot modify protected accounts. Rechecked per call,
+ * no caller-provided delegation flag. add must be 0/1, group 1..100.
+ * Only changed durable writes publish a new epoch; no-ops return zero change. */
+MemberOutcome member_core_group(const MemberActor *,uint32_t board,uint32_t target,unsigned group,int add,MemberChange *out);
 #endif
