@@ -18,6 +18,24 @@ static uint32_t changed_user,changed_actor;
 static unsigned suspend_calls,durable_writes;
 static int extras_error,commit_ok,changed_flag;
 static unsigned approval_calls,approval_writes,credential_changes;
+static unsigned level_calls,level_writes;
+static int levels[15];
+static uint32_t group_words[15][4];
+int members_level(uint32_t user) { return user<15?levels[user]:0; }
+uint32_t members_groups(uint32_t user) { return user<15?group_words[user][0]:0; }
+int members_in_group(uint32_t user,unsigned group) {
+    assert(group && group<=100);
+    return user<15 && !!(group_words[user][(group-1)/32] & (1u<<((group-1)%32)));
+}
+int members_rights(uint32_t user,uint32_t actor,int level,uint32_t groups) {
+    assert(actor==1 && admin && !moderation_suspended(actor) && members_active(user));
+    assert(level>=0 && level<=5 && groups==group_words[user][0]);
+    level_calls++;
+    if(levels[user]==level)return 2;
+    if(!commit_ok) { member_error=1;return -1; }
+    levels[user]=level;group_words[user][0]=groups;level_writes++;
+    changed_user=user;changed_actor=actor;return 1;
+}
 int members_active(uint32_t id) { return id && id<15 && present[id] && !retired[id]; }
 int members_approve(uint32_t user,uint32_t actor) {
     assert(actor==1 && admin && !moderation_suspended(actor));
@@ -27,7 +45,7 @@ int members_approve(uint32_t user,uint32_t actor) {
     pending[user]=0;approval_writes++;changed_user=user;changed_actor=actor;return 1;
 }
 void moderation_credentials_changed(uint32_t user) {
-    assert(user && user<15 && approval_writes && !pending[user]);
+    assert(user && user<15 && (approval_writes || level_writes));
     credential_changes++;epoch_changes[user]++;
 }
 int extras_broken(void) { return extras_error; }
@@ -61,6 +79,8 @@ int moderation_admin(uint32_t id) { return id==1 && admin; }
 static MemberActor reset(void) {
     count=14;epoch=9;admin=1;member_error=moderation_error=read_failure=0;
     count_calls=target_reads=0;approval_calls=approval_writes=credential_changes=0;
+    level_calls=level_writes=0;memset(group_words,0,sizeof(group_words));
+    for(unsigned i=0;i<15;i++)levels[i]=2;
     memset(retired,0,sizeof(retired));
     memset(epoch_changes,0,sizeof(epoch_changes));mod_count=extra_count=0;protected_target=7;
     extras_error=0;commit_ok=1;suspend_calls=durable_writes=0;changed_user=changed_actor=0;changed_flag=-1;
@@ -323,8 +343,110 @@ static void application_denials(void) {
     assert(member_core_approve(&actor,5,&change)==MEMBER_CORE_STORAGE && approval_calls==1);
     puts("PASS: application/approval authorization, failed writes and no epoch notification on failure");
 }
+static void rights_queries(void) {
+    MemberActor actor=reset();MemberRights rights;
+    uint32_t expected[]={0x80000001u,1u,0x80000000u,8u};
+    memcpy(group_words[2],expected,sizeof(expected));
+    actor.user=2;
+    assert(member_core_rights(&actor,2,&rights)==MEMBER_CORE_OK && rights.user==2 && rights.level==2);
+    assert(rights.state==MEMBER_STATE_ACTIVE);
+    for(unsigned i=0;i<100;i++)assert(rights.groups[i]==(i==0 || i==31 || i==32 || i==95 || i==99));
+    group_words[2][0]=0;assert(rights.groups[0] && rights.groups[31]); /* owned snapshot */
+    assert(member_core_rights(&actor,5,&rights)==MEMBER_CORE_ADMIN_REQUIRED);cleared(&rights,sizeof(rights));
+    actor.user=1;
+    suspended[5]=1;
+    assert(member_core_rights(&actor,5,&rights)==MEMBER_CORE_OK && rights.state==MEMBER_STATE_PENDING);
+    assert(member_core_rights(&actor,6,&rights)==MEMBER_CORE_OK && rights.state==MEMBER_STATE_SUSPENDED);
+    retired[2]=1;
+    assert(member_core_rights(&actor,2,&rights)==MEMBER_CORE_NOT_FOUND);cleared(&rights,sizeof(rights));
+    for(unsigned i=0;i<2;i++) {
+        assert(member_core_rights(&actor,i?UINT32_MAX:0,&rights)==MEMBER_CORE_NOT_FOUND);
+        cleared(&rights,sizeof(rights));
+    }
+    assert(!level_calls && !credential_changes);
+    puts("PASS: own/admin rights snapshots, all 100 group positions and pending state precedence");
+}
+static void rights_failures(void) {
+    MemberRights rights;
+    for(unsigned i=0;i<7;i++) {
+        MemberActor actor=reset();MemberOutcome want=MEMBER_CORE_REVOKED;
+        if(i==0) { actor.user=0;want=MEMBER_CORE_LOGIN_REQUIRED; }
+        else if(i==1)actor.epoch--;
+        else if(i==2)suspended[1]=1;
+        else if(i==3)actor.user=99;
+        else if(i==4) { member_error=1;want=MEMBER_CORE_STORAGE; }
+        else if(i==5) { moderation_error=1;want=MEMBER_CORE_MODERATION_STORAGE; }
+        else { admin=0;want=MEMBER_CORE_ADMIN_REQUIRED; }
+        memset(&rights,0x7f,sizeof(rights));
+        assert(member_core_rights(&actor,2,&rights)==want);cleared(&rights,sizeof(rights));
+    }
+    MemberActor actor=reset();read_failure=2;
+    assert(member_core_rights(&actor,2,&rights)==MEMBER_CORE_STORAGE);cleared(&rights,sizeof(rights));
+    actor=reset();levels[2]=6;
+    assert(member_core_rights(&actor,2,&rights)==MEMBER_CORE_STORAGE);cleared(&rights,sizeof(rights));
+    levels[2]=-1;
+    assert(member_core_rights(&actor,2,&rights)==MEMBER_CORE_STORAGE);cleared(&rights,sizeof(rights));
+    assert(member_core_rights(NULL,2,&rights)==MEMBER_CORE_LOGIN_REQUIRED);
+    assert(member_core_rights(&actor,2,NULL)==MEMBER_CORE_INVALID);
+    assert(!level_calls && !credential_changes);
+    puts("PASS: rights access denial and cleared results after store/metadata failures");
+}
+static void level_updates(void) {
+    MemberActor actor=reset();MemberChange change;
+    uint32_t original[]={0x80000001u,1u,0x80000000u,8u};
+    memcpy(group_words[2],original,sizeof(original));
+    for(unsigned level=0;level<=5;level++) {
+        assert(member_core_level(&actor,2,level,&change)==MEMBER_CORE_OK && levels[2]==(int)level);
+        assert(change.user==2 && change.epoch==10+level && credential_changes==level+1);
+        assert(changed_user==2 && changed_actor==1 && !memcmp(group_words[2],original,sizeof(original)));
+        assert(member_core_level(&actor,2,level,&change)==MEMBER_CORE_OK);cleared(&change,sizeof(change));
+        assert(level_writes==level+1 && credential_changes==level+1);
+    }
+    assert(moderation_epoch(1)==actor.epoch);
+    /* Existing policy permits an admin to update self and protected accounts. */
+    assert(member_core_level(&actor,1,4,&change)==MEMBER_CORE_OK && change.user==1);
+    assert(member_core_level(&actor,2,0,&change)==MEMBER_CORE_REVOKED);cleared(&change,sizeof(change));
+    actor.epoch=moderation_epoch(1);
+    assert(member_core_level(&actor,7,4,&change)==MEMBER_CORE_OK && change.user==7);
+    suspended[5]=1;
+    assert(member_core_level(&actor,5,3,&change)==MEMBER_CORE_OK && pending[5] && suspended[5]);
+    puts("PASS: levels 0..5, full group preservation, no-op epochs, self/protected targets and pending state");
+}
+static void level_denials(void) {
+    MemberChange change;
+    for(unsigned i=0;i<8;i++) {
+        MemberActor actor=reset();MemberOutcome want=MEMBER_CORE_ADMIN_REQUIRED;
+        if(i==0) { actor.user=0;want=MEMBER_CORE_LOGIN_REQUIRED; }
+        else if(i==1)actor.user=2;
+        else if(i==2)admin=0;
+        else if(i==3) { actor.epoch--;want=MEMBER_CORE_REVOKED; }
+        else if(i==4) { suspended[1]=1;want=MEMBER_CORE_REVOKED; }
+        else if(i==5) { actor.user=99;want=MEMBER_CORE_REVOKED; }
+        else if(i==6) { member_error=1;want=MEMBER_CORE_STORAGE; }
+        else { moderation_error=1;want=MEMBER_CORE_MODERATION_STORAGE; }
+        memset(&change,0x7f,sizeof(change));
+        assert(member_core_level(&actor,2,5,&change)==want);cleared(&change,sizeof(change));
+        assert(!level_calls && !credential_changes && levels[2]==2);
+    }
+    MemberActor actor=reset();
+    assert(member_core_level(&actor,2,6,&change)==MEMBER_CORE_RIGHTS_INVALID);
+    assert(member_core_level(&actor,2,UINT32_MAX,&change)==MEMBER_CORE_RIGHTS_INVALID);
+    assert(member_core_level(&actor,0,5,&change)==MEMBER_CORE_NOT_FOUND);
+    assert(member_core_level(&actor,UINT32_MAX,5,&change)==MEMBER_CORE_NOT_FOUND);
+    retired[2]=1;
+    assert(member_core_level(&actor,2,5,&change)==MEMBER_CORE_NOT_FOUND);
+    assert(member_core_level(NULL,5,5,&change)==MEMBER_CORE_LOGIN_REQUIRED);
+    assert(member_core_level(&actor,5,5,NULL)==MEMBER_CORE_INVALID);
+    assert(!level_calls && !credential_changes);cleared(&change,sizeof(change));
+    actor=reset();commit_ok=0;
+    assert(member_core_level(&actor,2,5,&change)==MEMBER_CORE_STORAGE);cleared(&change,sizeof(change));
+    assert(level_calls==1 && !level_writes && !credential_changes && levels[2]==2 && moderation_epoch(2)==9);
+    assert(member_core_level(&actor,2,5,&change)==MEMBER_CORE_STORAGE && level_calls==1);
+    puts("PASS: level authorization, bounds, retired targets and failed writes without epoch publication");
+}
 int main(void) {
     role_tests();directory_tests();denial_tests();failure_tests();
     suspension_tests();suspension_denials();suspension_failures();
-    application_pages();approval_tests();application_denials();return 0;
+    application_pages();approval_tests();application_denials();
+    rights_queries();rights_failures();level_updates();level_denials();return 0;
 }

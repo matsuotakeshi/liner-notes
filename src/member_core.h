@@ -41,4 +41,13 @@ MemberOutcome member_core_applications(const MemberActor *,uint32_t start,Member
  * approval is a state error, not a successful no-op. Forward MemberChange via
  * the existing runtime notification path. No other rights are modified. */
 MemberOutcome member_core_approve(const MemberActor *,uint32_t target,MemberChange *out);
+/* Own rights, or another active account for a global administrator. target is
+ * explicit (not zero-as-self). Group indexes 0..99 represent groups 1..100.
+ * This snapshot is descriptive, never an authorization token. */
+typedef struct { uint32_t user; int level; unsigned char groups[100]; MemberState state; } MemberRights;
+MemberOutcome member_core_rights(const MemberActor *,uint32_t target,MemberRights *out);
+/* Global admin only. Preserve all group memberships and pending/suspended
+ * state. Same level succeeds with a zero change result and no epoch update;
+ * changed results advance the epoch once, after durable member-store success. */
+MemberOutcome member_core_level(const MemberActor *,uint32_t target,unsigned level,MemberChange *out);
 #endif

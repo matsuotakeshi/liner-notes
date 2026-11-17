@@ -16,6 +16,7 @@ def run(binary):
             auth(a,'alice',True);auth(b,'bob',True)
             cmd(b,'RIGHTS',b'RIGHTS 2 LEVEL 2 GROUPS - STATUS active')
             cmd(b,'LEVEL 2 5',b'ERR admin required')
+            cmd(b,'RIGHTS 1',b'ERR admin required')
         finally:a.close();b.close();s.close()
         catalog.write_text('1|0|all|member|General\n2|1|l3+g1|l4+g1|Private\n3|2|all|member|Inherited\n4|1|g32|g32|Last group\n5|1|l0|l0|Level zero\n')
         def server(options=None):return Server(binary,data,members=users,admins=admins,catalog=catalog,options=options)
@@ -28,10 +29,23 @@ def run(binary):
             cmd(b,'BOARD 2',b'ERR board unavailable')
             cmd(a,'GROUP 2 1',b'RIGHTS 2 LEVEL 3 GROUPS 1');b.close();b=Client(s.port);auth(b,'bob')
             cmd(b,'BOARD 2',b'BOARD 2');cmd(b,'POST denied',b'ERR posting denied')
+            same_level_size=users.stat().st_size
+            cmd(a,'LEVEL 2 3',b'RIGHTS 2 LEVEL 3 GROUPS 1')
+            assert users.stat().st_size==same_level_size
+            cmd(b,'RIGHTS',b'RIGHTS 2 LEVEL 3 GROUPS 1') # no-op keeps the live session
+
             cmd(a,'LEVEL 2 4',b'RIGHTS 2 LEVEL 4');b.close();b=Client(s.port);auth(b,'bob')
             cmd(b,'BOARD 2',b'BOARD 2');article=post(b,'private','private text')
             cmd(a,'GROUP 2 32',b'RIGHTS 2 LEVEL 4 GROUPS 1,32');b.close();b=Client(s.port);auth(b,'bob')
             cmd(b,'BOARD 4',b'BOARD 4')
+            for group in [33,100]:
+                cmd(a,f'GROUP 2 {group}',b'RIGHTS 2 LEVEL 4')
+            cmd(a,'LEVEL 2 3',b'RIGHTS 2 LEVEL 3 GROUPS 1,32,33,100')
+            cmd(a,'LEVEL 2 4',b'RIGHTS 2 LEVEL 4 GROUPS 1,32,33,100')
+            for group in [33,100]:
+                cmd(a,f'UNGROUP 2 {group}',b'RIGHTS 2 LEVEL 4')
+            b.close();b=Client(s.port);auth(b,'bob')
+
             cmd(a,'UNGROUP 2 1',b'RIGHTS 2 LEVEL 4 GROUPS 32')
             assert b'ERR session revoked' in b.line();b.close();b=Client(s.port);auth(b,'bob')
             cmd(b,'BOARD 2',b'ERR board unavailable');cmd(b,'BOARD 3',b'ERR board unavailable')
