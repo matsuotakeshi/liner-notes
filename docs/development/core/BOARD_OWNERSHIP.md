@@ -47,3 +47,17 @@ for valid sessions. Direct stale/guest calls fail closed.
   and existing AUTHOR implementation; HELP/command syntax stays unchanged.
 
 No production, VM changes, migration, package publication or release performed.
+
+## PR #98 build correction
+
+The hosted CI for `6e375ee66c29fc2cc2c844f7afbc2309b664dc69` failed before
+runtime tests: board.c's exhaustive withdrawal/retitle outcome switch omitted the
+three new management results. All eight failed jobs report the same `-Wswitch`
+error (for example Linux run 44146331701 and doctor run 44146331555).
+
+Add explicit command/catalog/settings error cases, retaining the exhaustive
+switch and all warning-as-error flags. The focused local check compiles the exact
+updated switch with the real ArticleOutcome header under C11/Wall/Wextra/Werror,
+then checks all three error responses plus existing withdrawal/retitle success
+and revoked-session behavior. Full hosted runtime verification remains pending
+on the correction commit; the earlier Core-only success did not cover board.c.
