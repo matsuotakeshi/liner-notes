@@ -1105,11 +1105,18 @@ static void execute(const BoardRequest *q,BoardResult *r) {
             else member_result(result==MEMBER_CORE_EXTRAS_STORAGE?MEMBER_CORE_PROFILE_EDIT:result,r);
             return;
         }
-        if(q->action=='I') { r->service_action='8';r->service_number=q->number;strcpy(r->draft_body,profile_value(q->user,q->number==1?1:PROFILE_BUFFER));strcpy(r->text,"DOCUMENT EDIT\r\n");return; }
-        if(q->action=='E') { r->service_action='9';strcpy(r->draft_body,profile_value(q->user,PROFILE_BUFFER));return; }
         MemberActor actor={q->user,q->user_epoch};
+        if(q->action=='I' || q->action=='E') {
+            MemberDocument kind=q->action=='I' && q->number==1?MEMBER_DOCUMENT_BIO:MEMBER_DOCUMENT_BUFFER;
+            MemberOutcome result=member_core_document_get(&actor,kind,r->draft_body,sizeof(r->draft_body));
+            if(result!=MEMBER_CORE_OK) { member_result(result,r);return; }
+            r->service_action=q->action=='I'?'8':'9';r->service_number=q->number;
+            if(q->action=='I')strcpy(r->text,"DOCUMENT EDIT\r\n");
+            return;
+        }
         MemberOutcome result=q->action=='V'?member_core_profile_visibility(&actor,q->number,q->cursor):
-            member_core_profile_set(&actor,q->action=='B'?1:q->action=='C'?PROFILE_BUFFER:q->number,q->body);
+            (q->action=='B' || q->action=='C')?member_core_document_save(&actor,q->action=='B'?MEMBER_DOCUMENT_BIO:MEMBER_DOCUMENT_BUFFER,q->body):
+            member_core_profile_set(&actor,q->number,q->body);
         if(result!=MEMBER_CORE_OK) { member_result(result,r);return; }
         if(q->action=='V')r->board_refresh=1;
         if(q->action=='B' || q->action=='C') { r->service_action='0';r->service_number=q->scope?0:1; }

@@ -5,6 +5,7 @@
 #include "moderation.h"
 #include "board_policy.h"
 #include "extras.h"
+#include "profile_store.h"
 #include "content_limits.h"
 #include "store_limits.h"
 #include <string.h>
@@ -980,5 +981,31 @@ ArticleOutcome article_notes(const ArticleActor *actor,uint32_t board,uint32_t s
     ArticleOutcome result=notes_articles(actor,board,start,unread_only,out);
     policy_context(NULL);
     if(result!=ARTICLE_OK)memset(out,0,sizeof(*out));
+    return result;
+}
+
+static ArticleOutcome import_buffer(const ArticleActor *actor,uint32_t board,uint32_t id,char *scratch,size_t capacity) {
+    ArticleOutcome result=health();if(result!=ARTICLE_OK)return result;
+    result=identity(actor,0);if(result!=ARTICLE_OK)return result;
+    if(!scratch || !capacity)return ARTICLE_BUFFER_TOO_SMALL;
+    if(profile_store_broken())return ARTICLE_STORAGE;
+    ArticleMetadata metadata;
+    if(!article_repository_find(id,&metadata) || metadata.board!=board)return ARTICLE_NOT_FOUND;
+    ArticleView view;
+    memset(&view,0,sizeof(view));
+    result=read_article(actor,id,0,&view,scratch,capacity);
+    if(result!=ARTICLE_OK)return result;
+    if(view.state!=ARTICLE_VISIBLE)return ARTICLE_NOT_FOUND;
+    size_t n=0;while(n<capacity && scratch[n])n++;
+    if(n==capacity || n!=view.body_size)return ARTICLE_STORAGE;
+    if(profile_set(actor->user,PROFILE_BUFFER,scratch)!=1 || profile_store_broken())return ARTICLE_STORAGE;
+    return ARTICLE_OK;
+}
+ArticleOutcome article_import_buffer(const ArticleActor *actor,uint32_t board,uint32_t id,char *scratch,size_t capacity) {
+    if(scratch && capacity)memset(scratch,0,capacity);
+    policy_context(actor?actor->board_grants:NULL);
+    ArticleOutcome result=import_buffer(actor,board,id,scratch,capacity);
+    policy_context(NULL);
+    if(scratch && capacity)memset(scratch,0,capacity);
     return result;
 }

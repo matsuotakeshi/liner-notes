@@ -223,4 +223,9 @@ typedef struct { uint32_t next; unsigned count; ArticleBoardRow rows[8]; } Artic
 ArticleOutcome article_boards(const ArticleActor *,uint32_t start,int children_only,ArticleBoardsPage *out);
 ArticleOutcome article_next_board(const ArticleActor *,uint32_t current,ArticleBoardRow *out);
 
+/* Import a visible article from the current board into the actor's own common
+ * buffer. No posting/inspect override, read-state mutation or draft consumption.
+ * Caller provides worker-owned scratch (CONTENT_BODY+1 for any valid article).
+ * Scratch is cleared on every return, including successful persistence. */
+ArticleOutcome article_import_buffer(const ArticleActor *,uint32_t board,uint32_t id,char *scratch,size_t capacity);
 #endif

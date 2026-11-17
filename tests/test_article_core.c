@@ -7,11 +7,20 @@
 #include "moderation.h"
 #include "board_policy.h"
 #include "extras.h"
+#include "profile_store.h"
 #include "store_limits.h"
 #include <assert.h>
 #include <stdio.h>
 #include <string.h>
 
+static int profile_error,buffer_result;
+static unsigned buffer_calls;static uint32_t buffer_owner;static char saved_buffer[64];
+int profile_store_broken(void) { return profile_error; }
+int profile_set(uint32_t user,unsigned field,const char *body) {
+    assert(field==PROFILE_BUFFER && strlen(body)<sizeof(saved_buffer));buffer_calls++;buffer_owner=user;
+    if(buffer_result==1)strcpy(saved_buffer,body);
+    return buffer_result;
+}
 static ArticleMetadata stored;
 static const uint32_t *context;
 static uint32_t epoch,grants[1025];
@@ -230,6 +239,7 @@ void article_repository_title_changed(uint32_t id,const char *title) {
     assert(!strcmp(title,journal_text));publications++;
 }
 static ArticleActor reset(void) {
+    profile_error=0;buffer_result=1;buffer_calls=buffer_owner=0;strcpy(saved_buffer,"preserved");
     audit_admin=0;memset(audit_sigop,0,sizeof(audit_sigop));
     discovery=0;entry_menu=entry_inherited=entry_lock_fault=0;entry_title_override=NULL;
     entry_description=entry_information="";entry_metadata_reads=0;
@@ -1623,7 +1633,51 @@ static void audit_tests(void) {
     puts("PASS: audit Core manager/SIGOP scope, merged ordering, actor/article filters, bounded paging and atomic failure clearing");
 }
 
+static void import_tests(void) {
+    ArticleActor actor=reset();char scratch[64];writable=0;
+    assert(article_import_buffer(&actor,2,7,scratch,sizeof(scratch))==ARTICLE_OK);
+    assert(buffer_calls==1 && buffer_owner==1 && !strcmp(saved_buffer,persisted_body));
+    for(unsigned i=0;i<sizeof(scratch);i++)assert(!scratch[i]);
+    assert(!mark_calls && !commits && !context);
+    puts("PASS: article import needs read not post permission; preserves read state and clears successful scratch");
+    for(unsigned i=0;i<10;i++) {
+        actor=reset();ArticleOutcome expected=ARTICLE_NOT_FOUND;uint32_t board=2;
+        if(i==0)hidden=1;
+        else if(i==1) { hidden=1;manager=1; }
+        else if(i==2)removed=1;
+        else if(i==3)readable=0;
+        else if(i==4)board=3;
+        else if(i==5)locked=1;
+        else if(i==6) { actor.user=0;expected=ARTICLE_LOGIN_REQUIRED; }
+        else if(i==7) { actor.epoch++;expected=ARTICLE_REVOKED; }
+        else if(i==8) { suspended=1;expected=ARTICLE_REVOKED; }
+        else { policy_error=1;expected=ARTICLE_POLICY_STORAGE; }
+        memset(scratch,'x',sizeof(scratch));
+        assert(article_import_buffer(&actor,board,7,scratch,sizeof(scratch))==expected);
+        assert(!buffer_calls && !body_reads && !strcmp(saved_buffer,"preserved") && !context);
+        for(unsigned j=0;j<sizeof(scratch);j++)assert(!scratch[j]);
+    }
+    actor=reset();locked=1;grants[2]=grant_revision;
+    assert(article_import_buffer(&actor,2,7,scratch,sizeof(scratch))==ARTICLE_OK && !context);
+    grants[2]--;buffer_calls=body_reads=0;
+    assert(article_import_buffer(&actor,2,7,scratch,sizeof(scratch))==ARTICLE_NOT_FOUND && !buffer_calls && !body_reads);
+    puts("PASS: hidden/withdrawn/wrong-board/locked import denial, no admin override and revoked actor/grant");
+    for(unsigned i=0;i<4;i++) {
+        actor=reset();
+        if(i==0)body_ok=0;
+        else if(i==1)profile_error=1;
+        else if(i==2)buffer_result=0;
+        else buffer_result=-1;
+        assert(article_import_buffer(&actor,2,7,scratch,sizeof(scratch))==ARTICLE_STORAGE);
+        assert(!strcmp(saved_buffer,"preserved") && !mark_calls && !context);
+        for(unsigned j=0;j<sizeof(scratch);j++)assert(!scratch[j]);
+    }
+    actor=reset();assert(article_import_buffer(&actor,2,7,scratch,2)==ARTICLE_BUFFER_TOO_SMALL && !buffer_calls);
+    assert(article_import_buffer(&actor,2,7,NULL,0)==ARTICLE_BUFFER_TOO_SMALL);
+    puts("PASS: article import body/store failure, invalid scratch and preserved former buffer");
+}
 int main(void) {
+    import_tests();
     ArticleActor actor=reset();
     denied(article_withdraw(NULL,2,7,1),ARTICLE_LOGIN_REQUIRED);
     actor.user=0;denied(article_retitle(&actor,2,7,"new"),ARTICLE_LOGIN_REQUIRED);

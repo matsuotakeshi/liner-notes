@@ -1,6 +1,7 @@
 #ifndef MEMBER_CORE_H
 #define MEMBER_CORE_H
 #include <stdint.h>
+#include <stddef.h>
 #include "chat_preferences.h"
 #include "profile_store.h"
 #include "application_repository.h"
@@ -156,4 +157,11 @@ MemberOutcome member_core_profile_admin_set(const MemberActor *,uint32_t target,
 typedef struct { MemberProfile profile; ApplicationNotes notes; } MemberApplication;
 MemberOutcome member_core_application_get(const MemberActor *,uint32_t target,MemberApplication *out);
 MemberOutcome member_core_application_set(const MemberActor *,uint32_t target,ApplicationNoteField,const char *value);
+/* Own private editing documents only; no target-member/admin override. Kind is
+ * independent of profile field numbers. Reads copy to caller-owned storage and
+ * clear it on all errors. Save/clear do not alter draft revisions or visibility.
+ * Buffers must be distinct from input/store memory. Calls remain worker-serialized. */
+typedef enum { MEMBER_DOCUMENT_BIO, MEMBER_DOCUMENT_BUFFER } MemberDocument;
+MemberOutcome member_core_document_get(const MemberActor *,MemberDocument,char *body,size_t capacity);
+MemberOutcome member_core_document_save(const MemberActor *,MemberDocument,const char *body);
 #endif
