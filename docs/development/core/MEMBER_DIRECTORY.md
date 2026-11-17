@@ -7,6 +7,7 @@ RIGHTS and lifecycle operations remain in their existing paths. At this baseline
 only queries were extracted; the subsequent [suspension service](MEMBER_SUSPENSION.md)
 adds the explicit durable mutation API while keeping these queries read-only.
 [Application listing and approval](MEMBER_APPROVAL.md) are extracted in the next slice.
+[Rights queries and level updates](MEMBER_RIGHTS.md) follow without moving delegated group management.
 
 ## Responsibilities and trust
 

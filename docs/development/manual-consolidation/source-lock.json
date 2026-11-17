@@ -53,7 +53,7 @@
   "scripts/serial_connector.py": "3de6ad32005c5dff9b474d8f550a534232d88f4be73b59b5dcfc15cc11d0e670",
   "scripts/transfer_spool.py": "f7c590b73368c330da611d8ce41f0fd6fe5d8ad3b3e9ae9165e258d1e501db46",
   "scripts/vault_zmodem.py": "ace554ea5b6ab8d479ec39ad7daf7f5f7f34ca34ba13d5b9a73b115a0d63ef15",
-  "src/board.c": "5f25f2389d380619bb9d42177ec53749cb8adc224ae1e0068fbab26e1c3fceaa",
+  "src/board.c": "49c1646ed2d0cd1cb6c42cc00e2b578d8ab9b94804c0ea539815d01d8fc70c94",
   "src/board_link.inc": "95a85be0a6ca2d77380775b25befb51a72971908d266c6b72f76fc7ca94e1d4a",
   "src/board_policy.c": "0169bc17649ddc63599b43ca7ae49f6c1c756dac417bd030a79398229414165b",
   "src/catalog.c": "c96bab1f3042b7685cc27df9206ebfd63ad2c79b06ca92d3dd1ca219a0e2a361",
@@ -149,6 +149,6 @@
   "src/article_core.c": "36eb515cd8ba3e94d4278586c2e02d28c1c18e4fd3279cc2058677f43032559c",
   "src/article_core.h": "6a1104692df4002322e23a3eec24ccfc3dc5552a8af22c43fdf92a6d349839d3",
   "src/article_repository.h": "29a1e2787c9c8ba534f01c53b6841a3f473f44f0fdb81c488b682b3b6545975a",
-  "src/member_core.c": "bcbd40bf3452c2b1ff6565174d5514943f2f55445ceb83be154cf139d5eb00b6",
-  "src/member_core.h": "33bde1ff934de568a81169932964b9def88cbf4c7f4a8dfae0e1c6d461e270f7"
+  "src/member_core.c": "7512f03c22cd5e1a564cd6dd1ef0c3210311bda584df5dc66be9e9c71be5320b",
+  "src/member_core.h": "36266f0a71402700c50f520a718a84ea5d7f2a86e65ddb9901e2595088828e06"
 }

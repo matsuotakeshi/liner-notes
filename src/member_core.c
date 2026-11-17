@@ -85,7 +85,7 @@ MemberOutcome member_core_suspend(const MemberActor *actor,uint32_t target,int s
     return MEMBER_CORE_OK;
 }
 
-static MemberOutcome authorize_applications(const MemberActor *actor) {
+static MemberOutcome authorize_member_admin(const MemberActor *actor) {
     MemberOutcome result=authorize(actor,0);
     if(result!=MEMBER_CORE_OK)return result;
     if(!actor || !actor->user)return MEMBER_CORE_LOGIN_REQUIRED;
@@ -95,7 +95,7 @@ static MemberOutcome authorize_applications(const MemberActor *actor) {
 MemberOutcome member_core_applications(const MemberActor *actor,uint32_t start,MemberPage *out) {
     if(!out)return MEMBER_CORE_INVALID;
     memset(out,0,sizeof(*out));
-    MemberOutcome result=authorize_applications(actor);
+    MemberOutcome result=authorize_member_admin(actor);
     if(result!=MEMBER_CORE_OK)return result;
     uint32_t total=members_count();
     if(total>MEMBER_MAX)return MEMBER_CORE_STORAGE;
@@ -117,10 +117,44 @@ MemberOutcome member_core_applications(const MemberActor *actor,uint32_t start,M
 MemberOutcome member_core_approve(const MemberActor *actor,uint32_t target,MemberChange *out) {
     if(!out)return MEMBER_CORE_INVALID;
     memset(out,0,sizeof(*out));
-    MemberOutcome result=authorize_applications(actor);
+    MemberOutcome result=authorize_member_admin(actor);
     if(result!=MEMBER_CORE_OK)return result;
     if(!members_active(target))return MEMBER_CORE_NOT_FOUND;
     int saved=members_approve(target,actor->user);
+    if(saved<=0)return saved<0?MEMBER_CORE_STORAGE:MEMBER_CORE_RIGHTS_INVALID;
+    if(saved==1) {
+        moderation_credentials_changed(target);
+        out->user=target;out->epoch=moderation_epoch(target);
+    }
+    return MEMBER_CORE_OK;
+}
+
+MemberOutcome member_core_rights(const MemberActor *actor,uint32_t target,MemberRights *out) {
+    if(!out)return MEMBER_CORE_INVALID;
+    memset(out,0,sizeof(*out));
+    MemberOutcome result=authorize(actor,0);
+    if(result!=MEMBER_CORE_OK)return result;
+    if(!actor || !actor->user)return MEMBER_CORE_LOGIN_REQUIRED;
+    if(target!=actor->user && !moderation_admin(actor->user))return MEMBER_CORE_ADMIN_REQUIRED;
+    if(!members_active(target))return MEMBER_CORE_NOT_FOUND;
+    out->user=target;out->level=members_level(target);
+    for(unsigned i=0;i<100;i++)out->groups[i]=(unsigned char)!!members_in_group(target,i+1);
+    out->state=members_pending(target)?MEMBER_STATE_PENDING:
+               moderation_suspended(target)?MEMBER_STATE_SUSPENDED:MEMBER_STATE_ACTIVE;
+    if(members_broken() || out->level<0 || out->level>5)result=MEMBER_CORE_STORAGE;
+    else if(moderation_broken())result=MEMBER_CORE_MODERATION_STORAGE;
+    if(result!=MEMBER_CORE_OK)memset(out,0,sizeof(*out));
+    return result;
+}
+
+MemberOutcome member_core_level(const MemberActor *actor,uint32_t target,unsigned level,MemberChange *out) {
+    if(!out)return MEMBER_CORE_INVALID;
+    memset(out,0,sizeof(*out));
+    MemberOutcome result=authorize_member_admin(actor);
+    if(result!=MEMBER_CORE_OK)return result;
+    if(!members_active(target))return MEMBER_CORE_NOT_FOUND;
+    if(level>5)return MEMBER_CORE_RIGHTS_INVALID;
+    int saved=members_rights(target,actor->user,(int)level,members_groups(target));
     if(saved<=0)return saved<0?MEMBER_CORE_STORAGE:MEMBER_CORE_RIGHTS_INVALID;
     if(saved==1) {
         moderation_credentials_changed(target);

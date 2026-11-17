@@ -926,6 +926,14 @@ static void execute(const BoardRequest *q,BoardResult *r) {
     if(q->op=='!') { activity_execute(q,r);return; }
     if(q->op=='%') {
         uint32_t target=q->number?q->number:q->user;
+        if(!q->action) {
+            MemberActor actor={q->user,q->user_epoch};MemberRights rights;
+            MemberOutcome outcome=member_core_rights(&actor,target,&rights);
+            if(outcome!=MEMBER_CORE_OK) { member_result(outcome,r);return; }
+            char groups[401]="";size_t used=0;
+            for(unsigned i=0;i<100;i++)if(rights.groups[i])used+=(size_t)snprintf(groups+used,sizeof(groups)-used,"%s%u",used?",":"",i+1);
+            snprintf(r->text,sizeof(r->text),"RIGHTS %u LEVEL %d GROUPS %s STATUS %s\r\n",rights.user,rights.level,*groups?groups:"-",rights.state==MEMBER_STATE_PENDING?"pending":rights.state==MEMBER_STATE_SUSPENDED?"suspended":"active");return;
+        }
         if(q->action=='P') {
             MemberActor actor={q->user,q->user_epoch};MemberPage page;
             MemberOutcome outcome=member_core_applications(&actor,q->cursor,&page);
@@ -935,9 +943,9 @@ static void execute(const BoardRequest *q,BoardResult *r) {
                 used+=(size_t)snprintf(r->text+used,sizeof(r->text)-used,"APPLICATION %u %s\r\n",page.rows[i].id,page.rows[i].name);
             snprintf(r->text+used,sizeof(r->text)-used,"END NEXT %u\r\n",page.next);return;
         }
-        if(q->action=='A') {
+        if(q->action=='A' || q->action=='L') {
             MemberActor actor={q->user,q->user_epoch};MemberChange change;
-            MemberOutcome outcome=member_core_approve(&actor,target,&change);
+            MemberOutcome outcome=q->action=='A'?member_core_approve(&actor,target,&change):member_core_level(&actor,target,q->cursor,&change);
             if(outcome!=MEMBER_CORE_OK) { member_result(outcome,r);return; }
             r->account_user=change.user;r->account_epoch=change.epoch;
         } else {
@@ -946,7 +954,6 @@ static void execute(const BoardRequest *q,BoardResult *r) {
             if(!members_active(target)) { strcpy(r->text,"ERR no member\r\n");return; }
         }
         int result=2;
-        if(q->action=='L')result=members_rights(target,q->user,(int)q->cursor,members_groups(target));
         if(q->action=='G' || q->action=='D') {
             result=members_group_change(target,q->user,q->cursor,q->action=='G');
         }
