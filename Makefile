@@ -86,6 +86,7 @@ test: test-userlog test-chat runtime vaultctl test-adapters test-vault-core test
 	$(PYTHON) tests/test_mail_draft.py ./runtime
 	$(PYTHON) tests/test_mail_service.py ./runtime
 	$(PYTHON) tests/test_mail_reading.py ./runtime
+	$(PYTHON) tests/test_mail_resources.py ./runtime
 	$(PYTHON) tests/test_mail_draft_notice.py ./runtime
 	$(PYTHON) tests/test_mail_arrival.py ./runtime
 	$(PYTHON) tests/test_mail_notify.py ./runtime

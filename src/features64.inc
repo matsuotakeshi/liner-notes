@@ -143,14 +143,18 @@ static void advanced_execute(const BoardRequest *q,BoardResult *r) {
     if(q->action=='n') { if(q->number>2 || q->until>(uint64_t)time(NULL))goto invalid;strcpy(r->text,save_checked(q->user,q->number,q->until,q->title)?"CHECKPOINT SAVED\r\n":"ERR settings storage\r\n");return; }
     if(q->action=='M') {
         if(!board_feature_enabled("mail"))goto invalid;
-        const MailMessage *m=mailbox_get(q->number,q->user);if(!m) { strcpy(r->text,"MAIL ERROR unavailable\r\n");return; }
-        const char *body=mailbox_body(m);
-        if(mailbox_broken() || profile_set(q->user,PROFILE_BUFFER,body)!=1) { strcpy(r->text,"ERR storage unavailable\r\n");return; }
+        MailActor actor={q->user,q->user_epoch};MailOutcome result=mail_core_import(&actor,q->number);
+        if(result!=MAIL_CORE_OK) { mail_result(q,result,r);return; }
         strcpy(r->text,"MAIL IMPORTED TO BUFFER\r\n");return;
     }
     if(q->action=='B') {
-        const MailMessage *m=mailbox_get(q->number,q->user);if(!board_feature_enabled("mail") || !m || !m->attachments.count) { strcpy(r->text,"MAIL ERROR unavailable\r\n");return; }
-        size_t n=(size_t)snprintf(r->text,sizeof(r->text),"MAILBATCH");for(unsigned i=0;i<m->attachments.count;i++)n+=(size_t)snprintf(r->text+n,sizeof(r->text)-n," %u",m->attachments.ids[i]);snprintf(r->text+n,sizeof(r->text)-n,"\r\n");return;
+        MailActor actor={q->user,q->user_epoch};MailAttachments attachments;
+        MailOutcome result=mail_core_attachment_batch(&actor,q->number,&attachments);
+        if(result==MAIL_CORE_DISABLED) { strcpy(r->text,"MAIL ERROR unavailable\r\n");return; }
+        if(result!=MAIL_CORE_OK) { mail_result(q,result,r);return; }
+        size_t n=(size_t)snprintf(r->text,sizeof(r->text),"MAILBATCH");
+        for(unsigned i=0;i<attachments.count;i++)n+=(size_t)snprintf(r->text+n,sizeof(r->text)-n," %u",attachments.ids[i]);
+        snprintf(r->text+n,sizeof(r->text)-n,"\r\n");return;
     }
     if(!moderation_admin(q->user)) { strcpy(r->text,"ERR admin required\r\n");return; }
     if(q->action=='D') {

@@ -242,3 +242,41 @@ MailOutcome mail_core_read(const MailActor *actor,MailReadMode mode,uint32_t sta
     if(mode==MAIL_READ_SEQUENCE) { out->sequence=1;out->next=descending?id-1:id<total?id+1:0; }
     return MAIL_CORE_OK;
 }
+
+MailOutcome mail_core_files(const MailActor *actor,uint32_t cursor,MailFilePage *out) {
+    if(!out)return MAIL_CORE_UNAVAILABLE;
+    memset(out,0,sizeof(*out));
+    MailOutcome result=authorize(actor);if(result!=MAIL_CORE_OK)return result;
+    MailFilePage page={0};
+    if(!mail_files_page(actor->user,cursor,&page))return MAIL_CORE_STORAGE;
+    if(page.count>8)return MAIL_CORE_STORAGE;
+    for(unsigned i=0;i<page.count;i++)if(!bounded(page.rows[i].name,sizeof(page.rows[i].name)-1))return MAIL_CORE_STORAGE;
+    *out=page;return MAIL_CORE_OK;
+}
+MailOutcome mail_core_attachment_info(const MailActor *actor,uint32_t id,MailFileInfo *out) {
+    if(!out)return MAIL_CORE_UNAVAILABLE;
+    memset(out,0,sizeof(*out));
+    MailOutcome result=authorize(actor);if(result!=MAIL_CORE_OK)return result;
+    MailFileInfo info={0};
+    if(!id || !mail_files_info(actor->user,id,&info))return store_failure();
+    if(info.id!=id || !bounded(info.name,sizeof(info.name)-1))return MAIL_CORE_STORAGE;
+    *out=info;return MAIL_CORE_OK;
+}
+MailOutcome mail_core_attachment_batch(const MailActor *actor,uint32_t id,MailAttachments *out) {
+    if(!out)return MAIL_CORE_UNAVAILABLE;
+    memset(out,0,sizeof(*out));
+    MailOutcome result=authorize(actor);if(result!=MAIL_CORE_OK)return result;
+    const MailMessage *m=mailbox_get(id,actor->user);
+    if(!m || !m->attachments.count)return store_failure();
+    if(m->attachments.count>MAIL_ATTACH_MAX)return MAIL_CORE_STORAGE;
+    *out=m->attachments;return MAIL_CORE_OK;
+}
+MailOutcome mail_core_import(const MailActor *actor,uint32_t id) {
+    MailOutcome result=authorize(actor);if(result!=MAIL_CORE_OK)return result;
+    const MailMessage *stored=mailbox_get(id,actor->user);
+    if(!stored)return store_failure();
+    MailMessage message=*stored;
+    const char *body=mailbox_body(&message);
+    if(mailbox_broken() || !body || !bounded(body,CONTENT_BODY))return MAIL_CORE_BODY_STORAGE;
+    return mail_repository_buffer_save(actor->user,body)?MAIL_CORE_OK:MAIL_CORE_BUFFER_STORAGE;
+}

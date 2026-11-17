@@ -3,6 +3,7 @@
 #include <stddef.h>
 #include <stdint.h>
 #include "mail_attachments.h"
+#include "mail_files.h"
 
 /* Internal single-worker API. Actor is supplied by the trusted session, never
  * by a client as an authorization flag. No retained pointers or shared outputs;
@@ -10,7 +11,8 @@
 typedef struct { uint32_t user,epoch; } MailActor;
 typedef enum { MAIL_CORE_OK, MAIL_CORE_LOGIN_REQUIRED, MAIL_CORE_REVOKED,
     MAIL_CORE_MEMBER_STORAGE, MAIL_CORE_MODERATION_STORAGE, MAIL_CORE_DISABLED,
-    MAIL_CORE_STORAGE, MAIL_CORE_UNAVAILABLE, MAIL_CORE_BODY_LIMIT, MAIL_CORE_BODY_STORAGE } MailOutcome;
+    MAIL_CORE_STORAGE, MAIL_CORE_UNAVAILABLE, MAIL_CORE_BODY_LIMIT, MAIL_CORE_BODY_STORAGE,
+    MAIL_CORE_BUFFER_STORAGE } MailOutcome;
 typedef struct { uint32_t to,parent; char title[81]; } MailCompose;
 typedef struct {
     uint32_t revision,to,parent;
@@ -40,6 +42,17 @@ MailOutcome mail_core_delete(const MailActor *,uint32_t id);
 MailOutcome mail_core_attachment_select(const MailActor *,const MailAttachments *,
                                         uint32_t id,int detach,MailAttachments *out);
 MailOutcome mail_core_attachment_drop(const MailActor *,uint32_t id);
+/* Worker-owned metadata, rechecking identity/feature on each entry. Listing is
+ * owner-only, info is owner or a live message participant (never admin bypass).
+ * Cursor is inclusive, unlike MailQuery. Active uploads keep the legacy '-' name. */
+MailOutcome mail_core_files(const MailActor *,uint32_t cursor,MailFilePage *out);
+MailOutcome mail_core_attachment_info(const MailActor *,uint32_t id,MailFileInfo *out);
+/* Return message attachment IDs in stored order, without marking read or
+ * inspecting blob availability. Transfer reauthorizes each file on execution. */
+MailOutcome mail_core_attachment_batch(const MailActor *,uint32_t mail,MailAttachments *out);
+/* Copy participant-visible body to the actor's persistent common buffer.
+ * Does not mark read, alter mail/drafts or require attachment ownership. */
+MailOutcome mail_core_import(const MailActor *,uint32_t mail);
 
 /* Owned read models. Names are copied, sender=0 renders as guest. Read/list
  * authorization is participant-only, including for administrators. */
