@@ -332,3 +332,8 @@ unverified due to absent management authorization. Solaris COM/IPS and full-scal
 production performance remain outside the demonstrated scope. This document-only
 PR does not alter the tested code; distinguish the final code SHA above from the
 subsequent document-revision main SHA.
+
+## Interrupted transfer test timing
+
+See [ZMODEM cleanup wait](ZMODEM_CLEANUP_WAIT.md) for the bounded test wait,
+original failure evidence and exact-main revalidation requirements.
