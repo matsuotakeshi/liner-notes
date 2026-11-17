@@ -2,6 +2,7 @@
 #include "members.h"
 #include "moderation.h"
 #include "extras.h"
+#include "catalog.h"
 #include "app_limits.h"
 #include <string.h>
 
@@ -155,6 +156,26 @@ MemberOutcome member_core_level(const MemberActor *actor,uint32_t target,unsigne
     if(!members_active(target))return MEMBER_CORE_NOT_FOUND;
     if(level>5)return MEMBER_CORE_RIGHTS_INVALID;
     int saved=members_rights(target,actor->user,(int)level,members_groups(target));
+    if(saved<=0)return saved<0?MEMBER_CORE_STORAGE:MEMBER_CORE_RIGHTS_INVALID;
+    if(saved==1) {
+        moderation_credentials_changed(target);
+        out->user=target;out->epoch=moderation_epoch(target);
+    }
+    return MEMBER_CORE_OK;
+}
+
+MemberOutcome member_core_group(const MemberActor *actor,uint32_t board,uint32_t target,unsigned group,int add,MemberChange *out) {
+    if(!out)return MEMBER_CORE_INVALID;
+    memset(out,0,sizeof(*out));
+    MemberOutcome result=authorize(actor,0);
+    if(result!=MEMBER_CORE_OK)return result;
+    if(!actor || !actor->user)return MEMBER_CORE_LOGIN_REQUIRED;
+    if(!moderation_admin(actor->user) &&
+       !(catalog_sigop(board,actor->user) && catalog_group(board,group) && !moderation_protected(target)))
+        return MEMBER_CORE_ADMIN_REQUIRED;
+    if(!members_active(target))return MEMBER_CORE_NOT_FOUND;
+    if(!group || group>100 || (add!=0 && add!=1))return MEMBER_CORE_RIGHTS_INVALID;
+    int saved=members_group_change(target,actor->user,group,add);
     if(saved<=0)return saved<0?MEMBER_CORE_STORAGE:MEMBER_CORE_RIGHTS_INVALID;
     if(saved==1) {
         moderation_credentials_changed(target);

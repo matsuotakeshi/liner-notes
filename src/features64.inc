@@ -12,9 +12,6 @@ static int save_checked(uint32_t user,unsigned kind,uint64_t stamp,const char *s
     sqlite3_stmt *s=feature_stmt(*scope?"INSERT INTO news_scoped(user,kind,stamp,scope) VALUES(?,?,?,?) ON CONFLICT(user,kind,scope) DO UPDATE SET stamp=max(stamp,excluded.stamp)":"INSERT INTO news VALUES(?,?,?) ON CONFLICT(user,kind) DO UPDATE SET stamp=max(stamp,excluded.stamp)");if(!s)return 0;
     sqlite3_bind_int(s,1,(int)user);sqlite3_bind_int(s,2,(int)kind);sqlite3_bind_int64(s,3,(sqlite3_int64)stamp);if(*scope)sqlite3_bind_text(s,4,scope,-1,SQLITE_TRANSIENT);int ok=sqlite3_step(s)==SQLITE_DONE;sqlite3_finalize(s);return ok;
 }
-static int group_delegated(uint32_t board,uint32_t user,unsigned group) {
-    return catalog_sigop(board,user) && catalog_group(board,group);
-}
 static int feature_groups_recover(void) {
     for(;;) {
         sqlite3_stmt *s=feature_stmt("SELECT board,actor,source,destination FROM group_moves WHERE done=0 LIMIT 1");if(!s)return 0;

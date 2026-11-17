@@ -1,8 +1,9 @@
-/* Direct account Core tests; only account/moderation persistence is stubbed. */
+/* Direct account Core tests; persistence and catalog authority are stubbed. */
 #include "member_core.h"
 #include "members.h"
 #include "moderation.h"
 #include "extras.h"
+#include "catalog.h"
 #include "app_limits.h"
 #include <assert.h>
 #include <stdio.h>
@@ -21,6 +22,29 @@ static unsigned approval_calls,approval_writes,credential_changes;
 static unsigned level_calls,level_writes;
 static int levels[15];
 static uint32_t group_words[15][4];
+static unsigned group_calls,group_writes,delegation_checks,group_checks;
+static int sigop_enabled,group_enabled;
+static uint32_t seen_board,seen_user;
+int catalog_sigop(uint32_t board,uint32_t user) {
+    delegation_checks++;seen_board=board;seen_user=user;
+    return sigop_enabled && board==3 && user==2;
+}
+int catalog_group(uint32_t board,unsigned group) {
+    group_checks++;assert(board==3);
+    return group_enabled && group==10;
+}
+int members_group_change(uint32_t user,uint32_t actor,unsigned group,int add) {
+    assert(members_active(user) && !moderation_suspended(actor));
+    assert((actor==1 && admin) || (actor==2 && sigop_enabled && group_enabled && group==10 && user!=protected_target));
+    assert(group && group<=100 && (add==0 || add==1));
+    group_calls++;
+    if(members_in_group(user,group)==add)return 2;
+    if(!commit_ok) { member_error=1;return -1; }
+    uint32_t mask=1u<<((group-1)%32);
+    if(add)group_words[user][(group-1)/32]|=mask;
+    else group_words[user][(group-1)/32]&=~mask;
+    group_writes++;changed_user=user;changed_actor=actor;return 1;
+}
 int members_level(uint32_t user) { return user<15?levels[user]:0; }
 uint32_t members_groups(uint32_t user) { return user<15?group_words[user][0]:0; }
 int members_in_group(uint32_t user,unsigned group) {
@@ -45,7 +69,7 @@ int members_approve(uint32_t user,uint32_t actor) {
     pending[user]=0;approval_writes++;changed_user=user;changed_actor=actor;return 1;
 }
 void moderation_credentials_changed(uint32_t user) {
-    assert(user && user<15 && (approval_writes || level_writes));
+    assert(user && user<15 && (approval_writes || level_writes || group_writes));
     credential_changes++;epoch_changes[user]++;
 }
 int extras_broken(void) { return extras_error; }
@@ -80,6 +104,7 @@ static MemberActor reset(void) {
     count=14;epoch=9;admin=1;member_error=moderation_error=read_failure=0;
     count_calls=target_reads=0;approval_calls=approval_writes=credential_changes=0;
     level_calls=level_writes=0;memset(group_words,0,sizeof(group_words));
+    group_calls=group_writes=delegation_checks=group_checks=0;sigop_enabled=group_enabled=1;seen_board=seen_user=0;
     for(unsigned i=0;i<15;i++)levels[i]=2;
     memset(retired,0,sizeof(retired));
     memset(epoch_changes,0,sizeof(epoch_changes));mod_count=extra_count=0;protected_target=7;
@@ -444,9 +469,101 @@ static void level_denials(void) {
     assert(member_core_level(&actor,2,5,&change)==MEMBER_CORE_STORAGE && level_calls==1);
     puts("PASS: level authorization, bounds, retired targets and failed writes without epoch publication");
 }
+static void group_updates(void) {
+    MemberActor actor=reset();MemberChange change;
+    unsigned changed=0;
+    for(unsigned group=1;group<=100;group++) {
+        assert(member_core_group(&actor,0,4,group,1,&change)==MEMBER_CORE_OK);
+        changed++;assert(change.user==4 && change.epoch==epoch+changed);
+        assert(member_core_group(&actor,0,4,group,1,&change)==MEMBER_CORE_OK);cleared(&change,sizeof(change));
+        assert(group_writes==changed && credential_changes==changed);
+    }
+    for(unsigned group=1;group<=100;group++)assert(members_in_group(4,group));
+    for(unsigned group=1;group<=100;group++) {
+        assert(member_core_group(&actor,UINT32_MAX,4,group,0,&change)==MEMBER_CORE_OK);
+        changed++;assert(change.user==4 && change.epoch==epoch+changed && !members_in_group(4,group));
+        assert(member_core_group(&actor,UINT32_MAX,4,group,0,&change)==MEMBER_CORE_OK);cleared(&change,sizeof(change));
+        assert(group_writes==changed && credential_changes==changed);
+        for(unsigned rest=group+1;rest<=100;rest++)assert(members_in_group(4,rest));
+    }
+    assert(changed_user==4 && changed_actor==1 && levels[4]==2 && !delegation_checks && !group_checks);
+    assert(member_core_group(&actor,0,7,100,1,&change)==MEMBER_CORE_OK); /* protected allowed for admin */
+    suspended[5]=1;
+    assert(member_core_group(&actor,0,5,33,1,&change)==MEMBER_CORE_OK && pending[5] && suspended[5]);
+    puts("PASS: all 100 groups, add/remove no-ops, preserved memberships/state and single epoch updates");
+}
+static void delegated_groups(void) {
+    MemberActor actor=reset();actor.user=2;MemberChange change;
+    assert(member_core_group(&actor,3,4,10,1,&change)==MEMBER_CORE_OK);
+    assert(seen_board==3 && seen_user==2 && changed_actor==2 && change.user==4 && change.epoch==10);
+    assert(member_core_group(&actor,3,4,10,1,&change)==MEMBER_CORE_OK);cleared(&change,sizeof(change));
+    assert(group_writes==1 && credential_changes==1);
+    assert(member_core_group(&actor,3,4,10,0,&change)==MEMBER_CORE_OK && change.epoch==11);
+    for(int add=0;add<=1;add++) {
+        assert(member_core_group(&actor,4,4,10,add,&change)==MEMBER_CORE_ADMIN_REQUIRED);
+        assert(member_core_group(&actor,0,4,10,add,&change)==MEMBER_CORE_ADMIN_REQUIRED);
+        assert(member_core_group(&actor,UINT32_MAX,4,10,add,&change)==MEMBER_CORE_ADMIN_REQUIRED);
+        assert(member_core_group(&actor,3,4,11,add,&change)==MEMBER_CORE_ADMIN_REQUIRED);
+        assert(member_core_group(&actor,3,7,10,add,&change)==MEMBER_CORE_ADMIN_REQUIRED);
+        cleared(&change,sizeof(change));
+    }
+    assert(group_writes==2);
+    sigop_enabled=0;
+    assert(member_core_group(&actor,3,4,10,1,&change)==MEMBER_CORE_ADMIN_REQUIRED);
+    sigop_enabled=1;group_enabled=0;
+    assert(member_core_group(&actor,3,4,10,1,&change)==MEMBER_CORE_ADMIN_REQUIRED);
+    group_enabled=1;
+    assert(member_core_group(&actor,3,3,10,1,&change)==MEMBER_CORE_NOT_FOUND);
+    retired[4]=1;
+    assert(member_core_group(&actor,3,4,10,1,&change)==MEMBER_CORE_NOT_FOUND);
+    assert(group_writes==2);
+    assert(member_core_group(&actor,3,2,10,1,&change)==MEMBER_CORE_OK && change.user==2);
+    assert(member_core_group(&actor,3,2,10,0,&change)==MEMBER_CORE_REVOKED);cleared(&change,sizeof(change));
+    actor.epoch=moderation_epoch(2);
+    assert(member_core_group(&actor,3,2,10,0,&change)==MEMBER_CORE_OK);
+    puts("PASS: live SIGOP/ACL rechecks, exact board/group scope, protected targets and self revocation");
+}
+static void group_failures(void) {
+    MemberChange change;
+    for(unsigned i=0;i<7;i++) {
+        MemberActor actor=reset();MemberOutcome want=MEMBER_CORE_REVOKED;
+        if(i==0) { actor.user=0;want=MEMBER_CORE_LOGIN_REQUIRED; }
+        else if(i==1) { actor.user=4;want=MEMBER_CORE_ADMIN_REQUIRED; }
+        else if(i==2)actor.epoch--;
+        else if(i==3)suspended[1]=1;
+        else if(i==4)actor.user=99;
+        else if(i==5) { member_error=1;want=MEMBER_CORE_STORAGE; }
+        else { moderation_error=1;want=MEMBER_CORE_MODERATION_STORAGE; }
+        for(int add=0;add<=1;add++) {
+            memset(&change,0x7f,sizeof(change));
+            assert(member_core_group(&actor,3,4,10,add,&change)==want);cleared(&change,sizeof(change));
+        }
+        assert(!group_calls && !credential_changes);
+    }
+    MemberActor actor=reset();
+    assert(member_core_group(&actor,3,4,0,1,&change)==MEMBER_CORE_RIGHTS_INVALID);
+    assert(member_core_group(&actor,3,4,101,1,&change)==MEMBER_CORE_RIGHTS_INVALID);
+    assert(member_core_group(&actor,3,4,UINT32_MAX,1,&change)==MEMBER_CORE_RIGHTS_INVALID);
+    assert(member_core_group(&actor,3,4,10,-1,&change)==MEMBER_CORE_RIGHTS_INVALID);
+    assert(member_core_group(&actor,3,4,10,2,&change)==MEMBER_CORE_RIGHTS_INVALID);
+    assert(member_core_group(NULL,3,4,10,1,&change)==MEMBER_CORE_LOGIN_REQUIRED);
+    assert(member_core_group(&actor,3,4,10,1,NULL)==MEMBER_CORE_INVALID);
+    assert(member_core_group(&actor,3,0,10,1,&change)==MEMBER_CORE_NOT_FOUND);
+    assert(!group_calls);cleared(&change,sizeof(change));
+    for(int add=0;add<=1;add++) {
+        actor=reset();commit_ok=0;
+        group_words[4][0]=add?0:1u<<9;
+        assert(member_core_group(&actor,3,4,10,add,&change)==MEMBER_CORE_STORAGE);cleared(&change,sizeof(change));
+        assert(group_calls==1 && !group_writes && !credential_changes && moderation_epoch(4)==9);
+        assert(members_in_group(4,10)==!add);
+        assert(member_core_group(&actor,3,4,10,add,&change)==MEMBER_CORE_STORAGE && group_calls==1);
+    }
+    puts("PASS: group authorization, invalid arguments and failed add/remove without epoch publication");
+}
 int main(void) {
     role_tests();directory_tests();denial_tests();failure_tests();
     suspension_tests();suspension_denials();suspension_failures();
     application_pages();approval_tests();application_denials();
-    rights_queries();rights_failures();level_updates();level_denials();return 0;
+    rights_queries();rights_failures();level_updates();level_denials();
+    group_updates();delegated_groups();group_failures();return 0;
 }

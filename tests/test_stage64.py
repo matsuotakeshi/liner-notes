@@ -36,10 +36,21 @@ def run(binary,vaultctl):
    assert cmd(g,'BOARD 3').startswith(b'BOARD 3')
    assert cmd(g,'GROUP 3 10').startswith(b'RIGHTS 3')
    assert cmd(a,'SIGOPGROUP 3 10')==b'SIGOP GROUP SAVED'
+   unchanged=members.stat().st_size
+   assert cmd(g,'GROUP 3 10').startswith(b'RIGHTS 3')
+   assert members.stat().st_size==unchanged
+   assert cmd(g,'UNGROUP 3 10').startswith(b'RIGHTS 3')
+   unchanged=members.stat().st_size
+   assert cmd(g,'UNGROUP 3 10').startswith(b'RIGHTS 3')
+   assert members.stat().st_size==unchanged
+   assert cmd(g,'BOARD 4').startswith(b'BOARD 4')
+   assert cmd(g,'GROUP 3 10')==b'ERR admin required'
+   assert cmd(g,'BOARD 3').startswith(b'BOARD 3')
    assert cmd(g,'GROUP 3 10').startswith(b'RIGHTS 3')
    b.close();b=Client(s.port);auth(b,'alice')
    assert cmd(g,'GROUP 3 11')==b'ERR admin required'
    assert cmd(g,'GROUP 1 10')==b'ERR admin required'
+   assert cmd(g,'UNGROUP 1 10')==b'ERR admin required'
    assert cmd(b,'BOARD 3').startswith(b'BOARD 3')
    first=post(b,'needle alpha','private article body')
    assert cmd(a,'BOARD 4').startswith(b'BOARD 4');other=post(a,'needle other','other article')
