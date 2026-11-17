@@ -155,7 +155,7 @@
   "src/chat_preferences.h": "5ccd981f5282ab0e0161d923fba6935b543136e3fad5dacf78f91bba3859bdc0",
   "src/features64.inc": "9f06d34b34ac782984f09775db9dcc6e9f6f950d124dd6c770e6948219d8539b",
   "src/application_repository.h": "44685017695e60734b4fac1f3470fdf3a08733553142031cea2f5dcc9cca4adb",
-  "src/mail_core.c": "cdfcba7631d604cdec482bd935e94e50193e5af85d6085a0b88841acc90f0578",
+  "src/mail_core.c": "feae02849adf1d5f0a48073f8151752c205c563165d87820a88e367705549ffe",
   "src/mail_core.h": "4986250dc8a44404e31dc5ab19acb489741d06f9bb2c62699327246ac2fd6e8e",
   "src/mail_repository.h": "2ed4895d6174248ec028dc47ea26c43298a7cec6db334bc1a253ccfb8d1549f5",
   "help/en/mail.txt": "2cd15b2def11660f6b8566516d99b4637561590b4cea625eb489f193b9e4ba76"

@@ -1,3 +1,4 @@
+#define _POSIX_C_SOURCE 200809L
 #include "mail_core.h"
 #include "mail_repository.h"
 #include "mailbox.h"

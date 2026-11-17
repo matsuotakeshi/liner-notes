@@ -80,3 +80,16 @@ Public mail guidance and Japanese/English HELP clarify existing ownership and
 revision behavior. Canonical generation, links/search and offline parity are
 checked before PR publication. Stable manual version remains 0.74.1; this internal
 refactor is unreleased and does not complete all Core/UI separation.
+
+## PR build correction
+
+PR head ef3c5e41834138332291aae625ff0747398e94d9 failed POSIX builds:
+Native CI Source Checks job 134037267213 and Rocky Linux compatibility job
+134037279010 both report an undeclared setenv from runtime_limits.h. The new
+translation unit omitted the POSIX feature-test macro used by board.c. Windows
+unit checks did not exercise this declaration because the header uses _putenv_s
+on Windows. Declare _POSIX_C_SOURCE=200809L before every include in mail_core.c;
+retain strict C11/warnings-as-errors and all existing tests. Mail behavior, quotas
+and environment loading are unchanged. The correction's local targeted checks
+are supplemental; POSIX/runtime results await the new PR CI commit, not the old
+successful main commit. No CI rerun of the known-bad SHA is requested.
