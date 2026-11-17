@@ -6,6 +6,7 @@
 /* Stage 2: single-owner board store, bounded asynchronous request queue. */
 #include "board.h"
 #include "article_core.h"
+#include "member_core.h"
 #include "article_repository.h"
 #include "date_filter.h"
 #include "vault_bridge.h"
@@ -825,6 +826,19 @@ static void post_article(const BoardRequest *q,BoardResult *r,const char *remote
         snprintf(r->text,sizeof(r->text),"SAVED %u\r\n",r->selected);
 }
 #include "board_link.inc"
+static const char *member_state_text(MemberState state) {
+    return state==MEMBER_STATE_PENDING?"pending":state==MEMBER_STATE_SUSPENDED?"suspended":"active";
+}
+static void member_result(MemberOutcome result,BoardResult *r) {
+    switch(result) {
+    case MEMBER_CORE_REVOKED:r->revoked=1;strcpy(r->text,"ERR session revoked\r\n");break;
+    case MEMBER_CORE_ADMIN_REQUIRED:strcpy(r->text,"ERR admin required\r\n");break;
+    case MEMBER_CORE_NOT_FOUND:strcpy(r->text,"ERR no member\r\n");break;
+    case MEMBER_CORE_MODERATION_STORAGE:strcpy(r->text,"ERR moderation storage unavailable\r\n");break;
+    default:strcpy(r->text,"ERR member storage unavailable\r\n");break;
+    }
+}
+
 static void execute(const BoardRequest *q,BoardResult *r) {
     memset(r,0,sizeof(*r));
     policy_context(q->board_grants);
@@ -932,9 +946,12 @@ static void execute(const BoardRequest *q,BoardResult *r) {
         snprintf(r->text,sizeof(r->text),"RIGHTS %u LEVEL %d GROUPS %s STATUS %s\r\n",target,members_level(target),*groups?groups:"-",members_pending(target)?"pending":moderation_suspended(target)?"suspended":"active");return;
     }
     if(q->op=='z') {
-        snprintf(r->text,sizeof(r->text),"ROLE %s\r\n",moderation_admin(q->user)?"admin":members_name(q->user)?"member":"guest"); return;
+        MemberActor actor={q->user,q->user_epoch};MemberRole role;
+        MemberOutcome result=member_core_role(&actor,&role);
+        if(result!=MEMBER_CORE_OK) { member_result(result,r);return; }
+        snprintf(r->text,sizeof(r->text),"ROLE %s\r\n",role==MEMBER_ROLE_ADMIN?"admin":role==MEMBER_ROLE_MEMBER?"member":"guest");return;
     }
-    if(((strchr("hri",q->op) && !catalog_manage(q->board,q->user)) || (strchr("xylt",q->op) && !moderation_admin(q->user)))) { strcpy(r->text,"ERR admin required\r\n"); return; }
+    if(((strchr("hri",q->op) && !catalog_manage(q->board,q->user)) || (strchr("xy",q->op) && !moderation_admin(q->user)))) { strcpy(r->text,"ERR admin required\r\n"); return; }
     if(moderation_broken()) { strcpy(r->text,"ERR moderation storage unavailable\r\n"); return; }
     if(q->op==BOARD_MAIL_TRANSFER) { if(!members_name(q->user)) { strcpy(r->text,"ERR login required\r\n");return; }mail_files_transfer(q->user,q->body,r->text,sizeof(r->text));return; }
     if(q->op=='m') { if(!members_name(q->user)) { strcpy(r->text,"ERR login required\r\n");return; }mail_execute(q,r);return; }
@@ -1076,18 +1093,24 @@ static void execute(const BoardRequest *q,BoardResult *r) {
         }
         snprintf(r->text+pos,sizeof(r->text)-pos,"END NEXT %u\r\n",page.next);return;
     }
-    if(q->op=='l') {
-        size_t pos=(size_t)snprintf(r->text,sizeof(r->text),"MEMBERS\r\n");
-        uint32_t id=q->number?q->number:1; int shown=0;
-        for(;id<=members_count();id++) if(members_name(id)) {
-            if(shown++==8) break;
-            pos+=(size_t)snprintf(r->text+pos,sizeof(r->text)-pos,"MEMBER %u %s %s\r\n",id,members_name(id),members_pending(id)?"pending":moderation_suspended(id)?"suspended":"active");
+    if(q->op=='l' || q->op=='t') {
+        MemberActor actor={q->user,q->user_epoch};MemberOutcome result;
+        if(q->op=='t') {
+            MemberSummary member;result=member_core_get(&actor,q->number,&member);
+            if(result!=MEMBER_CORE_OK) { member_result(result,r);return; }
+            snprintf(r->text,sizeof(r->text),"MEMBER %u %s %s\r\n",member.id,member.name,member_state_text(member.state));return;
         }
-        snprintf(r->text+pos,sizeof(r->text)-pos,"END NEXT %u\r\n",id<=members_count()?id:0); return;
+        MemberPage page;result=member_core_list(&actor,q->number,&page);
+        if(result!=MEMBER_CORE_OK) { member_result(result,r);return; }
+        size_t pos=(size_t)snprintf(r->text,sizeof(r->text),"MEMBERS\r\n");
+        for(unsigned i=0;i<page.count;i++) {
+            const MemberSummary *member=&page.rows[i];
+            pos+=(size_t)snprintf(r->text+pos,sizeof(r->text)-pos,"MEMBER %u %s %s\r\n",member->id,member->name,member_state_text(member->state));
+        }
+        snprintf(r->text+pos,sizeof(r->text)-pos,"END NEXT %u\r\n",page.next);return;
     }
-    if(q->op=='x' || q->op=='y' || q->op=='t') {
+    if(q->op=='x' || q->op=='y') {
         if(!members_name(q->number)) { strcpy(r->text,"ERR no member\r\n"); return; }
-        if(q->op=='t') { snprintf(r->text,sizeof(r->text),"MEMBER %u %s %s\r\n",q->number,members_name(q->number),members_pending(q->number)?"pending":moderation_suspended(q->number)?"suspended":"active"); return; }
         if(q->number==q->user || moderation_protected(q->number)) { strcpy(r->text,"ERR protected member\r\n"); return; }
         if((uint64_t)moderation_count()+extras_audit_count()>=UINT32_MAX) { strcpy(r->text,"ERR moderation storage uncertain\r\n"); return; }
         if(!moderation_suspend(q->number,q->user,q->op=='x')) { strcpy(r->text,"ERR moderation storage uncertain\r\n"); return; }
