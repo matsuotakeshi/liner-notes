@@ -103,8 +103,25 @@ def parse_result(log_path, target, sha):
         raise RuntimeError(records[0].get("error", "Native suite failed"))
 
 
+def remote_directory_command(target, python):
+    if target not in TARGETS:
+        raise ValueError("Unknown native target")
+    if target == "solaris":
+        if not re.fullmatch(r"/usr/bin/python3(?:\.[0-9]+)?", python):
+            raise ValueError("Unexpected Solaris interpreter")
+        # Solaris mktemp can emit dots, rejected by both the transfer guard
+        # and the installed SMF method. Use the already-probed Python instead;
+        # mkdtemp creates an exclusive private directory, without relaxing guards.
+        code = ('import os, tempfile; '
+                'base = os.path.join(os.path.expanduser("~"), "ci"); '
+                'os.makedirs(base, mode=0o700, exist_ok=True); '
+                'print(tempfile.mkdtemp(prefix="native-solaris-", dir=base))')
+        return "umask 077; " + shlex.quote(python) + " -c " + shlex.quote(code)
+    return 'umask 077; mkdir -p "$HOME/ci" && mktemp -d "$HOME/ci/native-' + target + '-XXXXXXXX"'
+
+
 def validate_remote_directory(target, directory):
-    # Solaris mktemp uses underscores in its random suffix. Keep the fixed
+    # Solaris Python tempfile uses underscores in its random suffix. Keep the fixed
     # CI parent/prefix and reject shell syntax, extra output and traversal.
     if target not in TARGETS:
         raise ValueError("Unknown native target")
@@ -137,9 +154,8 @@ def execute_target(target, archive, digest, sha, output, cancelled):
                 python = run_setup(ssh + ["/bin/sh -c " + shlex.quote(probe)], log, cancelled, capture=True)
                 if not re.fullmatch(r"/usr/bin/python3(?:\.[0-9]+)?", python):
                     raise ValueError("No existing Solaris Python >=3.9 interpreter found")
-            directory = run_setup(ssh + [
-                'umask 077; mkdir -p "$HOME/ci" && mktemp -d "$HOME/ci/native-' + target + '-XXXXXXXX"'
-            ], log, cancelled, capture=True)
+            directory = run_setup(ssh + [remote_directory_command(target, python)],
+                                  log, cancelled, capture=True)
             validate_remote_directory(target, directory)
             result["remote_directory"] = directory
             run_setup(["scp", *ssh_options(key), str(archive), host + ":" + directory + "/source.tar.gz"], log, cancelled)
