@@ -10,13 +10,26 @@
 
 static uint32_t count,epoch;
 static char names[15][34];
-static unsigned char present[15],pending[15],suspended[15];
+static unsigned char present[15],pending[15],suspended[15],retired[15];
 static int member_error,moderation_error,admin,read_failure;
 static unsigned count_calls,target_reads;
 static uint32_t epoch_changes[15],mod_count,extra_count,protected_target;
 static uint32_t changed_user,changed_actor;
 static unsigned suspend_calls,durable_writes;
 static int extras_error,commit_ok,changed_flag;
+static unsigned approval_calls,approval_writes,credential_changes;
+int members_active(uint32_t id) { return id && id<15 && present[id] && !retired[id]; }
+int members_approve(uint32_t user,uint32_t actor) {
+    assert(actor==1 && admin && !moderation_suspended(actor));
+    approval_calls++;
+    if(!members_pending(user))return 0;
+    if(!commit_ok) { member_error=1;return -1; }
+    pending[user]=0;approval_writes++;changed_user=user;changed_actor=actor;return 1;
+}
+void moderation_credentials_changed(uint32_t user) {
+    assert(user && user<15 && approval_writes && !pending[user]);
+    credential_changes++;epoch_changes[user]++;
+}
 int extras_broken(void) { return extras_error; }
 uint32_t moderation_count(void) { return mod_count; }
 uint32_t extras_audit_count(void) { return extra_count; }
@@ -40,14 +53,15 @@ const char *members_name(uint32_t id) {
 }
 int members_pending(uint32_t id) {
     if(id==(uint32_t)read_failure)member_error=1;
-    return id<15?pending[id]:0;
+    return members_active(id)?pending[id]:0;
 }
 int moderation_suspended(uint32_t id) { return id<15?(suspended[id] || pending[id]):0; }
 uint32_t moderation_epoch(uint32_t id) { return epoch+(id<15?epoch_changes[id]:0); }
 int moderation_admin(uint32_t id) { return id==1 && admin; }
 static MemberActor reset(void) {
     count=14;epoch=9;admin=1;member_error=moderation_error=read_failure=0;
-    count_calls=target_reads=0;
+    count_calls=target_reads=0;approval_calls=approval_writes=credential_changes=0;
+    memset(retired,0,sizeof(retired));
     memset(epoch_changes,0,sizeof(epoch_changes));mod_count=extra_count=0;protected_target=7;
     extras_error=0;commit_ok=1;suspend_calls=durable_writes=0;changed_user=changed_actor=0;changed_flag=-1;
     memset(names,0,sizeof(names));memset(present,1,sizeof(present));present[0]=0;
@@ -222,7 +236,95 @@ static void suspension_failures(void) {
     cleared(&change,sizeof(change));assert(suspended[2] && !durable_writes && moderation_epoch(2)==9);
     puts("PASS: combined audit limit/overflow, failed durable writes and no success invalidation result on error");
 }
+static void application_pages(void) {
+    MemberActor actor=reset();MemberPage page;
+    assert(member_core_applications(&actor,0,&page)==MEMBER_CORE_OK);
+    assert(page.count==1 && page.rows[0].id==5 && page.rows[0].state==MEMBER_STATE_PENDING && !page.next);
+    assert(!strcmp(page.rows[0].name,"user5"));
+    for(unsigned i=2;i<15;i++)pending[i]=1;
+    assert(member_core_applications(&actor,0,&page)==MEMBER_CORE_OK && page.count==8 && page.next==12);
+    const uint32_t ids[]={2,4,5,6,7,8,9,11};
+    for(unsigned i=0;i<8;i++)assert(page.rows[i].id==ids[i] && page.rows[i].state==MEMBER_STATE_PENDING);
+    assert(member_core_applications(&actor,page.next,&page)==MEMBER_CORE_OK && page.count==3 && !page.next);
+    assert(page.rows[0].id==12 && page.rows[2].id==14);
+    retired[12]=1;
+    assert(member_core_applications(&actor,12,&page)==MEMBER_CORE_OK && page.count==2 && page.rows[0].id==13);
+    assert(member_core_applications(&actor,UINT32_MAX,&page)==MEMBER_CORE_OK);cleared(&page,sizeof(page));
+    memset(pending,0,sizeof(pending));
+    assert(member_core_applications(&actor,0,&page)==MEMBER_CORE_OK);cleared(&page,sizeof(page));
+    count=MEMBER_MAX;
+    assert(member_core_applications(&actor,MEMBER_MAX,&page)==MEMBER_CORE_OK);cleared(&page,sizeof(page));
+    count=MEMBER_MAX+1;
+    assert(member_core_applications(&actor,0,&page)==MEMBER_CORE_STORAGE);cleared(&page,sizeof(page));
+    actor=reset();read_failure=6;
+    assert(member_core_applications(&actor,0,&page)==MEMBER_CORE_STORAGE);cleared(&page,sizeof(page));
+    actor=reset();memset(names[5],'x',sizeof(names[5]));
+    assert(member_core_applications(&actor,0,&page)==MEMBER_CORE_STORAGE);cleared(&page,sizeof(page));
+    assert(!approval_calls && !credential_changes);
+    puts("PASS: pending-only application paging, retired IDs, bounds and cleared partial results");
+}
+static void approval_tests(void) {
+    MemberActor actor=reset();MemberChange change;MemberPage page;MemberRole role;
+    MemberActor applicant={5,epoch};
+    assert(member_core_role(&applicant,&role)==MEMBER_CORE_REVOKED);
+    assert(member_core_approve(&actor,5,&change)==MEMBER_CORE_OK);
+    assert(change.user==5 && change.epoch==10 && !pending[5]);
+    assert(approval_calls==1 && approval_writes==1 && credential_changes==1);
+    assert(changed_user==5 && changed_actor==1 && moderation_epoch(1)==9);
+    assert(member_core_role(&applicant,&role)==MEMBER_CORE_REVOKED);
+    applicant.epoch=change.epoch;
+    assert(member_core_role(&applicant,&role)==MEMBER_CORE_OK && role==MEMBER_ROLE_MEMBER);
+    assert(member_core_applications(&actor,0,&page)==MEMBER_CORE_OK && !page.count);
+    assert(member_core_approve(&actor,5,&change)==MEMBER_CORE_RIGHTS_INVALID);cleared(&change,sizeof(change));
+    assert(approval_writes==1 && credential_changes==1 && moderation_epoch(5)==10);
+    actor=reset();suspended[5]=1;
+    assert(member_core_approve(&actor,5,&change)==MEMBER_CORE_OK && suspended[5]);
+    applicant.epoch=change.epoch;
+    assert(member_core_role(&applicant,&role)==MEMBER_CORE_REVOKED);
+    actor=reset();retired[5]=1;
+    assert(member_core_approve(&actor,5,&change)==MEMBER_CORE_NOT_FOUND);
+    assert(!approval_calls && pending[5]);cleared(&change,sizeof(change));
+    for(uint32_t id=0;id<=3;id+=3) {
+        assert(member_core_approve(&actor,id,&change)==MEMBER_CORE_NOT_FOUND);
+        cleared(&change,sizeof(change));
+    }
+    assert(member_core_approve(&actor,UINT32_MAX,&change)==MEMBER_CORE_NOT_FOUND);
+    /* Approval and suspension protection are distinct existing policies. */
+    actor=reset();pending[7]=1;
+    assert(member_core_approve(&actor,7,&change)==MEMBER_CORE_OK && change.user==7);
+    puts("PASS: durable approval, attribution, single epoch update, repeat rejection and suspension preservation");
+}
+static void application_denials(void) {
+    MemberPage page;MemberChange change;
+    for(unsigned i=0;i<8;i++) {
+        MemberActor actor=reset();MemberOutcome want=MEMBER_CORE_ADMIN_REQUIRED;
+        if(i==0) { actor.user=0;want=MEMBER_CORE_LOGIN_REQUIRED; }
+        else if(i==1)actor.user=2;
+        else if(i==2)admin=0;
+        else if(i==3) { actor.epoch--;want=MEMBER_CORE_REVOKED; }
+        else if(i==4) { suspended[1]=1;want=MEMBER_CORE_REVOKED; }
+        else if(i==5) { actor.user=99;want=MEMBER_CORE_REVOKED; }
+        else if(i==6) { member_error=1;want=MEMBER_CORE_STORAGE; }
+        else { moderation_error=1;want=MEMBER_CORE_MODERATION_STORAGE; }
+        memset(&page,0x7f,sizeof(page));memset(&change,0x7f,sizeof(change));
+        assert(member_core_applications(&actor,0,&page)==want);cleared(&page,sizeof(page));
+        assert(member_core_approve(&actor,5,&change)==want);cleared(&change,sizeof(change));
+        assert(!approval_calls && !credential_changes && pending[5]);
+    }
+    MemberActor actor=reset();
+    assert(member_core_applications(NULL,0,&page)==MEMBER_CORE_LOGIN_REQUIRED);
+    assert(member_core_approve(NULL,5,&change)==MEMBER_CORE_LOGIN_REQUIRED);
+    assert(member_core_applications(&actor,0,NULL)==MEMBER_CORE_INVALID);
+    assert(member_core_approve(&actor,5,NULL)==MEMBER_CORE_INVALID);
+    assert(!approval_calls);
+    commit_ok=0;
+    assert(member_core_approve(&actor,5,&change)==MEMBER_CORE_STORAGE);cleared(&change,sizeof(change));
+    assert(approval_calls==1 && !approval_writes && !credential_changes && pending[5] && moderation_epoch(5)==9);
+    assert(member_core_approve(&actor,5,&change)==MEMBER_CORE_STORAGE && approval_calls==1);
+    puts("PASS: application/approval authorization, failed writes and no epoch notification on failure");
+}
 int main(void) {
     role_tests();directory_tests();denial_tests();failure_tests();
-    suspension_tests();suspension_denials();suspension_failures();return 0;
+    suspension_tests();suspension_denials();suspension_failures();
+    application_pages();approval_tests();application_denials();return 0;
 }
