@@ -164,4 +164,18 @@ MemberOutcome member_core_application_set(const MemberActor *,uint32_t target,Ap
 typedef enum { MEMBER_DOCUMENT_BIO, MEMBER_DOCUMENT_BUFFER } MemberDocument;
 MemberOutcome member_core_document_get(const MemberActor *,MemberDocument,char *body,size_t capacity);
 MemberOutcome member_core_document_save(const MemberActor *,MemberDocument,const char *body);
+/* Persisted guidance policy, not a permission or guest preference. */
+typedef enum { MEMBER_MENU_BEGINNER, MEMBER_MENU_STANDARD, MEMBER_MENU_EXPERT } MemberMenuMode;
+MemberOutcome member_core_menu_get(const MemberActor *,MemberMenuMode *out);
+MemberOutcome member_core_menu_save(const MemberActor *,MemberMenuMode);
+/* Actor-owned checkpoint keys retain legacy storage: empty = all; article
+ * scope = canonical board:0 (here) or board:2 (subtree); files = path <=48 bytes;
+ * mail only accepts empty. Keys select cursors, NEVER authorize content access.
+ * Begin is read-only; caller commits the captured until after traversal ends.
+ * Commit is monotonic, rejects future/out-of-SQLite-range stamps and rechecks
+ * credentials. Concurrent older completions cannot move a newer cursor back. */
+typedef enum { MEMBER_CHECK_ARTICLES, MEMBER_CHECK_MAIL, MEMBER_CHECK_FILES } MemberCheckKind;
+typedef struct { uint64_t since,until; } MemberCheckWindow;
+MemberOutcome member_core_check_begin(const MemberActor *,MemberCheckKind,const char *scope,MemberCheckWindow *out);
+MemberOutcome member_core_check_commit(const MemberActor *,MemberCheckKind,const char *scope,uint64_t until);
 #endif

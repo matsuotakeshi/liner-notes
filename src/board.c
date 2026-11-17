@@ -939,7 +939,9 @@ static void execute(const BoardRequest *q,BoardResult *r) {
             r->chat_admin=moderation_admin((uint32_t)id);r->chat_user=(uint32_t)id;members_chat_preferences((uint32_t)id,&r->chat_preferences);
             snprintf(r->chat_login,sizeof(r->chat_login),"%s",members_name((uint32_t)id));
             snprintf(r->chat_name,sizeof(r->chat_name),"%s",*profile_value((uint32_t)id,0)?profile_value((uint32_t)id,0):members_name((uint32_t)id));
-            r->menu_mode=(int)feature_setting("menu_preferences",(uint32_t)id);r->preferences=members_preferences((uint32_t)id,&r->language,&r->pager);
+            MemberActor menu_actor={(uint32_t)id,r->user_epoch};MemberMenuMode menu_mode;
+            r->menu_mode=member_core_menu_get(&menu_actor,&menu_mode)==MEMBER_CORE_OK?(int)menu_mode:MEMBER_MENU_STANDARD;
+            r->preferences=members_preferences((uint32_t)id,&r->language,&r->pager);
             MemberDraft draft={0};
             if(members_draft((uint32_t)id,&draft)) r->saved_draft_notice=draft.revision;
             OPENSSL_cleanse(&draft,sizeof(draft));
@@ -1158,7 +1160,9 @@ static void execute(const BoardRequest *q,BoardResult *r) {
         if(result!=MEMBER_CORE_OK) { member_result(result,r);return; }
         if(!preferences.present) { strcpy(r->text,"PREFS NONE\r\n");return; }
         if(q->number==2) {
-            r->preferences=1;r->menu_mode=(int)feature_setting("menu_preferences",q->user);
+            MemberMenuMode menu_mode;result=member_core_menu_get(&actor,&menu_mode);
+            if(result!=MEMBER_CORE_OK) { member_result(result,r);return; }
+            r->preferences=1;r->menu_mode=(int)menu_mode;
             r->language=preferences.language;r->pager=preferences.pager;r->editor_preference=preferences.editor;
             r->columns=preferences.columns;r->rows=preferences.rows;r->ui_aux=preferences.aux;
         }

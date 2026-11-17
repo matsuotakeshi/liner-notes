@@ -89,6 +89,7 @@ test: test-userlog test-chat runtime vaultctl test-adapters test-vault-core test
 	$(PYTHON) tests/test_mail_resources.py ./runtime
 	$(PYTHON) tests/test_mail_delivery.py ./runtime
 	$(PYTHON) tests/test_editor_documents.py ./runtime
+	$(PYTHON) tests/test_reading_settings.py ./runtime ./vaultctl
 	$(PYTHON) tests/test_mail_draft_notice.py ./runtime
 	$(PYTHON) tests/test_mail_arrival.py ./runtime
 	$(PYTHON) tests/test_mail_notify.py ./runtime
@@ -200,7 +201,7 @@ test-legacy-transfers: runtime vaultctl
 	$(PYTHON) tests/test_stage61_transfer_menu.py ./runtime ./vaultctl $(LRZ) $(LSZ)
 
 clean:
-	rm -f test-mail-core test-member-core test-article-core liner-notes-door-lock runtime vaultctl memberctl dbconvert generate-scale generate-members test-adapters test-chat test-vault-core test-upload-core test-transfer-connector test-userlog test-stage61-userlog test-zhost
+	rm -f test-member-settings-store test-mail-core test-member-core test-article-core liner-notes-door-lock runtime vaultctl memberctl dbconvert generate-scale generate-members test-adapters test-chat test-vault-core test-upload-core test-transfer-connector test-userlog test-stage61-userlog test-zhost
 
 memberctl: src/db_index.h src/memberctl.c src/members.c src/members.h src/app_limits.h src/store_limits.h
 	$(CC) $(CPPFLAGS) $(SQLITE_CFLAGS) $(CFLAGS) $(LDFLAGS) -std=c11 -Wall -Wextra -Werror src/memberctl.c src/members.c -lcrypto $(SQLITE_LIBS) $(LDLIBS) src/storage_sqlite.c $(SQLITE_CFLAGS) -pthread -lcrypto $(SQLITE_LIBS) -o memberctl
@@ -352,8 +353,8 @@ check: test-article-core
 
 # Account Core tests: no terminal, credentials or live database.
 .PHONY: test-member-core
-runtime test-adapters: src/member_core.h src/application_repository.h
-test-member-core: tests/test_member_core.c src/member_core.c src/member_core.h src/application_repository.h src/profile_store.h src/catalog.h src/members.h src/moderation.h src/extras.h src/app_limits.h src/content_limits.h src/chat_preferences.h
+runtime test-adapters: src/member_settings_store.inc src/member_settings_repository.h src/member_core.h src/application_repository.h
+test-member-core: src/member_settings_repository.h tests/test_member_core.c src/member_core.c src/member_core.h src/application_repository.h src/profile_store.h src/catalog.h src/members.h src/moderation.h src/extras.h src/app_limits.h src/content_limits.h src/chat_preferences.h
 	$(CC) $(CPPFLAGS) $(CFLAGS) $(LDFLAGS) -std=c11 -Wall -Wextra -Werror -Isrc tests/test_member_core.c src/member_core.c -o test-member-core
 	./test-member-core
 check: test-member-core
@@ -365,3 +366,9 @@ test-mail-core: src/transfer.h src/vault.h src/principal.h src/store_limits.h te
 	$(CC) $(CPPFLAGS) $(CFLAGS) $(LDFLAGS) -std=c11 -Wall -Wextra -Werror -Isrc tests/test_mail_core.c src/mail_core.c -o test-mail-core
 	./test-mail-core
 check: test-mail-core
+
+.PHONY: test-member-settings-store
+test-member-settings-store: tests/test_member_settings_store.c src/member_settings_store.inc src/member_settings_repository.h
+	$(CC) $(CPPFLAGS) $(SQLITE_CFLAGS) $(CFLAGS) $(LDFLAGS) -std=c11 -Wall -Wextra -Werror -Isrc tests/test_member_settings_store.c $(SQLITE_LIBS) -o test-member-settings-store
+	./test-member-settings-store
+check: test-member-settings-store
