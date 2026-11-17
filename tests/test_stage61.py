@@ -19,6 +19,10 @@ def run(binary,ctl):
   s=Server(binary,b,**kw);a,c,g=[Client(s.port) for _ in range(3)]
   try:
    auth(a,'admin');auth(c,'alice');auth(g,'bob')
+   for field in ('HANDLE','BIO','LOCATION','OCCUPATION','INTERESTS','WEBSITE','CONTACT'):
+    assert cmd(c,field+' Short value')==b'PROFILE SAVED'
+    assert (field+' Short value').encode() in rows(c,'PROFILE',b'END PROFILE')
+    assert cmd(c,field)==b'PROFILE SAVED'  # preserve empty/clear shorthand
    for field,value in [('MACHINE','PC-98'),('BIRTHDAY','1968-02-29'),('REALNAME','Private Name'),('PHONE','555-0100')]:
     assert cmd(c,f'profileset {field.lower()} {value}')==b'PROFILE SAVED'
    data=b'\n'.join(rows(g,'PROFILEID 2',b'END PROFILE'));assert b'Private Name' not in data and b'1968' not in data
@@ -28,8 +32,20 @@ def run(binary,ctl):
    assert not any(x.startswith(b'2 ') for x in rows(g,'PROFILEFIND REALNAME Private'))
    assert cmd(c,'PROFILEVIS MACHINE MEMBERS')==b'PROFILE SAVED'
    assert any(x.startswith(b'2 ') for x in rows(g,'PROFILEFIND MACHINE PC-98'))
+   journal=pathlib.Path(str(m)+'.profile');unchanged=journal.stat().st_size
+   assert cmd(c,'PROFILEVIS HANDLE PRIVATE')==b'ERR profile text'
+   assert cmd(c,'PROFILEVIS MACHINE MONTHDAY')==b'ERR profile text'
+   assert journal.stat().st_size==unchanged
+   assert cmd(c,'PROFILEVIS MACHINE PRIVATE')==b'PROFILE SAVED'
+   assert b'MACHINE PC-98' not in rows(g,'PROFILEID 2',b'END PROFILE')
+   assert not any(x.startswith(b'2 ') for x in rows(g,'PROFILEFIND MACHINE PC-98'))
+   assert b'MACHINE PC-98' in rows(c,'PROFILE',b'END PROFILE')
+   assert b'MACHINE PC-98' in rows(a,'PROFILEID 2',b'END PROFILE')
+   unchanged=journal.stat().st_size
    assert cmd(c,'PROFILESET BIRTHDAY 1900-02-29')==b'ERR profile text'
    assert cmd(c,'PROFILESET BIRTHDAY 1968X02-29')==b'ERR profile text'
+   assert journal.stat().st_size==unchanged
+   assert b'BIRTHDAY 1968-02-29' in rows(c,'PROFILE',b'END PROFILE')
    assert cmd(c,'BIOEDIT')==b'DOCUMENT EDIT'
    for i in range(20):c.send(('Line Mixed '+str(i)+' x'*30+'\n').encode())
    assert cmd(c,'/save')==b'PROFILE SAVED'

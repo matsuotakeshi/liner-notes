@@ -2,6 +2,7 @@
 #include "members.h"
 #include "moderation.h"
 #include "extras.h"
+#include "profile_store.h"
 #include "catalog.h"
 #include "app_limits.h"
 #include <string.h>
@@ -355,4 +356,31 @@ MemberOutcome member_core_chat_preferences(const MemberActor *actor,ChatPreferen
            moderation_broken()?MEMBER_CORE_MODERATION_STORAGE:MEMBER_CORE_OK;
     if(result!=MEMBER_CORE_OK)memset(out,0,sizeof(*out));
     return result;
+}
+
+static MemberOutcome authorize_profile(const MemberActor *actor) {
+    MemberOutcome result=authorize(actor,0);
+    if(result!=MEMBER_CORE_OK)return result;
+    if(!actor || !actor->user)return MEMBER_CORE_LOGIN_REQUIRED;
+    if(extras_broken() || profile_store_broken())return MEMBER_CORE_EXTRAS_STORAGE;
+    return MEMBER_CORE_OK;
+}
+
+MemberOutcome member_core_profile_set(const MemberActor *actor,unsigned field,const char *text) {
+    MemberOutcome result=authorize_profile(actor);
+    if(result!=MEMBER_CORE_OK)return result;
+    if(!text || field>PROFILE_BUFFER)return MEMBER_CORE_PROFILE_TEXT;
+    if(members_rtbbs_policy && !moderation_admin(actor->user) && (field==8 || field==11))
+        return MEMBER_CORE_PROFILE_ADMINISTRATOR;
+    int saved=profile_set(actor->user,field,text);
+    return saved==1?MEMBER_CORE_OK:saved<0?MEMBER_CORE_PROFILE_TEXT:MEMBER_CORE_EXTRAS_STORAGE;
+}
+
+MemberOutcome member_core_profile_visibility(const MemberActor *actor,unsigned field,unsigned mode) {
+    MemberOutcome result=authorize_profile(actor);
+    if(result!=MEMBER_CORE_OK)return result;
+    if(field>=PROFILE_FIELDS || mode>2 || (field==0 && mode!=1) || (mode==2 && field!=8))
+        return MEMBER_CORE_PROFILE_TEXT;
+    int saved=profile_visibility(actor->user,field,mode);
+    return saved==1?MEMBER_CORE_OK:saved<0?MEMBER_CORE_PROFILE_TEXT:MEMBER_CORE_EXTRAS_STORAGE;
 }

@@ -470,6 +470,7 @@ static int extra_text(const char *text,size_t max,int empty) {
 }
 static void post_result(ArticleOutcome result,BoardResult *r);
 
+static void member_result(MemberOutcome result,BoardResult *r);
 static void extra_execute(const BoardRequest *q,BoardResult *r) {
     if(q->action==1 || q->action==2) {
         ArticleActor actor={q->user,q->user_epoch,q->board_grants};
@@ -600,13 +601,17 @@ static void extra_execute(const BoardRequest *q,BoardResult *r) {
     }
     if(q->action>=12 && q->action<=16) {
         if(!extra_text(q->body,320,1)) { strcpy(r->text,"ERR profile text\r\n");return; }
-        if(profile_set(q->user,(unsigned)q->action-10,q->body)!=1) { strcpy(r->text,"ERR extras storage\r\n");return; }
+        MemberActor actor={q->user,q->user_epoch};
+        MemberOutcome result=member_core_profile_set(&actor,(unsigned)q->action-10,q->body);
+        if(result!=MEMBER_CORE_OK) { member_result(result==MEMBER_CORE_PROFILE_TEXT?MEMBER_CORE_EXTRAS_STORAGE:result,r);return; }
         strcpy(r->text,"PROFILE SAVED\r\n");return;
     }
     if(q->action==8 || q->action==9) {
         const char *text=q->action==8?q->title:q->body;
         if(!extra_text(text,q->action==8?80:320,1)) { strcpy(r->text,"ERR profile text\r\n"); return; }
-        if(profile_set(q->user,q->action==8?0:1,text)!=1) { strcpy(r->text,"ERR extras storage\r\n"); return; }
+        MemberActor actor={q->user,q->user_epoch};
+        MemberOutcome result=member_core_profile_set(&actor,q->action==8?0:1,text);
+        if(result!=MEMBER_CORE_OK) { member_result(result==MEMBER_CORE_PROFILE_TEXT?MEMBER_CORE_EXTRAS_STORAGE:result,r);return; }
         strcpy(r->text,"PROFILE SAVED\r\n"); return;
     }
     if(q->action==10) {
@@ -631,7 +636,6 @@ static void extra_execute(const BoardRequest *q,BoardResult *r) {
     strcpy(r->text,"ERR command\r\n");
 }
 static const char *mail_text(const BoardRequest *q,MessageId id,const char *raw) { return q->scope?message_text(q->scope==2?LANGUAGE_EN:LANGUAGE_JA,id):raw; }
-static void member_result(MemberOutcome result,BoardResult *r);
 static void mail_execute(const BoardRequest *q,BoardResult *r) {
     if((q->action=='S' || q->action=='W') && strlen(q->body)>ln_limit("BODY",BOARD_BODY)) { strcpy(r->text,"ERR body limit\r\n");return; }
     r->mail_action=q->action;
@@ -841,6 +845,8 @@ static void member_result(MemberOutcome result,BoardResult *r) {
     case MEMBER_CORE_LOGIN_REQUIRED:strcpy(r->text,"ERR login required\r\n");break;
     case MEMBER_CORE_RIGHTS_INVALID:strcpy(r->text,"ERR rights syntax\r\n");break;
     case MEMBER_CORE_PREFERENCES:strcpy(r->text,"ERR preferences\r\n");break;
+    case MEMBER_CORE_PROFILE_TEXT:strcpy(r->text,"ERR profile text\r\n");break;
+    case MEMBER_CORE_PROFILE_ADMINISTRATOR:strcpy(r->text,"ERR profile administrator required\r\n");break;
     case MEMBER_CORE_PASSWORD:strcpy(r->text,"ERR password change\r\n");break;
     case MEMBER_CORE_STATE:strcpy(r->text,"ERR member state\r\n");break;
     case MEMBER_CORE_PROTECTED:strcpy(r->text,"ERR protected member\r\n");break;
@@ -1038,11 +1044,13 @@ static void execute(const BoardRequest *q,BoardResult *r) {
         if(q->action=='A') { int ok=profile_admin_set(q->user,q->cursor,q->number,q->body);strcpy(r->text,ok==1?"PROFILE SAVED\r\n":"ERR profile permission or value\r\n");return; }
         if(q->action=='I') { r->service_action='8';r->service_number=q->number;strcpy(r->draft_body,profile_value(q->user,q->number==1?1:PROFILE_BUFFER));strcpy(r->text,"DOCUMENT EDIT\r\n");return; }
         if(q->action=='E') { r->service_action='9';strcpy(r->draft_body,profile_value(q->user,PROFILE_BUFFER));return; }
-        if(members_rtbbs_policy && !moderation_admin(q->user) && q->action!='V' && q->action!='B' && q->action!='C' && (q->number==8 || q->number==11)) { strcpy(r->text,"ERR profile administrator required\r\n");return; }
-        int ok=q->action=='V'?profile_visibility(q->user,q->number,q->cursor):profile_set(q->user,q->action=='B'?1:q->action=='C'?PROFILE_BUFFER:q->number,q->body);
-        if(ok==1 && q->action=='V')r->board_refresh=1;
-        if(ok==1 && (q->action=='B' || q->action=='C')) { r->service_action='0';r->service_number=q->scope?0:1; }
-        strcpy(r->text,ok==1?"PROFILE SAVED\r\n":ok<0?"ERR profile text\r\n":"ERR extras storage\r\n");return;
+        MemberActor actor={q->user,q->user_epoch};
+        MemberOutcome result=q->action=='V'?member_core_profile_visibility(&actor,q->number,q->cursor):
+            member_core_profile_set(&actor,q->action=='B'?1:q->action=='C'?PROFILE_BUFFER:q->number,q->body);
+        if(result!=MEMBER_CORE_OK) { member_result(result,r);return; }
+        if(q->action=='V')r->board_refresh=1;
+        if(q->action=='B' || q->action=='C') { r->service_action='0';r->service_number=q->scope?0:1; }
+        strcpy(r->text,"PROFILE SAVED\r\n");return;
     }
     if(q->op=='Z') { extra_execute(q,r); return; }
     if(q->op=='d' || q->op=='w' || q->op=='o' || q->op=='X') {
