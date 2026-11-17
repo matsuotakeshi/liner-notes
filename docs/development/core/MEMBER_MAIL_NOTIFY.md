@@ -58,3 +58,6 @@ HELP against members.c, session.c and runtime.c. Public semantics remain accurat
 the stable manual version is unchanged. CHANGELOG, this internal contract and
 reviewed source digests are updated. Canonical generation, links, search and offline
 parity are verified separately. No production access, deployment or release.
+
+The following [chat removal slice](MEMBER_CHAT_KICK.md) extracts a separate
+admin-authorized moderation order without changing notification preferences.

@@ -978,14 +978,15 @@ static void execute(const BoardRequest *q,BoardResult *r) {
         Principal p={0};IdentityProvider identity=identity_legacy_provider();
         if(!identity.resolve(identity.context,q->user,q->user_epoch,&p)) { strcpy(r->text,"ERR login required\r\n");return; }
         if(q->action=='K') {
-            if(!moderation_admin(q->user)) { r->chat_action='!';strcpy(r->text,"ERR admin required\r\n");return; }
-            uint32_t target=0;for(uint32_t i=1;i<=members_count();i++)if(members_name(i) && !strcmp(q->body,members_name(i))) { target=i;break; }
-            if(!target) { r->chat_action='!';strcpy(r->text,"ERR member not found\r\n");return; }
-            if(target==q->user || moderation_protected(target)) { r->chat_action='!';strcpy(r->text,"ERR protected member\r\n");return; }
-            if((uint64_t)moderation_count()+extras_audit_count()>=UINT32_MAX || !moderation_chat_kick(target,q->user)) {
-                r->chat_action='!';strcpy(r->text,"ERR moderation storage uncertain\r\n");return;
+            MemberActor actor={q->user,q->user_epoch};MemberChatKick removal;
+            MemberOutcome result=member_core_chat_kick(&actor,q->body,&removal);
+            if(result!=MEMBER_CORE_OK) {
+                r->chat_action='!';
+                if(result==MEMBER_CORE_NOT_FOUND)strcpy(r->text,"ERR member not found\r\n");
+                else member_result(result,r);
+                return;
             }
-            r->chat_action='K';r->chat_kick_user=target;strcpy(r->text,members_name(target));return;
+            r->chat_action='K';r->chat_kick_user=removal.user;strcpy(r->text,removal.name);return;
         }
         if(q->action=='P') {
             int ok=members_chat_control(q->user,q->body);

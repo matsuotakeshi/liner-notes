@@ -58,6 +58,14 @@ int members_set_mail_notify(uint32_t user,int deny) {
     if(!commit_ok) { member_error=1;return 0; }
     notify_deny[user]=deny;notify_revision[user]++;notify_writes++;return 1;
 }
+static unsigned kick_calls,kick_writes;
+static uint32_t kick_read_failure;
+int moderation_chat_kick(uint32_t user,uint32_t actor) {
+    assert(actor==1 && admin && !moderation_suspended(actor));
+    assert(members_name(user) && user!=actor && !moderation_protected(user));kick_calls++;
+    if(!commit_ok) { moderation_error=1;return 0; }
+    kick_writes++;mod_count++;changed_user=user;changed_actor=actor;return 1;
+}
 static unsigned password_calls,reset_calls,password_writes;
 static const char *test_current="test-current-password",*test_new="test-new-password";
 int members_password(uint32_t user,const char *current,const char *replacement) {
@@ -152,6 +160,7 @@ int members_broken(void) { return member_error; }
 int moderation_broken(void) { return moderation_error; }
 uint32_t members_count(void) { count_calls++;return count; }
 const char *members_name(uint32_t id) {
+    if(id && id==kick_read_failure)member_error=1;
     if(id!=1)target_reads++;
     if(id==MEMBER_MAX && count==MEMBER_MAX)return "last";
     return id && id<15 && present[id]?names[id]:NULL;
@@ -166,6 +175,7 @@ int moderation_admin(uint32_t id) { return id==1 && admin; }
 static MemberActor reset(void) {
     memset(notify_deny,0,sizeof(notify_deny));memset(notify_revision,0,sizeof(notify_revision));
     notify_read_failure=0;notify_reads=notify_calls=notify_writes=0;
+    kick_calls=kick_writes=0;kick_read_failure=0;
     count=14;epoch=9;admin=1;member_error=moderation_error=read_failure=0;
     count_calls=target_reads=0;approval_calls=approval_writes=credential_changes=0;
     memset(saved_preferences,0,sizeof(saved_preferences));prefs_reads=prefs_calls=prefs_writes=prefs_user=0;prefs_read_failure=0;
@@ -942,6 +952,73 @@ static void notification_failures(void) {
     }
     puts("PASS: notification revision saturation, failed writes/partial reads and no failed completion publication");
 }
+static void chat_kick_success(void) {
+    MemberActor actor=reset();MemberChatKick out;char login[]="user2";
+    assert(member_core_chat_kick(&actor,login,&out)==MEMBER_CORE_OK);
+    assert(out.user==2 && !strcmp(out.name,"user2") && kick_writes==1 && mod_count==1);
+    assert(changed_user==2 && changed_actor==1 && !credential_changes && moderation_epoch(2)==9);
+    login[0]='X';assert(!strcmp(out.name,"user2"));
+    assert(member_core_chat_kick(&actor,"user2",&out)==MEMBER_CORE_OK && kick_writes==2 && mod_count==2);
+    /* An order is audited even without a live connection, and changes no state. */
+    for(unsigned target=4;target<=6;target++) {
+        if(target==4)retired[target]=1;
+        assert(member_core_chat_kick(&actor,names[target],&out)==MEMBER_CORE_OK && out.user==target);
+    }
+    assert(retired[4] && pending[5] && suspended[6] && !credential_changes);
+    memset(names[2],'a',32);names[2][32]=0;
+    assert(member_core_chat_kick(&actor,names[2],&out)==MEMBER_CORE_OK && strlen(out.name)==32);
+    puts("PASS: chat removal attribution, copied names, repeated audit orders, target states and stable epochs");
+}
+static void chat_kick_authority(void) {
+    for(unsigned i=0;i<8;i++) {
+        MemberActor actor=reset();MemberChatKick out;MemberOutcome want=MEMBER_CORE_REVOKED;
+        if(i==0) { actor.user=0;want=MEMBER_CORE_ADMIN_REQUIRED; }
+        else if(i==1) { actor.user=2;want=MEMBER_CORE_ADMIN_REQUIRED; }
+        else if(i==2)actor.epoch--;
+        else if(i==3)suspended[1]=1;
+        else if(i==4)pending[1]=1;
+        else if(i==5)retired[1]=1;
+        else if(i==6) { admin=0;want=MEMBER_CORE_ADMIN_REQUIRED; }
+        else actor.user=99;
+        memset(&out,0x7f,sizeof(out));
+        assert(member_core_chat_kick(&actor,"user4",&out)==want);cleared(&out,sizeof(out));
+        assert(!count_calls && !kick_calls);
+    }
+    MemberActor actor=reset();MemberChatKick out;
+    assert(member_core_chat_kick(&actor,"user1",&out)==MEMBER_CORE_PROTECTED);cleared(&out,sizeof(out));
+    assert(member_core_chat_kick(&actor,"user7",&out)==MEMBER_CORE_PROTECTED);cleared(&out,sizeof(out));
+    assert(member_core_chat_kick(&actor,"user3",&out)==MEMBER_CORE_NOT_FOUND);
+    assert(member_core_chat_kick(&actor,"User2",&out)==MEMBER_CORE_NOT_FOUND);
+    assert(member_core_chat_kick(&actor,"",&out)==MEMBER_CORE_NOT_FOUND);
+    char long_name[34];memset(long_name,'a',33);long_name[33]=0;
+    assert(member_core_chat_kick(&actor,long_name,&out)==MEMBER_CORE_NOT_FOUND);cleared(&out,sizeof(out));
+    assert(member_core_chat_kick(&actor,NULL,&out)==MEMBER_CORE_INVALID);cleared(&out,sizeof(out));
+    assert(member_core_chat_kick(NULL,"user2",&out)==MEMBER_CORE_ADMIN_REQUIRED);
+    assert(member_core_chat_kick(&actor,"user2",NULL)==MEMBER_CORE_INVALID);
+    assert(!kick_calls && !kick_writes);
+    puts("PASS: chat removal admin/current-actor gate, self/protected/unknown targets and input boundaries");
+}
+static void chat_kick_failures(void) {
+    for(unsigned i=0;i<8;i++) {
+        MemberActor actor=reset();MemberChatKick out;MemberOutcome want=MEMBER_CORE_STORAGE;
+        if(i==0)member_error=1;
+        else if(i==1) { moderation_error=1;want=MEMBER_CORE_MODERATION_STORAGE; }
+        else if(i==2) { extras_error=1;want=MEMBER_CORE_EXTRAS_STORAGE; }
+        else if(i==3)count=MEMBER_MAX+1u;
+        else if(i==4)kick_read_failure=2;
+        else if(i==5) { mod_count=UINT32_MAX;want=MEMBER_CORE_MODERATION_UNCERTAIN; }
+        else if(i==6) { mod_count=UINT32_MAX-1;extra_count=2;want=MEMBER_CORE_MODERATION_UNCERTAIN; }
+        else { commit_ok=0;want=MEMBER_CORE_MODERATION_UNCERTAIN; }
+        memset(&out,0x7f,sizeof(out));
+        assert(member_core_chat_kick(&actor,"user2",&out)==want);cleared(&out,sizeof(out));
+        assert(kick_calls==(i==7?1u:0u) && !kick_writes && !credential_changes);
+    }
+    MemberActor actor=reset();MemberChatKick out;mod_count=UINT32_MAX-2;extra_count=1;
+    assert(member_core_chat_kick(&actor,"user2",&out)==MEMBER_CORE_OK && kick_writes==1);
+    assert(member_core_chat_kick(&actor,"user2",&out)==MEMBER_CORE_MODERATION_UNCERTAIN);cleared(&out,sizeof(out));
+    assert(kick_calls==1 && kick_writes==1 && !credential_changes);
+    puts("PASS: chat removal failed stores/lookups, combined audit capacity and no failed order publication");
+}
 int main(void) {
     role_tests();directory_tests();denial_tests();failure_tests();
     suspension_tests();suspension_denials();suspension_failures();
@@ -951,5 +1028,6 @@ int main(void) {
     lifecycle_success();lifecycle_denials();lifecycle_failures();
     password_updates();reset_authority();password_failures();
     preference_roundtrip();preference_authority();preference_failures();
-    notification_roundtrip();notification_authority();notification_failures();return 0;
+    notification_roundtrip();notification_authority();notification_failures();
+    chat_kick_success();chat_kick_authority();chat_kick_failures();return 0;
 }

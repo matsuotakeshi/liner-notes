@@ -30,7 +30,9 @@ def run(binary):
             command(c,'T '+b.greeting.split()[1].decode(),b'CHAT TALK OPEN ')
             settings(b,'/TALK OFF');settings(b,'/MUTE alice')
             b2.send(b'unfinished-chat-draft')
+            audit_size=journal.stat().st_size
             command(a,'/KICK bob',b'CHAT KICK bob 2')
+            assert journal.stat().st_size==audit_size+32
             for x in (b,b2):
                 until(x,b'CHAT KICKED');assert x.sock.recv(1)==b''
             until(c,b'CHAT TALK GONE');command(c,'no-public-fallback',b'CHAT ERROR target')
