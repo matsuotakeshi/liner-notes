@@ -2,6 +2,7 @@
 #define MEMBER_CORE_H
 #include <stdint.h>
 #include "chat_preferences.h"
+#include "profile_store.h"
 
 /* Internal, worker-owned account service. Trusted session supplies its
  * authenticated ID/epoch; no caller admin flag or cached authorization. No
@@ -13,7 +14,8 @@ typedef enum { MEMBER_CORE_OK, MEMBER_CORE_REVOKED, MEMBER_CORE_STORAGE,
                MEMBER_CORE_NOT_FOUND, MEMBER_CORE_INVALID, MEMBER_CORE_PROTECTED,
                MEMBER_CORE_EXTRAS_STORAGE, MEMBER_CORE_MODERATION_UNCERTAIN,
                MEMBER_CORE_LOGIN_REQUIRED, MEMBER_CORE_RIGHTS_INVALID, MEMBER_CORE_STATE, MEMBER_CORE_PASSWORD, MEMBER_CORE_PREFERENCES,
-               MEMBER_CORE_PROFILE_TEXT, MEMBER_CORE_PROFILE_ADMINISTRATOR } MemberOutcome;
+               MEMBER_CORE_PROFILE_TEXT, MEMBER_CORE_PROFILE_ADMINISTRATOR,
+               MEMBER_CORE_PROFILE_UNAVAILABLE, MEMBER_CORE_PROFILE_SEARCH_DENIED, MEMBER_CORE_PROFILE_EDIT } MemberOutcome;
 typedef enum { MEMBER_ROLE_NONE, MEMBER_ROLE_GUEST, MEMBER_ROLE_MEMBER, MEMBER_ROLE_ADMIN } MemberRole;
 typedef enum { MEMBER_STATE_ACTIVE, MEMBER_STATE_PENDING, MEMBER_STATE_SUSPENDED } MemberState;
 typedef struct { uint32_t id; char name[33]; MemberState state; } MemberSummary;
@@ -119,4 +121,29 @@ MemberOutcome member_core_chat_preferences(const MemberActor *,ChatPreferenceAct
  * Only successful visibility updates require the adapter's board refresh. */
 MemberOutcome member_core_profile_set(const MemberActor *,unsigned field,const char *text);
 MemberOutcome member_core_profile_visibility(const MemberActor *,unsigned field,unsigned mode);
+/* Visible, owned snapshot: at most 12 KiB, never all private store fields.
+ * target=0/login=NULL selects self; otherwise exactly one ID or exact login.
+ * The caller must authorize an article before resolving its author here.
+ * Value pointers belong to out, never the store's rotating scratch cache.
+ * All outputs clear on failure; input/output memory must not overlap. */
+typedef struct {
+    uint32_t user; char name[33],handle[81],bio[8193];
+    char fields[PROFILE_FIELDS-2][321];
+} MemberProfile;
+MemberOutcome member_core_profile_get(const MemberActor *,uint32_t target,const char *login,MemberProfile *out);
+const char *member_profile_value(const MemberProfile *,unsigned field);
+/* Typed search (field is zero based). Inclusive start; zero starts at 1.
+ * limit=1..8; next is the next unscanned ID, preserving legacy paging.
+ * Policy/ACL is rechecked per page. No total count or hidden matching values. */
+typedef enum { MEMBER_PROFILE_ALL, MEMBER_PROFILE_FIELD, MEMBER_PROFILE_GROUP } MemberProfileScope;
+typedef struct {
+    MemberProfileScope scope; unsigned field,group; uint32_t start;
+    unsigned limit; const char *text;
+} MemberProfileQuery;
+typedef struct { uint32_t user; char name[33],handle[81]; } MemberProfileRow;
+typedef struct { uint32_t next; unsigned count; MemberProfileRow rows[8]; } MemberProfilePage;
+MemberOutcome member_core_profile_search(const MemberActor *,const MemberProfileQuery *,MemberProfilePage *out);
+/* Global-admin editing, including own/protected/pending/suspended active accounts.
+ * No shared-buffer edit or epoch change. Store retains validation and actor audit. */
+MemberOutcome member_core_profile_admin_set(const MemberActor *,uint32_t target,unsigned field,const char *text);
 #endif

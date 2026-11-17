@@ -585,18 +585,21 @@ static void extra_execute(const BoardRequest *q,BoardResult *r) {
     }
     if(!q->user) { strcpy(r->text,"ERR login required\r\n"); return; }
     if(q->action==7 || q->action==17) {
-        uint32_t id=q->number?q->number:q->username[0]?user_named(q->username):q->user;
+        uint32_t target=q->number;const char *login=*q->username?q->username:NULL;
         if(q->action==17) {
             if(!q->number || q->number>article_count || unavailable(q->number) || !catalog_read(board_of(q->number),q->user)) { strcpy(r->text,"ERR no article\r\n");return; }
-            id=user_named(article_at(q->number-1)->author);
+            target=0;login=article_at(q->number-1)->author;
         }
-        if(!members_name(id) || moderation_suspended(id)) { strcpy(r->text,"ERR profile unavailable\r\n"); return; }
-        char scratch[16];size_t used=(size_t)snprintf(r->text,sizeof(r->text),"PROFILE %u %s\r\n",id,members_name(id));
-        for(unsigned f=0;f<PROFILE_FIELDS;f++) { const char *v=profile_visible(id,q->user,f,scratch);if(f>=7 && !*v)continue;
-            if(f==1 && strchr(v,'\n'))used+=(size_t)snprintf(r->text+used,sizeof(r->text)-used,"BIO \r\n");
-            else used+=(size_t)snprintf(r->text+used,sizeof(r->text)-used,"%s %s\r\n",profile_key(f),v);
+        MemberActor actor={q->user,q->user_epoch};MemberProfile profile;
+        MemberOutcome result=member_core_profile_get(&actor,target,login,&profile);
+        if(result!=MEMBER_CORE_OK) { member_result(result,r);return; }
+        size_t used=(size_t)snprintf(r->text,sizeof(r->text),"PROFILE %u %s\r\n",profile.user,profile.name);
+        for(unsigned field=0;field<PROFILE_FIELDS;field++) {
+            const char *value=member_profile_value(&profile,field);if(field>=7 && !*value)continue;
+            if(field==1 && strchr(value,'\n'))used+=(size_t)snprintf(r->text+used,sizeof(r->text)-used,"BIO \r\n");
+            else used+=(size_t)snprintf(r->text+used,sizeof(r->text)-used,"%s %s\r\n",profile_key(field),value);
         }
-        const char *bio=profile_visible(id,q->user,1,scratch);if(strchr(bio,'\n'))used+=(size_t)snprintf(r->text+used,sizeof(r->text)-used,"PROFILEBODY %zu\r\n%s",strlen(bio),bio);
+        if(strchr(profile.bio,'\n'))used+=(size_t)snprintf(r->text+used,sizeof(r->text)-used,"PROFILEBODY %zu\r\n%s",strlen(profile.bio),profile.bio);
         snprintf(r->text+used,sizeof(r->text)-used,"END PROFILE\r\n");return;
     }
     if(q->action>=12 && q->action<=16) {
@@ -615,23 +618,25 @@ static void extra_execute(const BoardRequest *q,BoardResult *r) {
         strcpy(r->text,"PROFILE SAVED\r\n"); return;
     }
     if(q->action==10) {
-        if(members_rtbbs_policy && !moderation_admin(q->user)) {
-            int sigop=0;for(uint32_t b=1;b<=CATALOG_MAX;b++)if(catalog_sigop(b,q->user)) { sigop=1;break; }
-            if((q->scope==100 && !sigop) || (q->scope>=10 && q->scope<=13)) { strcpy(r->text,"ERR profile search permission\r\n");return; }
-        }
-        if(!extra_text(q->title,80,0)) { strcpy(r->text,"ERR profile text\r\n"); return; }
-        uint32_t id=q->cursor?q->cursor:1; unsigned shown=0;
+        MemberActor actor={q->user,q->user_epoch};MemberProfilePage page;
+        MemberProfileQuery query={q->scope==100?MEMBER_PROFILE_GROUP:q->scope?MEMBER_PROFILE_FIELD:MEMBER_PROFILE_ALL,
+                                  q->scope?q->scope-1:0,q->number,q->cursor,q->notes_unread?1u:8u,q->title};
+        MemberOutcome result=member_core_profile_search(&actor,&query,&page);
+        if(result!=MEMBER_CORE_OK) { member_result(result,r);return; }
         size_t pos=(size_t)snprintf(r->text,sizeof(r->text),"PROFILES %s\r\n",q->title);
-        for(;id<=members_count() && shown<(q->notes_unread?1u:8u);id++) {
-            const char *name=members_name(id); if(!name || moderation_suspended(id)) continue;
-            if(q->scope==100) { if(!members_in_group(id,q->number))continue; }
-            else if(q->scope? !profile_match(id,q->user,q->scope-1,q->title):(strcmp(q->title,"*") && !strstr(name,q->title) && !profile_match(id,q->user,-1,q->title)))continue;
-            if(q->notes_unread) {
-                pos=(size_t)snprintf(r->text,sizeof(r->text),"PROFILE %u %s\r\n",id,name);
-                for(unsigned field=0;field<PROFILE_FIELDS;field++) { char scratch[16];const char *value=profile_visible(id,q->user,field,scratch);if(*value)pos+=(size_t)snprintf(r->text+pos,sizeof(r->text)-pos,"%s %s\r\n",profile_key(field),value); }
-            }else pos+=(size_t)snprintf(r->text+pos,sizeof(r->text)-pos,"%u %s %s\r\n",id,name,profile_visible(id,q->user,0,(char[16]){0})); shown++;
+        if(q->notes_unread && page.count) {
+            MemberProfile profile;result=member_core_profile_get(&actor,page.rows[0].user,NULL,&profile);
+            if(result!=MEMBER_CORE_OK) { member_result(result,r);return; }
+            pos=(size_t)snprintf(r->text,sizeof(r->text),"PROFILE %u %s\r\n",profile.user,profile.name);
+            for(unsigned field=0;field<PROFILE_FIELDS;field++) {
+                const char *value=member_profile_value(&profile,field);
+                if(*value)pos+=(size_t)snprintf(r->text+pos,sizeof(r->text)-pos,"%s %s\r\n",profile_key(field),value);
+            }
+        } else for(unsigned i=0;i<page.count;i++) {
+            const MemberProfileRow *row=&page.rows[i];
+            pos+=(size_t)snprintf(r->text+pos,sizeof(r->text)-pos,"%u %s %s\r\n",row->user,row->name,row->handle);
         }
-        snprintf(r->text+pos,sizeof(r->text)-pos,"END NEXT %u\r\n",id<=members_count()?id:0); return;
+        snprintf(r->text+pos,sizeof(r->text)-pos,"END NEXT %u\r\n",page.next);return;
     }
     strcpy(r->text,"ERR command\r\n");
 }
@@ -846,6 +851,9 @@ static void member_result(MemberOutcome result,BoardResult *r) {
     case MEMBER_CORE_RIGHTS_INVALID:strcpy(r->text,"ERR rights syntax\r\n");break;
     case MEMBER_CORE_PREFERENCES:strcpy(r->text,"ERR preferences\r\n");break;
     case MEMBER_CORE_PROFILE_TEXT:strcpy(r->text,"ERR profile text\r\n");break;
+    case MEMBER_CORE_PROFILE_UNAVAILABLE:strcpy(r->text,"ERR profile unavailable\r\n");break;
+    case MEMBER_CORE_PROFILE_SEARCH_DENIED:strcpy(r->text,"ERR profile search permission\r\n");break;
+    case MEMBER_CORE_PROFILE_EDIT:strcpy(r->text,"ERR profile permission or value\r\n");break;
     case MEMBER_CORE_PROFILE_ADMINISTRATOR:strcpy(r->text,"ERR profile administrator required\r\n");break;
     case MEMBER_CORE_PASSWORD:strcpy(r->text,"ERR password change\r\n");break;
     case MEMBER_CORE_STATE:strcpy(r->text,"ERR member state\r\n");break;
@@ -1041,7 +1049,13 @@ static void execute(const BoardRequest *q,BoardResult *r) {
             r->all_accounts_changed=1;r->password_changed=1;r->account_epoch=change.actor_epoch;strcpy(r->text,"GROUP MOVED\r\n");
             return;
         }
-        if(q->action=='A') { int ok=profile_admin_set(q->user,q->cursor,q->number,q->body);strcpy(r->text,ok==1?"PROFILE SAVED\r\n":"ERR profile permission or value\r\n");return; }
+        if(q->action=='A') {
+            MemberActor actor={q->user,q->user_epoch};
+            MemberOutcome result=member_core_profile_admin_set(&actor,q->cursor,q->number,q->body);
+            if(result==MEMBER_CORE_OK)strcpy(r->text,"PROFILE SAVED\r\n");
+            else member_result(result==MEMBER_CORE_EXTRAS_STORAGE?MEMBER_CORE_PROFILE_EDIT:result,r);
+            return;
+        }
         if(q->action=='I') { r->service_action='8';r->service_number=q->number;strcpy(r->draft_body,profile_value(q->user,q->number==1?1:PROFILE_BUFFER));strcpy(r->text,"DOCUMENT EDIT\r\n");return; }
         if(q->action=='E') { r->service_action='9';strcpy(r->draft_body,profile_value(q->user,PROFILE_BUFFER));return; }
         MemberActor actor={q->user,q->user_epoch};

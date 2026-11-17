@@ -7,6 +7,9 @@ reading/search, administrator editing, registration details and editor prompt
 management remain with their existing implementations. No public command,
 permission, default visibility, persistence format or package dependency changes.
 
+The follow-up [profile service](MEMBER_PROFILE_SERVICE.md) extracts ordinary
+profile reads/search and administrative edits as one related change.
+
 ## Authority and ownership
 
 member_core_profile_set and member_core_profile_visibility accept a trusted

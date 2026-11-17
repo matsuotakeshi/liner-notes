@@ -11,10 +11,39 @@
 #include <string.h>
 
 int members_rtbbs_policy;
+static const char *profile_values[15][PROFILE_FIELDS];
+static unsigned profile_access[15][PROFILE_FIELDS],profile_read_count,profile_match_count,profile_admin_calls;
+static unsigned profile_read_failure;
+static int profile_error;
+static uint32_t profile_admin_actor;
+static char profile_scratch[8194];
+const char *profile_visible(uint32_t owner,uint32_t viewer,unsigned field,char scratch[16]) {
+    assert(owner>0 && owner<15 && viewer>0 && viewer<15 && field<PROFILE_FIELDS);
+    profile_read_count++;if(field+1==profile_read_failure)profile_error=1;
+    if(!members_active(owner) || !members_active(viewer))return "";
+    const char *value=profile_values[owner][field];
+    if(owner!=viewer && !moderation_admin(viewer)) {
+        if(!profile_access[owner][field])return "";
+        if(field==8 && profile_access[owner][field]==2 && strlen(value)==10) {
+            memcpy(scratch,value+5,6);return scratch;
+        }
+    }
+    snprintf(profile_scratch,sizeof(profile_scratch),"%s",value);
+    return profile_scratch; /* Reused on every read, like the store cache. */
+}
+int profile_match(uint32_t owner,uint32_t viewer,int field,const char *query) {
+    profile_match_count++;
+    if(!strcmp(query,"*"))return 1;
+    for(unsigned f=0;f<PROFILE_FIELDS;f++)if(field<0 || f==(unsigned)field) {
+        char scratch[16];const char *v=profile_visible(owner,viewer,f,scratch);
+        if(*v && strstr(v,query))return 1;
+    }
+    return 0;
+}
 static unsigned profile_sets,profile_modes,profile_writes,profile_field_seen,profile_mode_seen;
 static uint32_t profile_owner;
 static const char *profile_borrowed;
-static int profile_error,profile_result;
+static int profile_result;
 int profile_store_broken(void) { return profile_error; }
 int profile_set(uint32_t user,unsigned field,const char *text) {
     assert(members_active(user) && !moderation_suspended(user));
@@ -29,6 +58,16 @@ int profile_visibility(uint32_t user,unsigned field,unsigned mode) {
     profile_modes++;profile_owner=user;profile_field_seen=field;profile_mode_seen=mode;
     if(profile_result==1)profile_writes++;
     return profile_result;
+}
+int profile_admin_set(uint32_t actor,uint32_t target,unsigned field,const char *text) {
+    assert(moderation_admin(actor) && members_active(target) && field<PROFILE_FIELDS && text);
+    profile_admin_calls++;profile_admin_actor=actor;profile_owner=target;profile_field_seen=field;
+    if(profile_result==1) { profile_writes++;profile_values[target][field]=text; }
+    return profile_result;
+}
+uint32_t members_find(const char *name) {
+    for(uint32_t id=1;id<15;id++) { const char *value=members_name(id);if(value && !strcmp(value,name))return id; }
+    return 0;
 }
 static uint32_t count,epoch;
 static char names[15][34];
@@ -224,6 +263,11 @@ int moderation_suspended(uint32_t id) { return id<15?(suspended[id] || pending[i
 uint32_t moderation_epoch(uint32_t id) { return epoch+(id<15?epoch_changes[id]:0); }
 int moderation_admin(uint32_t id) { return id==1 && admin; }
 static MemberActor reset(void) {
+    for(unsigned u=0;u<15;u++)for(unsigned f=0;f<PROFILE_FIELDS;f++) {
+        profile_values[u][f]="";profile_access[u][f]=f<7;
+    }
+    profile_read_count=profile_match_count=profile_admin_calls=profile_read_failure=profile_admin_actor=0;
+    profile_scratch[0]=0;
     members_rtbbs_policy=profile_error=0;profile_result=1;
     profile_sets=profile_modes=profile_writes=profile_field_seen=profile_mode_seen=profile_owner=0;profile_borrowed=NULL;
     memset(notify_deny,0,sizeof(notify_deny));memset(notify_revision,0,sizeof(notify_revision));
@@ -1298,7 +1342,160 @@ static void profile_failures(void) {
     }
     puts("PASS: profile invalid inputs, broken stores and persistence failures without successful completion");
 }
+static void profile_snapshots(void) {
+    MemberActor actor=reset();actor.user=2;MemberProfile out;
+    static char long_bio[8193];memset(long_bio,'x',8192);long_bio[4]='\n';long_bio[8192]=0;
+    profile_values[4][0]="Handle";profile_values[4][1]=long_bio;
+    profile_values[4][8]="1968-02-29";profile_values[4][9]="hidden name";profile_access[4][8]=2;
+    assert(member_core_profile_get(&actor,4,NULL,&out)==MEMBER_CORE_OK);
+    assert(out.user==4 && !strcmp(out.name,"user4") && !strcmp(out.handle,"Handle"));
+    assert(!strcmp(out.bio,long_bio) && !strcmp(member_profile_value(&out,8),"02-29"));
+    assert(!*member_profile_value(&out,9));
+    memset(profile_scratch,'z',100);profile_scratch[100]=0;
+    assert(!strcmp(out.handle,"Handle") && !strcmp(out.bio,long_bio));
+    assert(!*member_profile_value(NULL,0) && !*member_profile_value(&out,PROFILE_FIELDS));
+    actor.user=4;assert(member_core_profile_get(&actor,0,NULL,&out)==MEMBER_CORE_OK);
+    assert(!strcmp(member_profile_value(&out,9),"hidden name"));
+    actor.user=1;assert(member_core_profile_get(&actor,0,"user4",&out)==MEMBER_CORE_OK);
+    assert(!strcmp(member_profile_value(&out,8),"1968-02-29"));
+    assert(member_core_profile_get(&actor,0,"User4",&out)==MEMBER_CORE_PROFILE_UNAVAILABLE);cleared(&out,sizeof(out));
+    for(uint32_t target=3;target<=6;target++)if(target!=4) {
+        assert(member_core_profile_get(&actor,target,NULL,&out)==MEMBER_CORE_PROFILE_UNAVAILABLE);cleared(&out,sizeof(out));
+    }
+    retired[4]=1;assert(member_core_profile_get(&actor,4,NULL,&out)==MEMBER_CORE_PROFILE_UNAVAILABLE);
+    cleared(&out,sizeof(out));assert(!profile_writes && !credential_changes);
+    puts("PASS: owned visible profile snapshots, long biography, exact lookup, owner/admin and unavailable targets");
+}
+static void profile_search_pages(void) {
+    MemberActor actor=reset();actor.user=2;MemberProfilePage page;
+    MemberProfileQuery q={MEMBER_PROFILE_ALL,0,0,0,8,"*"};
+    assert(member_core_profile_search(&actor,&q,&page)==MEMBER_CORE_OK);
+    const uint32_t expected[]={1,2,4,7,8,9,11,12};
+    assert(page.count==8 && page.next==13);
+    for(unsigned i=0;i<8;i++)assert(page.rows[i].user==expected[i]);
+    q.start=page.next;assert(member_core_profile_search(&actor,&q,&page)==MEMBER_CORE_OK);
+    assert(page.count==2 && page.rows[0].user==13 && page.rows[1].user==14 && !page.next);
+    q.start=UINT32_MAX;assert(member_core_profile_search(&actor,&q,&page)==MEMBER_CORE_OK);
+    assert(!page.count && !page.next);
+    q.start=0;q.limit=1;q.text="user4";
+    profile_values[4][0]="public handle";
+    assert(member_core_profile_search(&actor,&q,&page)==MEMBER_CORE_OK);
+    assert(page.count==1 && page.rows[0].user==4 && page.next==5 && !strcmp(page.rows[0].handle,"public handle"));
+    memset(profile_scratch,'z',20);profile_scratch[20]=0;assert(!strcmp(page.rows[0].handle,"public handle"));
+    q.start=5;assert(member_core_profile_search(&actor,&q,&page)==MEMBER_CORE_OK && !page.count && !page.next);
+    q.start=0;q.text="private-needle";profile_values[4][9]="private-needle";
+    assert(member_core_profile_search(&actor,&q,&page)==MEMBER_CORE_OK && !page.count);
+    q.scope=MEMBER_PROFILE_FIELD;q.field=9;
+    assert(member_core_profile_search(&actor,&q,&page)==MEMBER_CORE_OK && !page.count);
+    profile_access[4][9]=1;
+    assert(member_core_profile_search(&actor,&q,&page)==MEMBER_CORE_OK && page.count==1 && page.rows[0].user==4);
+    profile_access[4][9]=0;actor.user=1;
+    assert(member_core_profile_search(&actor,&q,&page)==MEMBER_CORE_OK && page.count==1);
+    actor.user=2;q.field=8;q.text="1968";profile_values[4][8]="1968-02-29";profile_access[4][8]=2;
+    assert(member_core_profile_search(&actor,&q,&page)==MEMBER_CORE_OK && !page.count);
+    q.text="02-29";assert(member_core_profile_search(&actor,&q,&page)==MEMBER_CORE_OK && page.count==1);
+    q.text="*";q.field=9; /* Existing field wildcard enumerates eligible accounts, not secret content. */
+    assert(member_core_profile_search(&actor,&q,&page)==MEMBER_CORE_OK && page.count==1 && page.rows[0].user==1);
+    puts("PASS: profile paging, name/field search, ownership and month/day privacy without hidden matching values");
+}
+static void profile_search_policy(void) {
+    MemberActor actor=reset();actor.user=4;members_rtbbs_policy=1;MemberProfilePage page;
+    MemberProfileQuery q={MEMBER_PROFILE_GROUP,0,100,0,8,"*"};
+    group_words[7][3]=8;
+    assert(member_core_profile_search(&actor,&q,&page)==MEMBER_CORE_PROFILE_SEARCH_DENIED);cleared(&page,sizeof(page));
+    actor.user=2;assert(member_core_profile_search(&actor,&q,&page)==MEMBER_CORE_OK);
+    assert(page.count==1 && page.rows[0].user==7);
+    sigop_enabled=0;assert(member_core_profile_search(&actor,&q,&page)==MEMBER_CORE_PROFILE_SEARCH_DENIED);cleared(&page,sizeof(page));
+    sigop_enabled=1;q.scope=MEMBER_PROFILE_FIELD;
+    for(q.field=9;q.field<PROFILE_FIELDS;q.field++) {
+        assert(member_core_profile_search(&actor,&q,&page)==MEMBER_CORE_PROFILE_SEARCH_DENIED);cleared(&page,sizeof(page));
+    }
+    actor.user=1;q.field=9;
+    assert(member_core_profile_search(&actor,&q,&page)==MEMBER_CORE_OK && page.count==8);
+    admin=0;assert(member_core_profile_search(&actor,&q,&page)==MEMBER_CORE_PROFILE_SEARCH_DENIED);
+    members_rtbbs_policy=0;assert(member_core_profile_search(&actor,&q,&page)==MEMBER_CORE_OK);
+    assert(!profile_writes && !credential_changes);
+    puts("PASS: live compatibility search permissions, global SIGOP group access and no sensitive-field delegation");
+}
+static void profile_service_failures(void) {
+    MemberProfile out;MemberProfilePage page;MemberProfileQuery q={MEMBER_PROFILE_ALL,0,0,0,8,"*"};
+    for(unsigned failure=0;failure<8;failure++) {
+        MemberActor actor=reset();MemberOutcome expected=MEMBER_CORE_REVOKED;
+        if(failure==0) { actor.user=0;expected=MEMBER_CORE_LOGIN_REQUIRED; }
+        if(failure==1)actor.epoch--;
+        if(failure==2)retired[1]=1;
+        if(failure==3) { member_error=1;expected=MEMBER_CORE_STORAGE; }
+        if(failure==4) { moderation_error=1;expected=MEMBER_CORE_MODERATION_STORAGE; }
+        if(failure==5) { extras_error=1;expected=MEMBER_CORE_EXTRAS_STORAGE; }
+        if(failure==6) { profile_error=1;expected=MEMBER_CORE_EXTRAS_STORAGE; }
+        if(failure==7)pending[1]=1;
+        memset(&out,0x7f,sizeof(out));memset(&page,0x7f,sizeof(page));
+        assert(member_core_profile_get(&actor,4,NULL,&out)==expected);
+        assert(member_core_profile_search(&actor,&q,&page)==expected);
+        assert(member_core_profile_admin_set(&actor,4,7,"x")==expected);
+        cleared(&out,sizeof(out));cleared(&page,sizeof(page));assert(!profile_read_count && !profile_admin_calls);
+    }
+    MemberActor actor=reset();char long_query[82];memset(long_query,'x',81);long_query[81]=0;
+    const char *bad[]={NULL,"","control\n",long_query};
+    for(unsigned i=0;i<4;i++) { q.text=bad[i];assert(member_core_profile_search(&actor,&q,&page)==MEMBER_CORE_PROFILE_TEXT);cleared(&page,sizeof(page)); }
+    q.text="*";q.limit=9;assert(member_core_profile_search(&actor,&q,&page)==MEMBER_CORE_PROFILE_TEXT);
+    q.limit=0;assert(member_core_profile_search(&actor,&q,&page)==MEMBER_CORE_PROFILE_TEXT);
+    q.limit=8;q.scope=MEMBER_PROFILE_FIELD;q.field=PROFILE_FIELDS;
+    assert(member_core_profile_search(&actor,&q,&page)==MEMBER_CORE_PROFILE_TEXT);
+    q.scope=MEMBER_PROFILE_GROUP;q.group=101;assert(member_core_profile_search(&actor,&q,&page)==MEMBER_CORE_PROFILE_TEXT);
+    q.group=0;assert(member_core_profile_search(&actor,&q,&page)==MEMBER_CORE_PROFILE_TEXT);
+    q.scope=(MemberProfileScope)99;assert(member_core_profile_search(&actor,&q,&page)==MEMBER_CORE_PROFILE_TEXT);
+    assert(member_core_profile_search(&actor,NULL,&page)==MEMBER_CORE_PROFILE_TEXT);
+    assert(member_core_profile_search(&actor,&q,NULL)==MEMBER_CORE_INVALID);
+    assert(member_core_profile_get(&actor,4,NULL,NULL)==MEMBER_CORE_INVALID);
+    assert(member_core_profile_get(&actor,4,"user4",&out)==MEMBER_CORE_PROFILE_UNAVAILABLE);cleared(&out,sizeof(out));
+    assert(member_core_profile_get(&actor,0,"",&out)==MEMBER_CORE_PROFILE_UNAVAILABLE);
+    assert(member_core_profile_get(&actor,0,long_query,&out)==MEMBER_CORE_PROFILE_UNAVAILABLE);
+    q.scope=MEMBER_PROFILE_ALL;count=MEMBER_MAX+1;
+    assert(member_core_profile_search(&actor,&q,&page)==MEMBER_CORE_STORAGE);cleared(&page,sizeof(page));
+    actor=reset();profile_read_failure=1;
+    assert(member_core_profile_search(&actor,&q,&page)==MEMBER_CORE_EXTRAS_STORAGE);cleared(&page,sizeof(page));
+    actor=reset();profile_read_failure=13;profile_values[4][9]="secret";
+    assert(member_core_profile_get(&actor,4,NULL,&out)==MEMBER_CORE_EXTRAS_STORAGE);cleared(&out,sizeof(out));
+    actor=reset();profile_values[4][0]=long_query;
+    assert(member_core_profile_get(&actor,4,NULL,&out)==MEMBER_CORE_EXTRAS_STORAGE);cleared(&out,sizeof(out));
+    assert(member_core_profile_search(&actor,&q,&page)==MEMBER_CORE_EXTRAS_STORAGE);cleared(&page,sizeof(page));
+    assert(!profile_writes && !credential_changes);
+    puts("PASS: profile service input/store bounds, revoked actors and whole-output clearing after partial reads");
+}
+static void profile_admin_edits(void) {
+    MemberActor actor=reset();members_rtbbs_policy=1;
+    const uint32_t targets[]={1,2,5,6,7};
+    for(unsigned i=0;i<5;i++)for(unsigned field=0;field<PROFILE_FIELDS;field++) {
+        unsigned mode=profile_access[targets[i]][field];
+        assert(member_core_profile_admin_set(&actor,targets[i],field,"replacement")==MEMBER_CORE_OK);
+        assert(profile_admin_actor==1 && profile_owner==targets[i] && profile_field_seen==field);
+        assert(!strcmp(profile_values[targets[i]][field],"replacement") && profile_access[targets[i]][field]==mode);
+    }
+    assert(profile_writes==65 && profile_admin_calls==65 && pending[5] && suspended[6] && !credential_changes);
+    puts("PASS: admin profile edits preserve target identity/state/privacy and attribution across all fields");
+}
+static void profile_admin_denials(void) {
+    MemberActor actor=reset();actor.user=2;
+    assert(member_core_profile_admin_set(&actor,4,7,"x")==MEMBER_CORE_PROFILE_EDIT);
+    actor.user=1;admin=0;assert(member_core_profile_admin_set(&actor,4,7,"x")==MEMBER_CORE_PROFILE_EDIT);
+    admin=1;retired[4]=1;
+    assert(member_core_profile_admin_set(&actor,4,7,"x")==MEMBER_CORE_PROFILE_EDIT);
+    assert(member_core_profile_admin_set(&actor,3,7,"x")==MEMBER_CORE_PROFILE_EDIT);
+    assert(member_core_profile_admin_set(&actor,2,PROFILE_BUFFER,"x")==MEMBER_CORE_PROFILE_EDIT);
+    assert(member_core_profile_admin_set(&actor,2,7,NULL)==MEMBER_CORE_PROFILE_EDIT);
+    assert(!profile_admin_calls && !profile_writes);
+    for(int saved=-1;saved<=0;saved++) {
+        actor=reset();profile_result=saved;profile_values[4][7]="preserved";
+        assert(member_core_profile_admin_set(&actor,4,7,"bad")==
+               (saved<0?MEMBER_CORE_PROFILE_EDIT:MEMBER_CORE_EXTRAS_STORAGE));
+        assert(profile_admin_calls==1 && !profile_writes && !strcmp(profile_values[4][7],"preserved") && !credential_changes);
+    }
+    puts("PASS: admin profile edit denials, buffer exclusion and store rejection/failure without state publication");
+}
 int main(void) {
+    profile_snapshots();profile_search_pages();profile_search_policy();profile_service_failures();
+    profile_admin_edits();profile_admin_denials();
     profile_owned_updates();profile_authority();profile_failures();
     role_tests();directory_tests();denial_tests();failure_tests();
     suspension_tests();suspension_denials();suspension_failures();
