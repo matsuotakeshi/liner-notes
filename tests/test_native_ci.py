@@ -5,6 +5,7 @@ import io
 import json
 import os
 from pathlib import Path
+import shlex
 import signal
 import subprocess
 import sys
@@ -20,7 +21,7 @@ import yaml
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "ci"))
-from native_ci import all_passed, parse_result, require_trusted_main, run_parallel, ssh_options, supervise, validate_remote_directory
+from native_ci import all_passed, parse_result, remote_directory_command, require_trusted_main, run_parallel, ssh_options, supervise, validate_remote_directory
 import native_remote
 from native_remote import RESULT, commands_for, host_lock, unpack
 
@@ -55,7 +56,40 @@ class PolicyTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             require_trusted_main(env, SHA, "b" * 40)
 
-    def test_native_directory_accepts_solaris_mktemp_underscore_only(self):
+    def test_solaris_directory_creation_is_private_unique_and_valid(self):
+        command = remote_directory_command("solaris", "/usr/bin/python3.11")
+        self.assertTrue(command.startswith("umask 077; "))
+        args = shlex.split(command.removeprefix("umask 077; "))
+        self.assertEqual(args[:2], ["/usr/bin/python3.11", "-c"])
+        with tempfile.TemporaryDirectory() as folder:
+            home = Path(folder).resolve()
+            env = dict(os.environ, HOME=str(home), USERPROFILE=str(home))
+            paths = []
+            for _ in range(2):
+                result = subprocess.run([sys.executable, *args[1:]], env=env,
+                                        capture_output=True, text=True, check=True)
+                path = Path(result.stdout.strip())
+                self.assertTrue(path.is_dir())
+                self.assertEqual(path.parent, home / "ci")
+                remote = "/export/home/ci-test/ci/" + path.name
+                self.assertEqual(validate_remote_directory("solaris", remote), remote)
+                if os.name == "posix":
+                    self.assertEqual(path.stat().st_mode & 0o777, 0o700)
+                paths.append(path)
+            self.assertNotEqual(*paths)
+            self.assertTrue(all(path.is_dir() for path in paths))
+
+    def test_directory_command_preserves_other_os_and_rejects_injection(self):
+        for target in ("freebsd", "rocky", "ubuntu"):
+            self.assertEqual(remote_directory_command(target, "python3"),
+                             'umask 077; mkdir -p "$HOME/ci" && mktemp -d "$HOME/ci/native-' + target + '-XXXXXXXX"')
+        for python in ("python3", "/tmp/python3", "/usr/bin/python3;id", "/usr/bin/python3\n"):
+            with self.subTest(python=python), self.assertRaises(ValueError):
+                remote_directory_command("solaris", python)
+        with self.assertRaises(ValueError):
+            remote_directory_command("solaris;id", "/usr/bin/python3")
+
+    def test_native_directory_accepts_solaris_underscore_only(self):
         good = "/export/home/ci-test/ci/native-solaris-XX1U_6Wa"
         self.assertEqual(validate_remote_directory("solaris", good), good)
         for target in ("freebsd", "rocky", "ubuntu"):
@@ -67,7 +101,8 @@ class PolicyTests(unittest.TestCase):
                      good + "\n", good.replace("ci-test", ".."),
                      good.replace("native-solaris", "native-rocky"),
                      good + "$(id)", good + " `id`", "relative/" + good,
-                     "/export/home/ci-test/ci/native-solaris-", good + "."):
+                     "/export/home/ci-test/ci/native-solaris-", good + ".",
+                     "/export/home/ci-test/ci/native-solaris-XXm6u.Fb"):
             with self.subTest(path=path), self.assertRaises(ValueError):
                 validate_remote_directory("solaris", path)
         with self.assertRaises(ValueError):

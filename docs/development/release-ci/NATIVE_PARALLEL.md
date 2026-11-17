@@ -12,13 +12,14 @@
 | Rocky Linux | ci-test@10.0.0.51 | /home/ci/.ssh/id_ed25519_rocky_ci |
 | Ubuntu | ci-test@10.0.0.53 | /home/ci/.ssh/id_ed25519_ubuntu_ci |
 
-鍵やRunner、VMを新設しません。Solarisは既存のSSH疎通検査のみで、この3OSゲートへ追加していません。pkg/RPM/DEB生成は従来の独立ワークフローのままです。
+鍵やRunner、VMを新設しません。Solarisは独立したmain限定のSolaris Native CIで検証し、この3OSゲートへ追加していません。pkg/RPM/DEB生成は従来の独立ワークフローのままです。
 
 ## 信頼境界と衝突防止
 
 - self-hostedジョブの入口は本リポジトリのmainに限定します。実行処理もref、イベント、リポジトリ、チェックアウトSHAを照合してからSSHへ進みます。PRはGitHub-hostedの合成試験のみです。
 - コミットを `git archive` で固定し、全OSへ同じアーカイブを渡します。リモートでSHA-256を照合し、絶対パス・上位参照・リンク・特殊ファイルを拒否して新規ディレクトリへ展開します。
 - 作業先は各CIアカウントの `~/ci/native-OS-ランダム値/source`。既存の `~/ci/liner-notes` を削除・上書きしません。
+- Solarisだけは検出済みのPython 3.9以降の `tempfile.mkdtemp` を使用します。OSの `mktemp` が生成するピリオド入り接尾辞を避け、既存の転送先・SMFパス検査を維持します。ディレクトリは排他的に作成し、権限0700、umask077とします。他OSは従来のmktempを使います。原因と検証範囲は[調査記録](../solaris/TEMP_DIRECTORY.md)を参照してください。
 - 単体OSの手動ワークフローも `ci/native_ci.py --target OS` を利用します。すべて同じActions concurrency group `liner-notes-native-hosts` を使い、ホスト側でも `~/ci/.liner-notes-native.lock` を排他取得します。
 - `StrictHostKeyChecking=yes`、既存の専用鍵・アカウントを維持し、パスワード認証へフォールバックしません。
 
