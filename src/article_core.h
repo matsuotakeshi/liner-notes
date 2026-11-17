@@ -54,6 +54,20 @@ ArticleOutcome article_draft_save(const ArticleActor *,uint32_t board,uint32_t p
                                  const char *title,const char *body,uint32_t expected,uint32_t *revision);
 ArticleOutcome article_draft_remove(const ArticleActor *,uint32_t expected,uint32_t *revision);
 
+/* Board entry resolves current visibility and inherited password requirements.
+ * password_board is the board requiring a password, NOT a password revision;
+ * on a challenge only id/password_board are returned. Otherwise title/menu
+ * describe the authorized destination. Core never changes session selection,
+ * grants or retry throttles; a later request must reauthorize independently. */
+typedef struct { uint32_t id,password_board; int menu; char title[81]; } ArticleBoardEntry;
+ArticleOutcome article_enter_board(const ArticleActor *,uint32_t board,ArticleBoardEntry *out);
+/* INFO requires current read access, including all password grants. Caller owns
+ * metadata and long-information storage (capacity includes NUL). Errors clear
+ * both outputs. No article scan, read mark, selection or editor side effects. */
+typedef struct { uint32_t id; size_t information_size; char title[81],description[321]; } ArticleBoardInfo;
+ArticleOutcome article_board_info(const ArticleActor *,uint32_t board,ArticleBoardInfo *out,
+                                  char *information,size_t capacity);
+
 ArticleOutcome article_withdraw(const ArticleActor *,uint32_t board,
                                uint32_t article,int confirmed);
 ArticleOutcome article_retitle(const ArticleActor *,uint32_t board,

@@ -467,6 +467,8 @@ static int extra_text(const char *text,size_t max,int empty) {
     for(const unsigned char *p=(const unsigned char *)text;*p;p++) if(*p<32 || *p==127) return 0;
     return 1;
 }
+static void post_result(ArticleOutcome result,BoardResult *r);
+
 static void extra_execute(const BoardRequest *q,BoardResult *r) {
     if(q->action==1 || q->action==2) {
         ArticleActor actor={q->user,q->user_epoch,q->board_grants};
@@ -572,9 +574,11 @@ static void extra_execute(const BoardRequest *q,BoardResult *r) {
     }
     if(q->action==6) {
         uint32_t b=q->number?q->number:q->board;
-        if(!catalog_read(b,q->user)) { strcpy(r->text,"ERR board unavailable\r\n"); return; }
-        snprintf(r->text,sizeof(r->text),"INFO %u %s\r\nDESCRIPTION %s\r\nEND INFO\r\n",b,catalog_title(b),catalog_description(b));
-        if(*policy_info(b))snprintf(r->text,sizeof(r->text),"INFO %u %s\r\nDESCRIPTION %s\r\n%sEND INFO\r\n",b,catalog_title(b),catalog_description(b),policy_info(b));
+        ArticleActor actor={q->user,q->user_epoch,q->board_grants};
+        ArticleBoardInfo info;char information[BOARD_INFO_MAX+1];
+        ArticleOutcome result=article_board_info(&actor,b,&info,information,sizeof(information));
+        if(result!=ARTICLE_OK) { post_result(result,r);return; }
+        snprintf(r->text,sizeof(r->text),"INFO %u %s\r\nDESCRIPTION %s\r\n%sEND INFO\r\n",info.id,info.title,info.description,information);
         return;
     }
     if(!q->user) { strcpy(r->text,"ERR login required\r\n"); return; }
@@ -1137,10 +1141,12 @@ static void execute(const BoardRequest *q,BoardResult *r) {
         snprintf(r->text+pos,sizeof(r->text)-pos,"END NEXT %u\r\n",page.next);return;
     }
     if(q->op=='j') {
-        if(!catalog_visible(q->number,q->user)) strcpy(r->text,"ERR board unavailable\r\n");
-        else if(policy_locked(q->number,q->user) && q->action=='t')strcpy(r->text,"ERR try later\r\n");
-        else if(policy_locked(q->number,q->user)) { r->service_action='1';r->service_number=q->number;r->board_grant=(uint32_t)policy_locked(q->number,q->user);strcpy(r->text,"BOARD PASSWORD\r\n"); }
-        else { r->board=q->number;if(policy_menu(q->number))r->service_action='7'; snprintf(r->text,sizeof(r->text),"BOARD %u %.80s\r\n",q->number,catalog_title(q->number)); }
+        ArticleActor actor={q->user,q->user_epoch,q->board_grants};ArticleBoardEntry entry;
+        ArticleOutcome result=article_enter_board(&actor,q->number,&entry);
+        if(result!=ARTICLE_OK) { post_result(result,r);return; }
+        if(entry.password_board && q->action=='t')strcpy(r->text,"ERR try later\r\n");
+        else if(entry.password_board) { r->service_action='1';r->service_number=entry.id;r->board_grant=entry.password_board;strcpy(r->text,"BOARD PASSWORD\r\n"); }
+        else { r->board=entry.id;if(entry.menu)r->service_action='7';snprintf(r->text,sizeof(r->text),"BOARD %u %.80s\r\n",entry.id,entry.title); }
         return;
     }
     if(!catalog_read(q->board,q->user)) { strcpy(r->text,"ERR board unavailable\r\n"); return; }

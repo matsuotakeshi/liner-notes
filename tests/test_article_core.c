@@ -84,6 +84,20 @@ int members_store_draft(uint32_t user,const MemberDraft *draft,uint32_t expected
 }
 
 static int discovery;
+static int entry_menu,entry_inherited,entry_lock_fault;
+static const char *entry_title_override,*entry_description="",*entry_information="";
+static unsigned entry_metadata_reads;
+int policy_menu(uint32_t board) { (void)board;return entry_menu; }
+int policy_locked(uint32_t board,uint32_t user) {
+    (void)user;
+    if(entry_lock_fault)return entry_lock_fault;
+    if(manager)return 0;
+    return locked && (board==2 || (entry_inherited && board==4)) &&
+           (!context || context[2]!=(uint32_t)grant_revision)?2:0;
+}
+const char *policy_info(uint32_t board) { (void)board;entry_metadata_reads++;return entry_information; }
+const char *catalog_description(uint32_t board) { (void)board;entry_metadata_reads++;return entry_description; }
+
 static unsigned char board_present[CATALOG_MAX+1],board_visible[CATALOG_MAX+1],board_readable[CATALOG_MAX+1],board_writable[CATALOG_MAX+1];
 static uint32_t board_next[CATALOG_MAX+1],board_parent[CATALOG_MAX+1],board_depth[CATALOG_MAX+1];
 static char board_titles[CATALOG_MAX+1][81];
@@ -92,7 +106,7 @@ int catalog_visible(uint32_t id,uint32_t user) { (void)user;return catalog_exist
 uint32_t catalog_next(uint32_t id) { assert(catalog_exists(id));return board_next[id]; }
 uint32_t catalog_parent(uint32_t id) { assert(catalog_exists(id));return board_parent[id]; }
 unsigned catalog_depth(uint32_t id) { assert(catalog_exists(id));return board_depth[id]; }
-const char *catalog_title(uint32_t id) { assert(catalog_exists(id));return board_titles[id]; }
+const char *catalog_title(uint32_t id) { assert(catalog_exists(id));entry_metadata_reads++;return entry_title_override?entry_title_override:board_titles[id]; }
 
 
 int members_seen(uint32_t user,uint32_t id) {
@@ -161,8 +175,7 @@ int moderation_suspended(uint32_t user) { (void)user;return suspended; }
 uint32_t moderation_epoch(uint32_t user) { (void)user;return epoch; }
 void policy_context(const uint32_t *p) { context=p; }
 int catalog_read(uint32_t board,uint32_t user) {
-    if(discovery)return catalog_visible(board,user) && board_readable[board] &&
-        (board!=2 || !locked || (context && context[2]==(uint32_t)grant_revision));
+    if(discovery)return catalog_visible(board,user) && board_readable[board] && !policy_locked(board,user);
     (void)user;
     if(board==3 || board==4)return other_readable && user==1;
     return board==2 && readable && (!locked || (context && context[2]==(uint32_t)grant_revision));
@@ -200,7 +213,8 @@ void article_repository_title_changed(uint32_t id,const char *title) {
     assert(!strcmp(title,journal_text));publications++;
 }
 static ArticleActor reset(void) {
-    discovery=0;
+    discovery=0;entry_menu=entry_inherited=entry_lock_fault=0;entry_title_override=NULL;
+    entry_description=entry_information="";entry_metadata_reads=0;
     paging=0;other_readable=0;probe_user=0;lookup_error=0;
     memset(read_flags,0,sizeof(read_flags));mark_calls=seen_calls=seen_error=mark_user=mark_id=0;mark_ok=1;mark_value=0;
     memset(&stored,0,sizeof(stored));stored.board=2;stored.parent=5;strcpy(stored.author,"alice");
@@ -1396,6 +1410,100 @@ static void draft_tests(void) {
     puts("PASS: saved draft Core ownership, revision conflicts, ACL/parent rechecks, failed-output clearing and body boundaries");
 }
 
+static void entry_tests(void) {
+    ArticleActor actor=discovery_reset();ArticleBoardEntry entry;ArticleBoardInfo info;
+    char text[64];
+    entry_description="board description";entry_information="line 1\r\nline 2\r\n";
+    assert(article_enter_board(NULL,1,&entry)==ARTICLE_OK && entry.id==1 && !entry.menu && !entry.password_board);
+    assert(!strcmp(entry.title,"board 1") && !context);
+    entry_menu=1;
+    assert(article_enter_board(&actor,4,&entry)==ARTICLE_OK && entry.id==4 && entry.menu);
+    assert(article_board_info(&actor,4,&info,text,sizeof(text))==ARTICLE_OK);
+    assert(info.id==4 && !strcmp(info.title,"board 4") && !strcmp(info.description,entry_description));
+    assert(info.information_size==strlen(entry_information) && !strcmp(text,entry_information));
+    /* Owned output is independent of later store changes. */
+    entry_information="changed";assert(!strcmp(text,"line 1\r\nline 2\r\n"));
+    entry_information="";
+    assert(article_board_info(NULL,1,&info,text,1)==ARTICLE_OK && !info.information_size && !*text);
+    unsigned before=entry_metadata_reads;
+    assert(article_enter_board(&actor,3,&entry)==ARTICLE_BOARD_DENIED);
+    discovery_cleared(&entry,sizeof(entry));
+    memset(text,0x7f,sizeof(text));
+    assert(article_board_info(&actor,3,&info,text,sizeof(text))==ARTICLE_BOARD_DENIED);
+    discovery_cleared(&info,sizeof(info));discovery_cleared(text,sizeof(text));
+    assert(entry_metadata_reads==before);
+    for(unsigned i=0;i<3;i++) {
+        uint32_t invalid[]={0,12,CATALOG_MAX+1};
+        assert(article_enter_board(&actor,invalid[i],&entry)==ARTICLE_BOARD_DENIED);
+        discovery_cleared(&entry,sizeof(entry));
+        assert(article_board_info(&actor,invalid[i],&info,text,sizeof(text))==ARTICLE_BOARD_DENIED);
+        discovery_cleared(&info,sizeof(info));
+    }
+    /* Ancestor password ID is distinct from the requested destination/revision. */
+    locked=entry_inherited=1;before=entry_metadata_reads;
+    assert(article_enter_board(&actor,4,&entry)==ARTICLE_OK && entry.id==4 && entry.password_board==2);
+    assert(!entry.menu && !*entry.title && entry_metadata_reads==before);
+    assert(article_board_info(&actor,4,&info,text,sizeof(text))==ARTICLE_BOARD_DENIED);
+    discovery_cleared(&info,sizeof(info));discovery_cleared(text,sizeof(text));
+    assert(entry_metadata_reads==before);
+    grants[2]=(uint32_t)grant_revision;
+    assert(article_enter_board(&actor,4,&entry)==ARTICLE_OK && !entry.password_board && entry.menu);
+    assert(article_board_info(&actor,4,&info,text,sizeof(text))==ARTICLE_OK);
+    grant_revision++;
+    assert(article_enter_board(&actor,4,&entry)==ARTICLE_OK && entry.password_board==2 && !*entry.title);
+    assert(article_board_info(&actor,4,&info,text,sizeof(text))==ARTICLE_BOARD_DENIED);
+    manager=1;
+    assert(article_enter_board(&actor,4,&entry)==ARTICLE_OK && !entry.password_board);
+    assert(article_board_info(&actor,4,&info,text,sizeof(text))==ARTICLE_OK);
+    manager=0;board_visible[4]=0;
+    assert(article_enter_board(&actor,4,&entry)==ARTICLE_BOARD_DENIED);discovery_cleared(&entry,sizeof(entry));
+    assert(!mark_calls && !seen_calls && !body_reads && !commits && !publications);
+
+    int *errors[]={&member_error,&moderation_error,&policy_error,&extras_error};
+    ArticleOutcome wanted[]={ARTICLE_MEMBER_STORAGE,ARTICLE_MODERATION_STORAGE,ARTICLE_POLICY_STORAGE,ARTICLE_EXTRAS_STORAGE};
+    for(unsigned i=0;i<7;i++) {
+        actor=discovery_reset();ArticleOutcome expected=ARTICLE_REVOKED;
+        if(i<4) { *errors[i]=1;expected=wanted[i]; }
+        else if(i==4)epoch++;
+        else if(i==5)suspended=1;
+        else actor.user=99;
+        before=entry_metadata_reads;
+        assert(article_enter_board(&actor,2,&entry)==expected);discovery_cleared(&entry,sizeof(entry));
+        memset(text,0x7f,sizeof(text));
+        assert(article_board_info(&actor,2,&info,text,sizeof(text))==expected);
+        discovery_cleared(&info,sizeof(info));discovery_cleared(text,sizeof(text));assert(entry_metadata_reads==before);
+    }
+    actor=discovery_reset();entry_information="1234";
+    assert(article_board_info(&actor,2,&info,text,4)==ARTICLE_BUFFER_TOO_SMALL);
+    discovery_cleared(&info,sizeof(info));discovery_cleared(text,4);
+    assert(article_board_info(&actor,2,&info,text,5)==ARTICLE_OK && !strcmp(text,"1234"));
+    assert(article_board_info(&actor,2,&info,NULL,0)==ARTICLE_BUFFER_TOO_SMALL);
+    assert(article_enter_board(&actor,2,NULL)==ARTICLE_INVALID_READ);
+    memset(text,0x7f,sizeof(text));assert(article_board_info(&actor,2,NULL,text,sizeof(text))==ARTICLE_INVALID_READ);
+    discovery_cleared(text,sizeof(text));
+    static char long_info[BOARD_INFO_MAX+2],long_output[BOARD_INFO_MAX+2],description[322],title[82];
+    memset(long_info,'x',BOARD_INFO_MAX+1);long_info[BOARD_INFO_MAX+1]=0;entry_information=long_info;
+    assert(article_board_info(&actor,2,&info,long_output,sizeof(long_output))==ARTICLE_POLICY_STORAGE);
+    discovery_cleared(&info,sizeof(info));discovery_cleared(long_output,sizeof(long_output));
+    long_info[BOARD_INFO_MAX]=0;memset(description,'d',320);description[320]=0;entry_description=description;
+    memset(title,'t',80);title[80]=0;entry_title_override=title;
+    assert(article_board_info(&actor,2,&info,long_output,sizeof(long_output))==ARTICLE_OK);
+    assert(info.information_size==BOARD_INFO_MAX && strlen(info.description)==320 && strlen(info.title)==80);
+    assert(!strcmp(long_output,long_info));
+    description[320]='d';description[321]=0;
+    assert(article_board_info(&actor,2,&info,long_output,sizeof(long_output))==ARTICLE_STORAGE);
+    discovery_cleared(&info,sizeof(info));discovery_cleared(long_output,sizeof(long_output));
+    description[320]=0;title[80]='t';title[81]=0;
+    assert(article_enter_board(&actor,2,&entry)==ARTICLE_STORAGE);discovery_cleared(&entry,sizeof(entry));
+    assert(article_board_info(&actor,2,&info,text,sizeof(text))==ARTICLE_STORAGE);discovery_cleared(&info,sizeof(info));
+    entry_lock_fault=CATALOG_MAX+1;
+    assert(article_enter_board(&actor,2,&entry)==ARTICLE_POLICY_STORAGE);discovery_cleared(&entry,sizeof(entry));
+    entry_lock_fault=-1;
+    assert(article_enter_board(&actor,2,&entry)==ARTICLE_POLICY_STORAGE);discovery_cleared(&entry,sizeof(entry));
+    assert(!context);
+    puts("PASS: board entry/INFO Core ACL, ancestor password challenge, revoked grants, menu destinations and owned bounded output");
+}
+
 int main(void) {
     ArticleActor actor=reset();
     denied(article_withdraw(NULL,2,7,1),ARTICLE_LOGIN_REQUIRED);
@@ -1494,5 +1602,6 @@ int main(void) {
     discovery_tests();
     posting_tests();
     draft_tests();
+    entry_tests();
     return 0;
 }

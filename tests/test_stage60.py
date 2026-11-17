@@ -73,7 +73,9 @@ def run(binary):
             password(a,2,SECRET+'changed')
             assert cmd(c,'.')==b'ERR board unavailable'
             assert cmd(c,f'READ {root}')==b'ERR board unavailable'
+            assert cmd(c,'INFO 2')==b'ERR board unavailable'
             enter(c,2,SECRET+'changed')
+            assert sum(text.encode()==x for x in rows(c,'INFO 2',b'END INFO'))==30
             # Administrative reset bypasses only board passwords, not guest ACLs.
             assert cmd(a,'BOARD 2').startswith(b'BOARD 2')
             assert cmd(a,f'HIDE {root}').startswith(b'HIDDEN SAVED');assert cmd(a,f'RESTORE {root}').startswith(b'RESTORED')

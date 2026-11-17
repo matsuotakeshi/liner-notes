@@ -191,6 +191,67 @@ ArticleOutcome article_draft_remove(const ArticleActor *actor,uint32_t expected,
     *revision=view.revision;return result;
 }
 
+static ArticleOutcome enter_board(const ArticleActor *actor,uint32_t board,ArticleBoardEntry *out) {
+    ArticleOutcome result=health();
+    if(result!=ARTICLE_OK)return result;
+    result=identity(actor,1);
+    if(result!=ARTICLE_OK)return result;
+    uint32_t user=actor?actor->user:0;
+    if(!board || board>CATALOG_MAX || !catalog_visible(board,user))return ARTICLE_BOARD_DENIED;
+    int password_board=policy_locked(board,user);
+    if(password_board<0 || password_board>CATALOG_MAX)return ARTICLE_POLICY_STORAGE;
+    if(password_board) {
+        out->id=board;out->password_board=(uint32_t)password_board;return ARTICLE_OK;
+    }
+    const char *title=catalog_title(board);
+    if(!title || post_length(title,80)>80)return ARTICLE_STORAGE;
+    out->id=board;out->menu=policy_menu(board)!=0;strcpy(out->title,title);
+    return ARTICLE_OK;
+}
+
+ArticleOutcome article_enter_board(const ArticleActor *actor,uint32_t board,ArticleBoardEntry *out) {
+    if(!out)return ARTICLE_INVALID_READ;
+    memset(out,0,sizeof(*out));
+    policy_context(actor?actor->board_grants:NULL);
+    ArticleOutcome result=enter_board(actor,board,out);
+    policy_context(NULL);
+    if(result!=ARTICLE_OK)memset(out,0,sizeof(*out));
+    return result;
+}
+
+static ArticleOutcome board_info(const ArticleActor *actor,uint32_t board,ArticleBoardInfo *out,
+                                 char *information,size_t capacity) {
+    ArticleOutcome result=health();
+    if(result!=ARTICLE_OK)return result;
+    result=identity(actor,1);
+    if(result!=ARTICLE_OK)return result;
+    if(!board || board>CATALOG_MAX || !catalog_read(board,actor?actor->user:0))return ARTICLE_BOARD_DENIED;
+    const char *title=catalog_title(board),*description=catalog_description(board),*info=policy_info(board);
+    if(!title || !description || !info || post_length(title,80)>80 || post_length(description,320)>320)
+        return ARTICLE_STORAGE;
+    size_t length=post_length(info,BOARD_INFO_MAX);
+    if(length>BOARD_INFO_MAX)return ARTICLE_POLICY_STORAGE;
+    if(!information || capacity<=length)return ARTICLE_BUFFER_TOO_SMALL;
+    out->id=board;out->information_size=length;
+    strcpy(out->title,title);strcpy(out->description,description);memcpy(information,info,length+1);
+    return ARTICLE_OK;
+}
+
+ArticleOutcome article_board_info(const ArticleActor *actor,uint32_t board,ArticleBoardInfo *out,
+                                  char *information,size_t capacity) {
+    if(information && capacity)memset(information,0,capacity);
+    if(!out)return ARTICLE_INVALID_READ;
+    memset(out,0,sizeof(*out));
+    policy_context(actor?actor->board_grants:NULL);
+    ArticleOutcome result=board_info(actor,board,out,information,capacity);
+    policy_context(NULL);
+    if(result!=ARTICLE_OK) {
+        memset(out,0,sizeof(*out));
+        if(information && capacity)memset(information,0,capacity);
+    }
+    return result;
+}
+
 static ArticleOutcome authorize(const ArticleActor *actor,uint32_t board,uint32_t id) {
     ArticleOutcome result=health();
     if(result!=ARTICLE_OK)return result;
