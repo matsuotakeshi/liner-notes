@@ -23,8 +23,8 @@ def sysop(client, title, body):
     assert b"Compose mail" in response, response
     client.send((body + "\n.\n").encode())
     response = client.line()
-    assert response.startswith(b"SYSOP MAIL SENT "), response
-    return int(response.split()[-1])
+    # Session renders the localized completion, not board.c's internal ID reply.
+    assert response == b"SYSOP MAIL SENT", response
 
 
 def denied(action):
@@ -61,8 +61,9 @@ def run(binary):
             alice, bob, carol, guest = [stack.enter_context(closing(Client(server.port))) for _ in range(4)]
             for client, name in ((alice, "alice"), (bob, "bob"), (carol, "carol")):
                 auth(client, name)
-            assert sysop(guest, "guest request", "guest private body") == 1
-            assert b"FROM guest" in read(bob, 1)
+            sysop(guest, "guest request", "guest private body")
+            delivered = read(bob, 1)
+            assert all(text in delivered for text in (b"FROM guest", b"guest request", b"guest private body")), delivered
             assert read(carol, 1) == b"MAIL ERROR unavailable"
             assert cmd(guest, "MAIL READ 1") == b"ERR login required"
             assert cmd(alice, "MAIL SEND carol retained").startswith(b"MAIL EDIT ")
@@ -70,9 +71,10 @@ def run(binary):
             assert cmd(alice, "/SAVE") == b"MAIL DRAFT SAVED"
             revision = info(alice)
             assert cmd(alice, "MAIL EXIT") == b"MAIL CLOSED"
-            assert sysop(alice, "member request", "member private body") == 2
+            sysop(alice, "member request", "member private body")
             assert info(alice) == revision
-            assert b"FROM alice" in read(bob, 2)
+            delivered = read(bob, 2)
+            assert all(text in delivered for text in (b"FROM alice", b"member request", b"member private body")), delivered
             assert read(carol, 2) == b"MAIL ERROR unavailable"
             assert cmd(carol, "MAIL EXIT") == b"MAIL CLOSED"
             with closing(MailConnector("127.0.0.1", server.port, "alice", PASSWORD)) as sender:
@@ -102,8 +104,9 @@ def run(binary):
             for client, name in ((alice, "alice"), (bob, "bob"), (carol, "carol")):
                 auth(client, name)
             assert info(alice) == revision
-            assert sysop(guest, "new recipient", "carol private body") == 3
-            assert b"carol private body" in read(carol, 3)
+            sysop(guest, "new recipient", "carol private body")
+            delivered = read(carol, 3)
+            assert all(text in delivered for text in (b"FROM guest", b"new recipient", b"carol private body")), delivered
             assert read(bob, 3) == b"MAIL ERROR unavailable"
             assert read(carol, 1) == b"MAIL ERROR unavailable"
             assert b"guest private body" in read(bob, 1)

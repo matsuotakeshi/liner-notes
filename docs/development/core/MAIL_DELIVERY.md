@@ -80,3 +80,22 @@ adapters and contracts, rather than merely updated to silence validation.
 - Full local Windows runtime compilation is not claimed: existing POSIX flock
   and lstat portability constraints are outside this change. No conditions are
   weakened and no separate test infrastructure is created.
+
+## Socket completion expectation correction
+
+PR #95 head `d4f780de9cae99a3e214488f7d98c8f17245df3f` failed in both
+Rocky 9 and AlmaLinux 9 at the new test's first SYSOP completion assertion
+([Linux compatibility run](https://github.com/matsuotakeshi/liner-notes/actions/runs/44121446614),
+jobs `134173718605` and `134173718636`). The observed response was exactly
+`SYSOP MAIL SENT`. The test incorrectly expected the internal board worker's
+`SYSOP MAIL SENT <id>` result; session.c instead renders MSG_SYSOP_MAIL_SENT.
+Existing test_stage57.py already uses that user-visible completion.
+
+The helper now requires the exact existing response. Each expected message ID
+(1, 2, 3) is still read through its intended recipient, now asserting sender,
+title and body together; the other administrator's denial checks remain.
+No production command/output or assertion on actual private delivery is removed.
+Local scripted-client checks cover the exact completion and rejection of errors,
+an unexpected numeric suffix and partial completion. Python syntax and diff
+checks pass. Actual socket execution remains pending the corrected PR CI;
+successes on the earlier SHA do not validate this correction.
