@@ -47,8 +47,10 @@ Work remains serialized in the existing board worker; no API is reentrant.
 
 Public manual clarifications describe already-existing owner-list pagination and
 non-marking common-buffer imports. HELP/localized strings and protocol tokens
-are unchanged. Raw transfer parsing, guest SYSOPMAIL and login notifications are
-still separate work; this does not claim complete mail/Core or Web API separation.
+are unchanged. [The following delivery extraction](MAIL_DELIVERY.md) moves guest
+SYSOPMAIL, login notices and private transfer execution into Core, with raw
+transfer parsing in the adapter. Neither change claims complete mail/Core or
+Web API separation.
 
 ## Validation and limits
 

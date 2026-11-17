@@ -87,6 +87,7 @@ test: test-userlog test-chat runtime vaultctl test-adapters test-vault-core test
 	$(PYTHON) tests/test_mail_service.py ./runtime
 	$(PYTHON) tests/test_mail_reading.py ./runtime
 	$(PYTHON) tests/test_mail_resources.py ./runtime
+	$(PYTHON) tests/test_mail_delivery.py ./runtime
 	$(PYTHON) tests/test_mail_draft_notice.py ./runtime
 	$(PYTHON) tests/test_mail_arrival.py ./runtime
 	$(PYTHON) tests/test_mail_notify.py ./runtime
@@ -358,8 +359,8 @@ check: test-member-core
 
 # Mail composition/draft Core contract, with stubbed persistence.
 .PHONY: test-mail-core
-runtime test-adapters: src/mail_core.h src/mail_repository.h
-test-mail-core: src/store_limits.h tests/test_mail_core.c src/mail_core.c src/mail_core.h src/mail_repository.h src/mailbox.h src/mail_files.h src/mail_attachments.h src/members.h src/moderation.h src/app_limits.h src/content_limits.h src/runtime_limits.h
+runtime test-adapters: src/mail_core.h src/mail_repository.h src/transfer_line.h
+test-mail-core: src/transfer.h src/vault.h src/principal.h src/store_limits.h tests/test_mail_core.c src/mail_core.c src/mail_core.h src/mail_repository.h src/mailbox.h src/mail_files.h src/mail_attachments.h src/members.h src/moderation.h src/app_limits.h src/content_limits.h src/runtime_limits.h
 	$(CC) $(CPPFLAGS) $(CFLAGS) $(LDFLAGS) -std=c11 -Wall -Wextra -Werror -Isrc tests/test_mail_core.c src/mail_core.c -o test-mail-core
 	./test-mail-core
 check: test-mail-core

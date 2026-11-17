@@ -4,6 +4,7 @@
 #include <stdint.h>
 #include "mail_attachments.h"
 #include "mail_files.h"
+#include "transfer.h"
 
 /* Internal single-worker API. Actor is supplied by the trusted session, never
  * by a client as an authorization flag. No retained pointers or shared outputs;
@@ -12,7 +13,21 @@ typedef struct { uint32_t user,epoch; } MailActor;
 typedef enum { MAIL_CORE_OK, MAIL_CORE_LOGIN_REQUIRED, MAIL_CORE_REVOKED,
     MAIL_CORE_MEMBER_STORAGE, MAIL_CORE_MODERATION_STORAGE, MAIL_CORE_DISABLED,
     MAIL_CORE_STORAGE, MAIL_CORE_UNAVAILABLE, MAIL_CORE_BODY_LIMIT, MAIL_CORE_BODY_STORAGE,
-    MAIL_CORE_BUFFER_STORAGE } MailOutcome;
+    MAIL_CORE_BUFFER_STORAGE, MAIL_CORE_SYSOP_UNAVAILABLE } MailOutcome;
+typedef struct { uint32_t id,recipient; } MailDelivery;
+typedef struct { unsigned unread; uint32_t draft_revision; } MailNotice;
+/* Only this send entry permits explicit {0,0} guest identity. The recipient is
+ * selected internally (lowest eligible administrator ID); no caller override,
+ * attachments, reply or draft consumption. Delivery is published after commit. */
+MailOutcome mail_core_sysop_send(const MailActor *,const char *title,const char *body,MailDelivery *out);
+/* Login is not failed if optional notices cannot be loaded; caller decides
+ * presentation. Disabled/broken/revoked outcomes always leave zero notices. */
+MailOutcome mail_core_notice(const MailActor *,MailNotice *out);
+/* No client Principal/permissions are accepted. Reauthorize every chunk and
+ * finish. MAIL_CORE_OK means evaluated, not necessarily transferred: inspect
+ * the VaultResult too. Failed replies are cleared, including partial payloads.
+ * All inputs/outputs must be distinct, valid-sized objects. */
+MailOutcome mail_core_transfer(const MailActor *,const TransferRequest *,TransferReply *,VaultResult *);
 typedef struct { uint32_t to,parent; char title[81]; } MailCompose;
 typedef struct {
     uint32_t revision,to,parent;

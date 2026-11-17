@@ -6,6 +6,7 @@
 #include "members.h"
 #include "moderation.h"
 #include "content_limits.h"
+#include "app_limits.h"
 #include "store_limits.h"
 #include <assert.h>
 #include <stdio.h>
@@ -30,8 +31,17 @@ static int file_failure,buffer_failure;
 static MailFilePage file_page;
 static char common_buffer[CONTENT_BODY+1];
 static const char *body_override;
+static int admins[7],notice_failure;
+static uint32_t member_total,last_recipient,last_parent,last_revision;
+static unsigned notice_reads,transfer_calls;
+static VaultResult transfer_status;
+static int oversize_reply;
+static TransferOperation last_operation;
 static void reset(void) {
     member_error=moderation_error=mail_error=failure=body_failure=0;enabled=1;
+    memset(admins,0,sizeof(admins));admins[3]=1;member_total=6;
+    notice_failure=0;notice_reads=transfer_calls=0;transfer_status=VAULT_OK;oversize_reply=0;
+    last_recipient=last_parent=last_revision=0;
     file_reads=buffer_writes=0;file_failure=buffer_failure=0;body_override=NULL;
     memset(&file_page,0,sizeof(file_page));strcpy(common_buffer,"old buffer");
     reads=writes=cleanup=ownership_checks=drop_calls=body_reads=0;last_user=0;
@@ -44,6 +54,8 @@ static void reset(void) {
     letters[2]=(MailMessage){.id=12,.sender=3,.recipient=2,.title="other private"};
     input=(MailWrite){.to=2,.title="subject",.body="body\r\n"};next_id=20;next_revision=40;
 }
+uint32_t members_count(void) { return member_total; }
+int moderation_admin(uint32_t id) { return id<7?admins[id]:0; }
 int members_broken(void) { return member_error; }
 int moderation_broken(void) { return moderation_error; }
 const char *members_name(uint32_t id) { return id<7?names[id]:NULL; }
@@ -60,7 +72,8 @@ const MailMessage *mailbox_get(uint32_t id,uint32_t user) {
     return NULL;
 }
 const MailMessage *mailbox_draft(uint32_t user) {
-    reads++;last_user=user;if(user>=7 || !drafts[user].id)return NULL;
+    reads++;last_user=user;if(notice_failure==2) { mail_error=1;return NULL; }
+    if(user>=7 || !drafts[user].id)return NULL;
     cache=drafts[user];return &cache;
 }
 uint32_t mailbox_count(void) {
@@ -68,6 +81,7 @@ uint32_t mailbox_count(void) {
     uint32_t total=0;for(unsigned i=0;i<32;i++)if(letters[i].id>total)total=letters[i].id;return total;
 }
 unsigned mailbox_unread(uint32_t user) {
+    notice_reads++;if(notice_failure==1)mail_error=1;
     unsigned n=0;for(unsigned i=0;i<32;i++)if(letters[i].id && !letters[i].deleted && letters[i].recipient==user && !letters[i].read)n++;
     return n;
 }
@@ -110,9 +124,9 @@ int mailbox_delete_draft(uint32_t user,uint32_t revision) {
 }
 int mailbox_send(uint32_t user,uint32_t to,uint32_t parent,const char *title,const char *body,
                   const MailAttachments *attachments,uint32_t revision,uint32_t *id) {
-    writes++;last_user=user;*id=999;
+    writes++;last_user=user;last_recipient=to;last_parent=parent;last_revision=revision;*id=999;
     if(write_failed() || !*title || !*body || (revision && drafts[user].id!=revision) || !reply_valid(user,parent,to))return 0;
-    committed_attachments=*attachments;if(revision)drafts[user].id=0;*id=++next_id;return 1;
+    committed_attachments=attachments?*attachments:(MailAttachments){0};if(revision)drafts[user].id=0;*id=++next_id;return 1;
 }
 int mailbox_remove(uint32_t id,uint32_t user) {
     writes++;last_user=user;if(write_failed())return 0;
@@ -140,6 +154,15 @@ int mail_repository_buffer_save(uint32_t user,const char *body) {
     buffer_writes++;last_user=user;
     if(buffer_failure)return 0;
     strcpy(common_buffer,body);return 1;
+}
+VaultResult mail_files_execute(uint32_t user,const TransferRequest *q,TransferReply *out) {
+    transfer_calls++;last_user=user;last_operation=q->operation;
+    memset(out,0xa5,sizeof(*out));
+    if(transfer_status!=VAULT_OK)return transfer_status;
+    memset(out,0,sizeof(*out));out->id=101;
+    if(q->operation==TRANSFER_READ) { out->count=oversize_reply?VAULT_BLOCK+1:4;memcpy(out->bytes,"data",4); }
+    if(q->operation==TRANSFER_WRITE) { assert(q->bytes[0]==42);out->received=q->offset+(uint32_t)q->count; }
+    return VAULT_OK;
 }
 static int zero(const void *p,size_t n) { const unsigned char *b=p;for(size_t i=0;i<n;i++)if(b[i])return 0;return 1; }
 static void seed(void) { drafts[1]=(MailMessage){.id=7,.sender=1,.recipient=2,.parent=10,.title="draft"}; }
@@ -473,9 +496,120 @@ static void attachment_authority(void) {
     assert(mail_core_import(NULL,10)==MAIL_CORE_LOGIN_REQUIRED && !reads);
     puts("PASS attachment/import identity, epoch, store and feature gates before any private I/O");
 }
+static void sysop_delivery(void) {
+    reset();MailDelivery out;MailActor guest={0,0};seed();
+    admins[2]=1;admins[4]=1;
+    assert(mail_core_sysop_send(&guest,"visitor","guest body",&out)==MAIL_CORE_OK);
+    assert(out.id==21 && out.recipient==2 && last_user==0 && last_parent==0 && last_revision==0 && !committed_attachments.count);
+    blocked[2]=1;
+    assert(mail_core_sysop_send(&alice,"member","member body",&out)==MAIL_CORE_OK);
+    assert(out.id==22 && out.recipient==3 && last_user==1 && drafts[1].id==7);
+    assert(!cleanup && !marks && !ownership_checks);
+    blocked[3]=1;
+    assert(mail_core_sysop_send(&guest,"visitor","body",&out)==MAIL_CORE_SYSOP_UNAVAILABLE && zero(&out,sizeof(out)) && writes==2);
+    puts("PASS SYSOP guest/member routing chooses lowest eligible admin and preserves drafts");
+}
+static void sysop_failures(void) {
+    reset();MailDelivery out;MailActor guest={0,0};
+    for(int fail=1;fail<=2;fail++) {
+        reset();failure=fail;
+        assert(mail_core_sysop_send(&guest,"visitor","body",&out)==(fail==2?MAIL_CORE_STORAGE:MAIL_CORE_UNAVAILABLE));
+        assert(zero(&out,sizeof(out)) && !cleanup);
+    }
+    reset();member_total=MEMBER_MAX+1u;
+    assert(mail_core_sysop_send(&guest,"visitor","body",&out)==MAIL_CORE_MEMBER_STORAGE && !writes);
+    reset();char title[82];memset(title,'x',81);title[81]=0;
+    assert(mail_core_sysop_send(&guest,title,"body",&out)==MAIL_CORE_UNAVAILABLE);
+    assert(mail_core_sysop_send(&guest,"","body",&out)==MAIL_CORE_UNAVAILABLE);
+    assert(mail_core_sysop_send(&guest,"title",NULL,&out)==MAIL_CORE_UNAVAILABLE);
+    assert(mail_core_sysop_send(&guest,"title","",&out)==MAIL_CORE_UNAVAILABLE && !writes);
+    char *large=malloc(CONTENT_BODY+2);assert(large);memset(large,'x',CONTENT_BODY+1);large[CONTENT_BODY+1]=0;
+    assert(mail_core_sysop_send(&guest,"title",large,&out)==MAIL_CORE_BODY_LIMIT && !writes && zero(&out,sizeof(out)));
+    free(large);
+    puts("PASS SYSOP commit failures, missing recipient bounds and quota never publish delivery");
+}
+static void login_notices(void) {
+    reset();seed();MailNotice notice;
+    assert(mail_core_notice(&alice,&notice)==MAIL_CORE_OK && notice.unread==1 && notice.draft_revision==7);
+    assert(!marks && !writes && !body_reads && !file_reads);
+    assert(mail_core_notice(&admin,&notice)==MAIL_CORE_OK && !notice.unread && !notice.draft_revision);
+    for(int fail=1;fail<=2;fail++) {
+        reset();seed();notice_failure=fail;
+        assert(mail_core_notice(&alice,&notice)==MAIL_CORE_STORAGE && zero(&notice,sizeof(notice)));
+    }
+    reset();seed();enabled=0;
+    assert(mail_core_notice(&alice,&notice)==MAIL_CORE_DISABLED && zero(&notice,sizeof(notice)) && !reads && !notice_reads);
+    puts("PASS login notices are owner-only metadata, no body/mark, and clear partial failures");
+}
+static void transfer_operations(void) {
+    reset();TransferRequest q={0};TransferReply out;VaultResult status;
+    for(int op=TRANSFER_INFO;op<=TRANSFER_CHECK;op++) {
+        q=(TransferRequest){.operation=(TransferOperation)op,.id=101,.offset=3,.size=4,.count=4,.name="file.bin",.description="private"};
+        q.bytes[0]=42;
+        assert(mail_core_transfer(&alice,&q,&out,&status)==MAIL_CORE_OK && status==VAULT_OK);
+        assert(last_user==1 && last_operation==(TransferOperation)op);
+        if(op==TRANSFER_READ)assert(out.count==4 && !memcmp(out.bytes,"data",4));
+        if(op==TRANSFER_WRITE)assert(out.received==7);
+    }
+    assert(transfer_calls==8 && !writes && !marks);
+    for(int r=VAULT_DENIED;r<=VAULT_LIMIT;r++) {
+        transfer_status=(VaultResult)r;
+        assert(mail_core_transfer(&alice,&q,&out,&status)==MAIL_CORE_OK && status==(VaultResult)r && zero(&out,sizeof(out)));
+    }
+    transfer_status=VAULT_OK;q.operation=TRANSFER_READ;oversize_reply=1;
+    assert(mail_core_transfer(&alice,&q,&out,&status)==MAIL_CORE_OK && status==VAULT_STORAGE && zero(&out,sizeof(out)));
+    blocked[1]=1;unsigned before=transfer_calls;q.operation=TRANSFER_FINISH;
+    assert(mail_core_transfer(&alice,&q,&out,&status)==MAIL_CORE_REVOKED && status==VAULT_DENIED && zero(&out,sizeof(out)) && transfer_calls==before);
+    puts("PASS all private transfer operations, typed storage errors, partial payload clearing and revoke-before-finish");
+}
+static void transfer_bounds(void) {
+    reset();TransferReply out;VaultResult status;
+    TransferRequest bad[9]={
+        {.operation=(TransferOperation)99}, {.operation=TRANSFER_READ},
+        {.operation=TRANSFER_READ,.id=VAULT_ID_MAX+1u},
+        {.operation=TRANSFER_READ,.id=1,.count=VAULT_BLOCK+1},
+        {.operation=TRANSFER_WRITE,.id=1},
+        {.operation=TRANSFER_WRITE,.id=1,.count=1,.offset=VAULT_MAX_BYTES+1u},
+        {.operation=TRANSFER_CHECK,.category="public"},
+        {.operation=TRANSFER_START,.name="file",.size=VAULT_MAX_BYTES+1u},
+        {.operation=TRANSFER_START,.name="file",.category="public"}};
+    for(unsigned i=0;i<9;i++)assert(mail_core_transfer(&alice,&bad[i],&out,&status)==MAIL_CORE_OK && status==VAULT_INVALID && zero(&out,sizeof(out)));
+    TransferRequest q={.operation=TRANSFER_START};memset(q.name,'x',sizeof(q.name));
+    assert(mail_core_transfer(&alice,&q,&out,&status)==MAIL_CORE_OK && status==VAULT_INVALID);
+    strcpy(q.name,"file");memset(q.description,'x',sizeof(q.description));
+    assert(mail_core_transfer(&alice,&q,&out,&status)==MAIL_CORE_OK && status==VAULT_INVALID);
+    q.operation=TRANSFER_CHECK;memset(q.category,'x',sizeof(q.category));
+    assert(mail_core_transfer(&alice,&q,&out,&status)==MAIL_CORE_OK && status==VAULT_INVALID);
+    assert(mail_core_transfer(&alice,NULL,&out,&status)==MAIL_CORE_OK && status==VAULT_INVALID);
+    assert(!transfer_calls);
+    puts("PASS typed transfer bounds reject malformed buffers/IDs/categories before backend I/O");
+}
+static void delivery_authority(void) {
+    MailActor denied[]={{1,8},{4,9},{5,9},{6,9},{99,9},{0,9}};
+    for(unsigned i=0;i<10;i++) {
+        reset();const MailActor *actor=&alice;MailOutcome expected=MAIL_CORE_REVOKED;
+        if(i<6)actor=&denied[i];
+        else if(i==6) { member_error=1;expected=MAIL_CORE_MEMBER_STORAGE; }
+        else if(i==7) { moderation_error=1;expected=MAIL_CORE_MODERATION_STORAGE; }
+        else if(i==8) { enabled=0;expected=MAIL_CORE_DISABLED; }
+        else { mail_error=1;expected=MAIL_CORE_STORAGE; }
+        MailDelivery delivery;MailNotice notice;TransferRequest q={.operation=TRANSFER_CHECK};TransferReply out;VaultResult status;
+        assert(mail_core_sysop_send(actor,"title","body",&delivery)==expected && zero(&delivery,sizeof(delivery)));
+        MailOutcome member_expected=i==5?MAIL_CORE_LOGIN_REQUIRED:expected;
+        assert(mail_core_notice(actor,&notice)==member_expected && zero(&notice,sizeof(notice)));
+        assert(mail_core_transfer(actor,&q,&out,&status)==member_expected && status==VAULT_DENIED && zero(&out,sizeof(out)));
+        assert(!reads && !writes && !transfer_calls && !notice_reads);
+    }
+    reset();MailDelivery delivery;MailNotice notice;MailActor guest={0,0};
+    assert(mail_core_sysop_send(NULL,"title","body",&delivery)==MAIL_CORE_LOGIN_REQUIRED);
+    assert(mail_core_notice(&guest,&notice)==MAIL_CORE_LOGIN_REQUIRED);
+    assert(mail_core_sysop_send(&guest,"title","body",NULL)==MAIL_CORE_UNAVAILABLE);
+    assert(!writes);puts("PASS delivery, notice and transfer actor/epoch/health gates independent of UI");
+}
 int main(void) {
     authority();health();prepare();draft_views();draft_failures();lifecycle();attachment_selection();
     attachment_writes();failures();delete_private();boundaries();body_limits();
     list_pages();list_filters();search_privacy();reads_and_sequences();reading_failures();reading_authority_bounds();
-    attachment_views();attachment_batches();buffer_imports();attachment_authority();return 0;
+    attachment_views();attachment_batches();buffer_imports();attachment_authority();
+    sysop_delivery();sysop_failures();login_notices();transfer_operations();transfer_bounds();delivery_authority();return 0;
 }
