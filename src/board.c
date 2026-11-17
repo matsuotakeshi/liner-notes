@@ -836,6 +836,7 @@ static void member_result(MemberOutcome result,BoardResult *r) {
     case MEMBER_CORE_NOT_FOUND:strcpy(r->text,"ERR no member\r\n");break;
     case MEMBER_CORE_LOGIN_REQUIRED:strcpy(r->text,"ERR login required\r\n");break;
     case MEMBER_CORE_RIGHTS_INVALID:strcpy(r->text,"ERR rights syntax\r\n");break;
+    case MEMBER_CORE_PREFERENCES:strcpy(r->text,"ERR preferences\r\n");break;
     case MEMBER_CORE_PASSWORD:strcpy(r->text,"ERR password change\r\n");break;
     case MEMBER_CORE_STATE:strcpy(r->text,"ERR member state\r\n");break;
     case MEMBER_CORE_PROTECTED:strcpy(r->text,"ERR protected member\r\n");break;
@@ -1055,13 +1056,20 @@ static void execute(const BoardRequest *q,BoardResult *r) {
         if(q->number>2 || (q->number==1 && (q->cursor>1 || q->title[0]<'0' || q->title[0]>'1' || q->title[1]))) {
             strcpy(r->text,"ERR preferences\r\n"); return;
         }
-        if(q->number==1 && !members_save_ui_preferences(q->user,(int)q->cursor,q->title[0]-'0',q->scope,q->audit_article,q->audit_actor,q->ui_aux)) {
-            strcpy(r->text,"ERR member storage unavailable\r\n"); return;
+        MemberActor actor={q->user,q->user_epoch};MemberPreferences preferences;
+        MemberOutcome result;
+        if(q->number==1) {
+            MemberPreferences input={0,(int)q->cursor,q->title[0]-'0',q->scope,q->audit_article,q->audit_actor,q->ui_aux};
+            result=member_core_save_preferences(&actor,&input,&preferences);
+        } else result=member_core_preferences(&actor,&preferences);
+        if(result!=MEMBER_CORE_OK) { member_result(result,r);return; }
+        if(!preferences.present) { strcpy(r->text,"PREFS NONE\r\n");return; }
+        if(q->number==2) {
+            r->preferences=1;r->menu_mode=(int)feature_setting("menu_preferences",q->user);
+            r->language=preferences.language;r->pager=preferences.pager;r->editor_preference=preferences.editor;
+            r->columns=preferences.columns;r->rows=preferences.rows;r->ui_aux=preferences.aux;
         }
-        int language=0,pager=0;
-        if(!members_preferences(q->user,&language,&pager)) { strcpy(r->text,"PREFS NONE\r\n"); return; }
-        if(q->number==2) { r->preferences=1;r->menu_mode=(int)feature_setting("menu_preferences",q->user); r->language=language; r->pager=pager; }
-        snprintf(r->text,sizeof(r->text),"PREFS %s %s %s\r\n",q->number==1?"SAVED":q->number==2?"LOADED":"STORED",language?"en":"ja",pager?"ON":"OFF"); return;
+        snprintf(r->text,sizeof(r->text),"PREFS %s %s %s\r\n",q->number==1?"SAVED":q->number==2?"LOADED":"STORED",preferences.language?"en":"ja",preferences.pager?"ON":"OFF");return;
     }
     if(q->op=='~') {
         MemberActor actor={q->user,q->user_epoch};MemberChange change;
@@ -1274,7 +1282,7 @@ static void *work(void *unused)
         else if((!strncmp(rs->text,"ARTICLE ",8) || rs->service_action=='6') && !access_record('R',rs->service_action=='6'?rq->number:rs->selected,rq->user)) { rs->service_action=0;rs->selected=0;rs->draft_body[0]=0;strcpy(rs->text,"ERR board access storage\r\n"); }
         if(access_changed) { rs->access_refresh=1;access_changed=0; }
         rs->member_level=members_level(rs->auth>0?(uint32_t)rs->auth:rq->user);
-        if(rs->preferences)members_ui_preferences(rs->auth>0?(uint32_t)rs->auth:rq->user,&rs->editor_preference,&rs->columns,&rs->rows,&rs->ui_aux);
+        if(rs->preferences && rq->op!='V')members_ui_preferences(rs->auth>0?(uint32_t)rs->auth:rq->user,&rs->editor_preference,&rs->columns,&rs->rows,&rs->ui_aux);
         uint32_t who=rs->auth>0?(uint32_t)rs->auth:rq->user;
         rs->sigop=catalog_sigop(rs->board?rs->board:rq->board,who);
         if(rs->account_user2)vault_worker_account(rs->account_user2,rs->account_epoch2);
