@@ -7,6 +7,8 @@
 #include "board.h"
 #include "article_core.h"
 #include "member_core.h"
+#include "mail_core.h"
+#include "mail_repository.h"
 #include "article_repository.h"
 #include "date_filter.h"
 #include "vault_bridge.h"
@@ -641,24 +643,38 @@ static void extra_execute(const BoardRequest *q,BoardResult *r) {
     strcpy(r->text,"ERR command\r\n");
 }
 static const char *mail_text(const BoardRequest *q,MessageId id,const char *raw) { return q->scope?message_text(q->scope==2?LANGUAGE_EN:LANGUAGE_JA,id):raw; }
+int mail_repository_enabled(void) { return board_feature_enabled("mail"); }
+static void mail_result(const BoardRequest *q,MailOutcome result,BoardResult *r) {
+    switch(result) {
+    case MAIL_CORE_LOGIN_REQUIRED:strcpy(r->text,"ERR login required\r\n");break;
+    case MAIL_CORE_REVOKED:r->revoked=1;strcpy(r->text,"ERR session revoked\r\n");break;
+    case MAIL_CORE_MEMBER_STORAGE:strcpy(r->text,"ERR member storage unavailable\r\n");break;
+    case MAIL_CORE_MODERATION_STORAGE:strcpy(r->text,"ERR moderation storage unavailable\r\n");break;
+    case MAIL_CORE_DISABLED:strcpy(r->text,"ERR feature disabled\r\n");break;
+    case MAIL_CORE_BODY_LIMIT:strcpy(r->text,"ERR body limit\r\n");break;
+    case MAIL_CORE_STORAGE:snprintf(r->text,sizeof(r->text),"%s",mail_text(q,MSG_MAIL_STORAGE,"MAIL ERROR storage\r\n"));break;
+    default:snprintf(r->text,sizeof(r->text),"%s",mail_text(q,MSG_MAIL_UNAVAILABLE,"MAIL ERROR unavailable\r\n"));break;
+    }
+}
 static void mail_execute(const BoardRequest *q,BoardResult *r) {
-    if((q->action=='S' || q->action=='W') && strlen(q->body)>ln_limit("BODY",BOARD_BODY)) { strcpy(r->text,"ERR body limit\r\n");return; }
+    /* Preserve the completion kind even on quota refusal so a failed send
+     * returns to the editor with its unsent text and draft revision intact. */
     r->mail_action=q->action;
+    if((q->action=='S' || q->action=='W') && strlen(q->body)>ln_limit("BODY",BOARD_BODY)) { strcpy(r->text,"ERR body limit\r\n");return; }
+    MailActor actor={q->user,q->user_epoch};
     if(mailbox_broken()) { snprintf(r->text,sizeof(r->text),"%s",mail_text(q,MSG_MAIL_STORAGE,"MAIL ERROR storage\r\n"));return; }
     uint32_t id=q->number;
     if(q->mail_attachments.count>MAIL_ATTACH_MAX)goto unavailable;
     if(q->action=='A') {
-        if(id && !q->cursor && !mail_files_owned(q->user,id))goto unavailable;
-        r->mail_attachments=q->mail_attachments;
-        if(q->cursor) { unsigned n=0;for(unsigned i=0;i<r->mail_attachments.count;i++)if(r->mail_attachments.ids[i]!=id)r->mail_attachments.ids[n++]=r->mail_attachments.ids[i];r->mail_attachments.count=n; }
-        else if(!id)memset(&r->mail_attachments,0,sizeof(r->mail_attachments));
-        else if(!mail_has(&r->mail_attachments,id)) { if(r->mail_attachments.count==MAIL_ATTACH_MAX)goto unavailable;r->mail_attachments.ids[r->mail_attachments.count++]=id; }
+        MailOutcome result=mail_core_attachment_select(&actor,&q->mail_attachments,id,!!q->cursor,&r->mail_attachments);
+        if(result!=MAIL_CORE_OK) { mail_result(q,result,r);return; }
         r->mail_attachment=id;r->mail_to=q->user;
         snprintf(r->text,sizeof(r->text),q->cursor?mail_text(q,MSG_MAIL_ATTACHMENT_DETACHED,"MAIL ATTACHMENT DETACHED %u\r\n"):mail_text(q,MSG_MAIL_ATTACHMENT_SET,"MAIL ATTACHMENT %u\r\n"),id);return;
     }
     if(q->action=='I') { mail_files_list(q->user,q->cursor,q->scope,r->text,sizeof(r->text),&r->mail_next);return; }
     if(q->action=='X') {
-        if(!mail_files_drop(q->user,id))goto unavailable;
+        MailOutcome result=mail_core_attachment_drop(&actor,id);
+        if(result!=MAIL_CORE_OK) { mail_result(q,result,r);return; }
         snprintf(r->text,sizeof(r->text),mail_text(q,MSG_MAIL_ATTACHMENT_DROPPED,"MAIL ATTACHMENT REMOVED %u\r\n"),id);return;
     }
     if(q->action=='U') {
@@ -671,32 +687,28 @@ static void mail_execute(const BoardRequest *q,BoardResult *r) {
         snprintf(r->text,sizeof(r->text),mail_text(q,MSG_MAIL_NOTIFY,"MAIL NOTIFY %s\r\n"),r->mail_notify_deny?"OFF":"ON");return;
     }
     if(q->action=='F' || q->action=='O') {
-        const MailMessage *d=mailbox_draft(q->user);if(!d)goto unavailable;
-        r->mail_revision=d->id;r->mail_attachments=d->attachments;
-        if(q->action=='O') {
-            if(!members_name(d->recipient) || moderation_suspended(d->recipient))goto unavailable;
-            const MailMessage *old=d->parent?mailbox_get(d->parent,q->user):NULL;
-            if(d->parent && (!old || old->recipient!=q->user || old->sender!=d->recipient))goto unavailable;
-            r->mail_to=d->recipient;r->mail_parent=d->parent;
-            strcpy(r->draft_title,d->title);strcpy(r->draft_body,mail_body(d));
+        MailDraft draft;int resume=q->action=='O';
+        MailOutcome result=mail_core_draft_get(&actor,resume,&draft,r->draft_body,sizeof(r->draft_body));
+        if(result!=MAIL_CORE_OK) {
+            if(resume && mailbox_broken())body_read_failed=1;
+            mail_result(q,result,r);return;
         }
-        size_t offset=0;for(unsigned i=0;i<d->attachments.count;i++)offset+=mail_files_describe(q->user,d->attachments.ids[i],q->scope,r->text+offset,sizeof(r->text)-offset);
-        snprintf(r->text+offset,sizeof(r->text)-offset,mail_text(q,MSG_MAIL_DRAFT_INFO,"MAIL DRAFT %u TO %s REPLY %u TITLE %s\r\n"),d->id,members_name(d->recipient),d->parent,d->title);return;
+        r->mail_revision=draft.revision;r->mail_attachments=draft.attachments;
+        if(resume) { r->mail_to=draft.to;r->mail_parent=draft.parent;strcpy(r->draft_title,draft.title); }
+        size_t offset=0;for(unsigned i=0;i<draft.attachments.count;i++)offset+=mail_files_describe(q->user,draft.attachments.ids[i],q->scope,r->text+offset,sizeof(r->text)-offset);
+        snprintf(r->text+offset,sizeof(r->text)-offset,mail_text(q,MSG_MAIL_DRAFT_INFO,"MAIL DRAFT %u TO %s REPLY %u TITLE %s\r\n"),draft.revision,draft.recipient,draft.parent,draft.title);return;
     }
     if(q->action=='W' || q->action=='C') {
-        if(q->action=='W')for(unsigned i=0;i<q->mail_attachments.count;i++)if(!mail_files_owned(q->user,q->mail_attachments.ids[i]))goto unavailable;
-        int ok=q->action=='W'?mailbox_save_draft(q->user,q->number,q->cursor,q->title,q->body,&q->mail_attachments,q->mail_revision,&r->mail_revision):mailbox_delete_draft(q->user,q->mail_revision);
-        if(!ok) { if(mailbox_broken())goto storage;goto unavailable; }
-        mail_files_cleanup();
+        MailWrite input={q->number,q->cursor,q->mail_revision,q->title,q->body,q->mail_attachments};
+        MailOutcome result=q->action=='W'?mail_core_draft_save(&actor,&input,&r->mail_revision):mail_core_draft_delete(&actor,q->mail_revision);
+        if(result!=MAIL_CORE_OK) { mail_result(q,result,r);return; }
         snprintf(r->text,sizeof(r->text),"%s",q->action=='W'?mail_text(q,MSG_MAIL_DRAFT_SAVED,"MAIL DRAFT SAVED\r\n"):mail_text(q,MSG_MAIL_DRAFT_DELETED,"MAIL DRAFT DELETED\r\n"));return;
     }
-    if(q->action=='B'  || q->action=='Q') {
-        uint32_t target=0;const MailMessage *m=NULL;
-        if(q->action=='Q') { m=mailbox_get(id,q->user);if(m && m->recipient==q->user)target=m->sender; }
-        else for(uint32_t i=1;i<=members_count();i++)if(members_name(i) && !strcmp(members_name(i),q->username)) { target=i;break; }
-        if(!target || moderation_suspended(target))goto unavailable;
-        r->mail_to=target;r->mail_parent=m?m->id:0;
-        snprintf(r->draft_title,sizeof(r->draft_title),"%s",*q->title?q->title:m?m->title:"");
+    if(q->action=='B' || q->action=='Q') {
+        MailCompose compose;
+        MailOutcome result=mail_core_prepare(&actor,q->username,q->action=='Q'?id:0,q->title,&compose);
+        if(result!=MAIL_CORE_OK) { mail_result(q,result,r);return; }
+        r->mail_to=compose.to;r->mail_parent=compose.parent;strcpy(r->draft_title,compose.title);
         snprintf(r->text,sizeof(r->text),"%s",mail_text(q,MSG_MAIL_EDIT,"MAIL EDIT end with . or /CANCEL\r\n"));return;
     }
     if(q->action=='L') {
@@ -735,16 +747,16 @@ static void mail_execute(const BoardRequest *q,BoardResult *r) {
         snprintf(r->text+offset,sizeof(r->text)-offset,mail_text(q,MSG_MAIL_ITEM,"MAIL ITEM %u FROM %s TO %s READ %u REPLY %u\r\nTITLE %s\r\nBODY\r\n%sMAIL END\r\n"),m->id,(m->sender?members_name(m->sender):"guest"),members_name(m->recipient),(unsigned)m->read,m->parent,m->title,mail_body(m));return;
     }
     if(q->action=='D') {
-        if(!mailbox_get(id,q->user))goto unavailable;
-        if(!mailbox_remove(id,q->user))goto storage;
-        mail_files_cleanup();
+        MailOutcome result=mail_core_delete(&actor,id);
+        if(result!=MAIL_CORE_OK) { mail_result(q,result,r);return; }
         snprintf(r->text,sizeof(r->text),mail_text(q,MSG_MAIL_DELETED,"MAIL DELETED %u\r\n"),id);return;
     }
     if(q->action=='S') {
-        for(unsigned i=0;i<q->mail_attachments.count;i++)if(!mail_files_owned(q->user,q->mail_attachments.ids[i]))goto unavailable;
-        if(!members_name(q->number) || moderation_suspended(q->number))goto unavailable;
-        if(!mailbox_send(q->user,q->number,q->cursor,q->title,q->body,&q->mail_attachments,q->mail_revision,&id)) { if(mailbox_broken())goto storage;goto unavailable; }
-        mail_files_cleanup();r->mail_delivery=q->number;r->mail_id=id;snprintf(r->text,sizeof(r->text),mail_text(q,MSG_MAIL_SENT,"MAIL SENT %u\r\n"),id);return;
+        MailWrite input={q->number,q->cursor,q->mail_revision,q->title,q->body,q->mail_attachments};
+        MailOutcome result=mail_core_send(&actor,&input,&id);
+        if(result!=MAIL_CORE_OK) { mail_result(q,result,r);return; }
+        r->mail_delivery=q->number;r->mail_id=id;
+        snprintf(r->text,sizeof(r->text),mail_text(q,MSG_MAIL_SENT,"MAIL SENT %u\r\n"),id);return;
     }
 unavailable:snprintf(r->text,sizeof(r->text),"%s",mail_text(q,MSG_MAIL_UNAVAILABLE,"MAIL ERROR unavailable\r\n"));return;
 storage:snprintf(r->text,sizeof(r->text),"%s",mail_text(q,MSG_MAIL_STORAGE,"MAIL ERROR storage\r\n"));
