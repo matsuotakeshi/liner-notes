@@ -215,7 +215,15 @@
         "src/activity_core.c",
         "src/activity_core.h",
         "src/activity_repository.h",
-        "src/activity_store.c"
+        "src/activity_store.c",
+        "src/chat.c",
+        "src/chat.h",
+        "src/chat_core.c",
+        "src/chat_core.h",
+        "src/chat_types.h",
+        "tests/test_chat_core.c",
+        "tests/test_chat_core.py",
+        "help/en/chat.txt"
       ]
     },
     {
