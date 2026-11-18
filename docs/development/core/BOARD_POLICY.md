@@ -70,3 +70,20 @@ no result holds journal pointers or article bodies for access-log viewing.
   validation is run before the PR.
 
 Native tests remain trusted-main-only. No release or deployment is performed.
+
+## Hosted CI follow-up
+
+The initial PR head `adbde0a3385bdcd29d6d5f687716a49205058ae0` failed
+Linux compatibility run [44214652210](https://github.com/matsuotakeshi/liner-notes/actions/runs/44214652210)
+on AlmaLinux 9 and Rocky Linux 9. Both stopped at the new socket test's
+`BOARDPASS 4`: expected `ERR admin required`, received `ERR try later`.
+The test issued a password prompt within the existing 1,000 ms post-login
+credential throttle (`session_complete` / `auth_after` in session.c).
+
+The socket fixture now waits 1.05 seconds before password-prompt assertions,
+including the post-revocation login case, matching the existing stage60 helper.
+It still requires the exact ACL denial; no retry/alternative-success result,
+runtime throttle change, timeout increase or skipped assertion is introduced.
+Local helper checks cover waiting before sending the command, unchanged ordinary
+commands, and rejection of `ERR try later` as an ACL result. Hosted socket
+revalidation is required; the prior run is not a successful runtime result.

@@ -3,6 +3,7 @@ from contextlib import closing, ExitStack
 from pathlib import Path
 import sys
 import tempfile
+import time
 from test_board import Server,post,read
 from test_runtime import Client
 from test_members import auth
@@ -12,6 +13,10 @@ SECRET='Policy-Core-Test-Only-8872'
 
 
 def expect(c,command,wanted):
+    # Password prompts share the one-second post-login credential throttle.
+    # Wait before exercising ACLs; ERR try later must not count as ACL denial.
+    if command.startswith('BOARDPASS ') and len(command.split())==2:
+        time.sleep(1.05)
     got=cmd(c,command);assert got==wanted,(command,got,wanted)
 
 
