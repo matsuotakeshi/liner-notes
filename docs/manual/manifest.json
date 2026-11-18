@@ -456,7 +456,16 @@
         "src/door_lock.c",
         "src/door_lock.h",
         "src/door_lock_helper.c",
-        "tests/test_door_lock.py"
+        "tests/test_door_lock.py",
+        "src/door_core.c",
+        "src/door_core.h",
+        "src/door_config.c",
+        "src/door_config.h",
+        "src/door_protocol.c",
+        "src/door_protocol.h",
+        "tests/test_door_core.c",
+        "tests/test_stage65_doors.py",
+        "tests/test_doors_config.py"
       ]
     },
     {

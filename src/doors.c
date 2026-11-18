@@ -8,6 +8,9 @@
 #endif
 #include "doors.h"
 #include "door_lock.h"
+#include "door_core.h"
+#include "door_config.h"
+#include "door_protocol.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -29,8 +32,7 @@
 #include <pty.h>
 #endif
 /* Solaris 11.4 declares openpty/login_tty in <termios.h>, in libc. */
-typedef struct { unsigned id,level,seconds,slots,drop;char exe[1024],dir[1024],title[161]; } Game;
-static Game games[32];static unsigned game_count;
+static DoorCatalog catalog;
 struct Door { pid_t pid;int fd,exited,after_cr,lock;char run[1200];uint64_t until,stop_until;unsigned char input[8192];size_t used;struct Door *next; };
 static uint64_t door_clock(void) { struct timespec t;clock_gettime(CLOCK_MONOTONIC,&t);return (uint64_t)t.tv_sec*1000+(uint64_t)t.tv_nsec/1000000; }
 /* Keep the slot until the leader AND its process group have gone. */
@@ -54,7 +56,7 @@ void doors_reap(void) {
 }
 /* Slot locks are shared by all runtimes using this same working directory.
  * Never unlink a lock inode: another process may already have opened it. */
-static int door_slot(Door *d,const Game *g,unsigned *node) {
+static int door_slot(Door *d,const DoorSpec *g,unsigned *node) {
     for(unsigned n=1;n<=g->slots;n++) {
         char path[1100];struct stat st;snprintf(path,sizeof(path),"%s/.liner-door-slot-%u",g->dir,n);
         int fd=open(path,O_RDWR|O_CREAT|O_NOFOLLOW,0600);if(fd<0)return 0;
@@ -65,7 +67,7 @@ static int door_slot(Door *d,const Game *g,unsigned *node) {
     }
     errno=EBUSY;return 0;
 }
-static int door_drop(Door *d,const Game *g,uint32_t user,unsigned level) {
+static int door_drop(Door *d,const DoorSpec *g,uint32_t user,unsigned level) {
     snprintf(d->run,sizeof(d->run),"%s/.liner-door-run-XXXXXX",g->dir);
     if(!mkdtemp(d->run)) { d->run[0]=0;return 0; }
     char path[1240];snprintf(path,sizeof(path),"%s/DORINFO1.DEF",d->run);
@@ -77,47 +79,21 @@ static int door_drop(Door *d,const Game *g,uint32_t user,unsigned level) {
     if(fclose(f))ok=0;
     return ok;
 }
+static int door_paths_valid(void *context,const DoorSpec *game) {
+    struct stat st;(void)context;
+    return !stat(game->exe,&st) && S_ISREG(st.st_mode) && !access(game->exe,X_OK)
+        && !stat(game->dir,&st) && S_ISDIR(st.st_mode);
+}
 int doors_config(const char *path) {
-    game_count=0;if(!path)return 1;FILE *f=fopen(path,"r");if(!f)return 0;
-    char line[4096];int ok=1;
-    while(fgets(line,sizeof(line),f)) {
-        size_t n=strlen(line);if(n && line[n-1]=='\n')line[--n]=0;else if(!feof(f)) { ok=0;break; }
-        if(n && line[n-1]=='\r')line[--n]=0;
-        if(!*line || *line=='#')continue;
-        if(game_count==32) { ok=0;break; }Game *g=&games[game_count];memset(g,0,sizeof(*g));char *options=NULL;char *parts[6],*p=line;unsigned i;
-        for(i=0;i<6;i++) { parts[i]=p;char *bar=strchr(p,'|');if(i<5) { if(!bar)break;*bar=0;p=bar+1; }else if(bar) { *bar=0;options=bar+1; } }
-        if(i!=6) { ok=0;break; }unsigned *numbers[]={&g->id,&g->level,&g->seconds};
-        for(i=0;i<3;i++) { char *end;unsigned long v=strtoul(parts[i],&end,10);if(!*parts[i] || *end || *parts[i]<'0' || *parts[i]>'9' || v>86400)break;*numbers[i]=(unsigned)v; }
-        if(i!=3 || !g->id || g->level>5 || !g->seconds || parts[3][0]!='/' || parts[4][0]!='/' || strlen(parts[3])>=sizeof(g->exe) || strlen(parts[4])>=sizeof(g->dir) || !*parts[5] || strlen(parts[5])>=sizeof(g->title)) { ok=0;break; }
-        /* Optional seventh field: none:N or dorinfo1:N, N=1..32. */
-        if(options) {
-            const char *value=NULL;if(!strncmp(options,"dorinfo1:",9)) { g->drop=1;value=options+9; }
-            else if(!strncmp(options,"none:",5))value=options+5;
-            char *end=NULL;unsigned long slots=value?strtoul(value,&end,10):0;
-            if(!value || *value<'1' || *value>'9' || *end || slots<1 || slots>32) { ok=0;break; }g->slots=(unsigned)slots;
-        }
-        for(const unsigned char *q=(unsigned char *)parts[5];*q;q++)if(*q<32 || *q==127)ok=0;
-        for(i=0;i<game_count;i++)if(games[i].id==g->id)ok=0;
-        struct stat st;if(stat(parts[3],&st) || !S_ISREG(st.st_mode) || access(parts[3],X_OK) || stat(parts[4],&st) || !S_ISDIR(st.st_mode))ok=0;
-        if(!ok)break;
-        strcpy(g->exe,parts[3]);
-        strcpy(g->dir,parts[4]);
-        strcpy(g->title,parts[5]);
-        game_count++;
-    }
-    if(ferror(f))ok=0;
-    fclose(f);
-    if(!ok)game_count=0;
-    return ok;
+    return door_config_load(&catalog,path,door_paths_valid,NULL);
 }
 void doors_list(unsigned level,char *out,size_t size) {
-    size_t n=(size_t)snprintf(out,size,"GAMES\r\n");
-    for(unsigned i=0;i<game_count;i++)if(level>=games[i].level)n+=(size_t)snprintf(out+n,size-n,"GAME %u %u %s\r\n",games[i].id,games[i].seconds,games[i].title);
-    snprintf(out+n,size-n,"END GAMES\r\n");
+    DoorListing listing;door_core_list(&catalog,level,&listing);
+    door_protocol_list(&listing,out,size);
 }
 Door *door_start(unsigned id,unsigned level,uint32_t user,const char *name,unsigned columns,unsigned rows,uint64_t now) {
-    errno=0;if(!user || geteuid()==0)return NULL;doors_reap();errno=0;Game *g=NULL;
-    for(unsigned i=0;i<game_count;i++)if(games[i].id==id && level>=games[i].level)g=&games[i];
+    errno=0;if(!user || geteuid()==0)return NULL;doors_reap();errno=0;
+    const DoorSpec *g=door_core_launch(&catalog,id,level,user,geteuid()==0);
     if(!g)return NULL;
     Door *d=calloc(1,sizeof(*d));if(!d)return NULL;d->lock=-1;d->fd=-1;
     unsigned node=0;
@@ -128,7 +104,7 @@ Door *door_start(unsigned id,unsigned level,uint32_t user,const char *name,unsig
     snprintf(idenv,sizeof(idenv),"LINER_USER_ID=%u",user);snprintf(nameenv,sizeof(nameenv),"LINER_USER=%s",name);
     snprintf(cols,sizeof(cols),"COLUMNS=%u",columns);snprintf(lines,sizeof(lines),"LINES=%u",rows);snprintf(home,sizeof(home),"HOME=%s",g->dir);
     snprintf(nodeenv,sizeof(nodeenv),"LINER_DOOR_NODE=%u",node);snprintf(dropenv,sizeof(dropenv),"LINER_DOOR_DROP_DIR=%s",d->run);snprintf(gameenv,sizeof(gameenv),"LINER_DOOR_ID=%u",id);
-    char *env[]={"PATH=/usr/local/bin:/usr/bin:/bin","TERM=xterm","LANG=C.UTF-8",idenv,nameenv,cols,lines,home,nodeenv,dropenv,gameenv,NULL};char *argv[]={g->exe,NULL};
+    char *env[]={"PATH=/usr/local/bin:/usr/bin:/bin","TERM=xterm","LANG=C.UTF-8",idenv,nameenv,cols,lines,home,nodeenv,dropenv,gameenv,NULL};char *argv[]={(char *)g->exe,NULL};
     long maxfd=sysconf(_SC_OPEN_MAX);if(maxfd<0)maxfd=65536;
     pid_t pid=fork();if(!pid) {
 #ifdef __sun
