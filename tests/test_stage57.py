@@ -63,6 +63,12 @@ def run(binary,ctl):
    assert cmd(a,'FILERESTORE 1 CONFIRM')==b'ERR no file'
    assert cmd(a,'FILE 1')==b'ERR no file'
    a.send(b'CONNECTIONS\n');out=through(a,b'END CONNECTIONS');guest=int(g.greeting.split()[1]);assert f'CONNECTION {guest} guest'.encode() in out
+   rows=[line.split() for line in out.splitlines() if line.startswith(b'CONNECTION ')]
+   assert len(rows)==3 and {row[2] for row in rows}=={b'alice',b'bob',b'guest'},out
+   for row in rows:
+    assert len(row)==13 and row[3]==b'BBS' and row[4]==b'RAW',row
+    assert row[5].startswith(b'127.0.0.1:') and all(field.isdigit() for field in row[6:]),row
+    assert int(row[7])<=int(row[6]) and int(row[11])>0 and int(row[12])>0,row
    assert cmd(a,f'DISCONNECT {guest} CONFIRM')==f'DISCONNECTED {guest}'.encode();assert not g.sock.recv(1)
    assert cmd(a,'SHUTDOWN 30 test-stop')==b'SHUTDOWN SCHEDULED 30'
    assert cmd(a,'SHUTDOWN CANCEL')==b'SHUTDOWN CANCELLED'

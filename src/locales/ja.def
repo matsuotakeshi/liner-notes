@@ -369,6 +369,7 @@ MESSAGE(ERR_SYSOP_MAIL, "メールの保存に失敗したか、設定上限に�
 MESSAGE(CONNECTIONS_HEADER, "全接続一覧（番号 / ログイン名 / 状態）\r\n")
 MESSAGE(CONNECTIONS_END, "接続一覧終わり\r\n")
 MESSAGE(ERR_CONNECTION, "指定した接続は存在しません。")
+MESSAGE(ERR_CONNECTION_REPORT, "接続一覧を生成できませんでした。")
 MESSAGE(VDELETE, "物理削除")
 MESSAGE(ERR_CATALOG, "ボード設定を保存できませんでした。")
 MESSAGE(ERR_CATALOG_SYNTAX, "ボード設定が不正です。番号|親番号|閲覧権限|投稿権限|題名|説明で指定してください。")

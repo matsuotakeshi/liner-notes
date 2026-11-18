@@ -369,6 +369,7 @@ MESSAGE(ERR_SYSOP_MAIL, "Mail storage failed or the configured limit was reached
 MESSAGE(CONNECTIONS_HEADER, "All connections (ID / login / state)\r\n")
 MESSAGE(CONNECTIONS_END, "End of connections\r\n")
 MESSAGE(ERR_CONNECTION, "That connection does not exist.")
+MESSAGE(ERR_CONNECTION_REPORT, "Unable to generate the connection list.")
 MESSAGE(VDELETE, "Permanently deleted")
 MESSAGE(ERR_CATALOG, "Board settings could not be saved.")
 MESSAGE(ERR_CATALOG_SYNTAX, "Invalid board definition: ID|parent|read ACL|write ACL|title|description.")
