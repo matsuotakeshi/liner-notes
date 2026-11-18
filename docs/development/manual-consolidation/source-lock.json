@@ -1,6 +1,6 @@
 {
   "LICENSE": "fb981668c18a279e285fc4d83fba1e836cc84dd4daa73c9697d3cfd2d8aca6e0",
-  "Makefile": "8ad195fb848265537adfc3f5bfd1f8f568296d07194bdabdcfb94aeee10dfb6c",
+  "Makefile": "4e5cd027b37b89c66800d775271d6929e3ddbed7eba53c330802e210480bbb84",
   "boards.example.conf": "4bd1a17ecf3966d3829510e8495a1362fb8b922cd754badccc739f5e5ab0bde8",
   "ci/build-freebsd-package.sh": "4e62899471d1f1a6c44e00a783c1aff771332140704ae778da95a95048474108",
   "debian/changelog": "8f3574a094f5a3677a9a7188e530ecdbdc006138b082b57243ca8441c644114d",
@@ -63,7 +63,7 @@
   "src/profile_store.c": "9bd14cb1a44b9e117fb9465d036f2d5417bca8188a136a9162f91f8b46f33e2a",
   "src/runtime.c": "a12cc120a901ec09f5cc9df1919e4800b7f07041be84c2f8dcc2db17de9fb950",
   "src/runtime_limits.h": "82de34913914d0f81874789d473928e044225772c4db9d656bceac03920219a8",
-  "src/session.c": "50d07bcd6ed7d16a86b8fab4bc38766ccfb94304f4eea080461e85e1046e8ece",
+  "src/session.c": "f8b3fc07eb990ed4a5fc44d0d0eddf6c9f3f9519b57cd1aa1cf3b4730537ca8a",
   "src/storage_sqlite.c": "aa8971c445e2a23ae21548fc706e318e40238f8318c2f717490b867067ab3055",
   "src/telnet.c": "a490e550fb227858727b4edc656c7c1d60bf90f6fa13a2f74dd361234b8ff422",
   "src/transfer_line.c": "5c3f9e15fd46c8569d0f2775628de7a432d60eb6bdfd93babdf7f77fb5f9f156",
@@ -229,11 +229,11 @@
   "src/connection_protocol.h": "a497663d9dbf2652c795c8394fea1b38bb66f304ba629780d2bac33484aae667",
   "tests/test_connection_core.c": "2efb380fdfc520e697bef8edb70e476d60f23cf838a992075cbb83e10124d5e0",
   "tests/test_stage57.py": "c1ea9a6a665387c5ebc4f42e75688f4c31fb8ffd702cc9a4a99b7f478d558f8f",
-  "tests/test_adapters.c": "319a2f5fd4c35b3ebe5b5f20263c4a17dad6991fb510c8d007200ac4eb057cad",
+  "tests/test_adapters.c": "888c260a06ba3987cb5507af27508ee3e10f3c1b10aa18e720d3ca9b99139811",
   "src/notification_core.c": "05f93d1b102bd276649c68cc385799f8e43fab559003200c84b5bceeca8d726d",
   "src/notification_core.h": "637cde7c1ffd893ff380c83f41ffef0f3732872b2a4c014273d0d0cc90c90de9",
   "tests/test_notification_core.c": "c9b5d4cfdb30ed385abc928a1b05ebf1d148915e2a5ab76b0b2ee1a8288cf4fe",
-  "src/session.h": "089aa37599b2a38c4fae1813b93321a7d566d2bcee1be788b7d797df4466cd66",
+  "src/session.h": "4ac162391e98868efdea0658297a12a049e602b5db6aba25bcd5c28228f01e4f",
   "src/connector_core.c": "b1e080b0479d3ef782f99782099481de35a87638b9d3996daf34391c5ef9d5a7",
   "src/connector_core.h": "e36e1bc8e199da251f0ec70e27169c6b84758cc52ee1c61eb3f86dc6d98f67d4",
   "tests/test_connector_core.c": "1c43edbbb9934746e846cd50ff2cb07e26efce35c2b7411821427f5775f8febb",
@@ -276,5 +276,9 @@
   "src/list_navigation_protocol.c": "72d7ced938d4a3c99fca4ebc3c9a7e496f1f924d48ebd5df8a5e80590b788166",
   "src/list_navigation_protocol.h": "680f153e81b0894ea9c8b7180a93a5fa39345a8a6ec39505014792e017c1c744",
   "tests/test_list_navigation_core.c": "140b5ef138a91690143f40aee35129e698f7c50d5e29c52af38e929a8092f4ba",
-  "tests/test_stage69_ui.py": "db7baed1d0cf3055fd81a8f4dc4ce138ec3e037fa4d95cf9f387c491970facaa"
+  "tests/test_stage69_ui.py": "db7baed1d0cf3055fd81a8f4dc4ce138ec3e037fa4d95cf9f387c491970facaa",
+  "src/message_flow_core.c": "7471c849ecaa54d455455b3c09425f088d2b9f24a1d97a6acc29a8606cfc4a5a",
+  "src/message_flow_core.h": "55de3bc8f2c4f134ad48b10973e2fb32a346495e634e19362b2b4b6f59aef892",
+  "tests/test_activity_core.py": "b404d33e3c1bf75a57017cc6e644f3e4ad5f6c833aa8e5ff0274df792db059f2",
+  "tests/test_message_flow_core.c": "87a0b1833d9dc80fd8a4118bd0647f260ff2d7e233bc296e50965e6875e6fd85"
 }

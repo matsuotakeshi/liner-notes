@@ -55,6 +55,10 @@ def run(binary, sqlite):
             assert b'discarded' not in snapshot and b'retained' in snapshot
             assert b'bob gather-handle' in snapshot and ('新'*70).encode() in snapshot
             assert snapshot.endswith(b'GATHER END NEXT 0'),snapshot
+            # Read-only end returns to commands; an empty write closes without posting.
+            expect(a,'PING',b'PONG')
+            b.send(b'GATHER\n');through(b,b'GATHER END');assert b'70 characters' in b.line()
+            expect(b,'//',b'CANCELLED')
             # Cancel and invalid input must not append a Gather record.
             b.send(b'GATHER\n');through(b,b'GATHER END');assert b'70 characters' in b.line()
             b.send(('新'*71+'\n').encode());assert b'70 characters' in b.line()

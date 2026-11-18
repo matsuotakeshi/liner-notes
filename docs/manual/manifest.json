@@ -219,7 +219,13 @@
         "src/mail_navigation_core.c",
         "src/mail_navigation_core.h",
         "src/mail_query.h",
-        "tests/test_mail_navigation_core.c"
+        "tests/test_mail_navigation_core.c",
+        "src/message_flow_core.c",
+        "src/message_flow_core.h",
+        "tests/test_message_flow_core.c",
+        "src/session.h",
+        "tests/test_activity_core.py",
+        "tests/test_stage57.py"
       ]
     },
     {
@@ -245,7 +251,15 @@
         "src/chat_types.h",
         "tests/test_chat_core.c",
         "tests/test_chat_core.py",
-        "help/en/chat.txt"
+        "help/en/chat.txt",
+        "src/message_flow_core.c",
+        "src/message_flow_core.h",
+        "tests/test_message_flow_core.c",
+        "src/session.c",
+        "src/session.h",
+        "tests/test_adapters.c",
+        "tests/test_activity_core.py",
+        "tests/test_stage57.py"
       ]
     },
     {

@@ -7,6 +7,7 @@
 #include "preference_core.h"
 #include "mail_navigation_core.h"
 #include "list_navigation_core.h"
+#include "message_flow_core.h"
 #include <stddef.h>
 #include <stdint.h>
 #include "board.h"
@@ -34,7 +35,7 @@ typedef struct {
     uint64_t now,wake,auth_after;
     int closing,editing,pending,password_mode;uint32_t reset_target,boardpass_target,board_enter,board_lock;uint32_t board_grants[1025],vault_grants[1025];char filepass_path[49];int filepass_setting;
     ReportNavigation report;
-    int gather_mode,gather_pending,service_pending;uint32_t gather_cursor;unsigned gather_lines;uint64_t sysop_mail_after;NotificationState notifications;
+    GatherFlow gather;SysopMailFlow sysop_mail;NotificationState notifications;
     int editor_line,editor_input,editor_numbers,editor_upload,editor_confirm;uint64_t editor_deadline;uint32_t editor_at;
     char upload_description[241],upload_filename[101];int upload_batch;
     VaultNavigation vault;
