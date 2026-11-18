@@ -11,6 +11,8 @@
 #include "board_topology_core.h"
 #include "board_topology_repository.h"
 #include "member_core.h"
+#include "link_core.h"
+#include "link_repository.h"
 #include "authentication_core.h"
 #include "authentication_form.h"
 #include "authentication_repository.h"
@@ -874,24 +876,24 @@ static void post_result(ArticleOutcome result,BoardResult *r) {
     }
 }
 
-static void post_article(const BoardRequest *q,BoardResult *r,const char *remote_author,uint64_t remote_stamp,int validate_only) {
-        if(members_enabled() && !members_name(q->user) && !feature_setting("guest_boards",q->board)) { strcpy(r->text,"ERR login required\r\n"); return; }
-        if(members_enabled() && version<3) { strcpy(r->text,"ERR member posting needs RTBOARD3\r\n"); return; }
-        if(failed) { strcpy(r->text,"ERR storage unavailable\r\n"); return; }
-        if(q->number>article_count) { strcpy(r->text,"ERR no parent\r\n"); return; }
-        if(strlen(q->body)>ln_limit("BODY",BOARD_BODY)) { strcpy(r->text,"ERR body limit\r\n");return; }
-        if(article_count>=CONTENT_ID_MAX || (limit_articles && article_count>=limit_articles) || (!remote_author && limit_user_posts && q->user && user_posts[q->user]>=limit_user_posts)) { strcpy(r->text,"ERR board full\r\n"); return; }
-        size_t tl=strlen(q->title),bl=strlen(q->body);
-        if(!board_usage(q->board,1,bl)) { strcpy(r->text,"ERR board full\r\n");return; }
-        if(!tl || tl>BOARD_TITLE || !bl || bl>BOARD_BODY) { strcpy(r->text,"ERR draft\r\n"); return; }
-        if(validate_only) { r->selected=article_count+1;return; }
-        if(bl>1024 && version!=4) { strcpy(r->text,"ERR legacy board capacity; compact to RTBOARD4 first\r\n");return; }
-        if(!append_article_record(q->board,q->number,q->user,remote_author,q->title,q->body,1,remote_stamp,&r->selected)) {
-            strcpy(r->text,"ERR storage uncertain; restart inspection required\r\n");return;
-        }
-        snprintf(r->text,sizeof(r->text),"SAVED %u\r\n",r->selected);
+LinkOutcome link_repository_post(const LinkActor *actor,const LinkEvent *event,const char *alias,int validate_only,uint32_t *id) {
+    *id=0;
+    if(members_enabled() && !members_name(actor->user) && !feature_setting("guest_boards",event->board))return LINK_POST_LOGIN;
+    if(members_enabled() && version<3)return LINK_POST_VERSION;
+    if(failed)return LINK_POST_STORAGE;
+    if(event->parent>article_count)return LINK_POST_PARENT;
+    if(strlen(event->body)>ln_limit("BODY",BOARD_BODY))return LINK_POST_BODY;
+    if(article_count>=CONTENT_ID_MAX || (limit_articles && article_count>=limit_articles))return LINK_POST_FULL;
+    size_t tl=strlen(event->title),bl=strlen(event->body);
+    if(!board_usage(event->board,1,bl))return LINK_POST_FULL;
+    if(!tl || tl>BOARD_TITLE || !bl || bl>BOARD_BODY)return LINK_POST_DRAFT;
+    if(validate_only) { *id=article_count+1;return LINK_OK; }
+    if(bl>1024 && version!=4)return LINK_POST_CAPACITY;
+    if(!append_article_record(event->board,event->parent,actor->user,alias,event->title,event->body,1,event->created,id))return LINK_POST_UNCERTAIN;
+    return LINK_OK;
 }
 #include "board_link.inc"
+#include "link_adapter.inc"
 static const char *member_state_text(MemberState state) {
     return state==MEMBER_STATE_PENDING?"pending":state==MEMBER_STATE_SUSPENDED?"suspended":"active";
 }

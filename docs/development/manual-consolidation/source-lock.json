@@ -1,6 +1,6 @@
 {
   "LICENSE": "fb981668c18a279e285fc4d83fba1e836cc84dd4daa73c9697d3cfd2d8aca6e0",
-  "Makefile": "9f120b047643d666e1c4e1269319969b10f5a0ff083884762199a69b762f5920",
+  "Makefile": "bec60622e75b106a0162ae4bf4fe07bcf27ba601c8136244897da856309e06a7",
   "boards.example.conf": "4bd1a17ecf3966d3829510e8495a1362fb8b922cd754badccc739f5e5ab0bde8",
   "ci/build-freebsd-package.sh": "4e62899471d1f1a6c44e00a783c1aff771332140704ae778da95a95048474108",
   "debian/changelog": "8f3574a094f5a3677a9a7188e530ecdbdc006138b082b57243ca8441c644114d",
@@ -10,7 +10,7 @@
   "help/en/settings.txt": "8885570f247f6857c190faa13b74e4ab8bf4984c5056a08e332fbe3ff388fa53",
   "help/en/unread.txt": "b275226a78852e8a30c8da06bf5d9a602dd868fc9b071db77417d506de0c32c4",
   "help/ja/account.txt": "d1d18e1bfd839c7f554eed2534f8ffb89a4ea71f74c61f7a2e3e3b151605f61d",
-  "help/ja/admin.txt": "254e95e3af7d4e665a666069bd9347a38f1a27cd6d135530079bf987858870d6",
+  "help/ja/admin.txt": "78d1b70382e24ed10f226b33f5a4c92572d4619bdf0fe07e9a2377d602588418",
   "help/ja/adminboards.txt": "97f07367c06be1c89332901732f8372cefce857b6cd1da7a593a728aaa1c3530",
   "help/ja/adminconnections.txt": "975bc43d043300dd345b0b7003a74eccea680b22160dd447cf2a30e3e1015a27",
   "help/ja/adminfiles.txt": "bebd38574d8bbe8a25e415309281946268c114c362f16f33494c5a1465f8272f",
@@ -53,8 +53,8 @@
   "scripts/serial_connector.py": "3de6ad32005c5dff9b474d8f550a534232d88f4be73b59b5dcfc15cc11d0e670",
   "scripts/transfer_spool.py": "f7c590b73368c330da611d8ce41f0fd6fe5d8ad3b3e9ae9165e258d1e501db46",
   "scripts/vault_zmodem.py": "ace554ea5b6ab8d479ec39ad7daf7f5f7f34ca34ba13d5b9a73b115a0d63ef15",
-  "src/board.c": "8d4e39a522d9f923ce07e18a09e09496c6c1fbd938f1421f8fc3eeccbf7716b4",
-  "src/board_link.inc": "95a85be0a6ca2d77380775b25befb51a72971908d266c6b72f76fc7ca94e1d4a",
+  "src/board.c": "9b171e68e9182223625849c6bcf51a7db390581865284b92ab2999abf0c2589c",
+  "src/board_link.inc": "9939cea8410412b0a7b26560db08cc78691c391f3e3266f19cf7f28aa3d42179",
   "src/board_policy.c": "898862d27114ca09a86ac6d4a6bc1494c46598ff473bcf07b96b545a390b355a",
   "src/catalog.c": "49ed8eff1efe2ace300b92d20e1c91491523ba6e896bed270457afbccd865d68",
   "src/classic_commands.inc": "f39ecfe79522d5e05c7f5def00b0c05c1f9a68879288e88e08013d709eb08a9a",
@@ -197,5 +197,10 @@
   "src/vault_management_core.c": "d96d689d3e5531ea8c8550668461c20161ff508adb90faad296df08178dc7327",
   "src/authentication_core.c": "73a86411727979a2b34f75b0167241c59452dc9d5d5fe06f03c23cf7cefeaaf5",
   "src/authentication_form.c": "3ad3c5947ea90bb36521d420b047eb65fe6bd7a87ec81e3ff819079ca6ccf1ff",
-  "help/en/account.txt": "db66bfd148dff96faefd26d55c71c7411248020d1b71dc729cf38016360a4604"
+  "help/en/account.txt": "db66bfd148dff96faefd26d55c71c7411248020d1b71dc729cf38016360a4604",
+  "src/link_core.c": "f483a6ae8d3f6356fab49afa2abb401d0202e8b89c661c48c326fce3e085215d",
+  "src/link_core.h": "912290fb8bfe99d4940f2e995e068d1242868283c9b0727b653c04fa007ee8a9",
+  "src/link_repository.h": "3c520926c2b536545dd1fef6a35aa11dab70633088ae60e2a8e37e4a81f724a2",
+  "src/link_adapter.inc": "154120382fa37f71446cbc658cba90589e2d4dc71f8f8f32ccae3557895f23e2",
+  "help/en/admin.txt": "4cc0374cbe126f84a5cf08567361ff1b03fa2306f50c1a455f8edab08f1fa892"
 }
