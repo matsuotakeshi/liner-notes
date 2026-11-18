@@ -3,45 +3,13 @@
 #include "activity.h"
 #include "article_core.h"
 #include "catalog_core.h"
-#include "durable.h"
-#include "members.h"
+#include "activity_core.h"
+#include <stdio.h>
+#include <string.h>
+#include <time.h>
 #include "moderation.h"
-#include "extras.h"
-#include "profile_store.h"
-#include "chat.h"
 #include "messages.h"
 #include "catalog.h"
-#include "userlog.h"
-#include <stdlib.h>
-static Durable journal={-1,0,0};
-static DurableRow *gathers;
-static unsigned count;
-unsigned gather_limit=16;
-int gather_line_valid(const char *text) {
-    if(!*text)return 1;
-    if(!chat_text_valid(text))return 0;
-    unsigned n=0;for(const unsigned char *p=(const unsigned char *)text;*p;p++)if((*p&0xc0)!=0x80)n++;
-    return n<=70;
-}
-static int gather_valid(const char *body) {
-    unsigned lines=0;const char *p=body;
-    while(*p) { const char *e=strstr(p,"\r\n");if(!e || e-p>280 || ++lines>10)return 0;char line[281];memcpy(line,p,(size_t)(e-p));line[e-p]=0;if(!gather_line_valid(line))return 0;p=e+2; }
-    return lines!=0;
-}
-static int apply(void *ctx,const DurableRow *r) {
-    (void)ctx;if(!members_name(r->actor))return 0;
-    if(r->kind=='G') {
-        if(!gather_valid(r->text))return 0;
-        if(gather_limit) { if(count==gather_limit) { memmove(gathers,gathers+1,(count-1)*sizeof(*gathers));count--; }gathers[count++]=*r; }
-    } else if(!strchr("AKSC",r->kind))return 0;
-    return 1;
-}
-int activity_open(const char *base) {
-    count=0;char path[4096];int n=snprintf(path,sizeof(path),"%s.activity",base);if(n<0 || (size_t)n>=sizeof(path))return 0;
-    if(gather_limit && !(gathers=calloc(gather_limit,sizeof(*gathers))))return 0;
-    if(!dj_open(&journal,path,"LNACTV01",apply,NULL)) { free(gathers);gathers=NULL;return 0; }return 1;
-}
-void activity_close(void) { dj_close(&journal);free(gathers);gathers=NULL;count=0; }
 static void catalog_result(const BoardRequest *q,CatalogOutcome result,BoardResult *r) {
     const char *error="ERR catalog syntax\r\n";
     switch(result) {
@@ -91,41 +59,59 @@ static void catalog_execute(const BoardRequest *q,BoardResult *r) {
         snprintf(r->text+used,sizeof(r->text)-used,"END NEXT %u\r\n",history.next);
     }
 }
+static void activity_result(ActivityOutcome result,int admin,BoardResult *r) {
+    const char *error="ERR command\r\n";
+    switch(result) {
+    case ACTIVITY_OK:return;
+    case ACTIVITY_LOGIN:error=admin?"ERR admin required\r\n":"ERR login required\r\n";break;
+    case ACTIVITY_REVOKED:r->revoked=1;error="ERR session revoked\r\n";break;
+    case ACTIVITY_DENIED:error="ERR admin required\r\n";break;
+    case ACTIVITY_MEMBER_STORAGE:error="ERR member storage unavailable\r\n";break;
+    case ACTIVITY_MODERATION_STORAGE:error="ERR moderation storage unavailable\r\n";break;
+    case ACTIVITY_PROFILE_STORAGE:error="ERR extras storage\r\n";break;
+    case ACTIVITY_STORAGE:error="ERR activity storage\r\n";break;
+    case ACTIVITY_DISABLED:error="ERR feature disabled\r\n";break;
+    case ACTIVITY_NO_MEMBER:error="ERR no member\r\n";break;
+    case ACTIVITY_INVALID:break;
+    }
+    r->service_action=0;r->service_number=r->service_next=0;r->service_text[0]=0;
+    snprintf(r->text,sizeof(r->text),"%s",error);
+}
 void activity_execute(const BoardRequest *q,BoardResult *r) {
     int lang=q->scope;const char *error="ERR command\r\n";
+    ActivityActor actor={q->user,q->user_epoch};ActivityOutcome outcome;
     if(q->action=='G' || q->action=='g') {
-        if(!members_name(q->user)) { error="ERR login required\r\n";goto fail; }
-        if(!gather_limit) { error="ERR feature disabled\r\n";goto fail; }
         if(q->action=='g') {
-            if(!gather_valid(q->body))goto fail;
-            DurableRow row={0};row.kind='G';row.actor=q->user;strcpy(row.text,q->body);
-            if(!dj_append(&journal,&row) || !apply(NULL,&row)) { error="ERR activity storage\r\n";goto fail; }
+            outcome=activity_gather_post(&actor,q->body);
+            if(outcome!=ACTIVITY_OK) { activity_result(outcome,0,r);return; }
             r->service_action='g';snprintf(r->text,sizeof(r->text),"%s",lang?message_text(lang==2?LANGUAGE_EN:LANGUAGE_JA,MSG_GATHER_SAVED):"GATHER SAVED\r\n");return;
         }
-        unsigned start=q->cursor;size_t used=0;
-        if(start>count)goto fail;
+        unsigned cursor=q->cursor;size_t used=0;ActivityGather row;
+        outcome=activity_gather_read(&actor,cursor,&row);
+        if(outcome!=ACTIVITY_OK) { activity_result(outcome,0,r);return; }
         used=(size_t)snprintf(r->text,sizeof(r->text),"Gather world\r\n");
-        for(unsigned i=start;i<count;i++) {
-            DurableRow *row=&gathers[i];size_t need=strlen(row->text)+180;
-            if(used+need+100>=sizeof(r->text)) { r->service_next=i;break; }
-            time_t at=(time_t)row->time;struct tm *utc=localtime(&at);char date[32]="unknown";if(utc)strftime(date,sizeof(date),date_pattern(),utc);
-            used+=(size_t)snprintf(r->text+used,sizeof(r->text)-used,"%s %s %s\r\n%s",date,members_name(row->actor),profile_value(row->actor,0),row->text);
+        while(!row.end) {
+            size_t need=strlen(row.body)+180;
+            if(used+need+100>=sizeof(r->text)) { r->service_next=cursor;break; }
+            time_t at=(time_t)row.time;struct tm *utc=localtime(&at);char date[32]="unknown";if(utc)strftime(date,sizeof(date),date_pattern(),utc);
+            used+=(size_t)snprintf(r->text+used,sizeof(r->text)-used,"%s %s %s\r\n%s",date,row.name,row.handle,row.body);
+            cursor=row.next;outcome=activity_gather_read(&actor,cursor,&row);
+            if(outcome!=ACTIVITY_OK) { activity_result(outcome,0,r);return; }
         }
         snprintf(r->text+used,sizeof(r->text)-used,"GATHER END NEXT %u\r\n",r->service_next);r->service_action='G';return;
     }
     if(q->action=='U' || q->action=='V' || q->action=='u') {
-        if(!members_name(q->user)) { error="ERR login required\r\n";goto fail; }
-        uint32_t target=q->number?q->number:q->user;
-        if((q->notes_unread || target!=q->user) && !moderation_admin(q->user) && !userlog_public && !members_rtbbs_policy) { error="ERR admin required\r\n";goto fail; }
-        if(!q->notes_unread && !members_name(target)) { error="ERR no member\r\n";goto fail; }
-        r->service_action=q->action;r->service_number=target;r->service_next=q->cursor;
-        if(q->notes_unread)strcpy(r->service_text,"ALL");
+        ActivityLogRequest request;
+        outcome=activity_userlog(&actor,q->action=='U'?ACTIVITY_HISTORY:q->action=='V'?ACTIVITY_STATS:ACTIVITY_TABLE,
+                                q->number,q->cursor,q->notes_unread,&request);
+        if(outcome!=ACTIVITY_OK) { activity_result(outcome,0,r);return; }
+        r->service_action=q->action;r->service_number=request.target;r->service_next=request.cursor;
+        if(request.all)strcpy(r->service_text,"ALL");
         return;
     }
     if(q->action=='i' || q->action=='j' || q->action=='v' || q->action=='b') {
         catalog_execute(q,r);return;
     }
-    if(q->action!='s' && !moderation_admin(q->user)) { error="ERR admin required\r\n";goto fail; }
     if(q->action=='s') {
         ArticleActor actor={q->user,q->user_epoch,q->board_grants};ArticleRoleChange change;
         ArticleOutcome result=article_sigop_set(&actor,q->number,q->cursor,&change);
@@ -146,10 +132,17 @@ void activity_execute(const BoardRequest *q,BoardResult *r) {
         r->account_user=change.current;r->account_epoch=change.current_epoch;
         snprintf(r->text,sizeof(r->text),"SIGOP SET %u %u\r\n",q->number,q->cursor);return;
     }
-    if(q->action=='L') { r->service_action='L';return; }
-    if(!strchr("AKSC",q->action) || !q->action || strlen(q->body)>512 || (*q->body && !chat_text_valid(q->body)))goto fail;
-    DurableRow row={0};row.kind=(char)q->action;row.actor=q->user;row.target=q->number;strcpy(row.text,q->body);
-    if(!dj_append(&journal,&row)) { error="ERR activity storage\r\n";goto fail; }
-    r->service_action=q->action;r->service_number=q->number;strcpy(r->service_text,q->body);return;
+    ActivityControlKind kind;
+    switch(q->action) {
+    case 'L':kind=ACTIVITY_CONNECTIONS;break;
+    case 'A':kind=ACTIVITY_ANNOUNCE;break;
+    case 'K':kind=ACTIVITY_DISCONNECT;break;
+    case 'S':kind=ACTIVITY_SHUTDOWN;break;
+    case 'C':kind=ACTIVITY_CANCEL_SHUTDOWN;break;
+    default:kind=(ActivityControlKind)-1;break;
+    }
+    ActivityControl control;outcome=activity_control(&actor,kind,q->number,q->body,&control);
+    if(outcome!=ACTIVITY_OK) { activity_result(outcome,1,r);return; }
+    r->service_action=q->action;r->service_number=control.number;strcpy(r->service_text,control.text);return;
 fail:snprintf(r->text,sizeof(r->text),"%s",error);
 }

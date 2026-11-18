@@ -4,3 +4,5 @@ DISCONNECT connection CONFIRM / ANNOUNCE text
 SHUTDOWN seconds reason (1..86400) / SHUTDOWN CANCEL / SHUTDOWN NOW CONFIRM
 In chat: /KICK login
 USERLOG ALL / USERSTATS ALL
+
+Global administrators only; SIGOP alone is insufficient. Announce, disconnect, shutdown and cancellation requests are recorded before execution. A recorded request does not prove execution succeeded; check the result as well.

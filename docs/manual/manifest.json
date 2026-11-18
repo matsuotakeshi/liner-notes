@@ -204,7 +204,12 @@
         "TALK.md",
         "help/ja/chat.txt",
         "help/ja/gather.txt",
-        "STAGE70.md"
+        "STAGE70.md",
+        "src/activity.c",
+        "src/activity_core.c",
+        "src/activity_core.h",
+        "src/activity_repository.h",
+        "src/activity_store.c"
       ]
     },
     {
@@ -317,7 +322,12 @@
         "CONTENT_AUDIT.md",
         "HISTORY.md",
         "MAINTENANCE.md",
-        "help/ja/adminstorage.txt"
+        "help/ja/adminstorage.txt",
+        "src/activity.c",
+        "src/activity_core.c",
+        "src/activity_core.h",
+        "src/activity_repository.h",
+        "src/activity_store.c"
       ]
     },
     {
@@ -328,7 +338,12 @@
         "DAEMON.md",
         "help/ja/adminconnections.txt",
         "src/runtime.c",
-        "STAGE74.md"
+        "STAGE74.md",
+        "src/activity.c",
+        "src/activity_core.c",
+        "src/activity_core.h",
+        "src/activity_repository.h",
+        "src/activity_store.c"
       ]
     },
     {

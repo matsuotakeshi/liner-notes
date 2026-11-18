@@ -6,3 +6,5 @@ SHUTDOWN 秒数 理由: 終了予告（1..86400秒）
 SHUTDOWN CANCEL / SHUTDOWN NOW CONFIRM
 チャット内 /KICK ログイン名: チャットの接続を終了
 USERLOG ALL / USERSTATS ALL: 接続履歴と利用集計
+
+全体管理者限定（SIGOPだけでは不可）。告知・切断・停止・解除は要求を記録してから実行します。記録は実行成功の保証ではないため、結果の応答も確認してください。

@@ -1,6 +1,6 @@
 {
   "LICENSE": "fb981668c18a279e285fc4d83fba1e836cc84dd4daa73c9697d3cfd2d8aca6e0",
-  "Makefile": "3cea48bf6f5e23ccb467407d8d48070108b1df5ae844e5773d2b6b6a536bdc8e",
+  "Makefile": "8237f473177e20a6d542286949de82d75f7e033f45e41addfd644f621f10371c",
   "boards.example.conf": "4bd1a17ecf3966d3829510e8495a1362fb8b922cd754badccc739f5e5ab0bde8",
   "ci/build-freebsd-package.sh": "4e62899471d1f1a6c44e00a783c1aff771332140704ae778da95a95048474108",
   "debian/changelog": "8f3574a094f5a3677a9a7188e530ecdbdc006138b082b57243ca8441c644114d",
@@ -12,7 +12,7 @@
   "help/ja/account.txt": "39dfcb385a20fba8f34de2d86caea545423b7390360c6cf4e233557e45918379",
   "help/ja/admin.txt": "254e95e3af7d4e665a666069bd9347a38f1a27cd6d135530079bf987858870d6",
   "help/ja/adminboards.txt": "97f07367c06be1c89332901732f8372cefce857b6cd1da7a593a728aaa1c3530",
-  "help/ja/adminconnections.txt": "8d035f559b17f275450f9ab3f74724a1a55dde68fecaf08531858e900cb1e7d6",
+  "help/ja/adminconnections.txt": "975bc43d043300dd345b0b7003a74eccea680b22160dd447cf2a30e3e1015a27",
   "help/ja/adminfiles.txt": "1eb8e8bf60e64dc79080e272a18c21efb0d8976c892e8fa48ea9c2bcf107c0e1",
   "help/ja/adminmembers.txt": "ee6bf41b4530ea15eac77d7ae9dd259da3d2423c848c617eaf52d029bf507835",
   "help/ja/adminstorage.txt": "69670ddb7cc3af53c6f0604306faec4e85bce098772569cf546461603689a154",
@@ -176,5 +176,11 @@
   "src/catalog_group_core.c": "c0ffacf0b773351de502ddedf861e7c578216b281f2452f3050db7b05634ab19",
   "src/catalog_group_core.h": "3a18f67cc4689e69521be04ccf450130da6145533c57d8b68bf9353885b288dc",
   "src/catalog_group_repository.h": "20fe09176af7ba453de0626786a5418bf5fc35a1f7df0126f54b17462b63ab46",
-  "src/catalog_group_store.inc": "354c6231a4b4a99845c75424b2abb878cfacf85b4450c1d9ca33a485075232e1"
+  "src/catalog_group_store.inc": "354c6231a4b4a99845c75424b2abb878cfacf85b4450c1d9ca33a485075232e1",
+  "src/activity.c": "818ddcd8a27e900626d2578cadded6aa775c4e6737b2a1f2e3a8ddd320ddfc47",
+  "src/activity_core.c": "b2f27b99dbc8c664a3689882816c5b17aed451795538d1ea7aa9a46911119ce2",
+  "src/activity_core.h": "5011bdb97cb1d5e03c94ecdbc7a3502576b7694e7a4524c8b79957b804201453",
+  "src/activity_repository.h": "92d88e070cecebb7a587756dae3ef35e0fab7d82a54659178734cc59c7d62608",
+  "src/activity_store.c": "2a4231c43eca13459a2750d57ef7892d5453cff9f4d16429fb5041321e3c8a90",
+  "help/en/adminconnections.txt": "9177a5ca1adc528da79fb9b41dae006116e012c38724e91cd10d57328dd6cfed"
 }
