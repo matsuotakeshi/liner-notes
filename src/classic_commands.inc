@@ -8,12 +8,13 @@ static void classic_ask(Session *s,int input,MessageId message) {
     s->classic_input=input;queue_text(s,ui_text(&s->ui,message));
 }
 static void classic_read(Session *s,int descending,uint32_t distance,int repeat) {
-    uint32_t current=s->mail_mode?s->mail_current:s->current;
+    uint32_t current=s->mail_mode?s->mail.current:s->current;
     if(!current) { emit(s,"ERR no current article\r\n");prompt(s);return; }
     BoardRequest q={0};q.op=s->mail_mode?'m':'Z';q.action=s->mail_mode?'f':4;q.descending=descending;
     if(s->mail_mode)q.scope=(int)s->ui.language+1;
     strcpy(q.username,"*");strcpy(q.title,"*");
-    ReaderPosition next=reader_move(repeat?READER_REPEAT:descending?READER_BACKWARD:READER_FORWARD,current,descending,distance);
+    ReaderMove move=repeat?READER_REPEAT:descending?READER_BACKWARD:READER_FORWARD;
+    ReaderPosition next=s->mail_mode?mail_navigation_move(&s->mail,move,descending,distance):reader_move(move,current,descending,distance);
     q.cursor=next.cursor;
     if(!q.cursor) { emit(s,"SCAN END\r\n");prompt(s);return; }
     s->classic_direction=descending;submit(s,&q);if(s->pending) { s->scan=q;s->reader.active=1; }
@@ -145,13 +146,13 @@ static int classic_input(Session *s,const char *line) {
 static int classic_commands(Session *s,const char *line) {
     if(!s->ui.enabled || s->ui.input)return 0;
     if(classic_input(s,line))return 1;
-    if(!strcmp(line,"AUDIT REFRESH") && !s->mail_input && !s->mail_delete) {
+    if(!strcmp(line,"AUDIT REFRESH") && !s->mail_input && !s->mail.delete_id) {
         char mapped[256];
         if(s->ui.view==UI_AUDIT)audit_command(&s->ui,0,mapped,sizeof(mapped));
         else strcpy(mapped,"AUDIT");
         command_core(s,mapped);prompt(s);return 1;
     }
-    if(!s->mail_mode && !s->vault_mode && !s->mail_input && !s->mail_delete) {
+    if(!s->mail_mode && !s->vault_mode && !s->mail_input && !s->mail.delete_id) {
         if(!strcmp(line,"REGISTER") || !strcmp(line,"LOGIN")) {
             if(s->user)emit(s,"ERR logout first\r\n");
             else if(!s->member_mode)emit(s,"ERR members disabled\r\n");
@@ -170,22 +171,22 @@ static int classic_commands(Session *s,const char *line) {
         if(!strcmp(line,"SEEN NEXT")) { s->ui.next_after_seen=1;classic_run(s,"SEEN");return 1; }
     }
     /* These commands explicitly switch screens, independent of the last report. */
-    if(!strcmp(line,"MENU") && !s->mail_input && !s->mail_delete) {
+    if(!strcmp(line,"MENU") && !s->mail_input && !s->mail.delete_id) {
         s->mail_mode=s->vault_mode=0;s->file_selected=0;s->batch_screen=0;s->classic_area=CM_MAIN;return 0;
     }
     if(!strcmp(line,"BOARDS") || !strncmp(line,"BOARD ",6) || !strcmp(line,"NOTES") ||
        !strncmp(line,"NOTES ",6) || !strncmp(line,"READ ",5) || !strncmp(line,"SCAN ",5) ||
        !strncmp(line,"POST ",5) || !strncmp(line,"REPLY ",6))s->classic_area=CM_BOARD;
-    if((!strcmp(line,"O") || !strcmp(line,"Q")) && !s->mail_input && !s->mail_delete) { classic_ask(s,CI_EXIT,MSG_EXIT_CONFIRM);return 1; }
+    if((!strcmp(line,"O") || !strcmp(line,"Q")) && !s->mail_input && !s->mail.delete_id) { classic_ask(s,CI_EXIT,MSG_EXIT_CONFIRM);return 1; }
     if(s->mail_mode) {
-        if(s->mail_reading && !s->mail_input && !s->mail_delete && (!*line || !strcmp(line,"P") || !strcmp(line,"L") || !strcmp(line,"F") || *line=='+' || *line=='-')) {
+        if(s->mail.reading && !s->mail_input && !s->mail.delete_id && (!*line || !strcmp(line,"P") || !strcmp(line,"L") || !strcmp(line,"F") || *line=='+' || *line=='-')) {
             uint32_t distance=1;const char *tail;
             if((*line=='+' || *line=='-') && line[1] && (!number_arg(line+1,&distance,&tail) || *tail || !distance)) { emit(s,"ERR relative distance\r\n");prompt(s);return 1; }
             classic_read(s,*line=='P' || *line=='-'?1:*line=='+'?0:s->classic_direction,distance,*line=='L');
             if(*line=='F' && s->pending)s->reader.automatic=1;
             return 1;
         }
-        if(s->mail_input || s->mail_delete)return 0;
+        if(s->mail_input || s->mail.delete_id)return 0;
         if(!strcmp(line,"N")) { classic_ask(s,CI_DATE,MSG_CLASSIC_DATE);return 1; }
         if(!strcmp(line,"T")) { classic_run(s,"MAIL SCAN DESC");return 1; }
         if(!strcmp(line,"0") || !strcmp(line,"EXIT"))s->classic_area=CM_MAIN;

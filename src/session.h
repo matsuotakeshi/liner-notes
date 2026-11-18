@@ -5,6 +5,7 @@
 #include "batch_core.h"
 #include "traversal_core.h"
 #include "preference_core.h"
+#include "mail_navigation_core.h"
 #include <stddef.h>
 #include <stdint.h>
 #include "board.h"
@@ -37,8 +38,8 @@ typedef struct {
     char upload_description[241],upload_filename[101];int upload_batch;
     char vault_children[16][49];unsigned vault_child_count;uint32_t vault_child_next;int vault_child_view;char vault_path[49],vault_select[49];int vault_selecting;
     unsigned mail_batch_protocol;
-    int mail_reading;
-    int outside_talk,mail_mode,mail_pending,mail_input; uint32_t mail_current,mail_cursor,mail_delete,mail_revision; int mail_filter; char mail_query[81];
+    MailNavigation mail;
+    int outside_talk,mail_mode,mail_pending,mail_input; uint32_t mail_revision;
     unsigned search_first,search_last;int memo_input;int chatting,chat_notice,chat_pending,chat_prompting,talk_select,talk_lost;
     unsigned long talk_target,reply_target;
     PreferenceLifecycle preferences;unsigned transfer_protocol,zmodem_protocol;int zmodem_available,zmodem,zmodem_start,zmodem_receive,vault_mode;uint32_t zmodem_id;char zmodem_text[513];
