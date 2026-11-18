@@ -221,7 +221,10 @@
         "FILE_BOARDS.md",
         "help/ja/files.txt",
         "STAGE69.md",
-        "src/session.c"
+        "src/session.c",
+        "src/vault_query_core.h",
+        "src/vault_query_core.c",
+        "src/vault_bridge.c"
       ]
     },
     {
@@ -315,7 +318,10 @@
         "src/download_core.c",
         "src/download_core.h",
         "src/download_repository.h",
-        "src/download_store.c"
+        "src/download_store.c",
+        "src/vault_query_core.h",
+        "src/vault_query_core.c",
+        "src/vault_bridge.c"
       ]
     },
     {
@@ -337,7 +343,10 @@
         "src/download_core.c",
         "src/download_core.h",
         "src/download_repository.h",
-        "src/download_store.c"
+        "src/download_store.c",
+        "src/vault_query_core.h",
+        "src/vault_query_core.c",
+        "src/vault_bridge.c"
       ]
     },
     {

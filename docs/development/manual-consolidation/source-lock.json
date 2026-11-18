@@ -1,6 +1,6 @@
 {
   "LICENSE": "fb981668c18a279e285fc4d83fba1e836cc84dd4daa73c9697d3cfd2d8aca6e0",
-  "Makefile": "4c7fa468c5851f7fa0e1d66dfd737a777b61f7b6f40f1454c2459999e711b5a4",
+  "Makefile": "6735bc690404a71cc80dbb5914e40b05d6d142bdb301b2f714f222929da28409",
   "boards.example.conf": "4bd1a17ecf3966d3829510e8495a1362fb8b922cd754badccc739f5e5ab0bde8",
   "ci/build-freebsd-package.sh": "4e62899471d1f1a6c44e00a783c1aff771332140704ae778da95a95048474108",
   "debian/changelog": "8f3574a094f5a3677a9a7188e530ecdbdc006138b082b57243ca8441c644114d",
@@ -20,7 +20,7 @@
   "help/ja/content.txt": "49952d3a8ab650f3899a38b30e96234400a94691c6aa9fc5f00f720cea6748d3",
   "help/ja/draft.txt": "0c458e9dd03919cd6a7666c4091ff4f51341d82fd11f1144b548a6f276e8fae9",
   "help/ja/editor.txt": "9208311b045edfa61239e61c7f882cf3541093e1c6492a0e5ebd4b8ec7a88009",
-  "help/ja/files.txt": "16892a21987318cc29acdc08a01056ee3c36f67376b5b2e92b96cce7be6c3c3f",
+  "help/ja/files.txt": "a2a5ed852f6ae5fc13ef25c2f5e9438b2696297d62f77ef744aa78f38cc83bb4",
   "help/ja/gather.txt": "a7c3b48f9128aea8097b38bf5ed37c178ab9b54d8c44c0adb860332eea3d4a14",
   "help/ja/index.txt": "a654c7fc5651da4ecf74908ede0282b5bfad697a87ba2e1d8a1b8b110ddca94f",
   "help/ja/mail.txt": "e536ea85c7b6dfc642c4c83340c7646c0210def2a4890b0113f572af1efa7e1b",
@@ -188,5 +188,9 @@
   "src/download_core.h": "e898067f00d0adbd6d6fde4e26f8da14ee1e6abb63cf04d80866ec8fbfc67cb2",
   "src/download_repository.h": "55c5352e0e5f6bcea7ca7870dd638ed4d0a56b79438a41436f2793b1cb8abff2",
   "src/download_store.c": "dbed46d53032ae3b4992827367b069dcd70aa93fd4cc299365d0752d6d11002e",
-  "help/en/adminfiles.txt": "b30d4f71423954f2a9c5b0b7f484dec921f8bdc348a4ace6e2eb69c379ce2362"
+  "help/en/adminfiles.txt": "b30d4f71423954f2a9c5b0b7f484dec921f8bdc348a4ace6e2eb69c379ce2362",
+  "src/vault_query_core.h": "3b95758ad5e8c53158bcda2a5704f41ed992a66ffb44104d729ff8437279644c",
+  "src/vault_query_core.c": "80ac47517f7ad4e65435f9f14f5bcaea78941bb950e35912c229974fbe5af74e",
+  "src/vault_bridge.c": "9641e6595342ab7be9933df5be21077fd2227155ee62ed286ba980fa2ca075b7",
+  "help/en/files.txt": "51a3c7d5fda16bf5ed2544d93321fa8f2c97772706c988afe9cb2249ebe53883"
 }
