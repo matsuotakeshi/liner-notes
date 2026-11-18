@@ -168,7 +168,14 @@
         "UNREAD_THREADS.md",
         "LOGIN_UNREAD.md",
         "help/ja/unread.txt",
-        "src/session.c"
+        "src/session.c",
+        "src/traversal_core.c",
+        "src/traversal_core.h",
+        "src/traversal_protocol.c",
+        "src/traversal_protocol.h",
+        "tests/test_traversal_core.c",
+        "src/classic_commands.inc",
+        "tests/test_adapters.c"
       ]
     },
     {
