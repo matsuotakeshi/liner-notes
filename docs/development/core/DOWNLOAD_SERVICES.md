@@ -93,3 +93,15 @@ results to this branch. No production access, deployment or release is performed
 
 Canonical manual local verification passed: 42 pages, 7 chapters, 2,812 links,
 172 legacy URLs and 622 legacy anchors; Markdown/HTML/offline parity matched.
+
+## Focused CI follow-up for PR #104
+
+Both Linux 9 jobs failed at the newly added socket assertion after removing the
+file-board read ACL: the unchanged vault_info returns VAULT_NOT_FOUND, mapped to
+`ERR no file`, not `ERR vault denied`. The assertion now requires that exact
+existing response; production logic and all other assertions are unchanged.
+The user requested only the affected CI. This patch suppresses the automatic full
+PR rerun using the commit's skip marker, leaving required checks unsatisfied.
+A separate hosted-only verification branch checks out this patch's exact SHA and
+runs tests/test_download_core.py in the same Rocky/AlmaLinux 9 containers. That
+supplementary result is not a replacement for required full PR checks before merge.

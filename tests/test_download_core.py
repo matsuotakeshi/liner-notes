@@ -66,7 +66,8 @@ def run(binary,ctl,sqlite):
             expect(b,f'FILEDONE {token} {digest}',b'ERR vault syntax')
             assert fetch(b,token,0)==payload[:768]
             expect(a,'FILEBOARDSET -|none|none',b'FILEBOARD UPDATED')
-            expect(b,f'FILEFETCH {token} 768',b'ERR vault denied')
+            # vault_info conceals files outside the current board ACL as NOT_FOUND.
+            expect(b,f'FILEFETCH {token} 768',b'ERR no file')
             expect(a,'FILEBOARDSET -|member|member',b'FILEBOARD UPDATED')
             expect(b,f'FILEABORT {token}',b'DOWNLOAD ABORTED')
             expect(b,f'FILEABORT {token}',b'DOWNLOAD ABORTED')
