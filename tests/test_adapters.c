@@ -203,6 +203,7 @@ int main(void) {
     assert(session_line(&s,"/replace 1 Mixed Case",strlen("/replace 1 Mixed Case"),200));
     assert(!strcmp(s.draft.body,"Mixed Case\r\nTwo\r\n") && strstr((char *)m.data,"DRAFT LINE REPLACED"));
     reset(&m);assert(session_line(&s,"/undo",5,201));assert(!strcmp(s.draft.body,"One\r\nTwo\r\n"));
+    reset(&m);assert(session_line(&s,"/LINES",6,202));assert(strstr((char *)m.data,"DRAFT LINES 2") && strstr((char *)m.data,"LINE 2 Two"));
     reset(&m);assert(session_line(&s,"L2",2,202));assert(strstr((char *)m.data,"2 Two\r\n"));
     reset(&m);assert(session_line(&s,"S1-2",4,203));assert(s.editor_input==4 && s.search_last==2);
     reset(&m);assert(session_line(&s,"Two",3,204));assert(!s.editor_input && strstr((char *)m.data,"2 Two\r\n") && strstr((char *)m.data,"Matches: 1"));
