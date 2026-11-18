@@ -42,3 +42,5 @@ Each confirmed file receives a durable receipt even if a later file fails. DONE 
 Bare ZRESUME uses the current file board and saved description. ZRESUME board also reuses the description. Direct ZUPLOAD targets the root: use ZRESUME -. Reception times out after 120 seconds without file progress. Ask the administrator about resume receiver verification errors.
 
 After receipt, registration progress is displayed. 100% describes bytes written; wait for the final success result. The helper --timeout measures inactivity for every transfer protocol.
+
+FILESEARCH text covers all readable boards; FILESEARCH path|text and vault S search the selected/current board and descendants. BATCH MATCH stays in the current board. Access is checked on each operation; hidden files have no detail view. An empty new-file page can still have a continuation. FILEAUDIT is for global administrators.
