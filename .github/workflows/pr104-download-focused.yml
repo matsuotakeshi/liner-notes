@@ -1,0 +1,78 @@
+name: PR104 focused download regression
+on:
+  push:
+    branches: [ci-focused/download-104-20261118]
+permissions:
+  contents: read
+concurrency:
+  group: pr104-focused-download
+  cancel-in-progress: false
+jobs:
+  focused:
+    name: Download regression (${{ matrix.name }})
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: rocky9
+            image: rockylinux/rockylinux:9
+          - name: alma9
+            image: almalinux:9
+    env:
+      SOURCE_SHA: a6dbea6a1af7a80e18072b92486eef981aa1b910
+      IMAGE: ${{ matrix.image }}
+      EVIDENCE: ${{ runner.temp }}/focused-download
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: a6dbea6a1af7a80e18072b92486eef981aa1b910
+          persist-credentials: false
+      - name: Verify exact source and run only download socket regression
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$SOURCE_SHA"
+          mkdir -p "$EVIDENCE"
+          printf '%s\n' "$SOURCE_SHA" > "$EVIDENCE/source-sha.txt"
+          printf '%s\n' "$GITHUB_SHA" > "$EVIDENCE/workflow-sha.txt"
+          printf '%s\n' "$IMAGE" > "$EVIDENCE/container.txt"
+          docker run --rm -i -v "$PWD:/source:ro" "$IMAGE" bash -s <<'SH' 2>&1 | tee "$EVIDENCE/test.log"
+          set -euo pipefail
+          cat /etc/os-release
+          # Same hosted containers, compiler and non-root build setup as ci/linux.sh.
+          dnf install -y clang gcc make openssl-devel sqlite-devel python3.11 tar gzip procps-ng shadow-utils
+          useradd --create-home bbstest
+          mkdir /home/bbstest/source
+          tar -C /source --exclude=.git --exclude=build -cf - . | tar -C /home/bbstest/source -xf -
+          chown -R bbstest:bbstest /home/bbstest/source
+          runuser -u bbstest -- bash -c '
+            set -euo pipefail
+            cd /home/bbstest/source
+            export CC=clang
+            export LINER_TEST_START_TIMEOUT=180
+            make -j2 CC=clang PYTHON=python3.11 SQLITE_CFLAGS= SQLITE_LIBS=-lsqlite3 runtime vaultctl
+            python3.11 tests/test_download_core.py ./runtime ./vaultctl
+          '
+          SH
+      - name: Record scope and result
+        if: ${{ always() }}
+        env:
+          RESULT: ${{ job.status }}
+        run: |
+          mkdir -p "$EVIDENCE"
+          printf 'source=%s\nresult=%s\n' "$SOURCE_SHA" "$RESULT" > "$EVIDENCE/result.txt"
+          {
+            echo "Source: $SOURCE_SHA"
+            echo "Result: $RESULT"
+            echo 'Only tests/test_download_core.py (journals and SQLite).'
+            echo 'Supplementary check; not a substitute for required full PR checks.'
+          } >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@v4
+        if: ${{ always() }}
+        with:
+          name: pr104-download-${{ matrix.name }}
+          path: ${{ runner.temp }}/focused-download
+          if-no-files-found: error
+          retention-days: 30
