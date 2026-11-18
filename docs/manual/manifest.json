@@ -643,7 +643,10 @@
         "tests/test_connector_core.c",
         "tests/test_adapters.c",
         "tests/test_web_blocks.py",
-        "tests/test_binary_transfer.py"
+        "tests/test_binary_transfer.py",
+        "src/connector_protocol.c",
+        "src/connector_protocol.h",
+        "tests/test_connector_protocol.c"
       ]
     },
     {
