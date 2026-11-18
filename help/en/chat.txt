@@ -6,7 +6,7 @@ W or /WHO: all logged-in connections; ? or /HELP: this help.
 /SAY text: send W, ?, //, or slash-prefixed text literally.
 Up to 512 UTF-8 bytes per line; at least 0.5 seconds between messages.
 The last 20 room events are shown on entry. Public chat can be logged using --chat-log; private talk is not logged.
-The in-memory replay is cleared when the last participant leaves or the server stops; disk logs remain.
+With logging enabled, public speech remains after everyone leaves and is replayed from the log after restart. Without logging, replay is cleared when the room empties or the server stops.
 Handles are taken at entry; login names identify members.
 T or /TALK: select a connection number; T number or /TALK number selects directly.
 /REPLY selects the most recent private sender. Private text is never in room history.

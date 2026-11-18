@@ -2,13 +2,7 @@
 #define CHAT_H
 #include <stdint.h>
 #include "chat_preferences.h"
-#define CHAT_TEXT 512
-#define CHAT_HISTORY 20
-/* Event-loop-owned room; no sockets, BBS files or member database. Trusted
- * callers authenticate operations and provide an immutable identity snapshot. */
-typedef struct { char kind; int replay; uint32_t user; unsigned long connection;
-    char login[33],name[81],text[CHAT_TEXT+1]; } ChatEvent;
-typedef int (*ChatNotify)(void *,const ChatEvent *);
+#include "chat_types.h"
 int chat_log_open(const char *path);
 void chat_log_close(void);
 int chat_text_valid(const char *);

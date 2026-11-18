@@ -1,6 +1,6 @@
 {
   "LICENSE": "fb981668c18a279e285fc4d83fba1e836cc84dd4daa73c9697d3cfd2d8aca6e0",
-  "Makefile": "f4f9393db7463833f9264864ae4a18b90feb1cd7b6a8ff3b0ca36db8449204c7",
+  "Makefile": "bdb618b0965daf697eb5de205e461e92200108a38c6cb4375f4fd79cf7407590",
   "boards.example.conf": "4bd1a17ecf3966d3829510e8495a1362fb8b922cd754badccc739f5e5ab0bde8",
   "ci/build-freebsd-package.sh": "4e62899471d1f1a6c44e00a783c1aff771332140704ae778da95a95048474108",
   "debian/changelog": "8f3574a094f5a3677a9a7188e530ecdbdc006138b082b57243ca8441c644114d",
@@ -16,7 +16,7 @@
   "help/ja/adminfiles.txt": "bebd38574d8bbe8a25e415309281946268c114c362f16f33494c5a1465f8272f",
   "help/ja/adminmembers.txt": "ee6bf41b4530ea15eac77d7ae9dd259da3d2423c848c617eaf52d029bf507835",
   "help/ja/adminstorage.txt": "69670ddb7cc3af53c6f0604306faec4e85bce098772569cf546461603689a154",
-  "help/ja/chat.txt": "7bb3f8763e66c5f7c339640fa2f50225fc3654126cea6e5c903f66ab90716217",
+  "help/ja/chat.txt": "8cb5daf99a07c5a11c7fd8432f50246f26a8f15e84bfba32873a089d32f4680c",
   "help/ja/content.txt": "49952d3a8ab650f3899a38b30e96234400a94691c6aa9fc5f00f720cea6748d3",
   "help/ja/draft.txt": "0c458e9dd03919cd6a7666c4091ff4f51341d82fd11f1144b548a6f276e8fae9",
   "help/ja/editor.txt": "1d55dcb5af9aa2a4331136a0f8a14f0039a0d2115458d02cf78bdf27edab0413",
@@ -214,5 +214,13 @@
   "src/door_protocol.h": "a0bfb5ffd54bae5f2f594ae2a00e021002f9ea6394a2c2082c933cb34e22af7b",
   "tests/test_door_core.c": "3d1e382410c47efe7c68d486ccf954cc62336cdfaf5f89349f54d09469e6251f",
   "tests/test_stage65_doors.py": "2369a991573923bbf84fedc7ced79a57d31845a5a5e060b06aa05ce58ccfe645",
-  "tests/test_doors_config.py": "69e4bcb108d9cd6245aa94085960653a6623bfdf77ff5fe626fedabb2b8bd313"
+  "tests/test_doors_config.py": "69e4bcb108d9cd6245aa94085960653a6623bfdf77ff5fe626fedabb2b8bd313",
+  "src/chat.c": "b53c250ce84ec2baa5f60a1b20855204dc8a53f51037078f276d2b9d0ca42662",
+  "src/chat.h": "53634e3a00aae004eba3f01df01ec8479b3d580e535f7a111c75f9b3f6e7ec94",
+  "src/chat_core.c": "ac12c21caf73ab469241a62bb28dfb802ced4a80fa373f97e5f5af8c8c819272",
+  "src/chat_core.h": "7346acdc39a89e8261f5c013ef451d7d5cd1adf4e34eb466e84c3477715f2c4d",
+  "src/chat_types.h": "4dd2500e8aa8a528788c8a16a69b5413f231b976a8a689562e3f5f1dd9aa9a49",
+  "tests/test_chat_core.c": "869f1ed4cb68e46cee2f2af61cda9cbdb3b7f76466414c224d47e493249477a0",
+  "tests/test_chat_core.py": "d0cddb08b7d6a321f0f2b89d73012935c3848ce7ee03b3cf2644ee1b8fcea723",
+  "help/en/chat.txt": "92b1bb856a98e35dec1c84dec797691e8f66e57b0f0d3f853fd8346c40f615de"
 }
