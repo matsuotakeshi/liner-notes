@@ -256,7 +256,13 @@
         "I18N.md",
         "help/ja/profile.txt",
         "help/ja/settings.txt",
-        "src/profile_store.c"
+        "src/profile_store.c",
+        "src/classic_input.c",
+        "src/classic_input.h",
+        "src/terminal_pager.c",
+        "src/terminal_pager.h",
+        "tests/test_terminal_policy.c",
+        "tests/test_adapters.c"
       ]
     },
     {

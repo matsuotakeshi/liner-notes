@@ -1,5 +1,7 @@
 #define _POSIX_C_SOURCE 200809L
 #include "editor_core.h"
+#include "classic_input.h"
+#include "terminal_pager.h"
 #include "runtime_limits.h"
 #include "app_limits.h"
 #include "activity.h"
@@ -30,62 +32,22 @@ static void queue_text(Session *s,const char *text) {
     if(s->active && !s->io.write(s->io.context,text,strlen(text))) session_abort(s);
 }
 void session_dimensions(Session *s,unsigned columns,unsigned rows) {
-    s->columns=columns>=20 && columns<=240?columns:80;
-    s->rows=rows>=5 && rows<=100?rows:24;
+    TerminalDimensions size=terminal_dimensions(columns,rows);s->columns=size.columns;s->rows=size.rows;
 }
 static void page_clear(Session *s) { OPENSSL_cleanse(s->page,sizeof(s->page)); s->page_offset=0; s->help_page=0; }
-/* Count common UTF-8 terminal cells without relying on the process locale. */
-static unsigned cell_width(const unsigned char *p,size_t *bytes) {
-    unsigned cp=p[0]; *bytes=1;
-    unsigned n=cp>=0xf0 && cp<=0xf4?4:cp>=0xe0 && cp<=0xef?3:cp>=0xc2 && cp<=0xdf?2:1;
-    if(n>1) {
-        cp&=(1u<<(7-n))-1;
-        for(unsigned i=1;i<n;i++) { if(!p[i] || (p[i]&0xc0)!=0x80) return 1; cp=(cp<<6)|(p[i]&63); }
-        *bytes=n;
-    }
-    if((cp>=0x300 && cp<=0x36f) || (cp>=0xfe00 && cp<=0xfe0f) || cp==0x200d) return 0;
-    return (cp>=0x1100 && (cp<=0x115f || cp==0x2329 || cp==0x232a ||
-            (cp>=0x2e80 && cp<=0xa4cf) || (cp>=0xac00 && cp<=0xd7a3) ||
-            (cp>=0xf900 && cp<=0xfaff) || (cp>=0xfe10 && cp<=0xfe6f) ||
-            (cp>=0xff01 && cp<=0xff60) || (cp>=0xffe0 && cp<=0xffe6) || cp>=0x1f300))?2:1;
-}
 static void page_next(Session *s) {
-    char out[8192]; size_t used=0; unsigned lines=0,col=0;
-    unsigned limit=s->rows-3,width=s->columns-1;
-    while(s->page[s->page_offset] && lines<limit) {
-        const unsigned char *p=(const unsigned char *)s->page+s->page_offset;
-        if(*p=='\r' || *p=='\n') {
-            size_t n=(*p=='\r' && p[1]=='\n')?2:1;
-            if(used+2>=sizeof(out)) break;
-            out[used++]='\r'; out[used++]='\n'; s->page_offset+=n; lines++; col=0; continue;
-        }
-        size_t n; unsigned cells=cell_width(p,&n);
-        if(col+cells>width) {
-            if(used+2>=sizeof(out)) break;
-            out[used++]='\r'; out[used++]='\n'; lines++; col=0; continue;
-        }
-        if(used+n>=sizeof(out)) break;
-        memcpy(out+used,p,n); used+=n; s->page_offset+=n; col+=cells;
-    }
-    out[used]=0; queue_text(s,out);
-    if(s->page[s->page_offset]) queue_text(s,ui_text(&s->ui,MSG_PAGER_MORE));
+    char out[8192];int more=terminal_pager_render(s->page,&s->page_offset,s->columns,s->rows,out,sizeof(out));
+    if(more<0) { session_abort(s);return; }
+    queue_text(s,out);
+    if(more)queue_text(s,ui_text(&s->ui,MSG_PAGER_MORE));
     else page_clear(s);
-}
-/* Only complete, authorized article/list responses enter the display pager.
- * UI cursor/view state belongs to the logical result, not a screen fragment. */
-static int paged_response(const char *text) {
-    static const char *prefixes[]={"ARTICLE ","PREVIEW ","DRAFT LINES ","NOTES ","TREE ","UNREAD ","LIST ","SEARCH ","AUDIT ","FIND ","NEWS ","INFO ","PROFILE ","PROFILES ","FILES", "FILE ","FILEAUDIT","FILECATEGORIES","FILEBOARDS","FILENEWS","FILEHISTORY","FILETEXT","USERTABLE","USERLOG","BOARDLOG","BOARDACCESS"};
-    for(size_t i=0;i<sizeof(prefixes)/sizeof(prefixes[0]);i++)
-        if(!strncmp(text,prefixes[i],strlen(prefixes[i]))) return 1;
-    return !strcmp(text,"BOARDS\r\n") || !strncmp(text,"BOARDS\r\n",8) ||
-           !strcmp(text,"MEMBERS\r\n") || !strncmp(text,"MEMBERS\r\n",9);
 }
 static void emit(Session *s,const char *text) {
     if(s->binary) { binary_frame(s,'T',text,strlen(text));return; }
     char formatted[CONTENT_DISPLAY];
     if(s->ui.enabled) {
         if(!ui_format(&s->ui,text,formatted,sizeof(formatted))) { session_abort(s); return; }
-        if(s->pager_enabled && !s->auto_read && paged_response(text)) {
+        if(s->pager_enabled && !s->auto_read && terminal_pager_response(text)) {
             snprintf(s->page,sizeof(s->page),"%s",formatted); s->page_offset=0; page_next(s);
         } else queue_text(s,formatted);
     } else queue_text(s,text);
@@ -1665,59 +1627,19 @@ void session_tick(Session *s,uint64_t now) {
     if(s->binary && connector_reader_expired(&s->binary_reader,now)) { session_abort(s);return; }
     if(s->active && s->wake && now>=s->wake) { s->wake=0; emit(s,"AWAKE\r\n"); prompt(s); }
 }
-static int word_is(const char *p,size_t n,const char *word) {
-    if(strlen(word)!=n)return 0;
-    for(size_t i=0;i<n;i++) { unsigned c=(unsigned char)p[i];if(c>='a' && c<='z')c-=32;if(c!=(unsigned char)word[i])return 0; }return 1;
+static ClassicInput classic_input_state(const Session *s) {
+    return (ClassicInput){.memo=s->memo_input,
+        .selection=s->classic_input==CI_FILE_ACTION || s->classic_input==CI_BATCH,
+        .application=s->application_step,.classic=s->classic_input,.secret=session_secret(s),
+        .input=s->ui.input,.mail_input=s->mail_input,.paging=!!s->page[0],.binary=s->binary,.transfer=s->zmodem,
+        .editing=s->editing,.chatting=s->chatting,.gather=s->gather_mode,.talk=s->outside_talk,
+        .line_editor=s->editor_line,.editor_input=s->editor_input,.mail_mode=s->mail_mode};
 }
 int session_uppercase(const Session *s,const char *line,size_t size) {
-    if(s->memo_input)return 0;
-    if(s->classic_input==CI_FILE_ACTION || s->classic_input==CI_BATCH)return 1;
-    if(s->application_step || s->classic_input)return 0;
-    if(session_secret(s) || s->ui.input || s->mail_input || s->page[0] || s->binary || s->zmodem)return 0;
-    if(s->editing || s->chatting || s->gather_mode || s->outside_talk) {
-        if(!size || line[0]!='/')return !s->chatting && s->editing && s->editor_line && !s->editor_input && !memchr(line,' ',size);
-        if(size>1 && line[1]=='/')return 0;
-        const char *space=memchr(line,' ',size);
-        if(!space)return 1;
-        size_t first=(size_t)(space-line);
-        return (word_is(line,first,"/EDITOR") || word_is(line,first,"/LANG") || word_is(line,first,"/NOTIFY")) && !memchr(space+1,' ',size-first-1);
-    }
-    const char *space=memchr(line,' ',size);if(!space)return 1;
-    size_t n=(size_t)(space-line),offset=n+1;
-    const char *words[]={"MENUMODE","BOARDGUEST","LANG","HELP","PAGER","PREFS","PROTOCOL","EDITOR","MAIL","BATCH","CHAT","TALK","NOTES","USERLOG","USERTABLE","USERSTATS","FILESTATS","FILEHISTORY","SHUTDOWN","AUDIT","FIND","SCAN","NEWS","NOTIFY","DRAFT","BUFFER","CHECK"};
-    for(unsigned i=0;i<sizeof(words)/sizeof(words[0]);i++)if(word_is(line,n,words[i]))return !memchr(line+offset,' ',size-offset);
-    return 0;
+    ClassicInput state=classic_input_state(s);return classic_input_uppercase(&state,line,size);
 }
-static char *upper_word(char *p) { for(;*p && *p!=' ';p++)if(*p>='a' && *p<='z')*p-=32;return *p?p+1:p; }
-static void normalize_command(Session *s,char *line,size_t n) {
-    /* Hidden input remains case-sensitive; only the exact cancellation token folds. */
-    if(word_is(line,n,"/CANCEL")) { memcpy(line,"/CANCEL",7);return; }
-    if(s->memo_input)return;
-    if(s->classic_input==CI_FILE_ACTION || s->classic_input==CI_BATCH) { for(char *p=line;*p;p++)if(*p>='a' && *p<='z')*p-=32;return; }
-    if(s->application_step || s->classic_input)return;
-    if(session_secret(s))return;
-    if(!strncmp(line,"//",2))return;
-    for(size_t i=0;i<n;i++)if(session_uppercase(s,line,i) && line[i]>='a' && line[i]<='z')line[i]=(char)(line[i]-32);
-    if(s->editing || s->chatting || s->gather_mode || s->outside_talk || s->ui.input || s->mail_input)return;
-    if(!strncmp(line,"MAIL SCAN ",10))upper_word(line+10);
-    if(!strncmp(line,"FIND ",5) || !strncmp(line,"SCAN ",5)) { char *scope=upper_word(line+5);if(!strncmp(line+5,"ASC ",4) || !strncmp(line+5,"DESC ",5))upper_word(scope); }
-    if(!strncmp(line,"FINDFROM ",9)) { char *p=strchr(line+9,' ');if(p)upper_word(p+1); }
-    if(!strncmp(line,"MEMBERPROFILE ",14) || !strncmp(line,"APPLICATIONSET ",15)) { char *p=strchr(line+(*line=='M'?14:15),' ');if(p)upper_word(p+1); }
-    if(!strncmp(line,"FILEBOARDOPTIONS ",17)) { char *p=strchr(line+17,'|');if(p)upper_word(p+1); }
-    if(!strncmp(line,"FILEBOARDPASS ",14)) { char *p=strchr(line+14,' ');if(p)upper_word(p+1); }
-    if(!strncmp(line,"MAIL DRAFT ",11) && strlen(line)>=18 && word_is(line+11,6,"DELETE"))memcpy(line+11,"DELETE",6);
-    if(!strncmp(line,"MAIL NOTIFY ",12) || !strncmp(line,"MAIL DROP ",10) || (s->mail_mode && !strncmp(line,"DROP ",5))) {
-        char *last=strrchr(line,' ');if(last && (word_is(last+1,strlen(last+1),"ON") || word_is(last+1,strlen(last+1),"OFF") || word_is(last+1,strlen(last+1),"CONFIRM")))for(char *p=last+1;*p;p++)if(*p>='a' && *p<='z')*p-=32;
-    }
-    if(!strncmp(line,"BOARDPASS ",10)) { char *p=strchr(line+10,' ');if(p && strlen(p)>=5 && word_is(p+1,4,"NONE"))memcpy(p+1,"NONE",4); }
-    if(!strncmp(line,"PROFILEVIS ",11)) { char *last=strrchr(line,' ');if(last)for(char *p=last+1;*p;p++)if(*p>='a' && *p<='z')*p-=32; }
-    /* Confirmation tokens are syntax only on operations that accept them. */
-    if(!strncmp(line,"BOARDGUEST ",11)) { char *p=strchr(line+11,' ');if(p)upper_word(p+1); }
-    if(!strncmp(line,"BOARDDELETEALL ",15)) { char *p=strchr(line+15,' ');if(p)upper_word(p+1); }
-    const char *confirm[]={"AUTHOR ","MOVEBRANCH ","BOARDDELETEALL ","FILEDELETE ","FILEHIDE ","FILERESTORE ","WITHDRAW ","DISCONNECT ","BOARDDELETE ","MOVE ","BOARDPASS ","GROUPMOVE ","BOARDGROUP ","FILEBOARDPASS "};
-    for(unsigned i=0;i<sizeof(confirm)/sizeof(confirm[0]);i++)if(!strncmp(line,confirm[i],strlen(confirm[i]))) {
-        char *last=strrchr(line,' ');if(last && word_is(last+1,strlen(last+1),"CONFIRM"))memcpy(last+1,"CONFIRM",7);
-    }
+static void normalize_command(Session *s,char *line,size_t size) {
+    ClassicInput state=classic_input_state(s);classic_input_normalize(&state,line,size);
 }
 static int connector_hex(const char *text,size_t size) {
     for(size_t i=0;i<size;i++)if(!((text[i]>='0' && text[i]<='9') || (text[i]>='a' && text[i]<='f')))return 0;
