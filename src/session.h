@@ -2,6 +2,7 @@
 #define SESSION_H
 #include "notification_core.h"
 #include "connector_core.h"
+#include "batch_core.h"
 #include <stddef.h>
 #include <stdint.h>
 #include "board.h"
@@ -20,7 +21,7 @@ typedef struct {
     unsigned long id;
     int slot,active,board_enabled,member_mode;
     Ui ui;
-    uint64_t connected_at;int talk_once,talk_return_editor,status_pending;uint32_t file_selected,file_selecting;unsigned profile_edit_target;int profile_walk,profile_walk_pending;BoardRequest profile_search;int batch_screen,batch_copying;unsigned batch_copy_at;char batch_copy_path[49];unsigned char batch_copied[16];int profile_edit_field;int classic_area,classic_input,classic_direction;uint32_t classic_id;
+    uint64_t connected_at;int talk_once,talk_return_editor,status_pending;uint32_t file_selected,file_selecting;unsigned profile_edit_target;int profile_walk,profile_walk_pending;BoardRequest profile_search;int batch_screen,batch_copying;BatchSelection batch;int profile_edit_field;int classic_area,classic_input,classic_direction;uint32_t classic_id;
     int door,game_menu;int pager_enabled, help_page,menu_mode,menu_shown,auto_read,exit_after_save,editor_upload_question;
     char guest_handle[33];
     unsigned columns,rows;
@@ -38,7 +39,7 @@ typedef struct {
     int outside_talk,mail_mode,mail_pending,mail_input; uint32_t mail_current,mail_cursor,mail_delete,mail_revision; int mail_filter; char mail_query[81];
     unsigned search_first,search_last;int memo_input;int chatting,chat_notice,chat_pending,chat_prompting,talk_select,talk_lost;
     unsigned long talk_target,reply_target;
-    uint64_t saved_ui;unsigned transfer_protocol,zmodem_protocol;int zmodem_available,zmodem,zmodem_start,zmodem_receive,vault_mode;uint32_t batch[16];unsigned char batch_done[16];unsigned batch_count;uint32_t zmodem_id;char zmodem_text[513];
+    uint64_t saved_ui;unsigned transfer_protocol,zmodem_protocol;int zmodem_available,zmodem,zmodem_start,zmodem_receive,vault_mode;uint32_t zmodem_id;char zmodem_text[513];
     int binary,binary_allowed,binary_menu;
     ConnectorReader binary_reader;
     uint32_t current,user,board,user_epoch;unsigned member_level;
@@ -72,6 +73,8 @@ int session_uppercase(const Session *,const char *,size_t);
 int session_line(Session *,const char *text,size_t size,uint64_t now);
 void session_announce(Session *,const char *);
 void session_tick(Session *,uint64_t now);
+/* Runtime validates session/slot/transfer generation before delivering receipts. */
+void session_transfer_receipt(Session *,const char *);
 void session_zmodem_finish(Session *,int success,unsigned id,uint64_t size,int recovery);
 void session_mail_arrived(Session *,uint32_t recipient);
 void session_mail_notify(Session *,uint32_t user,int deny,uint32_t revision);
