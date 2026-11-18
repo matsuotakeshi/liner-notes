@@ -198,5 +198,21 @@ int main(void) {
     assert(!s.connector_literal && strstr((char *)m.data,"ERR connector editor state"));
     session_dispose(&s);
     puts("PASS: negotiated connector leaves unauthenticated LINK/BLOCK denied, SYNC read-only during secret input, literal state rechecked");
+    reset(&m);session_init(&s,io,121,4,1,1,0,LANGUAGE_EN);s.user=2;s.editing=1;s.editor_line=1;s.editor_numbers=1;s.editor_at=1;s.draft.op='p';
+    strcpy(s.draft.title,"Title");strcpy(s.draft.body,"One\r\nTwo\r\n");reset(&m);
+    assert(session_line(&s,"/replace 1 Mixed Case",strlen("/replace 1 Mixed Case"),200));
+    assert(!strcmp(s.draft.body,"Mixed Case\r\nTwo\r\n") && strstr((char *)m.data,"DRAFT LINE REPLACED"));
+    reset(&m);assert(session_line(&s,"/undo",5,201));assert(!strcmp(s.draft.body,"One\r\nTwo\r\n"));
+    reset(&m);assert(session_line(&s,"L2",2,202));assert(strstr((char *)m.data,"2 Two\r\n"));
+    reset(&m);assert(session_line(&s,"S1-2",4,203));assert(s.editor_input==4 && s.search_last==2);
+    reset(&m);assert(session_line(&s,"Two",3,204));assert(!s.editor_input && strstr((char *)m.data,"2 Two\r\n") && strstr((char *)m.data,"Matches: 1"));
+    reset(&m);assert(session_line(&s,"D2",2,205));assert(!strcmp(s.draft.body,"One\r\n"));
+    assert(session_line(&s,"/undo",5,206));assert(!strcmp(s.draft.body,"One\r\nTwo\r\n"));
+    assert(session_line(&s,"E1",2,207));assert(s.editor_input==2);
+    assert(session_line(&s,"Replacement",11,208));assert(!s.editor_input && !strcmp(s.draft.body,"Replacement\r\nTwo\r\n"));
+    assert(session_line(&s,"0",1,209));assert(s.editor_confirm && s.editing);
+    assert(session_line(&s,"E",1,210));assert(!s.editor_confirm && s.editing && !s.pending);
+    session_dispose(&s);
+    puts("PASS: Session preserves draft case, Undo, ranged listing, prompted search, line replacement and return from write confirmation");
     return 0;
 }
