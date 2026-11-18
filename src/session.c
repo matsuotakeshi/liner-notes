@@ -89,7 +89,7 @@ static void prompt(Session *s) {
     if(s->reader.automatic || s->door || s->memo_input || s->application_step || (s->editing && s->editor_input==4))return;
     if(!s->zmodem && !s->chatting && !s->binary && s->ui.enabled && s->active && !s->pending && !s->closing && !s->wake && !s->page[0]) {
         if(s->game_menu && !s->editing && !s->password_mode) { queue_text(s,s->ui.language==LANGUAGE_JA?"ゲーム [番号:起動 Enter/L:一覧 0:主画面] > ":"Games [number:play Enter/L:list 0:main] > ");return; }
-        if(s->gather_mode) { queue_text(s,ui_text(&s->ui,s->gather_cursor?MSG_GATHER_MORE:MSG_GATHER_PROMPT));return; }
+        if(s->gather.mode) { queue_text(s,ui_text(&s->ui,s->gather.cursor?MSG_GATHER_MORE:MSG_GATHER_PROMPT));return; }
         if(s->vault_mode && !s->editing && !s->password_mode && !s->ui.input && (!s->classic_input || s->classic_input==CI_FILE_ACTION || s->classic_input==CI_BATCH)) {
             if(s->batch_screen) { s->classic_input=CI_BATCH;queue_text(s,ui_text(&s->ui,MSG_TRANSFER_BATCH));return; }
             if(s->file_selected) { s->classic_input=CI_FILE_ACTION;queue_text(s,s->ui.language==LANGUAGE_JA?"T:表示 S/C/X/Y/G/Z/M:転送 B:選択 E:説明 K:削除 0:戻る > ":"T:view S/C/X/Y/G/Z/M:transfer B:select E:description K:delete 0:back > ");return; }
@@ -760,13 +760,13 @@ invalid:emit(s,"ERR command\r\n");return 1;
 static int service_command(Session *s,const char *line) {
     BoardRequest q={0};q.op='!';q.scope=s->ui.enabled?(int)s->ui.language+1:0;
     if(!strcmp(line,"GATHER") || !strcmp(line,"GATHER READ")) {
-        q.action='G';submit(s,&q);s->gather_pending=s->pending?(!strcmp(line,"GATHER READ")?2:1):0;return 1;
+        q.action='G';submit(s,&q);gather_flow_read_submitted(&s->gather,!strcmp(line,"GATHER READ"),s->pending);return 1;
     }
     if(!strncmp(line,"SYSOPMAIL ",10)) {
         const char *title=line+10;
-        if(s->now<s->sysop_mail_after) { queue_text(s,ui_text(&s->ui,MSG_SYSOP_MAIL_RATE));return 1; }
+        if(!sysop_mail_ready(&s->sysop_mail,s->now)) { queue_text(s,ui_text(&s->ui,MSG_SYSOP_MAIL_RATE));return 1; }
         if(!board_feature_enabled("mail")) { emit(s,"ERR feature disabled\r\n");return 1; }
-        if(!*title || strlen(title)>80 || !safe_text(title)) { emit(s,"ERR title 1..80 bytes, no controls\r\n");return 1; }
+        if(!sysop_mail_title_valid(title)) { emit(s,"ERR title 1..80 bytes, no controls\r\n");return 1; }
         memset(&s->draft,0,sizeof(s->draft));s->draft.op='?';s->draft.action='M';strcpy(s->draft.title,title);s->editing=1;undo_clear(s);queue_text(s,ui_text(&s->ui,MSG_SYSOP_MAIL_EDIT));return 1;
     }
     if(!strncmp(line,"FILEBOARDINFO ",14)) {
@@ -820,24 +820,24 @@ static int service_command(Session *s,const char *line) {
 invalid:emit(s,"ERR command\r\n");return 1;
 }
 static void gather_input(Session *s,const char *line) {
-    if(!strcmp(line,"/CANCEL")) { s->gather_mode=0;s->gather_cursor=0;s->gather_lines=0;memset(&s->draft,0,sizeof(s->draft));emit(s,"CANCELLED\r\n");return; }
-    if(s->gather_cursor) {
-        if(!strcmp(line,"//") || !strcmp(line,"Q")) {
-            s->gather_cursor=0;
-            if(s->gather_mode==2)s->gather_mode=0;
-            else { s->gather_lines=0;memset(&s->draft,0,sizeof(s->draft));queue_text(s,ui_text(&s->ui,MSG_GATHER_EDIT)); }
-            return;
-        }
-        if(!*line || !strcmp(line,"+")) { BoardRequest q={0};q.op='!';q.action='G';q.cursor=s->gather_cursor;submit(s,&q);s->gather_pending=s->pending?(s->gather_mode==2?2:1):0; }
-        return;
+    GatherInput input=!strcmp(line,"/CANCEL")?GATHER_INPUT_CANCEL:
+        !strcmp(line,"//")?GATHER_INPUT_FINISH:!strcmp(line,"Q")?GATHER_INPUT_QUIT:
+        (!*line || !strcmp(line,"+"))?GATHER_INPUT_NEXT:GATHER_INPUT_TEXT;
+    GatherEffect effect=gather_flow_input(&s->gather,input,line,gather_line_valid(line),s->draft.body,sizeof(s->draft.body));
+    switch(effect) {
+    case GATHER_ABORTED:memset(&s->draft,0,sizeof(s->draft));emit(s,"CANCELLED\r\n");break;
+    case GATHER_EMPTY:emit(s,"CANCELLED\r\n");break;
+    case GATHER_EDIT:memset(&s->draft,0,sizeof(s->draft));queue_text(s,ui_text(&s->ui,MSG_GATHER_EDIT));break;
+    case GATHER_INVALID:queue_text(s,ui_text(&s->ui,MSG_GATHER_INVALID));break;
+    case GATHER_NEXT_PAGE: {
+        BoardRequest q={0};q.op='!';q.action='G';q.cursor=s->gather.cursor;submit(s,&q);
+        gather_flow_read_submitted(&s->gather,s->gather.mode==2,s->pending);break;
     }
-    if(strcmp(line,"//")) {
-        if(!gather_line_valid(line)) { queue_text(s,ui_text(&s->ui,MSG_GATHER_INVALID));return; }
-        size_t n=strlen(s->draft.body);snprintf(s->draft.body+n,sizeof(s->draft.body)-n,"%s\r\n",line);s->gather_lines++;
-        if(s->gather_lines<10)return;
+    case GATHER_POST:
+        s->draft.op='!';s->draft.action='g';s->draft.scope=s->ui.enabled?(int)s->ui.language+1:0;
+        submit(s,&s->draft);gather_flow_post_submitted(&s->gather,s->pending);break;
+    default:break;
     }
-    if(!s->gather_lines) { s->gather_mode=0;emit(s,"CANCELLED\r\n");return; }
-    s->draft.op='!';s->draft.action='g';s->draft.scope=s->ui.enabled?(int)s->ui.language+1:0;submit(s,&s->draft);s->gather_pending=s->pending?3:0;
 }
 
 static const char *application_fields[]={"REALNAME","KANA","ADDRESS","PHONE","BIRTHDAY","MACHINE","HANDLE","LOCATION","OCCUPATION","INTERESTS","WEBSITE","CONTACT","FROMBBS","SYSOPNOTE"};
@@ -943,7 +943,7 @@ static void command_core(Session *s,char *line) {
             if(!s->draft.body[0] && s->draft.op!='(' && s->draft.op!=')') { emit(s,"ERR empty body\r\n"); return; }
             if(s->draft.op=='(' || s->draft.op==')')submit(s,&s->draft);
             else if(s->draft.op=='m') { s->draft.action='S';s->draft.mail_revision=s->mail_revision;mail_submit(s,&s->draft); }
-            else if(s->draft.op=='?') { submit(s,&s->draft);s->service_pending=s->pending?'M':0; }
+            else if(s->draft.op=='?') { submit(s,&s->draft);sysop_mail_submitted(&s->sysop_mail,s->pending); }
             else { s->draft.op='P'; submit(s,&s->draft); }
             if(s->pending) { s->editing=0;s->editor_upload=s->editor_confirm=s->editor_upload_question=0; undo_clear(s); }
         } else {
@@ -1394,7 +1394,7 @@ static void command(Session *s,char *line) {
         else queue_text(s,ui_text(&s->ui,MSG_PAGER_MORE));
         prompt(s); return;
     }
-    if(s->gather_mode) { gather_input(s,line);prompt(s);return; }
+    if(s->gather.mode) { gather_input(s,line);prompt(s);return; }
     if(s->reader.active) {
         if(!strcmp(line,"P") || !strcmp(line,"L")) {
             s->reader.automatic=0;
@@ -1432,7 +1432,7 @@ static void command(Session *s,char *line) {
     if(!s->ui.input && !s->classic_input && !s->mail_input && !s->mail.delete_id && s->ui.enabled && !*s->connector_token &&
        (!strcmp(line,"GAME") || !strcmp(line,"GAMES"))) {
         if(!s->user) { emit(s,"ERR login required\r\n");prompt(s);return; }
-        s->game_menu=1;s->vault_mode=s->mail_mode=s->gather_mode=0;s->classic_area=CM_MAIN;
+        s->game_menu=1;s->vault_mode=s->mail_mode=s->gather.mode=0;s->classic_area=CM_MAIN;
         command_core(s,"GAMES");prompt(s);return;
     }
     if(s->game_menu) {
@@ -1647,7 +1647,7 @@ static ClassicInput classic_input_state(const Session *s) {
         .selection=s->classic_input==CI_FILE_ACTION || s->classic_input==CI_BATCH,
         .application=s->application_step,.classic=s->classic_input,.secret=session_secret(s),
         .input=s->ui.input,.mail_input=s->mail_input,.paging=!!s->page[0],.binary=s->binary,.transfer=s->zmodem,
-        .editing=s->editing,.chatting=s->chatting,.gather=s->gather_mode,.talk=s->outside_talk,
+        .editing=s->editing,.chatting=s->chatting,.gather=s->gather.mode,.talk=s->outside_talk,
         .line_editor=s->editor_line,.editor_input=s->editor_input,.mail_mode=s->mail_mode};
 }
 int session_uppercase(const Session *s,const char *line,size_t size) {
@@ -1667,7 +1667,7 @@ static void connector_transfer(Session *s,const char *line) {
     snprintf(q.body,sizeof(q.body),"%s",line);submit(s,&q);
 }
 static void connector_link(Session *s,char *line) {
-    if(!s->user || s->editing || session_secret(s) || s->chatting || s->gather_mode || !board_link_enabled(s->board,s->user)) { queue_text(s,"ERR link denied\r\n");return; }
+    if(!s->user || s->editing || session_secret(s) || s->chatting || s->gather.mode || !board_link_enabled(s->board,s->user)) { queue_text(s,"ERR link denied\r\n");return; }
     BoardRequest q={0};LinkWireRequest request;
     _Static_assert(sizeof(q.link_origin)==sizeof(request.origin),"link origin capacity");
     _Static_assert(sizeof(q.link_article)==sizeof(request.article),"link article capacity");
@@ -1686,13 +1686,13 @@ static int connector_line(Session *s,char *line,size_t size) {
     if(*s->connector_token && link_wire_command(line)) { connector_link(s,line);return 1; }
     if(envelope.kind==CONNECTOR_LINKBLOCK) {
         const char *end;uint32_t n;connector_block_clear(&s->connector_block);
-        if(!s->user || s->editing || session_secret(s) || s->chatting || s->gather_mode || !board_link_enabled(s->board,s->user) || !number_arg(envelope.payload,&n,&end) || *end || !n || n>CONNECTOR_LINK_BLOCK_MAX) { queue_text(s,"ERR link syntax\r\n");return 1; }
+        if(!s->user || s->editing || session_secret(s) || s->chatting || s->gather.mode || !board_link_enabled(s->board,s->user) || !number_arg(envelope.payload,&n,&end) || *end || !n || n>CONNECTOR_LINK_BLOCK_MAX) { queue_text(s,"ERR link syntax\r\n");return 1; }
         if(connector_block_begin(&s->connector_block,CONNECTOR_LINK_BLOCK,n,s->now)<1)session_abort(s);
         return 1;
     }
     if(envelope.kind==CONNECTOR_TRANSFER) {
         const char *cmd=envelope.payload;
-        if(s->user && !s->password_mode && !s->chatting && !s->gather_mode &&
+        if(s->user && !s->password_mode && !s->chatting && !s->gather.mode &&
            (!s->editing || s->draft.op=='m') && !strncmp(cmd,"MFILE",5) && transfer_line_command(cmd+1))connector_transfer(s,cmd);
         else queue_text(s,"ERR vault syntax\r\n");
         return 1;
@@ -1700,7 +1700,7 @@ static int connector_line(Session *s,char *line,size_t size) {
     if(envelope.kind==CONNECTOR_BLOCK) {
         const char *end;uint32_t n;
         connector_block_clear(&s->connector_block);
-        if(!s->user || (s->editing && s->draft.op!='m') || s->password_mode || s->chatting || s->gather_mode ||
+        if(!s->user || (s->editing && s->draft.op!='m') || s->password_mode || s->chatting || s->gather.mode ||
            !number_arg(envelope.payload,&n,&end) || *end || !n || n>CONNECTOR_FILE_BLOCK_MAX) { queue_text(s,"ERR vault syntax\r\n");return 1; }
         if(connector_block_begin(&s->connector_block,CONNECTOR_FILE_BLOCK,n,s->now)<1)session_abort(s);
         return 1;
@@ -1732,7 +1732,7 @@ static int connector_line(Session *s,char *line,size_t size) {
             .board=s->board,.article=s->current,.admin=!!s->ui.admin,.sigop=!!s->ui.sigop,.level=s->member_level,
             .editing=s->editing,.editor_kind=(unsigned char)s->draft.op,.secret=session_secret(s),.password_mode=s->password_mode,
             .mail=s->mail_mode,.mail_current=s->mail.current,.chat=s->chatting,.talk=s->outside_talk,
-            .pager=!!s->page[0],.gather=s->gather_mode,
+            .pager=!!s->page[0],.gather=s->gather.mode,
             .input=s->application_step?s->application_step:s->classic_input?s->classic_input:s->memo_input?s->memo_input:s->mail_input?s->mail_input:s->talk_select,
             .confirmation=s->mail.delete_id,.binary=s->binary,.door=s->door,.members=s->member_mode,
             .feature_mail=board_feature_enabled("mail"),.feature_chat=board_feature_enabled("chat"),.feature_vault=board_feature_enabled("vault")
@@ -1817,18 +1817,20 @@ void session_result(Session *s,const BoardResult *completion,uint64_t now) {
     }
     if(!strncmp(completion->text,"FILEBOARD EDIT ",15)) { const char *body=strstr(completion->text,"\r\n");if(body) { memset(&s->draft,0,sizeof(s->draft));s->draft.op='Y';s->draft.action=VAULT_CMD_BOARDGUIDE;size_t n=(size_t)(body-(completion->text+15));if(n<=48) { memcpy(s->draft.title,completion->text+15,n);snprintf(s->draft.body,sizeof(s->draft.body),"%s",body+2);s->editing=1;s->editor_input=0;s->editor_at=1;undo_clear(s);queue_text(s,s->ui.language==LANGUAGE_JA?"ファイルボード案内文を編集します。/SAVE で保存。\r\n":"Edit file-board guide. /SAVE to save.\r\n");prompt(s);return; } } }
     if(s->editing && s->draft.op=='Y' && !strcmp(completion->text,"FILEBOARD UPDATED\r\n")) { s->editing=0;s->editor_upload=s->editor_confirm=s->editor_upload_question=0;memset(&s->draft,0,sizeof(s->draft)); }
-    if(s->gather_pending) {
-        int mode=s->gather_pending;s->gather_pending=0;
-        if(completion->service_action=='G') {
-            queue_text(s,completion->text);s->gather_cursor=completion->service_next;s->gather_mode=mode;
-            if(!s->gather_cursor) { if(mode==2)s->gather_mode=0;else { s->gather_lines=0;memset(&s->draft,0,sizeof(s->draft));queue_text(s,ui_text(&s->ui,MSG_GATHER_EDIT)); } }
-        } else if(completion->service_action=='g') { s->gather_mode=0;s->gather_lines=0;memset(&s->draft,0,sizeof(s->draft));queue_text(s,completion->text); }
-        else emit(s,completion->text);
+    if(s->gather.pending) {
+        GatherResponse response=completion->service_action=='G'?GATHER_RESPONSE_PAGE:
+            completion->service_action=='g'?GATHER_RESPONSE_SAVED:GATHER_RESPONSE_OTHER;
+        GatherEffect effect=gather_flow_complete(&s->gather,response,completion->service_next);
+        if(response==GATHER_RESPONSE_PAGE)queue_text(s,completion->text);
+        if(effect==GATHER_EDIT || effect==GATHER_SAVED)memset(&s->draft,0,sizeof(s->draft));
+        if(effect==GATHER_EDIT)queue_text(s,ui_text(&s->ui,MSG_GATHER_EDIT));
+        else if(effect==GATHER_SAVED)queue_text(s,completion->text);
+        else if(effect==GATHER_FAILED)emit(s,completion->text);
         prompt(s);return;
     }
-    if(s->service_pending=='M') {
-        s->service_pending=0;
-        if(completion->service_action=='M') { s->editing=0;s->editor_upload=s->editor_confirm=s->editor_upload_question=0;s->sysop_mail_after=now+30000;memset(&s->draft,0,sizeof(s->draft));queue_text(s,ui_text(&s->ui,MSG_SYSOP_MAIL_SENT)); }
+    if(s->sysop_mail.pending) {
+        SysopMailEffect effect=sysop_mail_complete(&s->sysop_mail,completion->service_action=='M',now);
+        if(effect==SYSOP_MAIL_SENT) { s->editing=0;s->editor_upload=s->editor_confirm=s->editor_upload_question=0;memset(&s->draft,0,sizeof(s->draft));queue_text(s,ui_text(&s->ui,MSG_SYSOP_MAIL_SENT)); }
         else { s->editing=1;emit(s,completion->text); }
         prompt(s);return;
     }

@@ -385,5 +385,34 @@ int main(void) {
         session_dispose(&s);
     }
     puts("PASS: Japanese/English report invalidation, profile continuation, vault acceptance/denial, stale completion and revocation isolation");
+    for(int lang=LANGUAGE_JA;lang<LANGUAGE_COUNT;lang++) {
+        reset(&m);session_init(&s,io,150,4,1,1,1,(Language)lang);s.user=2;s.pager_enabled=0;
+        strcpy(s.draft.body,"old draft");gather_flow_read_submitted(&s.gather,1,1);s.pending=1;
+        memset(&result,0,sizeof(result));result.session=149;result.slot=4;result.service_action='G';
+        strcpy(result.text,"GATHER END NEXT 0\r\n");reset(&m);session_result(&s,&result,800);
+        assert(s.pending && s.gather.pending==2 && !m.size);
+        result.session=150;result.slot=3;session_result(&s,&result,801);assert(s.gather.pending==2);
+        result.slot=4;session_result(&s,&result,802);
+        assert(!s.pending && !s.gather.pending && !s.gather.mode && !strcmp(s.draft.body,"old draft"));
+        gather_flow_read_submitted(&s.gather,0,1);result.service_next=8;session_result(&s,&result,803);
+        assert(s.gather.mode==1 && s.gather.cursor==8 && !strcmp(s.draft.body,"old draft"));
+        assert(session_line(&s,"Q",1,804));assert(!s.gather.cursor && s.gather.mode==1 && !s.draft.body[0]);
+        assert(session_line(&s,"Q",1,805));assert(s.gather.lines==1 && !strcmp(s.draft.body,"Q\r\n"));
+        gather_flow_post_submitted(&s.gather,1);result.service_action=0;strcpy(result.text,"ERR write failed\r\n");
+        session_result(&s,&result,806);assert(s.gather.mode==1 && s.gather.lines==1 && !strcmp(s.draft.body,"Q\r\n"));
+        gather_flow_post_submitted(&s.gather,1);result.service_action='g';strcpy(result.text,"GATHER SAVED\r\n");
+        session_result(&s,&result,807);assert(!s.gather.mode && !s.gather.lines && !s.draft.body[0]);
+        s.gather.mode=1;strcpy(s.draft.body,"cancel me");s.gather.lines=1;
+        assert(session_line(&s,"/CANCEL",7,808));assert(!s.gather.mode && !s.gather.lines && !s.draft.body[0]);
+        s.draft.op='?';strcpy(s.draft.body,"retry body");sysop_mail_submitted(&s.sysop_mail,1);
+        result.session=149;result.service_action='M';session_result(&s,&result,809);
+        assert(s.sysop_mail.pending && !s.sysop_mail.after && !strcmp(s.draft.body,"retry body"));
+        result.session=150;result.service_action=0;strcpy(result.text,"ERR no administrator\r\n");session_result(&s,&result,810);
+        assert(s.editing && !s.sysop_mail.pending && !s.sysop_mail.after && !strcmp(s.draft.body,"retry body"));
+        sysop_mail_submitted(&s.sysop_mail,1);result.service_action='M';session_result(&s,&result,811);
+        assert(!s.editing && !s.draft.body[0] && !s.sysop_mail.pending && s.sysop_mail.after==30811);
+        session_dispose(&s);
+    }
+    puts("PASS: Japanese/English Gather and SYSOPMAIL state, stale completion refusal, failed-body retention and successful cleanup");
     return 0;
 }
