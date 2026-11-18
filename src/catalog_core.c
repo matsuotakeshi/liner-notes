@@ -14,11 +14,15 @@ static CatalogOutcome authorize(const CatalogActor *actor) {
        moderation_epoch(actor->user)!=actor->epoch)return CATALOG_CORE_REVOKED;
     return CATALOG_CORE_OK;
 }
+CatalogOutcome catalog_core_manage(const CatalogActor *actor,uint32_t board) {
+    CatalogOutcome result=authorize(actor);
+    if(result!=CATALOG_CORE_OK)return result;
+    return catalog_manage(board,actor->user)?CATALOG_CORE_OK:CATALOG_CORE_DENIED;
+}
 CatalogOutcome catalog_core_info(const CatalogActor *actor,uint32_t board,CatalogConfig *out) {
     if(!out)return CATALOG_CORE_INVALID;
     memset(out,0,sizeof(*out));
-    CatalogOutcome result=authorize(actor);if(result!=CATALOG_CORE_OK)return result;
-    if(!catalog_manage(board,actor->user))return CATALOG_CORE_DENIED;
+    CatalogOutcome result=catalog_core_manage(actor,board);if(result!=CATALOG_CORE_OK)return result;
     if(!catalog_config(board,out)) { memset(out,0,sizeof(*out));return CATALOG_CORE_STORAGE; }
     return CATALOG_CORE_OK;
 }

@@ -67,6 +67,8 @@ static void records_make(unsigned n) {
 }
 int main(void) {
     CatalogActor actor=reset();CatalogConfig info;CatalogRoles roles;CatalogHistory page;uint32_t id;
+    assert(catalog_core_manage(&actor,2)==CATALOG_CORE_OK);
+    assert(catalog_core_manage(&actor,3)==CATALOG_CORE_DENIED);
     assert(catalog_core_info(&actor,2,&info)==CATALOG_CORE_OK && info.id==2 && info.parent==1);
     strcpy(config.title,"changed");assert(!strcmp(info.title,"managed"));
     assert(catalog_core_info(&actor,3,&info)==CATALOG_CORE_DENIED);zero(&info,sizeof(info));
@@ -134,6 +136,7 @@ int main(void) {
         case 7:store_error=1;wanted=CATALOG_CORE_STORAGE;break;
         }
         memset(&info,0xff,sizeof(info));memset(&roles,0xff,sizeof(roles));memset(&page,0xff,sizeof(page));id=99;
+        assert(catalog_core_manage(&actor,2)==wanted);
         assert(catalog_core_info(&actor,2,&info)==wanted);zero(&info,sizeof(info));
         assert(catalog_core_roles(&actor,&roles)==wanted);zero(&roles,sizeof(roles));
         assert(catalog_core_history(&actor,2,0,&page)==wanted);zero(&page,sizeof(page));

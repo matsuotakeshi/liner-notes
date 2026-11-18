@@ -6,6 +6,7 @@
 /* Stage 2: single-owner board store, bounded asynchronous request queue. */
 #include "board.h"
 #include "article_core.h"
+#include "catalog_policy_core.h"
 #include "member_core.h"
 #include "mail_core.h"
 #include "mail_repository.h"

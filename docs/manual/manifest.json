@@ -283,7 +283,11 @@
         "src/catalog.c",
         "src/catalog.h",
         "src/catalog_core.c",
-        "src/catalog_core.h"
+        "src/catalog_core.h",
+        "src/catalog_policy_core.c",
+        "src/catalog_policy_core.h",
+        "src/board_policy_repository.h",
+        "src/board_features.inc"
       ]
     },
     {
