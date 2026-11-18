@@ -2,6 +2,7 @@
 #include "date_filter.h"
 #include "activity.h"
 #include "article_core.h"
+#include "catalog_core.h"
 #include "durable.h"
 #include "members.h"
 #include "moderation.h"
@@ -41,6 +42,54 @@ int activity_open(const char *base) {
     if(!dj_open(&journal,path,"LNACTV01",apply,NULL)) { free(gathers);gathers=NULL;return 0; }return 1;
 }
 void activity_close(void) { dj_close(&journal);free(gathers);gathers=NULL;count=0; }
+static void catalog_result(const BoardRequest *q,CatalogOutcome result,BoardResult *r) {
+    const char *error="ERR catalog syntax\r\n";
+    switch(result) {
+    case CATALOG_CORE_OK:return;
+    case CATALOG_CORE_LOGIN_REQUIRED:
+        error=q->action=='v'?"ERR login required\r\n":
+              (q->action=='b'?"ERR catalog syntax\r\n":"ERR admin required\r\n");break;
+    case CATALOG_CORE_REVOKED:r->revoked=1;error="ERR session revoked\r\n";break;
+    case CATALOG_CORE_MEMBER_STORAGE:error="ERR member storage unavailable\r\n";break;
+    case CATALOG_CORE_MODERATION_STORAGE:error="ERR moderation storage unavailable\r\n";break;
+    case CATALOG_CORE_POLICY_STORAGE:error="ERR board policy storage\r\n";break;
+    case CATALOG_CORE_STORAGE:error="ERR catalog storage\r\n";break;
+    case CATALOG_CORE_DENIED:error="ERR admin required\r\n";break;
+    case CATALOG_CORE_INVALID:break;
+    case CATALOG_CORE_CURSOR:error="ERR command\r\n";break;
+    }
+    snprintf(r->text,sizeof(r->text),"%s",error);
+}
+static void catalog_execute(const BoardRequest *q,BoardResult *r) {
+    CatalogActor actor={q->user,q->user_epoch};CatalogOutcome result;
+    if(q->action=='i') {
+        CatalogConfig info;result=catalog_core_info(&actor,q->number,&info);
+        if(result!=CATALOG_CORE_OK) { catalog_result(q,result,r);return; }
+        snprintf(r->text,sizeof(r->text),"BOARDSETTING %u|%u|%s|%s|%s|%s\r\n",
+                 info.id,info.parent,info.read_acl,info.write_acl,info.title,info.description);
+    } else if(q->action=='b') {
+        uint32_t id=0;result=catalog_core_update(&actor,q->body,&id);
+        if(result!=CATALOG_CORE_OK) { catalog_result(q,result,r);return; }
+        r->service_action='b';snprintf(r->text,sizeof(r->text),"BOARD UPDATED %u\r\n",id);
+    } else if(q->action=='v') {
+        CatalogRoles roles;result=catalog_core_roles(&actor,&roles);
+        if(result!=CATALOG_CORE_OK) { catalog_result(q,result,r);return; }
+        size_t used=(size_t)snprintf(r->text,sizeof(r->text),"SIGOPS\r\n");
+        for(unsigned i=0;i<roles.count;i++)
+            used+=(size_t)snprintf(r->text+used,sizeof(r->text)-used,"SIGOP %u %u\r\n",roles.rows[i].board,roles.rows[i].user);
+        snprintf(r->text+used,sizeof(r->text)-used,"END SIGOPS\r\n");
+    } else {
+        CatalogHistory history;result=catalog_core_history(&actor,q->board,q->cursor,&history);
+        if(result!=CATALOG_CORE_OK) { catalog_result(q,result,r);return; }
+        size_t used=(size_t)snprintf(r->text,sizeof(r->text),"BOARDLOG\r\n");
+        for(unsigned i=0;i<history.count;i++) {
+            const CatalogChange *row=&history.rows[i];
+            used+=(size_t)snprintf(r->text+used,sizeof(r->text)-used,"BOARDCHANGE %u %u %llu %s\r\n",
+                                  row->sequence,row->actor,(unsigned long long)row->time,row->specification);
+        }
+        snprintf(r->text+used,sizeof(r->text)-used,"END NEXT %u\r\n",history.next);
+    }
+}
 void activity_execute(const BoardRequest *q,BoardResult *r) {
     int lang=q->scope;const char *error="ERR command\r\n";
     if(q->action=='G' || q->action=='g') {
@@ -72,16 +121,10 @@ void activity_execute(const BoardRequest *q,BoardResult *r) {
         if(q->notes_unread)strcpy(r->service_text,"ALL");
         return;
     }
-    if(q->action=='i') {
-        if(!catalog_manage(q->number,q->user)) { error="ERR admin required\r\n";goto fail; }
-        catalog_settings(q->number,r->text,sizeof(r->text));return;
+    if(q->action=='i' || q->action=='j' || q->action=='v' || q->action=='b') {
+        catalog_execute(q,r);return;
     }
-    if(q->action=='j') {
-        if(!moderation_admin(q->user) && !catalog_sigop(q->board,q->user)) { error="ERR admin required\r\n";goto fail; }
-        catalog_history(q->user,q->cursor,r->text,sizeof(r->text));return;
-    }
-    if(q->action=='v') { if(!members_name(q->user)) { error="ERR login required\r\n";goto fail; }catalog_roles(q->user,r->text,sizeof(r->text));return; }
-    if(q->action!='b' && q->action!='s' && !moderation_admin(q->user)) { error="ERR admin required\r\n";goto fail; }
+    if(q->action!='s' && !moderation_admin(q->user)) { error="ERR admin required\r\n";goto fail; }
     if(q->action=='s') {
         ArticleActor actor={q->user,q->user_epoch,q->board_grants};ArticleRoleChange change;
         ArticleOutcome result=article_sigop_set(&actor,q->number,q->cursor,&change);
@@ -101,12 +144,6 @@ void activity_execute(const BoardRequest *q,BoardResult *r) {
         r->account_user2=change.previous;r->account_epoch2=change.previous_epoch;
         r->account_user=change.current;r->account_epoch=change.current_epoch;
         snprintf(r->text,sizeof(r->text),"SIGOP SET %u %u\r\n",q->number,q->cursor);return;
-    }
-    if(q->action=='b') {
-        /* catalog_set validates both the existing and proposed parent scopes. */
-        uint32_t id;int ok=catalog_set(q->user,q->body,&id);
-        if(ok<=0) { error=ok<0?"ERR catalog storage\r\n":"ERR catalog syntax\r\n";goto fail; }
-        r->service_action='b';snprintf(r->text,sizeof(r->text),"BOARD UPDATED %u\r\n",id);return;
     }
     if(q->action=='L') { r->service_action='L';return; }
     if(!strchr("AKSC",q->action) || !q->action || strlen(q->body)>512 || (*q->body && !chat_text_valid(q->body)))goto fail;
