@@ -99,7 +99,7 @@ static void prompt(Session *s) {
         if(s->editing && s->editor_numbers) { char number[40];snprintf(number,sizeof(number),"%u ",s->editor_line?s->editor_at:editor_count(s)+1);queue_text(s,number); }
         if(s->vault_mode && !s->editing && !s->password_mode && !s->ui.input) { queue_text(s,ui_text(&s->ui,MSG_VAULT_PROMPT));return; }
         if(s->mail_input) { queue_text(s,ui_text(&s->ui,s->mail_input==1?MSG_MAIL_TO_PROMPT:MSG_MAIL_TITLE_PROMPT));return; }
-    if(s->mail_delete) { queue_text(s,ui_text(&s->ui,MSG_MAIL_CONFIRM));return; }
+    if(s->mail.delete_id) { queue_text(s,ui_text(&s->ui,MSG_MAIL_CONFIRM));return; }
         if(s->mail_mode && !s->editing && !s->password_mode) { queue_text(s,ui_text(&s->ui,MSG_MAIL_PROMPT));return; }
         if(s->reader.active && !s->reader.automatic) queue_text(s,ui_text(&s->ui,MSG_SCAN_HINT));
         if(!s->editing && !s->password_mode && !s->ui.input && !s->reader.active && s->ui.view==UI_HOME)show_menu(s,0);
@@ -547,7 +547,7 @@ static void chat_prompt(Session *s) {
 static int chat_event(void *context,const ChatEvent *e) {
     Session *s=context;if(!s->active || s->closing || !s->user || s->zmodem || s->door)return 0;
     if(e->kind=='X' && e->connection!=s->talk_target)return 1;
-    if((e->kind=='I' || e->kind=='C') && !s->chatting && (s->password_mode || s->editing || s->binary || s->zmodem || s->pending || s->page[0] || s->ui.input || s->classic_input || s->mail_input || s->mail_delete || s->wake))return 0;
+    if((e->kind=='I' || e->kind=='C') && !s->chatting && (s->password_mode || s->editing || s->binary || s->zmodem || s->pending || s->page[0] || s->ui.input || s->classic_input || s->mail_input || s->mail.delete_id || s->wake))return 0;
     if((e->kind=='J' || e->kind=='S') && (!s->chatting || s->outside_talk))return 1;
     if((e->kind=='L' || e->kind=='X') && (!s->chatting || s->outside_talk) && e->connection!=s->talk_target)return 1;
     char text[1400];
@@ -659,6 +659,22 @@ static void chat_input(Session *s,char *line) {
     }
     submit(s,&q);s->chat_pending=s->pending;if(!s->pending)chat_prompt(s);
 }
+/* Worker protocol stays in the Session adapter, not the value-only Core. */
+static MailSessionEvent mail_event(int action) {
+    switch(action) {
+    case 'L':return MAIL_EVENT_LIST;case 'I':return MAIL_EVENT_FILES;
+    case 'B':return MAIL_EVENT_BEGIN;case 'Q':return MAIL_EVENT_REPLY;
+    case 'O':return MAIL_EVENT_RESUME;case 'W':return MAIL_EVENT_SAVE;
+    case 'S':return MAIL_EVENT_SEND;case 'A':return MAIL_EVENT_ATTACH;
+    case 'R':case 'N':case 'T':case 'f':return MAIL_EVENT_READ;
+    default:return MAIL_EVENT_OTHER;
+    }
+}
+static void mail_list_request(const Session *s,BoardRequest *q) {
+    MailListing plan=mail_navigation_listing(&s->mail);
+    q->action='L';q->cursor=plan.cursor;q->number=(uint32_t)plan.filter;
+    strcpy(q->title,plan.query);
+}
 static void mail_submit(Session *s,BoardRequest *q) {
     q->op='m';q->scope=s->ui.enabled?(int)s->ui.language+1:0;submit(s,q);s->mail_pending=s->pending;
 }
@@ -667,11 +683,11 @@ static int mail_command(Session *s,const char *line) {
     if(!s->mail_mode && !explicit_mail)return 0;
     if(!s->user) { emit(s,"ERR login required\r\n");return 1; }
     if(explicit_mail) { s->mail_mode=1;line=line[4]?line+5:"L"; }
-    if(!s->mail_input && (!strcmp(line,"G") || !strcmp(line,"GET") || !strncmp(line,"GET ",4))) { BoardRequest q={0};q.op='}';q.action='M';q.number=s->mail_current;const char *tail;if(!strncmp(line,"GET ",4) && (!number_arg(line+4,&q.number,&tail) || *tail)) { emit(s,"ERR command\r\n");return 1; }submit(s,&q);return 1; }
-    if(!s->mail_input && (!strcmp(line,"F") || !strcmp(line,"SCAN") || !strcmp(line,"SCAN ASC") || !strcmp(line,"SCAN DESC"))) { BoardRequest q={0};q.op='m';q.action='f';q.descending=!strcmp(line,"SCAN DESC");q.cursor=q.descending?UINT32_MAX:1;q.scope=s->ui.enabled?(int)s->ui.language+1:0;submit(s,&q);if(s->pending) { s->scan=q;s->reader.active=1; }return 1; }
-    if(s->mail_delete) {
-        uint32_t id=s->mail_delete;s->mail_delete=0;
-        if(!strcmp(line,"Y") || !strcmp(line,"y")) { BoardRequest q={0};q.action='D';q.number=id;mail_submit(s,&q); }
+    if(!s->mail_input && (!strcmp(line,"G") || !strcmp(line,"GET") || !strncmp(line,"GET ",4))) { BoardRequest q={0};q.op='}';q.action='M';q.number=s->mail.current;const char *tail;if(!strncmp(line,"GET ",4) && (!number_arg(line+4,&q.number,&tail) || *tail)) { emit(s,"ERR command\r\n");return 1; }submit(s,&q);return 1; }
+    if(!s->mail_input && (!strcmp(line,"F") || !strcmp(line,"SCAN") || !strcmp(line,"SCAN ASC") || !strcmp(line,"SCAN DESC"))) { BoardRequest q={0};q.op='m';q.action='f';ReaderPosition start=mail_navigation_start(!strcmp(line,"SCAN DESC"));q.descending=start.descending;q.cursor=start.cursor;q.scope=s->ui.enabled?(int)s->ui.language+1:0;submit(s,&q);if(s->pending) { s->scan=q;s->reader.active=1; }return 1; }
+    if(s->mail.delete_id) {
+        uint32_t id=mail_navigation_confirmed(&s->mail,!strcmp(line,"Y") || !strcmp(line,"y"));
+        if(id) { BoardRequest q={0};q.action='D';q.number=id;mail_submit(s,&q); }
         else emit(s,"CANCELLED\r\n");
         return 1;
     }
@@ -693,14 +709,14 @@ static int mail_command(Session *s,const char *line) {
         const char *date=line+5;uint64_t stamp;
         if(!strncmp(line,"NEWSFROM ",9)) { if(!number_arg(line+9,&q.cursor,&tail) || *tail!=' ' || q.cursor>CONTENT_ID_MAX)goto invalid;date=tail+1; }
         if(!date_filter(date,&stamp))goto invalid;
-        strcpy(s->mail_query,date);s->mail_filter=5;s->mail_cursor=q.cursor;q.action='L';q.number=5;strcpy(q.title,date);
+        if(!mail_navigation_filter(&s->mail,MAIL_LIST_NEWS,date,q.cursor))goto invalid;
+        mail_list_request(s,&q);
     }
     else if(!strncmp(line,"SEARCH ",7) || !strncmp(line,"SEARCHFROM ",11)) {
         const char *query=line+7;
         if(!strncmp(line,"SEARCHFROM ",11)) { if(!number_arg(line+11,&q.cursor,&tail) || *tail!=' ' || q.cursor>CONTENT_ID_MAX)goto invalid;query=tail+1; }
-        if(!*query || strlen(query)>80 || !safe_text(query))goto invalid;
-        strcpy(s->mail_query,query);s->mail_filter=4;s->mail_cursor=q.cursor;
-        q.action='L';q.number=4;strcpy(q.title,query);
+        if(!mail_navigation_filter(&s->mail,MAIL_LIST_SEARCH,query,q.cursor))goto invalid;
+        mail_list_request(s,&q);
     }
     else if(!strcmp(line,"FILES") || !strncmp(line,"FILES ",6)) { q.action='I';if(line[5] && (!number_arg(line+6,&q.cursor,&tail) || *tail))goto invalid; }
     else if(!strncmp(line,"DROP ",5)) { q.action='X';if(!number_arg(line+5,&q.number,&tail) || strcmp(tail," CONFIRM"))goto invalid; }
@@ -708,8 +724,8 @@ static int mail_command(Session *s,const char *line) {
     else if(!strcmp(line,"RESUME"))q.action='O';
     else if(!strncmp(line,"DRAFT DELETE ",13)) { q.action='C';if(!audit_number(line+13,&q.mail_revision))goto invalid; }
     else if(!strcmp(line,"L") || !strcmp(line,"LIST") || !strcmp(line,"SENT") || !strcmp(line,"INBOX") || !strcmp(line,"UNREAD") || !strcmp(line,"+")) {
-        q.action='L';if(strcmp(line,"+")) { s->mail_cursor=0;s->mail_filter=!strcmp(line,"SENT")?1:!strcmp(line,"UNREAD")?2:!strcmp(line,"INBOX")?3:0; }
-        q.cursor=s->mail_cursor;q.number=(uint32_t)s->mail_filter;if(s->mail_filter==4 || s->mail_filter==5)strcpy(q.title,s->mail_query);
+        if(strcmp(line,"+"))mail_navigation_filter(&s->mail,!strcmp(line,"SENT")?MAIL_LIST_SENT:!strcmp(line,"UNREAD")?MAIL_LIST_UNREAD:!strcmp(line,"INBOX")?MAIL_LIST_INBOX:MAIL_LIST_ALL,NULL,0);
+        mail_list_request(s,&q);
     } else if(!strcmp(line,"N") || !strcmp(line,"NEXT"))q.action='N';
     else if(!strcmp(line,"T") || !strcmp(line,"LATEST"))q.action='T';
     else if(!strcmp(line,"E") || !strcmp(line,"SEND")) { memset(&s->draft,0,sizeof(s->draft));s->mail_input=1;return 1; }
@@ -727,7 +743,7 @@ static int mail_command(Session *s,const char *line) {
         else if(!strncmp(line,"R ",2)) { q.action='Q';arg=line+2; }
         else if(!strncmp(line,"DELETE ",7)) { q.action='D';arg=line+7; }
         else if(!strncmp(line,"K ",2)) { q.action='D';arg=line+2; }
-        else if(!strcmp(line,"R") || !strcmp(line,"K")) { q.action=*line=='R'?'Q':'D';id=s->mail_current;tail=""; }
+        else if(!strcmp(line,"R") || !strcmp(line,"K")) { q.action=*line=='R'?'Q':'D';id=s->mail.current;tail=""; }
         else if(*line>='0' && *line<='9')q.action='R';
         else return 0;
         if(!id && !number_arg(arg,&id,&tail))goto invalid;
@@ -735,7 +751,7 @@ static int mail_command(Session *s,const char *line) {
         q.number=id;
         if(q.action=='Q' && *tail==' ' && strlen(tail+1)<=80 && safe_text(tail+1))strcpy(q.title,tail+1);
         else if(*tail)goto invalid;
-        if(q.action=='D') { s->mail_delete=id;if(!s->ui.enabled)queue_text(s,"MAIL DELETE CONFIRM Y/N\r\n");return 1; }
+        if(q.action=='D') { mail_navigation_confirm(&s->mail,id);if(!s->ui.enabled)queue_text(s,"MAIL DELETE CONFIRM Y/N\r\n");return 1; }
     }
     mail_submit(s,&q);return 1;
 invalid:emit(s,"ERR command\r\n");return 1;
@@ -1274,7 +1290,7 @@ board_syntax:emit(s,"ERR command\r\n");return;
         if(preference_exit_begin(&s->preferences,s->user,PREF_EXIT_LOGOUT)) { command_core(s,"PREFS SAVE");preference_exit_submitted(&s->preferences,s->pending);return; }
         s->preferences.exit_action=PREF_EXIT_NONE;selection_reset(s);
         s->classic_input=0;s->classic_id=0;s->classic_area=CM_MAIN;check_traversal_reset(&s->check);memset(s->vault_grants,0,sizeof(s->vault_grants));
-        chat_disconnect(s->id);s->mail_mode=0;OPENSSL_cleanse(s->mail_query,sizeof(s->mail_query));s->mail_filter=0;s->mail_cursor=0;
+        chat_disconnect(s->id);s->mail_mode=0;mail_navigation_clear_filter(&s->mail);
         memset(s->board_grants,0,sizeof(s->board_grants));batch_reset(&s->batch);s->game_menu=0;s->vault_mode=0;notification_mail_discard(&s->notifications);s->user=0;s->ui.admin=0;s->ui.sigop=0;s->reset_target=0; s->user_epoch=0; s->current=0; s->board=1; memset(&s->draft,0,sizeof(s->draft)); s->draft_revision=0; undo_clear(s); emit(s,"LOGGED OUT\r\n");
     } else if(!strcmp(line,"NEXTBOARD")) {
         if(!s->board_enabled) { emit(s,"ERR no board\r\n"); return; }
@@ -1378,8 +1394,8 @@ static void command(Session *s,char *line) {
     if(s->reader.active) {
         if(!strcmp(line,"P") || !strcmp(line,"L")) {
             s->reader.automatic=0;
-            uint32_t id=s->scan.op=='m'?s->mail_current:s->current;
-            ReaderPosition next=reader_move(*line=='P'?READER_PREVIOUS:READER_REPEAT,id,s->scan.descending,1);
+            ReaderMove move=*line=='P'?READER_PREVIOUS:READER_REPEAT;
+            ReaderPosition next=s->scan.op=='m'?mail_navigation_move(&s->mail,move,s->scan.descending,1):reader_move(move,s->current,s->scan.descending,1);
             s->scan.cursor=next.cursor;s->scan.descending=next.descending;
             if(s->scan.cursor)submit(s,&s->scan);else emit(s,"SCAN END\r\n");
             return;
@@ -1389,8 +1405,8 @@ static void command(Session *s,char *line) {
         if(*line=='+' || *line=='-') {
             uint32_t distance=1;const char *tail;
             if(line[1] && (!number_arg(line+1,&distance,&tail) || *tail || !distance)) { emit(s,"ERR relative distance\r\n");prompt(s);return; }
-            uint32_t id=s->scan.op=='m'?s->mail_current:s->current;
-            ReaderPosition next=reader_move(*line=='-'?READER_BACKWARD:READER_FORWARD,id,s->scan.descending,distance);
+            ReaderMove move=*line=='-'?READER_BACKWARD:READER_FORWARD;
+            ReaderPosition next=s->scan.op=='m'?mail_navigation_move(&s->mail,move,s->scan.descending,distance):reader_move(move,s->current,s->scan.descending,distance);
             s->scan.cursor=next.cursor;s->scan.descending=next.descending;
             if(s->scan.cursor)submit(s,&s->scan);else { s->reader.active=0;emit(s,s->scan.op=='m'?"MAIL SCAN END\r\n":"SCAN END\r\n");prompt(s); }return;
         }
@@ -1401,7 +1417,7 @@ static void command(Session *s,char *line) {
         }
     }
     if(s->password_mode || s->editing || s->application_step) { command_core(s,line); prompt(s); return; }
-    if(!s->ui.input && !s->classic_input && !s->mail_input && !s->mail_delete && (!strcmp(line,"LANG") || !strncmp(line,"LANG ",5))) {
+    if(!s->ui.input && !s->classic_input && !s->mail_input && !s->mail.delete_id && (!strcmp(line,"LANG") || !strncmp(line,"LANG ",5))) {
         if(line[4] && !language_parse(line+5,&s->ui.language)) queue_text(s,ui_text(&s->ui,MSG_ERR_LANGUAGE));
         else {
             snprintf(mapped,sizeof(mapped),ui_text(&s->ui,MSG_LANGUAGE),language_code(s->ui.language));
@@ -1409,7 +1425,7 @@ static void command(Session *s,char *line) {
         }
         prompt(s); return;
     }
-    if(!s->ui.input && !s->classic_input && !s->mail_input && !s->mail_delete && s->ui.enabled && !*s->connector_token &&
+    if(!s->ui.input && !s->classic_input && !s->mail_input && !s->mail.delete_id && s->ui.enabled && !*s->connector_token &&
        (!strcmp(line,"GAME") || !strcmp(line,"GAMES"))) {
         if(!s->user) { emit(s,"ERR login required\r\n");prompt(s);return; }
         s->game_menu=1;s->vault_mode=s->mail_mode=s->gather_mode=0;s->classic_area=CM_MAIN;
@@ -1579,7 +1595,7 @@ static NotificationAudience notification_audience(const Session *s) {
     unsigned blocked=(s->door?NOTICE_DOOR:0)|(s->binary?NOTICE_BINARY:0)|(s->zmodem?NOTICE_TRANSFER:0)|
         (s->password_mode?NOTICE_SECRET:0)|(s->pending?NOTICE_PENDING:0)|(s->page[0]?NOTICE_PAGE:0)|
         (s->editing?NOTICE_EDITOR:0)|(s->wake?NOTICE_TIMER:0)|
-        ((s->ui.input || s->classic_input || s->mail_input || s->mail_delete)?NOTICE_INPUT:0)|
+        ((s->ui.input || s->classic_input || s->mail_input || s->mail.delete_id)?NOTICE_INPUT:0)|
         (s->chatting?NOTICE_CHAT:0)|(s->reader.active?NOTICE_SCAN:0);
     return (NotificationAudience){s->user,blocked,s->active,s->closing,s->ui.enabled,s->binary_menu};
 }
@@ -1706,10 +1722,10 @@ static int connector_line(Session *s,char *line,size_t size) {
             .connection=s->id,.user=s->user,.username=s->user?s->username:"",
             .board=s->board,.article=s->current,.admin=!!s->ui.admin,.sigop=!!s->ui.sigop,.level=s->member_level,
             .editing=s->editing,.editor_kind=(unsigned char)s->draft.op,.secret=session_secret(s),.password_mode=s->password_mode,
-            .mail=s->mail_mode,.mail_current=s->mail_current,.chat=s->chatting,.talk=s->outside_talk,
+            .mail=s->mail_mode,.mail_current=s->mail.current,.chat=s->chatting,.talk=s->outside_talk,
             .pager=!!s->page[0],.gather=s->gather_mode,
             .input=s->application_step?s->application_step:s->classic_input?s->classic_input:s->memo_input?s->memo_input:s->mail_input?s->mail_input:s->talk_select,
-            .confirmation=s->mail_delete,.binary=s->binary,.door=s->door,.members=s->member_mode,
+            .confirmation=s->mail.delete_id,.binary=s->binary,.door=s->door,.members=s->member_mode,
             .feature_mail=board_feature_enabled("mail"),.feature_chat=board_feature_enabled("chat"),.feature_vault=board_feature_enabled("vault")
         };
         if(!connector_state_format(&state,envelope.payload,out,sizeof(out))) { session_abort(s);return 1; }
@@ -1751,8 +1767,7 @@ void session_result(Session *s,const BoardResult *completion,uint64_t now) {
         s->vault_selecting=0;
         if(!strncmp(completion->text,"FILEBOARDSETTING ",17)) { strcpy(s->vault_path,s->vault_select);s->vault_child_view=0;s->vault_child_count=0;s->file_selected=0;s->vault_mode=1;s->mail_mode=0; }
     }
-    if(completion->mail_id) { s->mail_current=completion->mail_id;s->mail_reading=completion->mail_action!='S'; }
-    if(completion->mail_action=='L' || completion->mail_action=='I')s->mail_reading=0;
+    mail_navigation_observe(&s->mail,mail_event(completion->mail_action),completion->mail_id);
     if(completion->service_action=='n') { check_traversal_begin(&s->check,completion->service_number,completion->since,completion->until);check_page(s);return; }
     if(s->check.committing) { check_traversal_committed(&s->check,!strncmp(completion->text,"CHECKPOINT SAVED",16));emit(s,completion->text);prompt(s);return; }
     if(s->check.pending) { check_traversal_response(&s->check,completion->text);emit(s,completion->text);queue_text(s,s->check.automatic?"CHECK NEXT / CHECK CANCEL (AUTO)\r\n":s->ui.language==LANGUAGE_JA?"CHECK NEXT: 続き / CHECK DONE: 確認日時を保存 / CHECK CANCEL: 中断\r\n":"CHECK NEXT / CHECK DONE / CHECK CANCEL\r\n");prompt(s);return; }
@@ -1815,25 +1830,23 @@ void session_result(Session *s,const BoardResult *completion,uint64_t now) {
     }
     if(s->mail_pending) {
         s->mail_pending=0;
-        if(completion->mail_action=='A' && completion->mail_to)s->draft.mail_attachments=completion->mail_attachments;
-        if(completion->mail_action=='B' || completion->mail_action=='Q' || completion->mail_action=='O') {
-            if(completion->mail_to) {
-                memset(&s->draft,0,sizeof(s->draft));s->draft.op='m';s->draft.action='S';s->draft.number=completion->mail_to;s->draft.cursor=completion->mail_parent;s->draft.mail_attachments=completion->mail_attachments;
-                strcpy(s->draft.title,completion->draft_title);strcpy(s->draft.body,completion->draft_body);s->mail_revision=completion->mail_revision;s->editing=1;s->editor_input=0;s->editor_at=1;undo_clear(s);
-            }
+        MailDraftEffect effect=mail_draft_effect(mail_event(completion->mail_action),completion->mail_to,completion->mail_id,completion->mail_revision);
+        if(effect==MAIL_DRAFT_ATTACH)s->draft.mail_attachments=completion->mail_attachments;
+        if(effect==MAIL_DRAFT_OPEN) {
+            memset(&s->draft,0,sizeof(s->draft));s->draft.op='m';s->draft.action='S';s->draft.number=completion->mail_to;s->draft.cursor=completion->mail_parent;s->draft.mail_attachments=completion->mail_attachments;
+            strcpy(s->draft.title,completion->draft_title);strcpy(s->draft.body,completion->draft_body);s->mail_revision=completion->mail_revision;s->editing=1;s->editor_input=0;s->editor_at=1;undo_clear(s);
         }
-        if(completion->mail_action=='W' && completion->mail_revision) { OPENSSL_cleanse(&s->draft,sizeof(s->draft));s->editing=0;s->editor_upload=s->editor_confirm=s->editor_upload_question=0;s->mail_revision=0;undo_clear(s); }
-        if(completion->mail_action=='S') {
-            if(completion->mail_id) { OPENSSL_cleanse(&s->draft,sizeof(s->draft));s->editing=0;s->editor_upload=s->editor_confirm=s->editor_upload_question=0; }
+        if(effect==MAIL_DRAFT_SAVED) { OPENSSL_cleanse(&s->draft,sizeof(s->draft));s->editing=0;s->editor_upload=s->editor_confirm=s->editor_upload_question=0;s->mail_revision=0;undo_clear(s); }
+        if(effect==MAIL_DRAFT_SENT || effect==MAIL_DRAFT_RETRY) {
+            if(effect==MAIL_DRAFT_SENT) { OPENSSL_cleanse(&s->draft,sizeof(s->draft));s->editing=0;s->editor_upload=s->editor_confirm=s->editor_upload_question=0; }
             else { s->editing=1;s->editor_input=0;s->editor_at=1; }
         }
         if(s->vault_selecting) {
         s->vault_selecting=0;
         if(!strncmp(completion->text,"FILEBOARDSETTING ",17)) { strcpy(s->vault_path,s->vault_select);s->vault_child_view=0;s->vault_child_count=0;s->file_selected=0;s->vault_mode=1;s->mail_mode=0; }
     }
-    if(completion->mail_id) { s->mail_current=completion->mail_id;s->mail_reading=completion->mail_action!='S'; }
-    if(completion->mail_action=='L' || completion->mail_action=='I')s->mail_reading=0;
-        if(completion->mail_action=='L' || completion->mail_action=='I')s->mail_cursor=completion->mail_next;
+
+        mail_navigation_page(&s->mail,mail_event(completion->mail_action),completion->mail_next);
         if(s->ui.enabled && s->pager_enabled && strchr("ILRNT",completion->mail_action) && completion->mail_action) {
             snprintf(s->page,sizeof(s->page),"%s",completion->text);s->page_offset=0;page_next(s);
         } else if(!completion->mail_action)emit(s,completion->text);
@@ -1918,7 +1931,7 @@ void session_result(Session *s,const BoardResult *completion,uint64_t now) {
         s->pager_enabled=loaded.pager;s->editor_line=loaded.editor;s->editor_numbers=(int)loaded.line_numbers;s->transfer_protocol=loaded.transfer_protocol;
         if(completion->columns && completion->rows)session_dimensions(s,loaded.columns,loaded.rows);
     }
-    if(completion->auth) { selection_reset(s);memset(s->board_grants,0,sizeof(s->board_grants));OPENSSL_cleanse(s->mail_query,sizeof(s->mail_query));s->mail_filter=0;s->mail_cursor=0;notification_mail_reset(&s->notifications);chat_disconnect(s->id);s->user=completion->auth>0?(uint32_t)completion->auth:0; s->user_epoch=completion->user_epoch; s->current=0; s->board=1; s->auth_after=now+1000; }
+    if(completion->auth) { selection_reset(s);memset(s->board_grants,0,sizeof(s->board_grants));mail_navigation_clear_filter(&s->mail);notification_mail_reset(&s->notifications);chat_disconnect(s->id);s->user=completion->auth>0?(uint32_t)completion->auth:0; s->user_epoch=completion->user_epoch; s->current=0; s->board=1; s->auth_after=now+1000; }
     if(completion->auth>0)snprintf(s->username,sizeof(s->username),"%s",completion->chat_login);
     if(completion->auth>0)session_mail_notify(s,completion->mail_notify_user,completion->mail_notify_deny,completion->mail_notify_revision);
     if(completion->auth>0)s->member_level=(unsigned)completion->member_level;
@@ -1996,7 +2009,7 @@ void session_chat_kick(Session *s) {
 void session_revoke(Session *s) {
     selection_reset(s);
     s->classic_input=0;s->classic_id=0;s->classic_area=CM_MAIN;check_traversal_reset(&s->check);memset(s->vault_grants,0,sizeof(s->vault_grants));
-    chat_disconnect(s->id);s->mail_mode=s->mail_input=0;s->mail_delete=0;
+    chat_disconnect(s->id);s->mail_mode=s->mail_input=0;mail_navigation_confirmed(&s->mail,0);
     if(s->chatting) { s->chatting=0;chat_leave(s->id); }
     if(s->door || s->binary || s->zmodem) { session_abort(s);return; }
     if(!s->active || s->closing) return;

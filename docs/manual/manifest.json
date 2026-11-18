@@ -215,7 +215,11 @@
         "src/notification_core.c",
         "src/notification_core.h",
         "tests/test_notification_core.c",
-        "tests/test_adapters.c"
+        "tests/test_adapters.c",
+        "src/mail_navigation_core.c",
+        "src/mail_navigation_core.h",
+        "src/mail_query.h",
+        "tests/test_mail_navigation_core.c"
       ]
     },
     {

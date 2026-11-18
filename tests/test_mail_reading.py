@@ -80,6 +80,11 @@ def run(binary):
                 incoming = send(bob, "alice", "incoming", "inbox-body")
                 first = listing(alice, "MAIL SEARCH Needle")
                 assert ids(first) == own[:8], first
+                # Direct read and rejected requests must not replace the list
+                # cursor or query. Selection is not authorization for another mail.
+                assert item(alice, f"MAIL READ {own[0]}")[0].startswith(f"MAIL ITEM {own[0]} ".encode())
+                assert read(alice, private[0]) == b"MAIL ERROR unavailable"
+                assert cmd(alice, "MAIL SEARCHFROM 4294967296 Changed") == b"ERR command"
                 assert ids(listing(alice, "+")) == own[8:]
                 assert pages(alice, "MAIL SEARCH private-secret") == []
                 assert pages(alice, "MAIL SEARCH needle") == []
@@ -95,6 +100,9 @@ def run(binary):
                 assert latest[0].startswith(f"MAIL ITEM {incoming} ".encode()), latest
                 assert b"READ 1" in latest[0]
                 assert item(alice, "MAIL NEXT") == [b"MAIL ERROR unavailable"]
+                assert cmd(alice, f"MAIL DELETE {own[0]}").startswith(b"MAIL DELETE CONFIRM")
+                assert cmd(alice, "n") == b"CANCELLED"
+                assert item(alice, f"MAIL READ {own[0]}")[0].startswith(f"MAIL ITEM {own[0]} ".encode())
                 assert cmd(alice, f"MAIL DELETE {own[1]}").startswith(b"MAIL DELETE CONFIRM")
                 assert cmd(alice, "Y") == f"MAIL DELETED {own[1]}".encode()
                 visible = [ident for ident in own if ident != own[1]] + [incoming]

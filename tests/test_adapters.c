@@ -240,7 +240,7 @@ int main(void) {
     assert(s.reader.active && strstr((char *)m.data,"SCAN END"));
     assert(s.scan.board==42 && s.scan.scope==2 && !strcmp(s.scan.username,"alice") && !strcmp(s.scan.title,"needle"));
     reset(&m);assert(session_line(&s,"-1",2,401));assert(!s.reader.active && strstr((char *)m.data,"SCAN END"));
-    s.reader.active=1;s.scan.op='m';s.mail_current=1;
+    s.reader.active=1;s.scan.op='m';s.mail.current=1;
     reset(&m);assert(session_line(&s,"-",1,402));assert(!s.reader.active && strstr((char *)m.data,"MAIL SCAN END"));
     s.reader.active=1;s.reader.automatic=1;s.pending=1;strcpy(s.page,"queued text");
     session_scan_stop(&s);assert(!session_auto_read(&s) && !s.reader.active && s.reader.cancel_pending && !s.page[0]);
@@ -307,5 +307,42 @@ int main(void) {
     result.session=125;session_result(&s,&result,505);assert(s.closing && !s.preferences.exit_action);
     free(save);session_dispose(&s);
     puts("PASS: Session disconnect snapshot/epoch, guest/clean exclusion, legacy restore/clamping, stale/save-failure refusal and logout/quit routing");
+    /* Exercise response mapping and identity checks, not just pure Core calls. */
+    for(int lang=LANGUAGE_JA;lang<LANGUAGE_COUNT;lang++) {
+        reset(&m);session_init(&s,io,130,4,1,1,1,(Language)lang);s.user=2;s.mail_mode=1;s.pager_enabled=0;
+        assert(mail_navigation_filter(&s.mail,MAIL_LIST_SEARCH,"Mixed needle",12));
+        s.mail.current=6;s.mail.reading=1;s.mail_pending=s.pending=1;
+        memset(&result,0,sizeof(result));result.session=129;result.slot=4;result.mail_action='L';result.mail_next=22;
+        reset(&m);session_result(&s,&result,600);assert(!m.size && s.mail.cursor==12 && s.mail.reading && s.mail_pending);
+        result.session=130;result.slot=3;session_result(&s,&result,601);assert(s.mail.cursor==12 && s.mail_pending);
+        result.slot=4;strcpy(result.text,"MAIL LIST\r\n");session_result(&s,&result,602);
+        assert(!s.mail_pending && !s.pending && !s.mail.reading && s.mail.current==6 && s.mail.cursor==22);
+        assert(s.mail.filter==MAIL_LIST_SEARCH && !strcmp(s.mail.query,"Mixed needle"));
+        s.mail_pending=1;result.mail_action='R';result.mail_id=14;result.mail_next=0;session_result(&s,&result,603);
+        assert(s.mail.current==14 && s.mail.reading && s.mail.cursor==22);
+        result.mail_action=0;result.mail_id=0;s.mail_pending=1;strcpy(result.text,"ERR mail denied\r\n");session_result(&s,&result,604);
+        assert(s.mail.current==14 && s.mail.reading && s.mail.cursor==22);
+        s.mail_pending=1;result.mail_action='I';result.mail_next=77;session_result(&s,&result,605);
+        assert(s.mail.cursor==77 && !s.mail.reading && s.mail.current==14);
+        s.mail_pending=0;result.mail_action='L';result.mail_next=9;session_result(&s,&result,606);
+        assert(s.mail.cursor==77); /* Only an awaited mail listing changes cursor. */
+        s.mail_pending=1;result.mail_action='B';result.mail_to=3;result.mail_parent=14;result.mail_revision=9;
+        strcpy(result.draft_title,"Retained title");strcpy(result.draft_body,"Retained body");session_result(&s,&result,607);
+        assert(s.editing && s.draft.op=='m' && s.draft.number==3 && s.draft.cursor==14 && s.mail_revision==9);
+        assert(!strcmp(s.draft.body,"Retained body"));
+        s.mail_pending=1;result.mail_action='W';result.mail_revision=0;session_result(&s,&result,608);
+        assert(s.editing && s.mail_revision==9 && !strcmp(s.draft.body,"Retained body"));
+        s.mail_pending=1;result.mail_action='S';result.mail_id=0;session_result(&s,&result,609);
+        assert(s.editing && s.mail.current==14 && !strcmp(s.draft.body,"Retained body"));
+        s.mail_pending=1;result.mail_action='S';result.mail_id=15;session_result(&s,&result,610);
+        assert(!s.editing && !s.draft.body[0] && s.mail.current==15 && !s.mail.reading);
+        s.editing=1;strcpy(s.draft.body,"saved body");s.mail_pending=1;result.mail_action='W';result.mail_id=0;result.mail_revision=10;
+        session_result(&s,&result,611);assert(!s.editing && !s.draft.body[0] && !s.mail_revision);
+        s.mail.current=14;s.mail.reading=1;mail_navigation_confirm(&s.mail,14);
+        reset(&m);assert(session_line(&s,"n",1,612));assert(!s.mail.delete_id && s.mail.current==14 && !s.pending);
+        mail_navigation_confirm(&s.mail,14);session_revoke(&s);assert(!s.mail.delete_id && !s.mail_mode);
+        session_dispose(&s);
+    }
+    puts("PASS: Japanese/English mail response mapping, stale identity refusal, filter retention, cursor ownership, draft failure/success and confirmation revocation");
     return 0;
 }

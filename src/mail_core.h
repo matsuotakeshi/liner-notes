@@ -3,6 +3,7 @@
 #include <stddef.h>
 #include <stdint.h>
 #include "mail_attachments.h"
+#include "mail_query.h"
 #include "mail_files.h"
 #include "transfer.h"
 
@@ -77,8 +78,6 @@ typedef struct {
     int read;
     char from[33],to[33],title[81];
 } MailSummary;
-typedef enum { MAIL_LIST_ALL, MAIL_LIST_SENT, MAIL_LIST_UNREAD, MAIL_LIST_INBOX,
-               MAIL_LIST_SEARCH, MAIL_LIST_NEWS } MailListMode;
 typedef struct {
     MailListMode mode;
     uint32_t cursor; /* exclusive; next is the last ID before the next match */
