@@ -1,5 +1,5 @@
-#include "editor_core.h"
 #define _POSIX_C_SOURCE 200809L
+#include "editor_core.h"
 #include "runtime_limits.h"
 #include "app_limits.h"
 #include "activity.h"
