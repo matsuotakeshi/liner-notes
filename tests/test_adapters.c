@@ -96,6 +96,16 @@ int main(void) {
     assert(s.user==2 && s.user_epoch==5 && session_ready(&s)); session_dispose(&s);
     puts("PASS: password change is transport-independent; revocation clears secrets and success advances session epoch");
     reset(&m); session_init(&s,io,101,4,1,1,1,LANGUAGE_EN);
+    session_dimensions(&s,241,101);assert(s.columns==80 && s.rows==24);
+    session_dimensions(&s,240,100);assert(s.columns==240 && s.rows==100);
+    assert(session_uppercase(&s,"lang ",5));
+    s.password_mode=1;assert(!session_uppercase(&s,"lang ",5));s.password_mode=0;
+    s.editing=1;assert(!session_uppercase(&s,"MiXeD",5));
+    assert(session_uppercase(&s,"/editor ",8));
+    s.editor_line=1;assert(session_uppercase(&s,"l3-5",4));
+    s.editor_input=1;assert(!session_uppercase(&s,"body",4));
+    s.editing=s.editor_line=s.editor_input=0;
+    strcpy(s.page,"held");assert(!session_uppercase(&s,"lang ",5));s.page[0]=0;
     session_dimensions(&s,20,5); assert(s.columns==20 && s.rows==5);
     session_line(&s,"PAGER ON",8,4000);
     memset(&result,0,sizeof(result)); result.session=101; result.slot=4;
