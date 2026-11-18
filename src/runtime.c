@@ -110,9 +110,9 @@ static ConnectionPolicy policy={.idle_seconds=600,.warning_seconds=60,.grace_sec
 static void stop(int sig) { (void)sig; stopping=1; }
 static void drop(Connection *c) {
     if(c->fd==INVALID)return; /* Unused slots contain no live secrets/resources. */
-    if(c->app.user && c->app.exit_after_save!=3 && c->app.saved_ui!=session_ui_signature(&c->app)) {
+    if(session_disconnect_preferences(&c->app,NULL)) {
         BoardRequest *q=calloc(1,sizeof(*q));
-        if(q) { q->op='V';q->number=1;q->ui_aux=(unsigned)c->app.editor_numbers | (c->app.transfer_protocol<<1);q->user=c->app.user;q->user_epoch=c->app.user_epoch;q->cursor=c->app.ui.language;q->title[0]=c->app.pager_enabled?'1':'0';q->scope=c->app.editor_line;q->audit_article=c->app.columns;q->audit_actor=c->app.rows;
+        if(q) { session_disconnect_preferences(&c->app,q);
             if(!board_save_disconnect(q)) { fprintf(stderr,"disconnect preferences: queue failed\n");log_failed=1; }free(q);
         } else { fprintf(stderr,"disconnect preferences: allocation failed\n");log_failed=1; }
     }
