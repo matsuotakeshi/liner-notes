@@ -10,9 +10,20 @@ def run(binary):
         p=Path(tmp);game=p/'bad-exec';game.write_text('#!/nonexistent/liner-notes-interpreter\n');game.chmod(0o700)
         config=p/'doors';base=f'1|0|30|{game}|{p}|Broken executable'
         for bad in ['','dorinfo1:0','dorinfo1:33','dorinfo1:-1','dorinfo1:1junk','dorinfo1:1|extra','none:0','none:999999999999999999999','unknown:1']:
-            config.write_text(base+'|'+bad+'\n')
+            config.write_text(f'9|0|30|{game}|{p}|Accepted before invalid row\n'+base+'|'+bad+'\n')
             r=subprocess.run([binary,'--doors',str(config),'0',str(p/'notes')],capture_output=True,timeout=10)
             assert r.returncode and b'LISTEN ' not in r.stdout,(bad,r.stdout,r.stderr)
+        invalid_rows=[
+            base+'\n'+base, # duplicate identity
+            f'1|0|30|{game}|{p}/missing|Missing directory',
+            f'1|0|30|{p}|{p}|Executable is a directory',
+            f'1|0|30|{game}|{p}|Control\x1btitle',
+            '#'+('x'*4096),
+        ]
+        for row in invalid_rows:
+            config.write_text(row+'\n')
+            r=subprocess.run([binary,'--doors',str(config),'0',str(p/'notes')],capture_output=True,timeout=10)
+            assert r.returncode and b'LISTEN ' not in r.stdout,(row[:120],r.stdout,r.stderr)
         for options in ['none:1','dorinfo1:1']:
             config.write_text(base+'|'+options+'\n')
             s=Server(binary,p/'notes',members=p/'members',menu=True,telnet=True,language='en',options=['--doors',str(config)])
