@@ -197,7 +197,11 @@
         "MAIL_ATTACHMENTS.md",
         "help/ja/mail.txt",
         "src/session.c",
-        "webui/app.py"
+        "webui/app.py",
+        "src/notification_core.c",
+        "src/notification_core.h",
+        "tests/test_notification_core.c",
+        "tests/test_adapters.c"
       ]
     },
     {
@@ -388,7 +392,11 @@
         "src/connection_protocol.c",
         "src/connection_protocol.h",
         "tests/test_connection_core.c",
-        "tests/test_stage57.py"
+        "tests/test_stage57.py",
+        "src/notification_core.c",
+        "src/notification_core.h",
+        "tests/test_notification_core.c",
+        "tests/test_adapters.c"
       ]
     },
     {
