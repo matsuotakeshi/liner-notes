@@ -631,7 +631,13 @@
         "BINARY_TRANSFER.md",
         "UPLOAD.md",
         "webui/bbs_transport.py",
-        "src/session.c"
+        "src/session.c",
+        "src/connector_core.c",
+        "src/connector_core.h",
+        "tests/test_connector_core.c",
+        "tests/test_adapters.c",
+        "tests/test_web_blocks.py",
+        "tests/test_binary_transfer.py"
       ]
     },
     {
