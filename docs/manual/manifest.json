@@ -224,7 +224,9 @@
         "src/session.c",
         "src/vault_query_core.h",
         "src/vault_query_core.c",
-        "src/vault_bridge.c"
+        "src/vault_bridge.c",
+        "src/vault_management_core.h",
+        "src/vault_management_core.c"
       ]
     },
     {
@@ -321,7 +323,9 @@
         "src/download_store.c",
         "src/vault_query_core.h",
         "src/vault_query_core.c",
-        "src/vault_bridge.c"
+        "src/vault_bridge.c",
+        "src/vault_management_core.h",
+        "src/vault_management_core.c"
       ]
     },
     {
@@ -346,7 +350,9 @@
         "src/download_store.c",
         "src/vault_query_core.h",
         "src/vault_query_core.c",
-        "src/vault_bridge.c"
+        "src/vault_bridge.c",
+        "src/vault_management_core.h",
+        "src/vault_management_core.c"
       ]
     },
     {

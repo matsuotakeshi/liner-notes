@@ -2,6 +2,7 @@
 #include "vault_bridge.h"
 #include "vault.h"
 #include "vault_query_core.h"
+#include "vault_management_core.h"
 #include "download.h"
 #include <stdlib.h>
 #include "date_filter.h"
@@ -26,12 +27,28 @@ void vault_bridge_execute(IdentityProvider identity,uint32_t user,uint32_t epoch
     Principal p={0};
     if(!identity.resolve || !identity.resolve(identity.context,user,epoch,&p)) { snprintf(out,size,"ERR login required\r\n");return; }
     VaultResult r=VAULT_INVALID;VaultEntry e;
+    static const struct { int op;VaultFileChangeKind kind;const char *label; } file_changes[]={
+        {VAULT_CMD_DESCRIPTION,VAULT_FILE_DESCRIPTION,"EDITED"},{VAULT_CMD_RENAME,VAULT_FILE_RENAME,"RENAMED"},
+        {VAULT_CMD_OWNER,VAULT_FILE_OWNER,"OWNER CHANGED"},{VAULT_CMD_ASCII,VAULT_FILE_ASCII,"ATTRIBUTE CHANGED"},
+        {VAULT_CMD_CATEGORY,VAULT_FILE_CATEGORY,"CATEGORY"},{VAULT_CMD_HIDE,VAULT_FILE_HIDE,"HIDDEN"},
+        {VAULT_CMD_RESTORE,VAULT_FILE_RESTORE,"RESTORED"},{VAULT_CMD_DELETE,VAULT_FILE_DELETE,"DELETED"}
+    };
+    for(size_t i=0;i<sizeof(file_changes)/sizeof(file_changes[0]);i++)if(op==file_changes[i].op) {
+        VaultFileChange change={.kind=file_changes[i].kind,.text=op==VAULT_CMD_CATEGORY && !strcmp(argument,"-")?"":argument,
+                               .ascii=op==VAULT_CMD_ASCII?(!strcmp(argument,"ON")?1:!strcmp(argument,"OFF")?0:-1):0};
+        r=vault_manage_file(store,&p,id,&change);
+        if(r==VAULT_OK) { snprintf(out,size,"FILE %s %u\r\n",file_changes[i].label,id);return; }
+        break;
+    }
     if(op==VAULT_CMD_PASSWORD || op==VAULT_CMD_UNLOCK || op==VAULT_CMD_OPTIONS) {
         const char *bar=strchr(argument,'|');if(bar && bar-argument<=48) { char name[49];memcpy(name,argument,(size_t)(bar-argument));name[bar-argument]=0;
-            if(op==VAULT_CMD_UNLOCK) { uint32_t board,revision;r=vault_unlock(store,&p,!strcmp(name,"-")?"":name,bar+1,&board,&revision);if(r==VAULT_OK) { snprintf(out,size,"FILEBOARD UNLOCKED %u %u\r\n",board,revision);return; } }
-            else r=op==VAULT_CMD_PASSWORD?vault_password(store,&p,!strcmp(name,"-")?"":name,bar+1):vault_board_metadata(store,&p,!strcmp(name,"-")?"":name,'v',bar+1);
+            const char *path=!strcmp(name,"-")?"":name;
+            if(op==VAULT_CMD_UNLOCK) { VaultBoardGrant grant;r=vault_manage_unlock(store,&p,path,bar+1,&grant);if(r==VAULT_OK) { snprintf(out,size,"FILEBOARD UNLOCKED %u %u\r\n",grant.board,grant.revision);return; } }
+            else if(op==VAULT_CMD_PASSWORD)r=vault_manage_password(store,&p,path,bar+1);
+            else { VaultBoardUpdate result=vault_manage_board(store,&p,path,VAULT_BOARD_OPTIONS,bar+1);r=result.result;
+                if(result.retention_failed) { snprintf(out,size,"ERR vault log storage\r\n");return; } }
         }
-        if(r==VAULT_OK) { if(op==VAULT_CMD_OPTIONS && !downloads_prune(store)) { snprintf(out,size,"ERR vault log storage\r\n");return; }snprintf(out,size,"FILEBOARD UPDATED\r\n");return; }
+        if(r==VAULT_OK) { snprintf(out,size,"FILEBOARD UPDATED\r\n");return; }
     }
     if(op==VAULT_CMD_CHILDREN) {
         VaultQueryChildren page;r=vault_query_children(store,&p,!strcmp(argument,"-")?"":argument,id,&page);
@@ -41,25 +58,19 @@ void vault_bridge_execute(IdentityProvider identity,uint32_t user,uint32_t epoch
             snprintf(out+used,size-used,"END CHILDREN NEXT %u\r\n",page.next);return;
         }
     }
-    if(op==VAULT_CMD_COPY) { r=vault_copy(store,&p,id,!strcmp(argument,"-")?"":argument,&e);if(r==VAULT_OK) { snprintf(out,size,"FILE COPIED %u %u\r\n",id,e.id);return; } }
-    if(op==VAULT_CMD_RENAME) { r=vault_rename(store,&p,id,argument);if(r==VAULT_OK) { snprintf(out,size,"FILE RENAMED %u\r\n",id);return; } }
+    if(op==VAULT_CMD_COPY) { r=vault_manage_copy(store,&p,id,!strcmp(argument,"-")?"":argument,&e);if(r==VAULT_OK) { snprintf(out,size,"FILE COPIED %u %u\r\n",id,e.id);return; } }
     if(op==VAULT_CMD_MATCH) {
         char category[49];const char *pattern=argument,*scope=NULL,*bar=strchr(argument,'|');
         if(bar) { size_t length=(size_t)(bar-argument);if(!length || length>48) { snprintf(out,size,"ERR vault syntax\r\n");return; }memcpy(category,argument,length);category[length]=0;if(!strcmp(category,"-"))category[0]=0;scope=category;pattern=bar+1; }
         VaultQueryMatch match;r=vault_query_match(store,&p,pattern,scope,&match);
         if(r==VAULT_OK) { size_t used=(size_t)snprintf(out,size,"BATCHMATCH");for(size_t i=0;i<match.count;i++)used+=(size_t)snprintf(out+used,size-used," %u",match.ids[i]);snprintf(out+used,size-used,"\r\n");return; }
     }
-    if(op==VAULT_CMD_OWNER || op==VAULT_CMD_ASCII) {
-        r=op==VAULT_CMD_OWNER?vault_owner(store,&p,id,argument):vault_ascii(store,&p,id,!strcmp(argument,"ON")?1:!strcmp(argument,"OFF")?0:-1);
-        if(r==VAULT_OK) { snprintf(out,size,"FILE %s %u\r\n",op==VAULT_CMD_OWNER?"OWNER CHANGED":"ATTRIBUTE CHANGED",id);return; }
-    }
     if(op==VAULT_CMD_BOARDNAME || op==VAULT_CMD_BOARDGUIDE || op==VAULT_CMD_BOARDSIGOP) {
-        const char *bar=strchr(argument,'|');if(bar && bar-argument<=48) { char name[49];memcpy(name,argument,(size_t)(bar-argument));name[bar-argument]=0;r=vault_board_metadata(store,&p,!strcmp(name,"-")?"":name,op==VAULT_CMD_BOARDNAME?'n':op==VAULT_CMD_BOARDSIGOP?'o':'i',bar+1); }
+        const char *bar=strchr(argument,'|');if(bar && bar-argument<=48) { char name[49];memcpy(name,argument,(size_t)(bar-argument));name[bar-argument]=0;VaultBoardUpdate result=vault_manage_board(store,&p,!strcmp(name,"-")?"":name,op==VAULT_CMD_BOARDNAME?VAULT_BOARD_NAME:op==VAULT_CMD_BOARDSIGOP?VAULT_BOARD_SIGOP:VAULT_BOARD_GUIDE,bar+1);r=result.result; }
         if(r==VAULT_OK) { snprintf(out,size,"FILEBOARD UPDATED\r\n");return; }
     }
     if(op==VAULT_CMD_BOARDEDIT) {
-        VaultBoard b;r=vault_board_get(store,&p,!strcmp(argument,"-")?"":argument,&b);
-        if(r==VAULT_OK && !b.can_manage)r=VAULT_DENIED;
+        VaultBoard b;r=vault_manage_inspect(store,&p,!strcmp(argument,"-")?"":argument,1,&b);
         if(r==VAULT_OK) { snprintf(out,size,"FILEBOARD EDIT %s\r\n%s",argument,b.info);return; }
     }
     if(op==VAULT_CMD_TEXT) {
@@ -82,7 +93,7 @@ void vault_bridge_execute(IdentityProvider identity,uint32_t user,uint32_t epoch
         }
     }
     if(op==VAULT_CMD_BOARDINFO) {
-        VaultBoard b;r=vault_board_get(store,&p,!strcmp(argument,"-")?"":argument,&b);
+        VaultBoard b;r=vault_manage_inspect(store,&p,!strcmp(argument,"-")?"":argument,0,&b);
         if(r==VAULT_OK && !*b.display && !*b.info && !*b.sigop && !b.menu && !b.order && !b.keep && !b.locked) { snprintf(out,size,"FILEBOARDSETTING %s|%s|%s\r\n",*b.name?b.name:"-",b.read,b.upload);return; }
         if(r==VAULT_OK) { snprintf(out,size,"FILEBOARDSETTING %s|%s|%s\r\nDISPLAY %s\r\nSIGOP %s\r\n%s",*b.name?b.name:"-",b.read,b.upload,b.display,*b.sigop?b.sigop:"-",b.info);size_t used=strlen(out);snprintf(out+used,size-used,"OPTIONS %s %u %u PASSWORD %s\r\nEND FILEBOARD\r\n",b.menu?"MENU":"BOARD",b.order,b.keep,b.locked?"ON":"OFF");return; }
     }
@@ -93,11 +104,8 @@ void vault_bridge_execute(IdentityProvider identity,uint32_t user,uint32_t epoch
     if(op==VAULT_CMD_BOARDSET) {
         char copy[256];if(strlen(argument)>=sizeof(copy)) { snprintf(out,size,"ERR vault syntax\r\n");return; }strcpy(copy,argument);
         char *read=strchr(copy,'|'),*write=read?strchr(read+1,'|'):NULL;
-        if(read && write && !strchr(write+1,'|')) { *read++=0;*write++=0;r=vault_board_set(store,&p,!strcmp(copy,"-")?"":copy,read,write); }
+        if(read && write && !strchr(write+1,'|')) { *read++=0;*write++=0;r=vault_manage_policy(store,&p,!strcmp(copy,"-")?"":copy,read,write); }
         if(r==VAULT_OK) { snprintf(out,size,"FILEBOARD UPDATED\r\n");return; }
-    } else if(op==VAULT_CMD_DELETE) {
-        r=vault_reclaim(store,&p,id);
-        if(r==VAULT_OK) { snprintf(out,size,"FILE DELETED %u\r\n",id);return; }
     } else if(op==VAULT_CMD_LIST || op==VAULT_CMD_SEARCH || op==VAULT_CMD_IN || op==VAULT_CMD_NEWS) {
         VaultQueryFiles page;VaultQuery request={.cursor=id};
         char category[49];const char *query=argument,*scope=NULL,*bar=strchr(argument,'|');
@@ -125,17 +133,8 @@ void vault_bridge_execute(IdentityProvider identity,uint32_t user,uint32_t epoch
     } else if(op==VAULT_CMD_INFO) {
         VaultQueryDetail detail;r=vault_query_detail(store,&p,id,&detail);
         if(r==VAULT_OK) { char hash[65];e=detail.entry;vault_hex(e.sha256,hash);snprintf(out,size,"FILE %u %u %s\r\nNAME %s\r\nDESCRIPTION %s\r\nPUBLISHER %s\r\nCATEGORY %s\r\nASCII %s\r\nPROTOCOL %s\r\nEND FILE\r\n",e.id,e.size,hash,e.name,e.description,e.publisher,*e.category?e.category:"-",e.ascii?"ON":"OFF",detail.protocol);return; }
-    } else if(op==VAULT_CMD_HIDE) {
-        r=vault_hide(store,&p,id);
-        if(r==VAULT_OK) { snprintf(out,size,"FILE HIDDEN %u\r\n",id);return; }
     }
-    if(op==VAULT_CMD_DESCRIPTION || op==VAULT_CMD_RESTORE) {
-        r=op==VAULT_CMD_DESCRIPTION?vault_description(store,&p,id,argument):vault_restore(store,&p,id);
-        if(r==VAULT_OK) { snprintf(out,size,"FILE %s %u\r\n",op==VAULT_CMD_DESCRIPTION?"EDITED":"RESTORED",id);return; }
-    } else if(op==VAULT_CMD_CATEGORY) {
-        r=vault_category(store,&p,id,!strcmp(argument,"-")?"":argument);
-        if(r==VAULT_OK) { snprintf(out,size,"FILE CATEGORY %u\r\n",id);return; }
-    } else if(op==VAULT_CMD_BOARDS) {
+    if(op==VAULT_CMD_BOARDS) {
         VaultQueryBoards page;r=vault_query_boards(store,&p,id,&page);
         if(r==VAULT_OK) {
             size_t pos=(size_t)snprintf(out,size,"FILEBOARDS\r\n");
