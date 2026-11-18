@@ -10,3 +10,5 @@ S3-10 query, or S3-10 then a query, searches a range; S query searches all lines
 At the line-command prompt: W lists all connections; # shows time, connection duration, online count and own usage totals; \ asks for a connection memo; T [connection] sends one private line and returns to the unchanged editor/Undo buffer. In beta input use /W /# /MEMO text /T connection.
 
 /TALK [connection] starts continuing talk; // returns to the editor.
+
+Undo belongs to this connection and restores one edit. Identical title/line replacements and range/capacity errors preserve it. Resuming a saved draft does not restore previous Undo history.

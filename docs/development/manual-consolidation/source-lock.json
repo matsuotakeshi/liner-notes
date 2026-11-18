@@ -1,6 +1,6 @@
 {
   "LICENSE": "fb981668c18a279e285fc4d83fba1e836cc84dd4daa73c9697d3cfd2d8aca6e0",
-  "Makefile": "bec60622e75b106a0162ae4bf4fe07bcf27ba601c8136244897da856309e06a7",
+  "Makefile": "7530708eae98980d8190e6ec2cf63672b3eb13ac6a5f4f123a64a6f326603faa",
   "boards.example.conf": "4bd1a17ecf3966d3829510e8495a1362fb8b922cd754badccc739f5e5ab0bde8",
   "ci/build-freebsd-package.sh": "4e62899471d1f1a6c44e00a783c1aff771332140704ae778da95a95048474108",
   "debian/changelog": "8f3574a094f5a3677a9a7188e530ecdbdc006138b082b57243ca8441c644114d",
@@ -19,7 +19,7 @@
   "help/ja/chat.txt": "7bb3f8763e66c5f7c339640fa2f50225fc3654126cea6e5c903f66ab90716217",
   "help/ja/content.txt": "49952d3a8ab650f3899a38b30e96234400a94691c6aa9fc5f00f720cea6748d3",
   "help/ja/draft.txt": "0c458e9dd03919cd6a7666c4091ff4f51341d82fd11f1144b548a6f276e8fae9",
-  "help/ja/editor.txt": "9208311b045edfa61239e61c7f882cf3541093e1c6492a0e5ebd4b8ec7a88009",
+  "help/ja/editor.txt": "1d55dcb5af9aa2a4331136a0f8a14f0039a0d2115458d02cf78bdf27edab0413",
   "help/ja/files.txt": "a2a5ed852f6ae5fc13ef25c2f5e9438b2696297d62f77ef744aa78f38cc83bb4",
   "help/ja/gather.txt": "a7c3b48f9128aea8097b38bf5ed37c178ab9b54d8c44c0adb860332eea3d4a14",
   "help/ja/index.txt": "a654c7fc5651da4ecf74908ede0282b5bfad697a87ba2e1d8a1b8b110ddca94f",
@@ -63,7 +63,7 @@
   "src/profile_store.c": "9bd14cb1a44b9e117fb9465d036f2d5417bca8188a136a9162f91f8b46f33e2a",
   "src/runtime.c": "826887e0c17a1733b43d938c1469d28023417ead325c0ef819eaec1a6d9a375e",
   "src/runtime_limits.h": "82de34913914d0f81874789d473928e044225772c4db9d656bceac03920219a8",
-  "src/session.c": "f6f5300e5f9116e81d48319bc0dc0deac7522cd2cddf095e663aeec4d7bf1dd8",
+  "src/session.c": "801fa1c8e9e69db86258cbe61b3863e62ff93841af1da548ebac0d7485b30945",
   "src/storage_sqlite.c": "aa8971c445e2a23ae21548fc706e318e40238f8318c2f717490b867067ab3055",
   "src/telnet.c": "a490e550fb227858727b4edc656c7c1d60bf90f6fa13a2f74dd361234b8ff422",
   "src/transfer_line.c": "5c3f9e15fd46c8569d0f2775628de7a432d60eb6bdfd93babdf7f77fb5f9f156",
@@ -202,5 +202,8 @@
   "src/link_core.h": "912290fb8bfe99d4940f2e995e068d1242868283c9b0727b653c04fa007ee8a9",
   "src/link_repository.h": "3c520926c2b536545dd1fef6a35aa11dab70633088ae60e2a8e37e4a81f724a2",
   "src/link_adapter.inc": "154120382fa37f71446cbc658cba90589e2d4dc71f8f8f32ccae3557895f23e2",
-  "help/en/admin.txt": "4cc0374cbe126f84a5cf08567361ff1b03fa2306f50c1a455f8edab08f1fa892"
+  "help/en/admin.txt": "4cc0374cbe126f84a5cf08567361ff1b03fa2306f50c1a455f8edab08f1fa892",
+  "src/editor_core.c": "9b3b58d6b1c49865765530649e6e9ca752fbf423b73e20fb1dbfeb026f8952bb",
+  "src/editor_core.h": "4aea6898b2b675bee53139b9f1e1c66084304cdb757d421bebcddd39a335927c",
+  "help/en/editor.txt": "7184a9afcf7b55ce052e3fac627e31e7d4358af3fc0e43dba2de597ee14c7303"
 }

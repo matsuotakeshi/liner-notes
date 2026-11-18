@@ -1,3 +1,4 @@
+#include "editor_core.h"
 #define _POSIX_C_SOURCE 200809L
 #include "runtime_limits.h"
 #include "app_limits.h"
@@ -441,72 +442,58 @@ bad_profile:emit(s,"ERR profile text\r\n");return 1;
 syntax:
     emit(s,"ERR extended syntax\r\n"); return 1;
 }
-static void undo_clear(Session *s) {
-    s->undo_available=0; OPENSSL_cleanse(s->undo_title,sizeof(s->undo_title)); OPENSSL_cleanse(s->undo_body,sizeof(s->undo_body));
+static EditorDocument editor_document(Session *s) {
+    return (EditorDocument){s->draft.title,s->draft.body,s->undo_title,s->undo_body,&s->undo_available};
 }
-static void undo_save(Session *s) {
-    memcpy(s->undo_title,s->draft.title,sizeof(s->undo_title)); memcpy(s->undo_body,s->draft.body,sizeof(s->undo_body)); s->undo_available=1;
+static void undo_clear(Session *s) { EditorDocument d=editor_document(s);editor_discard_undo(&d); }
+static EditorOutcome edit_apply(Session *s,EditorOperation op,uint32_t first,uint32_t last,const char *text) {
+    EditorDocument d=editor_document(s);return editor_apply(&d,op,first,last,text);
+}
+static void editor_error(Session *s,EditorOutcome result) {
+    emit(s,result==EDITOR_NO_UNDO?"ERR no undo\r\n":result==EDITOR_TITLE_INVALID?"ERR title 1..80 bytes, no controls\r\n":
+           result==EDITOR_CONTROL?"ERR control character\r\n":result==EDITOR_LIMIT?"ERR body limit 262144 bytes; cancel or finish\r\n":"ERR draft line\r\n");
 }
 static int draft_word(const char *line,const char *word) {
     size_t n=strlen(word); return !strncmp(line,word,n) && (!line[n] || line[n]==' ');
 }
 static int edit_draft(Session *s,const char *line) {
-    char *body=s->draft.body;
+    EditorDocument d=editor_document(s);EditorOutcome result;
     if(!strcmp(line,"/UNDO")) {
-        if(!s->undo_available) emit(s,"ERR no undo\r\n");
-        else {
-            memcpy(s->draft.title,s->undo_title,sizeof(s->undo_title)); memcpy(body,s->undo_body,sizeof(s->undo_body));
-            undo_clear(s); emit(s,"DRAFT UNDONE\r\n");
-        }
+        result=editor_apply(&d,EDITOR_UNDO,0,0,NULL);
+        if(result==EDITOR_OK)emit(s,"DRAFT UNDONE\r\n");else editor_error(s,result);
         return 1;
     }
     if(!strcmp(line,"/LINES")) {
-        char out[CONTENT_DISPLAY]; unsigned count=0;
-        for(const char *p=body;*p;p=strstr(p,"\r\n")+2) count++;
-        size_t used=(size_t)snprintf(out,sizeof(out),"DRAFT LINES %u\r\nTITLE %s\r\n",count,s->draft.title);
-        unsigned number=1;
-        for(const char *p=body;*p;number++) {
-            const char *end=strstr(p,"\r\n");
-            used+=(size_t)snprintf(out+used,sizeof(out)-used,"LINE %u %.*s\r\n",number,(int)(end-p),p); p=end+2;
-        }
-        snprintf(out+used,sizeof(out)-used,"END DRAFT\r\n"); emit(s,out); return 1;
+        EditorInfo info;if(editor_inspect(&d,&info)!=EDITOR_OK) { editor_error(s,EDITOR_INVALID);return 1; }
+        char out[CONTENT_DISPLAY];size_t used=(size_t)snprintf(out,sizeof(out),"DRAFT LINES %u\r\nTITLE %s\r\n",info.lines,s->draft.title);
+        unsigned number=1;size_t cursor=0;EditorSpan span;
+        while(editor_next_line(d.body,info.bytes,&cursor,&span)==1)
+            used+=(size_t)snprintf(out+used,sizeof(out)-used,"LINE %u %.*s\r\n",number++,(int)span.size,span.text);
+        snprintf(out+used,sizeof(out)-used,"END DRAFT\r\n");emit(s,out);return 1;
     }
     if(draft_word(line,"/TITLE")) {
-        const char *title=line[6]?line+7:"";
-        if(!*title || strlen(title)>BOARD_TITLE || !safe_text(title)) emit(s,"ERR title 1..80 bytes, no controls\r\n");
-        else { if(strcmp(s->draft.title,title)) undo_save(s); strcpy(s->draft.title,title); emit(s,"DRAFT TITLE CHANGED\r\n"); }
+        result=editor_apply(&d,EDITOR_SET_TITLE,0,0,line[6]?line+7:"");
+        if(result==EDITOR_OK)emit(s,"DRAFT TITLE CHANGED\r\n");else editor_error(s,result);
         return 1;
     }
     int replace=draft_word(line,"/REPLACE"),remove=draft_word(line,"/DELETE"),insert=draft_word(line,"/INSERT");
-    if(!replace && !remove && !insert) return 0;
-    size_t prefix=replace?8:7; uint32_t number; const char *tail;
+    if(!replace && !remove && !insert)return 0;
+    size_t prefix=replace?8:7;uint32_t number;const char *tail;
     if(!line[prefix] || !number_arg(line+prefix+1,&number,&tail) || (remove && *tail) || (!remove && *tail && *tail!=' ')) {
-        emit(s,"ERR draft line\r\n"); return 1;
+        emit(s,"ERR draft line\r\n");return 1;
     }
-    char *start=body;
-    uint32_t at=1;
-    for(;at<number && *start;at++) start=strstr(start,"\r\n")+2;
-    if(at!=number || (!insert && !*start)) { emit(s,"ERR draft line\r\n"); return 1; }
-    char *end=insert?start:strstr(start,"\r\n")+2;
-    const char *text=!remove && *tail?tail+1:"";
-    if(!safe_text(text)) { emit(s,"ERR control character\r\n"); return 1; }
-    size_t n=strlen(text),old=(size_t)(end-start),length=strlen(body),add=remove?0:n+2;
-    if(length-old+add>BOARD_BODY) { emit(s,"ERR body limit 262144 bytes; cancel or finish\r\n"); return 1; }
-    if(replace && old==add && !memcmp(start,text,n)) { emit(s,"DRAFT LINE REPLACED\r\n"); return 1; }
-    undo_save(s);
-    memmove(start+add,end,strlen(end)+1);
-    if(!remove) { memcpy(start,text,n); memcpy(start+n,"\r\n",2); }
-    memset(body+length-old+add+1,0,BOARD_BODY-(length-old+add));
-    emit(s,insert?"DRAFT LINE INSERTED\r\n":replace?"DRAFT LINE REPLACED\r\n":"DRAFT LINE DELETED\r\n"); return 1;
+    result=editor_apply(&d,insert?EDITOR_INSERT:replace?EDITOR_REPLACE:EDITOR_DELETE,number,number,!remove && *tail?tail+1:"");
+    if(result==EDITOR_OK)emit(s,insert?"DRAFT LINE INSERTED\r\n":replace?"DRAFT LINE REPLACED\r\n":"DRAFT LINE DELETED\r\n");else editor_error(s,result);
+    return 1;
 }
-
 static unsigned editor_count(const Session *s) {
-    unsigned n=0;for(const char *p=s->draft.body;*p;p=strstr(p,"\r\n")+2)n++;return n;
+    EditorDocument d={(char *)s->draft.title,(char *)s->draft.body,(char *)s->undo_title,(char *)s->undo_body,(int *)&s->undo_available};
+    EditorInfo info;return editor_inspect(&d,&info)==EDITOR_OK?info.lines:0;
 }
 /* RTBBS line commands share the existing draft and undo snapshot. */
 static int classic_editor(Session *s,const char *line,char *translated,size_t size) {
     if(s->editor_upload_question) {
-        if(!*line || !strcmp(line,"Y") || !strcmp(line,"y")) { undo_save(s);s->draft.body[0]=0; }
+        if(!*line || !strcmp(line,"Y") || !strcmp(line,"y")) { edit_apply(s,EDITOR_CLEAR,0,0,NULL); }
         else if(strcmp(line,"N") && strcmp(line,"n")) { queue_text(s,"Y / N > ");return 1; }
         s->editor_upload_question=0;s->editor_at=editor_count(s)+1;s->editor_input=1;s->editor_upload=1;s->editor_deadline=s->now+3000;
         queue_text(s,s->ui.language==LANGUAGE_JA?"テキスト受信中。3秒間の無入力で終了します。\r\n":"Receiving text; 3 seconds idle ends input.\r\n");return 1;
@@ -518,7 +505,7 @@ static int classic_editor(Session *s,const char *line,char *translated,size_t si
     if(!strcmp(line,"/EDITOR BETA")) { s->editor_line=0;s->editor_input=0;queue_text(s,ui_text(&s->ui,MSG_EDITOR_BETA));return 1; }
     if(!strcmp(line,"/?") || (s->editor_line && !s->editor_input && !strcmp(line,"?"))) { queue_text(s,help_text(s->ui.language,"EDITOR")?help_text(s->ui.language,"EDITOR"):ui_text(&s->ui,MSG_EDITOR_HELP));return 1; }
     if(!strcmp(line,"/M") || (s->editor_line && !s->editor_input && !strcmp(line,"M"))) { s->editor_numbers=!s->editor_numbers;queue_text(s,ui_text(&s->ui,MSG_EDITOR_NUMBERS));queue_text(s,s->editor_numbers?"ON\r\n":"OFF\r\n");return 1; }
-    if(!strcmp(line,"/N")) { undo_save(s);memset(s->draft.body,0,sizeof(s->draft.body));s->editor_at=1;return 1; }
+    if(!strcmp(line,"/N")) { edit_apply(s,EDITOR_CLEAR,0,0,NULL);s->editor_at=1;return 1; }
     if(!s->editor_line) { if(!strcmp(line,"//")) {
         if(s->ui.enabled) { s->editor_confirm=1;queue_text(s,ui_text(&s->ui,MSG_CLASSIC_WRITE));return 1; }
         snprintf(translated,size,".");
@@ -528,13 +515,12 @@ static int classic_editor(Session *s,const char *line,char *translated,size_t si
         if(s->editor_upload)s->editor_deadline=s->now+3000;
         if(!strcmp(line,"//")) { s->editor_input=0;s->editor_upload=0;return 1; }
         if(*line=='/' && (draft_word(line,"/SAVE") || draft_word(line,"/CANCEL") || draft_word(line,"/UNDO") || draft_word(line,"/PREVIEW") || draft_word(line,"/ATTACH") || draft_word(line,"/DETACH") || draft_word(line,"/TITLE") || draft_word(line,"/LINES") || draft_word(line,"/REPLACE") || draft_word(line,"/INSERT") || draft_word(line,"/DELETE") || draft_word(line,"/HELP")))return 0;
-        unsigned count=editor_count(s);if(s->editor_at>count+1)s->editor_at=count+1;const char *op=s->editor_input==2 && s->editor_at<=count?"/REPLACE":"/INSERT";
-        char command[INPUT_LINE_MAX+128];snprintf(command,sizeof(command),"%s %u %s",op,s->editor_at,line);
-        /* Check capacity before advancing the cursor. */
-        const char *at=s->draft.body;for(unsigned n=1;n<s->editor_at && *at;n++)at=strstr(at,"\r\n")+2;
-        size_t old=!strcmp(op,"/REPLACE")?(size_t)(strstr(at,"\r\n")+2-at):0;
-        if(safe_text(line) && strlen(s->draft.body)-old+strlen(line)+2<=BOARD_BODY) {
-            edit_draft(s,command);s->editor_at++;if(s->editor_input==2)s->editor_input=0;
+        unsigned count=editor_count(s);if(s->editor_at>count+1)s->editor_at=count+1;
+        EditorOperation op=s->editor_input==2 && s->editor_at<=count?EDITOR_REPLACE:EDITOR_INSERT;
+        EditorOutcome result=edit_apply(s,op,s->editor_at,s->editor_at,line);
+        if(result==EDITOR_OK) {
+            emit(s,op==EDITOR_REPLACE?"DRAFT LINE REPLACED\r\n":"DRAFT LINE INSERTED\r\n");
+            s->editor_at++;if(s->editor_input==2)s->editor_input=0;
         } else emit(s,"ERR body limit 262144 bytes; cancel or finish\r\n");
         return 1;
     }
@@ -545,7 +531,7 @@ static int classic_editor(Session *s,const char *line,char *translated,size_t si
         const char *end;uint32_t at;if(number_arg(line,&at,&end) && !*end && at<=count)s->editor_at=at;else emit(s,"ERR draft line\r\n");return 1;
     }
     char key=*line;if(key>='a' && key<='z')key-=32;
-    if(key=='N' && !line[1]) { undo_save(s);memset(s->draft.body,0,sizeof(s->draft.body));s->editor_at=1;s->editor_input=1;return 1; }
+    if(key=='N' && !line[1]) { edit_apply(s,EDITOR_CLEAR,0,0,NULL);s->editor_at=1;s->editor_input=1;return 1; }
     if(key=='U' && !line[1] && count) { s->editor_upload_question=1;queue_text(s,s->ui.language==LANGUAGE_JA?"バッファをクリアしますか？ [Y]/N（Nは追記） > ":"Clear buffer? [Y]/N (N appends) > ");return 1; }
     if((key=='A' || key=='U') && !line[1]) { s->editor_at=count+1;s->editor_input=1;if(key=='U') { s->editor_upload=1;s->editor_deadline=s->now+3000;queue_text(s,s->ui.language==LANGUAGE_JA?"テキスト受信中。3秒間の無入力で編集へ戻ります。\r\n":"Receiving text; 3 seconds idle returns to editor.\r\n"); }return 1; }
     if(key=='S') {
@@ -559,20 +545,20 @@ static int classic_editor(Session *s,const char *line,char *translated,size_t si
         if(!first || first>last || last>count)goto invalid;
         while(*query==' ')query++;
         if(!*query) { s->search_first=first;s->search_last=last;s->editor_input=4;queue_text(s,ui_text(&s->ui,MSG_EDITOR_SEARCH));return 1; }
-        unsigned n=1,matches=0;size_t length=strlen(query);
-        for(const char *p=s->draft.body;*p;n++) {
-            const char *end=strstr(p,"\r\n");if(!end)break;
-            const char *hit=strstr(p,query);
-            if(n>=first && n<=last && hit && hit+length<=end) {
-                size_t capacity=(size_t)(end-p)*12+128;char *out=malloc(capacity);if(!out) { emit(s,"ERR board busy\r\n");return 1; }size_t used=0;const char *at=p;
-                if(s->editor_numbers)used+=(size_t)snprintf(out+used,capacity-used,"%u ",n);
-                while(hit && hit+length<=end) {
-                    used+=(size_t)snprintf(out+used,capacity-used,"%.*s%s%.*s%s",(int)(hit-at),at,s->ui.enabled?"\033[33m":"",(int)length,hit,s->ui.enabled?"\033[0m":"");
-                    matches++;at=hit+length;hit=strstr(at,query);
-                }
-                snprintf(out+used,capacity-used,"%.*s\r\n",(int)(end-at),at);queue_text(s,out);free(out);
-            }
-            p=end+2;
+        unsigned n=0,matches=0;EditorDocument document=editor_document(s);EditorInfo info;
+        if(editor_inspect(&document,&info)!=EDITOR_OK)goto invalid;
+        size_t cursor=0;EditorSpan span;
+        while(editor_next_line(document.body,info.bytes,&cursor,&span)==1) {
+            n++;if(n<first || n>last)continue;
+            size_t search=0;EditorMatch hit;if(editor_find_next(&span,query,&search,&hit)!=1)continue;
+            size_t capacity=span.size*12+128;char *out=malloc(capacity);
+            if(!out) { emit(s,"ERR board busy\r\n");return 1; }
+            size_t used=0,at=0;if(s->editor_numbers)used+=(size_t)snprintf(out+used,capacity-used,"%u ",n);
+            do {
+                used+=(size_t)snprintf(out+used,capacity-used,"%.*s%s%.*s%s",(int)(hit.offset-at),span.text+at,s->ui.enabled?"\033[33m":"",(int)hit.size,span.text+hit.offset,s->ui.enabled?"\033[0m":"");
+                matches++;at=hit.offset+hit.size;
+            } while(editor_find_next(&span,query,&search,&hit)==1);
+            snprintf(out+used,capacity-used,"%.*s\r\n",(int)(span.size-at),span.text+at);queue_text(s,out);free(out);
         }
         char total[80];snprintf(total,sizeof(total),s->ui.language==LANGUAGE_JA?"一致: %u 件\r\n":"Matches: %u\r\n",matches);queue_text(s,total);return 1;
     }
@@ -598,12 +584,11 @@ static int classic_editor(Session *s,const char *line,char *translated,size_t si
     char *end=begin;for(uint32_t i=first;i<=last;i++)end=strstr(end,"\r\n")+2;
     if(key=='L') { char out[CONTENT_DISPLAY];size_t used=0;uint32_t n=first;
         for(char *p=begin;p<end;n++) { char *next=strstr(p,"\r\n");if(s->editor_numbers)used+=(size_t)snprintf(out+used,sizeof(out)-used,"%u ",n);used+=(size_t)snprintf(out+used,sizeof(out)-used,"%.*s\r\n",(int)(next-p),p);p=next+2; }queue_text(s,out);return 1; }
-    if(key=='D') { undo_save(s);memmove(begin,end,strlen(end)+1);s->editor_at=first;return 1; }
-    if(key=='Q') {
-        if(strlen(s->draft.body)+2*(last-first+1)>BOARD_BODY)goto invalid;
-        char copy[BOARD_BODY+1];size_t used=(size_t)(begin-s->draft.body);memcpy(copy,s->draft.body,used);
-        for(char *p=begin;p<end;) { char *next=strstr(p,"\r\n")+2;copy[used++]='>';copy[used++]=' ';memcpy(copy+used,p,(size_t)(next-p));used+=(size_t)(next-p);p=next; }
-        strcpy(copy+used,end);undo_save(s);strcpy(s->draft.body,copy);return 1;
+    if(key=='D' || key=='Q') {
+        EditorOutcome result=edit_apply(s,key=='D'?EDITOR_DELETE:EDITOR_QUOTE,first,last,NULL);
+        if(result!=EDITOR_OK)goto invalid;
+        if(key=='D')s->editor_at=first;
+        return 1;
     }
 invalid:emit(s,"ERR draft line\r\n");return 1;
 }
@@ -1007,10 +992,8 @@ static void command_core(Session *s,char *line) {
         } else {
             if(!strncmp(line,"..",2) || !strcmp(line,"//PREVIEW") || !strcmp(line,"//LINES") || !strcmp(line,"//UNDO") || !strcmp(line,"//SAVE") || !strcmp(line,"//HELP") ||
                (line[0]=='/' && (draft_word(line+1,"/TITLE") || draft_word(line+1,"/REPLACE") || draft_word(line+1,"/DELETE") || draft_word(line+1,"/INSERT")))) line++;
-            size_t have=strlen(s->draft.body), n=strlen(line);
-            if(!safe_text(line)) emit(s,"ERR control character\r\n");
-            else if(have+n+2>BOARD_BODY) emit(s,"ERR body limit 262144 bytes; cancel or finish\r\n");
-            else { undo_save(s); memcpy(s->draft.body+have,line,n); memcpy(s->draft.body+have+n,"\r\n",3); }
+            EditorOutcome result=edit_apply(s,EDITOR_APPEND_LINE,0,0,line);
+            if(result!=EDITOR_OK)editor_error(s,result);
         }
         return;
     }
@@ -1841,9 +1824,7 @@ static int connector_line(Session *s,char *line,size_t size) {
         if(!s->editing || s->password_mode || s->chatting)queue_text(s,"ERR connector editor state\r\n");
         else if(!safe_text(line))queue_text(s,"ERR control character\r\n");
         else {
-            size_t have=strlen(s->draft.body);
-            if(have+size+2>BOARD_BODY)queue_text(s,"ERR body limit\r\n");
-            else { undo_save(s);memcpy(s->draft.body+have,line,size);memcpy(s->draft.body+have+size,"\r\n",3); }
+            if(edit_apply(s,EDITOR_APPEND_LINE,0,0,line)!=EDITOR_OK)queue_text(s,"ERR body limit\r\n");
         }
         return 1;
     }
@@ -2047,7 +2028,7 @@ void session_result(Session *s,const BoardResult *completion,uint64_t now) {
         BoardRequest q={0};q.op='j';q.number=completion->service_number;submit(s,&q);return;
     }
     if(completion->service_action=='8') { memset(&s->draft,0,sizeof(s->draft));undo_clear(s);s->draft.op=')';s->draft.action=completion->service_number==1?'B':'C';strcpy(s->draft.body,completion->draft_body);s->editing=1;s->editor_input=0;s->editor_at=1; }
-    if(completion->service_action=='9') { size_t have=strlen(s->draft.body),add=strlen(completion->draft_body);if(!s->editing || have+add>BOARD_BODY)emit(s,"ERR body limit 262144 bytes; cancel or finish\r\n");else { undo_save(s);memcpy(s->draft.body+have,completion->draft_body,add+1);emit(s,"BUFFER IMPORTED\r\n"); }prompt(s);return; }
+    if(completion->service_action=='9') { if(!s->editing || edit_apply(s,EDITOR_APPEND_BLOCK,0,0,completion->draft_body)!=EDITOR_OK)emit(s,"ERR body limit 262144 bytes; cancel or finish\r\n");else emit(s,"BUFFER IMPORTED\r\n");prompt(s);return; }
     if(completion->service_action=='0' && completion->service_number) { s->editing=0;s->editor_upload=s->editor_confirm=s->editor_upload_question=0;memset(&s->draft,0,sizeof(s->draft));undo_clear(s); }
     if(completion->service_action=='3') { s->boardpass_target=completion->service_number;s->password_mode='p'; }
     if(completion->service_action=='4' || completion->service_action=='6') {

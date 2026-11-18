@@ -182,7 +182,10 @@
         "SAVED_DRAFT.md",
         "DRAFT_NOTICE.md",
         "help/ja/editor.txt",
-        "src/session.c"
+        "src/session.c",
+        "src/editor_core.c",
+        "src/editor_core.h",
+        "help/en/editor.txt"
       ]
     },
     {
