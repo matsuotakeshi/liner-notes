@@ -55,7 +55,8 @@ static void catalog_result(const BoardRequest *q,CatalogOutcome result,BoardResu
     case CATALOG_CORE_POLICY_STORAGE:error="ERR board policy storage\r\n";break;
     case CATALOG_CORE_STORAGE:error="ERR catalog storage\r\n";break;
     case CATALOG_CORE_DENIED:error="ERR admin required\r\n";break;
-    case CATALOG_CORE_INVALID:break;
+    case CATALOG_CORE_INVALID:case CATALOG_CORE_NOT_EMPTY:
+    case CATALOG_CORE_INFO_LIMIT:case CATALOG_CORE_BUFFER:break;
     case CATALOG_CORE_CURSOR:error="ERR command\r\n";break;
     }
     snprintf(r->text,sizeof(r->text),"%s",error);

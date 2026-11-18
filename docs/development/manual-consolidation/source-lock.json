@@ -1,6 +1,6 @@
 {
   "LICENSE": "fb981668c18a279e285fc4d83fba1e836cc84dd4daa73c9697d3cfd2d8aca6e0",
-  "Makefile": "582c08db96650a6033294a5de61998f6f23c1d3ff6dbf1f79698a658e2eede71",
+  "Makefile": "39c978721d4aa8bc091c0fd203226353314f2a432e2bda2afb5b67ede5cb7634",
   "boards.example.conf": "4bd1a17ecf3966d3829510e8495a1362fb8b922cd754badccc739f5e5ab0bde8",
   "ci/build-freebsd-package.sh": "4e62899471d1f1a6c44e00a783c1aff771332140704ae778da95a95048474108",
   "debian/changelog": "8f3574a094f5a3677a9a7188e530ecdbdc006138b082b57243ca8441c644114d",
@@ -53,9 +53,9 @@
   "scripts/serial_connector.py": "3de6ad32005c5dff9b474d8f550a534232d88f4be73b59b5dcfc15cc11d0e670",
   "scripts/transfer_spool.py": "f7c590b73368c330da611d8ce41f0fd6fe5d8ad3b3e9ae9165e258d1e501db46",
   "scripts/vault_zmodem.py": "ace554ea5b6ab8d479ec39ad7daf7f5f7f34ca34ba13d5b9a73b115a0d63ef15",
-  "src/board.c": "341378e56381fe2cbbe3bd4245df651672e35613cfc071db0f9137eed29bcc5e",
+  "src/board.c": "77a8b8f0aece1e0e3376b760cba3ce2cbfac0917ebb72bf8906c29315a0f67e2",
   "src/board_link.inc": "95a85be0a6ca2d77380775b25befb51a72971908d266c6b72f76fc7ca94e1d4a",
-  "src/board_policy.c": "0169bc17649ddc63599b43ca7ae49f6c1c756dac417bd030a79398229414165b",
+  "src/board_policy.c": "898862d27114ca09a86ac6d4a6bc1494c46598ff473bcf07b96b545a390b355a",
   "src/catalog.c": "49ed8eff1efe2ace300b92d20e1c91491523ba6e896bed270457afbccd865d68",
   "src/classic_commands.inc": "f39ecfe79522d5e05c7f5def00b0c05c1f9a68879288e88e08013d709eb08a9a",
   "src/doors.c": "560f9380f2623d8085e8e6edf8319a738e2aeaeff9461336760f56527c66bb04",
@@ -164,6 +164,10 @@
   "src/member_settings_repository.h": "00d652c65d31166ae5105f1df5214b7b0d7c53b6b6d2f6dc038c33abf2ff3f13",
   "src/member_settings_store.inc": "85fe1336fca4d63d2d326b222dc941d5281cfcf372db12f9c46dda1426ae1d15",
   "src/catalog.h": "5c0c6f1f32460dd62f5f87d5f73fc2df96abe645182dc19369a151dd9a6e4e44",
-  "src/catalog_core.c": "79ee4ef1fd193416a8795dc8e80dc3878574768de725b5fb02d28931e454c197",
-  "src/catalog_core.h": "d3dbaa84b96da50629147c1d43e81859f9774b72a8f48c9f1b1421cf8b07ce55"
+  "src/catalog_core.c": "c1aa0c7830aed0728bcb98c094e7e67ae6fed336953d89b5576b76ae30271cb3",
+  "src/catalog_core.h": "370e62c6d647cb9eb02581b68c1d5309662f23a019fe41ca58e18673623da7dd",
+  "src/catalog_policy_core.c": "45cbab466fc2580d8ded4a1a70ec38e3553351eb056512a30d6c2f1f01446e6d",
+  "src/catalog_policy_core.h": "d950fbf2b21646d16da45aeba24b336964eadf77865fd6b2a85590cdeaee52e5",
+  "src/board_policy_repository.h": "de5b468416d7b63f4fcf729bbc4e7c7507104c04dd0a86c64425db36dd146aae",
+  "src/board_features.inc": "9490ee5b5b204877f1d305f43afb335e918f7dd7750a19e4278afac5eb049cc2"
 }

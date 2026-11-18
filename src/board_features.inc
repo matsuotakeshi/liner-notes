@@ -102,15 +102,85 @@ static int access_record(char kind,uint32_t article,uint32_t user) {
     DurableRow r={0};r.kind=kind;r.target=article;r.actor=user;snprintf(r.text,sizeof(r.text),"%u",b);
     if(!dj_append(&access_journal,&r) || !access_load(NULL,&r) || !access_prune(0)) { access_journal.broken=1;return 0; }return 1;
 }
-static void access_report(uint32_t b,uint32_t cursor,char *out,size_t size) {
-    uint32_t keep=policy_log_keep(b),retained=0;size_t oldest=access_count;
-    if(keep)while(oldest && retained<keep) { oldest--;if((*access_at((uint32_t)(oldest))).board==b)retained++; }
-    size_t index=cursor?cursor-1:access_count;if(index>access_count) { snprintf(out,size,"ERR command\r\n");return; }
-    size_t used=(size_t)snprintf(out,size,"BOARDACCESS %u\r\n",b);unsigned shown=0,scanned=0;
-    while(index>oldest && shown<8 && scanned++<256) { Access *a=&(*access_at((uint32_t)(--index)));if(a->board!=b)continue;
-        used+=(size_t)snprintf(out+used,size-used,"ACCESSROW %u %u %u %c %llu\r\n",a->seq,a->article,a->user,a->kind,(unsigned long long)a->at);shown++;
+int board_policy_repository_broken(void) { return access_journal.broken || move_journal.broken; }
+int board_policy_repository_prepare(void) { return require_v5(); }
+int board_policy_repository_has_articles(uint32_t board) {
+    for(uint32_t i=1;i<=article_count;i++)if(on_board(i,board))return 1;
+    return 0;
+}
+int board_policy_repository_prune(void) {
+    if(access_prune(1))return 1;
+    access_journal.broken=1;return 0;
+}
+uint32_t board_policy_repository_access_count(void) { return (uint32_t)access_count; }
+int board_policy_repository_access_get(uint32_t index,BoardAccessRecord *out) {
+    memset(out,0,sizeof(*out));
+    if(board_policy_repository_broken() || index>=access_count)return 0;
+    const Access *row=access_at(index);
+    *out=(BoardAccessRecord){row->seq,row->board,row->article,row->user,row->at,row->kind};return 1;
+}
+static void board_policy_result(CatalogOutcome result,BoardResult *r) {
+    const char *error="ERR board policy storage\r\n";
+    switch(result) {
+    case CATALOG_CORE_OK:return;
+    case CATALOG_CORE_LOGIN_REQUIRED:case CATALOG_CORE_DENIED:error="ERR admin required\r\n";break;
+    case CATALOG_CORE_REVOKED:r->revoked=1;error="ERR session revoked\r\n";break;
+    case CATALOG_CORE_INVALID:case CATALOG_CORE_CURSOR:error="ERR command\r\n";break;
+    case CATALOG_CORE_NOT_EMPTY:error="ERR board not empty\r\n";break;
+    case CATALOG_CORE_INFO_LIMIT:error="ERR board info limit\r\n";break;
+    case CATALOG_CORE_MEMBER_STORAGE:error="ERR member storage unavailable\r\n";break;
+    case CATALOG_CORE_MODERATION_STORAGE:error="ERR moderation storage unavailable\r\n";break;
+    case CATALOG_CORE_STORAGE:error="ERR catalog storage\r\n";break;
+    case CATALOG_CORE_POLICY_STORAGE:case CATALOG_CORE_BUFFER:break;
     }
-    snprintf(out+used,size-used,"END NEXT %zu\r\n",index>oldest?index+1:0);
+    snprintf(r->text,sizeof(r->text),"%s",error);
+}
+static void board_policy_execute(const BoardRequest *q,uint32_t b,BoardResult *r) {
+    CatalogActor actor={q->user,q->user_epoch};CatalogOutcome result;
+    if(q->action=='A') {
+        BoardAccessPage page;result=catalog_access_page(&actor,b,q->cursor,&page);
+        if(result!=CATALOG_CORE_OK) { board_policy_result(result,r);return; }
+        size_t used=(size_t)snprintf(r->text,sizeof(r->text),"BOARDACCESS %u\r\n",b);
+        for(unsigned i=0;i<page.count;i++) {
+            const BoardAccessRecord *row=&page.rows[i];
+            used+=(size_t)snprintf(r->text+used,sizeof(r->text)-used,"ACCESSROW %u %u %u %c %llu\r\n",
+                                  row->sequence,row->article,row->user,row->kind,(unsigned long long)row->time);
+        }
+        snprintf(r->text+used,sizeof(r->text)-used,"END NEXT %u\r\n",page.next);return;
+    }
+    if(q->action=='O') {
+        if(!*q->body) {
+            BoardPolicySettings settings;result=catalog_policy_get(&actor,b,&settings);
+            if(result!=CATALOG_CORE_OK) { board_policy_result(result,r);return; }
+            snprintf(r->text,sizeof(r->text),"BOARDOPTIONS %u %s ORDER %u ARTICLES %u BYTES %llu LOG %u PASSWORD %s\r\n",
+                     b,settings.menu?"MENU":"BOARD",settings.order,settings.max_articles,
+                     (unsigned long long)settings.max_bytes,settings.log_keep,settings.password_set?"ON":"OFF");return;
+        }
+        result=catalog_policy_set(&actor,b,q->body);
+        if(result==CATALOG_CORE_OK) { r->board_refresh=1;strcpy(r->text,"BOARD OPTIONS SAVED\r\n"); }
+        else board_policy_result(result,r);
+        return;
+    }
+    if(q->action=='P') {
+        result=catalog_password_prepare(&actor,b);
+        if(result!=CATALOG_CORE_OK) { board_policy_result(result,r);return; }
+        r->service_action='3';r->service_number=b;r->board_grant=b;strcpy(r->text,"NEW PASSWORD\r\n");return;
+    }
+    if(q->action=='S' || q->action=='C') {
+        result=catalog_password_set(&actor,b,q->action=='C'?"":q->new_password);
+        if(result==CATALOG_CORE_OK) { r->board_refresh=1;strcpy(r->text,"BOARD PASSWORD SAVED\r\n"); }
+        else board_policy_result(result,r);
+        return;
+    }
+    if(q->action=='I') {
+        result=catalog_information_get(&actor,b,r->draft_body,sizeof(r->draft_body));
+        if(result!=CATALOG_CORE_OK) { board_policy_result(result,r);return; }
+        r->service_action='4';r->service_number=b;strcpy(r->text,"BOARD INFO EDIT\r\n");return;
+    }
+    int attempted=0;result=catalog_information_set(&actor,b,q->body,&attempted);
+    if(attempted) { r->service_action='5';r->service_number=result==CATALOG_CORE_OK?b:0; }
+    if(result==CATALOG_CORE_OK)strcpy(r->text,"BOARD INFO SAVED\r\n");
+    else board_policy_result(result,r);
 }
 static int board_usage(uint32_t board,uint32_t extra_count,uint64_t extra_bytes) {
     uint64_t bytes=extra_bytes;uint32_t count=extra_count;
@@ -134,20 +204,9 @@ static void board_features(const BoardRequest *q,BoardResult *r) {
         else strcpy(r->text,"ERR article storage\r\n");
         return;
     }
+    if(q->action && strchr("AOPSCIW",q->action)) { board_policy_execute(q,b,r);return; }
     if(!catalog_manage(b,q->user)) { strcpy(r->text,"ERR admin required\r\n");return; }
-    if((strchr("SCWDMB",q->action) || (q->action=='O' && *q->body)) && !require_v5()) { strcpy(r->text,"ERR board policy storage\r\n");return; }
-    if(q->action=='A') { access_report(b,q->cursor,r->text,sizeof(r->text));return; }
-    if(q->action=='O') {
-        if(!*q->body) { policy_report(b,r->text,sizeof(r->text));return; }
-        if(!strncmp(q->body,"MENU ",5))for(uint32_t i=1;i<=article_count;i++)if(on_board(i,b)) { strcpy(r->text,"ERR board not empty\r\n");return; }
-        int ok=policy_options(b,q->user,q->body);if(ok>0 && !access_prune(1)) { access_journal.broken=1;ok=0; }r->board_refresh=ok>0;strcpy(r->text,ok>0?"BOARD OPTIONS SAVED\r\n":ok<0?"ERR command\r\n":"ERR board policy storage\r\n");return;
-    }
-    if(q->action=='P') { r->service_action='3';r->service_number=b;r->board_grant=b;strcpy(r->text,"NEW PASSWORD\r\n");return; }
-    if(q->action=='S' || q->action=='C') {
-        if(!policy_password(b,q->user,q->action=='C'?"":q->new_password))strcpy(r->text,"ERR board policy storage\r\n");else { r->board_refresh=1;strcpy(r->text,"BOARD PASSWORD SAVED\r\n"); }return;
-    }
-    if(q->action=='I') { r->service_action='4';r->service_number=b;strcpy(r->draft_body,policy_info(b));strcpy(r->text,"BOARD INFO EDIT\r\n");return; }
-    if(q->action=='W') { int ok=policy_information(b,q->user,q->body);r->service_action='5';r->service_number=ok>0?b:0;strcpy(r->text,ok>0?"BOARD INFO SAVED\r\n":ok<0?"ERR board info limit\r\n":"ERR board policy storage\r\n");return; }
+    if(strchr("DMB",q->action) && !require_v5()) { strcpy(r->text,"ERR board policy storage\r\n");return; }
     if(!moderation_admin(q->user)) { strcpy(r->text,"ERR admin required\r\n");return; }
     if(q->action=='D') {
         if(b==1) { strcpy(r->text,"ERR board not empty\r\n");return; }

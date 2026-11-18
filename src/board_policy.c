@@ -96,6 +96,12 @@ int policy_information(uint32_t b,uint32_t actor,const char *body) {
     return append(b,actor,'E',"");
 }
 int policy_delete(uint32_t b,uint32_t actor) { return append(b,actor,'D',""); }
-void policy_report(uint32_t b,char *out,size_t size) {
-    Policy *p=&boards[b];snprintf(out,size,"BOARDOPTIONS %u %s ORDER %u ARTICLES %u BYTES %" PRIu64 " LOG %u PASSWORD %s\r\n",b,p->menu?"MENU":"BOARD",p->order,p->max_articles,p->max_bytes,p->keep,p->revision?"ON":"OFF");
+int policy_settings(uint32_t b,BoardPolicySettings *out) {
+    if(!out)return 0;
+    memset(out,0,sizeof(*out));
+    if(!catalog_exists(b) || policy_broken())return 0;
+    const Policy *p=&boards[b];
+    out->menu=p->menu;out->password_set=p->revision!=0;out->order=p->order;
+    out->max_articles=p->max_articles;out->max_bytes=p->max_bytes;out->log_keep=p->keep;
+    return 1;
 }
