@@ -18,6 +18,16 @@ async def run(server):
         await a.command(f'CONNECTOR BLOCK {a.token} 9')
         assert 'ERR vault syntax' in (await a.command(f'CONNECTOR DATA {a.token} LEVEL 2 5'))['text']
         await b.command();assert b.state['level']!=5
+        # Independent partial blocks; replacement discards the old prefix and overflow clears it.
+        await a.command(f'CONNECTOR BLOCK {a.token} 9')
+        await a.command(f'CONNECTOR DATA {a.token} OLD')
+        await b.command(f'CONNECTOR BLOCK {b.token} 9')
+        await b.command(f'CONNECTOR DATA {b.token} LEV')
+        await a.command(f'CONNECTOR BLOCK {a.token} 2')
+        assert 'ERR vault syntax' in (await a.command(f'CONNECTOR DATA {a.token} too-long'))['text']
+        assert 'ERR vault syntax' in (await a.command(f'CONNECTOR DATA {a.token} xx'))['text']
+        assert 'ERR vault syntax' in (await b.command(f'CONNECTOR DATA {b.token} EL 2 5'))['text']
+        await b.command();assert b.state['level']!=5
         start=await a.command(f'FILESTART {len(data)} {digest} ZmlsZS5iaW4= -');ident=int(re.search(r'^UPLOAD (\d+)',start['text'])[1])
         assert 'ERR vault denied' in (await b.command(f'FILEPUTBLOCK {ident} 0 '+enc(data[:65536])))['text']
         assert 'ERR vault syntax' in (await a.command(f'FILEPUT {ident} 0 '+enc(data[:673])))['text']

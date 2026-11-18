@@ -109,14 +109,23 @@ int main(void) {
     for(int i=0;i<256;i++) { unsigned char decoded=0; assert(terminal_binary_receive(&term,(unsigned char)i,&decoded)==1); assert(decoded==i); }
     terminal_set_binary(&term,0);
     reset(&m); session_init(&s,io,102,4,1,1,0,LANGUAGE_EN);
-    s.binary=1; s.binary_deadline=60000; session_tick(&s,59999); assert(s.active);
+    s.binary=1; s.binary_reader.deadline=60000; session_tick(&s,59999); assert(s.active);
     session_tick(&s,60000); assert(!s.active); session_dispose(&s);
     reset(&m); session_init(&s,io,103,4,1,1,0,LANGUAGE_EN);
     s.binary=1; assert(!session_binary_byte(&s,'~',100));
     session_tick(&s,15099); assert(s.active); session_tick(&s,15100); assert(!s.active); session_dispose(&s);
     puts("PASS: all raw terminal bytes preserved; binary idle and partial-frame deadlines enforced");
+    reset(&m);session_init(&s,io,114,4,1,1,0,LANGUAGE_EN);
+    assert(connector_block_begin(&s.connector_block,CONNECTOR_FILE_BLOCK,4,100)==1);
+    assert(!connector_block_append(&s.connector_block,"ab",2));
+    session_tick(&s,60099);assert(s.active && s.connector_block.data);
+    session_tick(&s,60100);assert(!s.active && !s.connector_block.data);session_dispose(&s);
+    reset(&m);session_init(&s,io,115,4,1,1,0,LANGUAGE_EN);
+    assert(connector_block_begin(&s.connector_block,CONNECTOR_LINK_BLOCK,4,100)==1);
+    session_dispose(&s);assert(!s.active && !s.connector_block.data);
+    puts("PASS: connector partial-block timeout and disposal release session-owned buffers");
     reset(&m);session_init(&s,io,104,4,1,1,1,LANGUAGE_EN);s.user=2;reset(&m);
-    s.binary=1;s.binary_menu=1;s.ui.enabled=0;s.binary_deadline=60000;
+    s.binary=1;s.binary_menu=1;s.ui.enabled=0;s.binary_reader.deadline=60000;
     session_mail_arrived(&s,2);session_mail_arrived(&s,2);session_tick(&s,100);
     assert(m.size==0 && s.notifications.mail.arrivals==2);
     s.binary=0;s.ui.enabled=1;s.password_mode=1;session_tick(&s,101);assert(m.size==0);
@@ -140,7 +149,7 @@ int main(void) {
         reset(&m);session_init(&s,io,106+mode,4,1,1,1,LANGUAGE_EN);s.user=2;reset(&m);
         s.door=mode==0;s.binary=mode==1;s.zmodem=mode==2;s.password_mode=mode==3;s.pending=mode==4;
         if(mode==5)strcpy(s.page,"retained page");
-        s.binary_deadline=60000;
+        s.binary_reader.deadline=60000;
         session_announce(&s,"deferred administrator notice");session_mail_arrived(&s,2);
         session_tick(&s,100);assert(!m.size && s.notifications.mail.arrivals==1);
         s.door=s.binary=s.zmodem=s.password_mode=s.pending=0;s.page[0]=0;

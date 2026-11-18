@@ -59,7 +59,7 @@ def run(binary,ctl):
                         c.protocol.wire.sock.sendall(bytes([255,252,0]))
                         fails(lambda:c.protocol.frame())
                     finally:c.close()
-                for malformed in (b'x',b'~\0\0\0\0',b'~\0\0\4\1',b'~\0\0\0\1X',b'~\0\0\0\5LPING'):
+                for malformed in (b'x',b'~\0\0\0\0',b'~\0\0\4\1',b'~\0\0\0\1X',b'~\0\0\0\5LPING',b'~\0\0\0\2Qx',b'~\0\0\0\3La\n',b'~\0\0\0\3La\0',b'~\0\0\0\1W'):
                     c=BinaryConnector('127.0.0.1',s.port,'alice',PASSWORD)
                     try:
                         c.protocol.wire.send_bytes(malformed)

@@ -1,6 +1,7 @@
 #ifndef SESSION_H
 #define SESSION_H
 #include "notification_core.h"
+#include "connector_core.h"
 #include <stddef.h>
 #include <stdint.h>
 #include "board.h"
@@ -39,16 +40,13 @@ typedef struct {
     unsigned long talk_target,reply_target;
     uint64_t saved_ui;unsigned transfer_protocol,zmodem_protocol;int zmodem_available,zmodem,zmodem_start,zmodem_receive,vault_mode;uint32_t batch[16];unsigned char batch_done[16];unsigned batch_count;uint32_t zmodem_id;char zmodem_text[513];
     int binary,binary_allowed,binary_menu;
-    uint64_t binary_deadline;size_t binary_used,binary_length;unsigned char binary_buffer[1029];
+    ConnectorReader binary_reader;
     uint32_t current,user,board,user_epoch;unsigned member_level;
     char username[33];
     /* Opt-in transport synchronization; never an authentication credential. */
     char connector_token[65];
     int connector_literal;
-    char *connector_block;
-    int connector_link_block;
-    size_t connector_block_size,connector_block_used;
-    uint64_t connector_block_until;
+    ConnectorBlock connector_block;
     char old_password[129], new_password[129];
     BoardRequest draft, scan;
     char check_key[80];int check_scope,check_auto,check_committing;uint32_t check_board;
