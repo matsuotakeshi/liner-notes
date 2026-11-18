@@ -1,6 +1,6 @@
 {
   "LICENSE": "fb981668c18a279e285fc4d83fba1e836cc84dd4daa73c9697d3cfd2d8aca6e0",
-  "Makefile": "f55557a61f7f889e5a57f58f9244ef8a5aca9c6b7c235d5eefb4148eb96fb090",
+  "Makefile": "9f120b047643d666e1c4e1269319969b10f5a0ff083884762199a69b762f5920",
   "boards.example.conf": "4bd1a17ecf3966d3829510e8495a1362fb8b922cd754badccc739f5e5ab0bde8",
   "ci/build-freebsd-package.sh": "4e62899471d1f1a6c44e00a783c1aff771332140704ae778da95a95048474108",
   "debian/changelog": "8f3574a094f5a3677a9a7188e530ecdbdc006138b082b57243ca8441c644114d",
@@ -9,7 +9,7 @@
   "help/en/content.txt": "9c264408a543ea4dd0ac471b36de0a1a9e32fa8b28b3e1c1ca333fa0019a511f",
   "help/en/settings.txt": "8885570f247f6857c190faa13b74e4ab8bf4984c5056a08e332fbe3ff388fa53",
   "help/en/unread.txt": "b275226a78852e8a30c8da06bf5d9a602dd868fc9b071db77417d506de0c32c4",
-  "help/ja/account.txt": "39dfcb385a20fba8f34de2d86caea545423b7390360c6cf4e233557e45918379",
+  "help/ja/account.txt": "d1d18e1bfd839c7f554eed2534f8ffb89a4ea71f74c61f7a2e3e3b151605f61d",
   "help/ja/admin.txt": "254e95e3af7d4e665a666069bd9347a38f1a27cd6d135530079bf987858870d6",
   "help/ja/adminboards.txt": "97f07367c06be1c89332901732f8372cefce857b6cd1da7a593a728aaa1c3530",
   "help/ja/adminconnections.txt": "975bc43d043300dd345b0b7003a74eccea680b22160dd447cf2a30e3e1015a27",
@@ -53,7 +53,7 @@
   "scripts/serial_connector.py": "3de6ad32005c5dff9b474d8f550a534232d88f4be73b59b5dcfc15cc11d0e670",
   "scripts/transfer_spool.py": "f7c590b73368c330da611d8ce41f0fd6fe5d8ad3b3e9ae9165e258d1e501db46",
   "scripts/vault_zmodem.py": "ace554ea5b6ab8d479ec39ad7daf7f5f7f34ca34ba13d5b9a73b115a0d63ef15",
-  "src/board.c": "847e7103213ad433a0a9166c94a0c31ded7f45b98cc6ebe46399bcaa063c4ffe",
+  "src/board.c": "8d4e39a522d9f923ce07e18a09e09496c6c1fbd938f1421f8fc3eeccbf7716b4",
   "src/board_link.inc": "95a85be0a6ca2d77380775b25befb51a72971908d266c6b72f76fc7ca94e1d4a",
   "src/board_policy.c": "898862d27114ca09a86ac6d4a6bc1494c46598ff473bcf07b96b545a390b355a",
   "src/catalog.c": "49ed8eff1efe2ace300b92d20e1c91491523ba6e896bed270457afbccd865d68",
@@ -153,7 +153,7 @@
   "src/member_core.h": "5085ce3069720d9de53deb7504055c05bbf518c95f933a9c20a49ee250daabed",
   "src/members.h": "b860c0aaf4ea15e027c8517758e161e3ae5ab74ad2194aec0982405f4f56d87d",
   "src/chat_preferences.h": "5ccd981f5282ab0e0161d923fba6935b543136e3fad5dacf78f91bba3859bdc0",
-  "src/features64.inc": "4f4058ed4bab9271cc7f8cf4059c9a655bbf4d1d2644d2a57ccb1a872488becd",
+  "src/features64.inc": "c780a4d336af30b6eb5eaa4b66ebb24ad736a7770821e284bbec70ec1f04694d",
   "src/application_repository.h": "44685017695e60734b4fac1f3470fdf3a08733553142031cea2f5dcc9cca4adb",
   "src/mail_core.c": "d49cfdc519e9668f26918338c4a93d17172d335ec3caaad11bff7255e08fb220",
   "src/mail_core.h": "f46c2ecba47975debc48bebc63a7f2836dfa5ca07bb8297a2b89d4c062f4772b",
@@ -194,5 +194,8 @@
   "src/vault_bridge.c": "3c9a90ce17abd6a07e815ed6f6f4935dbdb5907b67695fc64909bc69a112da5f",
   "help/en/files.txt": "51a3c7d5fda16bf5ed2544d93321fa8f2c97772706c988afe9cb2249ebe53883",
   "src/vault_management_core.h": "19cc7bd263b2a99ec7bbfe6f71d469bf71d13c7322d0d0165d2b7fa52e9a4a3d",
-  "src/vault_management_core.c": "d96d689d3e5531ea8c8550668461c20161ff508adb90faad296df08178dc7327"
+  "src/vault_management_core.c": "d96d689d3e5531ea8c8550668461c20161ff508adb90faad296df08178dc7327",
+  "src/authentication_core.c": "73a86411727979a2b34f75b0167241c59452dc9d5d5fe06f03c23cf7cefeaaf5",
+  "src/authentication_form.c": "3ad3c5947ea90bb36521d420b047eb65fe6bd7a87ec81e3ff819079ca6ccf1ff",
+  "help/en/account.txt": "db66bfd148dff96faefd26d55c71c7411248020d1b71dc729cf38016360a4604"
 }

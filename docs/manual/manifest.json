@@ -125,7 +125,10 @@
         "help/ja/account.txt",
         "PASSWORD.md",
         "src/session.c",
-        "src/runtime.c"
+        "src/runtime.c",
+        "src/authentication_core.c",
+        "src/authentication_form.c",
+        "help/en/account.txt"
       ]
     },
     {
