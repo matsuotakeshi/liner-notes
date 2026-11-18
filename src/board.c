@@ -7,6 +7,7 @@
 #include "board.h"
 #include "article_core.h"
 #include "catalog_policy_core.h"
+#include "catalog_group_core.h"
 #include "board_topology_core.h"
 #include "board_topology_repository.h"
 #include "member_core.h"

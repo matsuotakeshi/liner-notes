@@ -4,8 +4,10 @@ BOARDINFO 番号 / BOARDSET 番号|親番号|閲覧|投稿|題名|説明
 BOARDOPTIONS 番号 BOARD|MENU 順序 記事件数 本文バイト数 ログ件数
 BOARDPASS 番号 / BOARDPASS 番号 NONE CONFIRM / INFOEDIT 番号
 SIGOP ボード番号 会員番号|NONE / SIGOPS
-SIGOPGROUP ボード番号 グループ番号: 担当グループの管理を委任
-BOARDGROUP ボード番号 旧グループ 新グループ CONFIRM: ACLと所属をまとめて移行
+SIGOPGROUP ボード番号 グループ番号: 全体管理者が担当グループを記録（1〜100、0は不可）
+GROUP/UNGROUPのSIGOP権限は、担当ボードとそのACLで判定します。SIGOPGROUPの記録だけで権限は変わりません。
+BOARDGROUP ボード番号 旧グループ 新グループ CONFIRM: 全体管理者が対象ACLと全会員の所属を移行
+他ボードのACLは変わりません。他の接続は失効し、再ログインが必要です。
 BOARDGUEST ボード番号 ON|OFF
 WITHDRAW 記事番号 CONFIRM: 本人・全体管理者・親を含む担当SIGOPが取り消し
 HIDE / RESTORE / INSPECT 記事番号: 非表示・復元・確認（取り消しとは別）
