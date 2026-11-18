@@ -64,3 +64,8 @@ syntax check is blocked by pre-existing storage_lock struct flock declaration an
 TZ misleading-indentation warnings. No Windows full-runtime success is claimed;
 FreeBSD/Linux runtime and regression validation belongs to the existing CI.
 This extraction adds no SSH transport, new configuration or persistence format.
+
+The Linux PR CI catalog check caught a missing translation for the new report
+capacity failure. ERR connection report now maps to ERR_CONNECTION_REPORT in
+both catalogs; test_adapters checks actual formatting in Japanese and English.
+The catalog coverage check is retained unchanged.

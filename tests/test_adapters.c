@@ -15,6 +15,13 @@ static void feed(Telnet *t,const unsigned char *p,size_t n) {
     unsigned char b; for(size_t i=0;i<n;i++) assert(telnet_receive(t,p[i],&b)==TN_NONE);
 }
 int main(void) {
+    /* Runtime report failures must use the requested language, not raw ERR text. */
+    for(int lang=LANGUAGE_JA;lang<LANGUAGE_COUNT;lang++) {
+        Ui ui={.language=(Language)lang,.enabled=1};char output[256];
+        const char *expected=lang==LANGUAGE_JA?"接続一覧を生成できませんでした。":"Unable to generate the connection list.";
+        assert(ui_format(&ui,"ERR connection report\r\n",output,sizeof(output)));
+        assert(strstr(output,expected) && !strstr(output,"ERR connection report"));
+    }
     Memory m={0}; Telnet t;
     assert(telnet_init(&t,bytes,&m)); assert(m.size==18); reset(&m);
     const unsigned char nvt[]={'a','\n','b','\r','c','\r','\n',255};

@@ -73,6 +73,7 @@ static const char *error_text(const Ui *u,const char *p) {
         {"ERR no board",MSG_ERR_BOARD},
         {"ERR activity storage",MSG_ERR_ACTIVITY},
         {"ERR no connection",MSG_ERR_CONNECTION},
+        {"ERR connection report",MSG_ERR_CONNECTION_REPORT},
         {"ERR game unavailable",MSG_ERR_GAME},
         {"ERR game busy",MSG_ERR_GAME_BUSY},
         {"ERR SYSOP unavailable",MSG_ERR_SYSOP},
