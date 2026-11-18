@@ -15,8 +15,10 @@ legacy messages, catalog refresh, vault notifications and session actions.
 Both extracted mutations require the shared `catalog_core_admin` check of current
 member identity, epoch, member/moderation/policy/catalog health and global admin.
 A SIGOP's local or inherited role is never enough. Group records accept 1..100
-only when present in the target board's own read/write ACL; 0 clears that board's
-records. Migration requires distinct nonzero groups and a source in that ACL.
+only when present in the target board's own read/write ACL. The internal API
+retains the old worker's zero-as-clear path, but the terminal number parser
+rejects zero before dispatch; no terminal clear command is introduced. Migration
+requires distinct nonzero groups and a source in that ACL.
 
 The existing delegated table is a recorded association, NOT an additional
 permission gate for GROUP/UNGROUP. `member_core_group` currently uses actual
@@ -82,3 +84,20 @@ Existing stage64/member tests remain enabled. New Core and SQLite tests are
 part of make check without changing workflow triggers, protection or timeouts.
 Canonical manual/HELP changes are source-reviewed and generated/linked/offline
 validated. Full LN-23/24 modularization remains ongoing.
+
+## PR CI correction
+
+Initial head `eda54ac5bf20d2b22764ab4879969c22bdadd394` failed the new
+socket test on both Rocky Linux 9 and AlmaLinux 9 in
+[Linux compatibility run 44232947541](https://github.com/matsuotakeshi/liner-notes/actions/runs/44232947541).
+`SIGOPGROUP 3 0` returned `ERR command` instead of the fixture's expected success.
+Baseline and current session.c use the same number_arg helper, which rejects
+zero. The fixture and public HELP/manual incorrectly generalized an internal
+Core/worker zero-as-clear path into a terminal command.
+
+The socket fixture now requires the exact rejection and unchanged delegation
+rows. Internal clear coverage stays in the direct Core and real-SQLite tests.
+The public instructions and API comment distinguish the two boundaries. No
+parser/runtime logic, permission, timeout or CI gate is relaxed. A local check
+of the actual number_arg implementation confirms zero/00 rejection and positive
+values; full socket revalidation remains pending hosted CI.

@@ -10,7 +10,8 @@ typedef enum {
     GROUP_CORE_SETTINGS_STORAGE,GROUP_CORE_INVALID
 } CatalogGroupOutcome;
 /* Global admin only. group 1..100 must occur in this board's own ACL;
- * zero clears all recorded delegations for this board. */
+ * Internal API zero clears all recorded delegations for this board; the
+ * unchanged terminal number parser rejects zero before reaching this API. */
 CatalogGroupOutcome catalog_group_delegate(const CatalogActor *,uint32_t board,unsigned group);
 /* Global admin only. Replace the source in this board's ACL, migrate global
  * member memberships, then migrate its delegation row through durable replay.
