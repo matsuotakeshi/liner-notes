@@ -13,7 +13,7 @@
 
 `AUDIT ARTICLE 番号`、`AUDIT ACTOR ログイン名`、`AUDIT ACTORID 会員番号` は記事・操作者の絞り込みで、併用できます。`AUDIT REFRESH` は再取得、`AUDIT ALL` は全体、`+` は続きです。操作権限・担当範囲を確認します。
 
-USERLOGは通常本人分、管理者は `USERLOG ALL` / `USERSTATS ALL` を使います。任意の会員公開設定は[会員設定](personal-settings.md)を参照してください。過去のUSERLOGにある接続番号を現在の強制切断へ使わず、CONNECTIONSで現在の接続を確認します。
+`USERLOG`・`USERTABLE`・`USERSTATS` はログイン必須で、対象省略時は本人分です。他会員番号またはALLの指定は、通常は全体管理者に限定されます。`--userlog-public` または `--rtbbs-member-policy` を有効にすると、登録会員も他会員分・ALLを閲覧できますが、ゲストは閲覧できません。これらの公開設定で接続管理の権限が増えることはありません。任意の会員公開設定は[会員設定](personal-settings.md)を参照してください。過去のUSERLOGにある接続番号を現在の強制切断へ使わず、CONNECTIONSで現在の接続を確認します。
 
 取得完了は転送コネクタの個別完了通知に基づきます。一括途中失敗でも成功分の履歴は保持し、未完了を成功にしません。WebではHTTPへの送出完了であり、利用者のディスク保存完了までは保証しません。
 
