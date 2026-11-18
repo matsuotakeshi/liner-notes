@@ -12,3 +12,5 @@ FILERESTORE ファイル番号 CONFIRM / FILEDELETE ファイル番号 CONFIRM
 親から継承した担当SIGOPも担当範囲を管理できます。私信添付の閲覧権限は広がりません。
 
 FILEHISTORYは全体管理者向けです。FILESTATSは閲覧可能なファイルの回数を表示し、全体管理者には非公開・削除済みでも累計が残るファイルを含めます。取得履歴を保持件数で整理しても累計回数は維持します。
+
+FILEBOARDINFOで閲覧できても、FILEINFOEDITには管理権限が必要です。担当解除・パスワード変更は後続の操作へ反映されます。FILEBOARDOPTIONSでERR vault log storageが出た場合は設定保存後の履歴整理失敗です。FILEBOARDINFOと保存領域を確認してください。

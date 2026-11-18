@@ -10,3 +10,5 @@ FILEDELETE reclaims the physical payload. FILEAUDIT / FILEHISTORY / FILESTATS re
 Inherited SIGOP rights apply only within scope. Private mail attachment permissions are unchanged.
 
 FILEHISTORY requires a global administrator. FILESTATS shows readable files; global administrators can also see counts retained for hidden/deleted files. Pruning retained download history preserves cumulative counts.
+
+Readable FILEBOARDINFO does not grant FILEINFOEDIT permission. Later operations honor revoked SIGOP rights and password changes. ERR vault log storage after FILEBOARDOPTIONS means settings were saved but history pruning failed. Check FILEBOARDINFO and storage before retrying.
