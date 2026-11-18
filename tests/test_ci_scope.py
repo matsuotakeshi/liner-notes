@@ -126,7 +126,7 @@ class HistoryTests(unittest.TestCase):
         self.assertTrue(self.push(head=self.base)['build'])
         self.assertTrue(self.push(ref='refs/heads/release/0.75')['build'])
         self.assertTrue(self.push(ref='refs/tags/v0.75')['build'])
-        for event in ['workflow_dispatch', 'workflow_run', 'unknown']:
+        for event in ['workflow_dispatch', 'workflow_run', 'schedule', 'unknown']:
             self.assertTrue(classify(self.repo, event, {}, 'refs/heads/main')['build'])
 
     def test_pr_uses_merge_base_not_advanced_target_changes(self):

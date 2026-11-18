@@ -91,3 +91,19 @@ Self-hosted Runnerと自宅検証VMには、レビュー済みでmainへ統合�
 FreeBSD pkg生成もCIアカウントの `~/ci/.liner-notes-native.lock` を共有し、native試験と同時に実行しません。`freebsd_package_lease.py` は既存のheartbeat・切断監視・子プロセス回収を再利用します。別途承認されたroot初回準備が同じロックを使う場合は、既存のregular fileを所有者・link数・inode確認のうえ読み取り専用fdで排他取得し、CI所有ファイルを書き換えたりソースとして実行したりしません。
 
 OS別ログ、ソースSHA、アーカイブSHA-256、開始/終了日時、所要時間を `native-ci-results` Artifactへ保存します。実行手順と検証方法は [ネイティブCI並列実行](docs/development/release-ci/NATIVE_PARALLEL.md)を参照してください。文書のみの変更では上記の対象外判定を適用し、それ以外は従来の全試験を維持します。
+
+## Solarisの日次検証
+
+Solaris Native CIの自動実行はmainへのpushごとではなく、毎日1回、UTC 19:23
+（日本時間翌日04:23）を予定時刻とします。GitHubの混雑により遅延・未実行が
+発生する場合があります。起動時のmainの正確なSHAを検証し、日中の各コミットを
+個別に検証したことにはしません。変更がない日も検証します。
+
+緊急修正・リリース前にはmainを指定してworkflow_dispatchで追加実行できます。
+手動実行や管理者による再実行は日次1回の枠外です。main/repository/SHA検査、
+既存の排他、SSHアカウント・ホスト鍵照合、試験範囲は維持します。
+
+配備判定は同一SHAのSolaris日次実行・手動実行（変更前のpush実行も含む）の
+最新結果と実行ステップ・Artifactを確認します。前日の異なるSHAの成功では
+代用できません。リリース候補SHAに成功証跡がない場合は日次実行を待つか、
+mainの手動検証を完了させてください。他OS・パッケージ・Release Setの起動条件は変更しません。

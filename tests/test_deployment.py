@@ -276,6 +276,23 @@ class Deployment(unittest.TestCase):
         with self.assertRaises(ValueError):
             successful_execution(jobs, 'actual test', 2)
 
+    def test_solaris_daily_evidence_keeps_exact_sha_and_latest_result(self):
+        from deploy_release import GATES
+        event = GATES['solaris'][1]
+        self.assertEqual(event, 'schedule')
+        base = {'id': 1, 'run_number': 1, 'run_attempt': 1, 'head_branch': 'main',
+                'head_sha': self.doc['source_sha'], 'status': 'completed', 'conclusion': 'success', 'event': 'push'}
+        for kind in ('push', 'schedule', 'workflow_dispatch'):
+            run = dict(base, event=kind)
+            self.assertEqual(latest_full_run({'workflow_runs': [run]}, self.doc['source_sha'], event, 'solaris'), 1)
+        scheduled = dict(base, id=2, run_number=2, event='schedule')
+        for state in ({'conclusion': 'failure'}, {'status': 'in_progress', 'conclusion': None}):
+            with self.subTest(state=state), self.assertRaises(ValueError):
+                latest_full_run({'workflow_runs': [base, dict(scheduled, **state)]}, self.doc['source_sha'], event, 'solaris')
+        for state in ({'head_sha': 'f' * 40}, {'head_branch': 'feature'}, {'event': 'pull_request'}):
+            with self.subTest(state=state), self.assertRaises(ValueError):
+                latest_full_run({'workflow_runs': [dict(scheduled, **state)]}, self.doc['source_sha'], event, 'solaris')
+
     def test_manual_full_run_allowed_but_new_failed_attempt_cannot_be_hidden(self):
         base = {'id': 1, 'run_number': 1, 'run_attempt': 1, 'head_branch': 'main',
                 'head_sha': self.doc['source_sha'], 'status': 'completed', 'conclusion': 'success', 'event': 'push'}

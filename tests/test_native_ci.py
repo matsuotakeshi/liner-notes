@@ -56,6 +56,23 @@ class PolicyTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             require_trusted_main(env, SHA, "b" * 40)
 
+    def test_schedule_is_only_allowed_for_exact_main_solaris(self):
+        env = dict(GITHUB_REF="refs/heads/main", GITHUB_EVENT_NAME="schedule",
+                   GITHUB_REPOSITORY="matsuotakeshi/liner-notes", GITHUB_SHA=SHA)
+        require_trusted_main(env, SHA, SHA, "solaris")
+        for target in (None, "all", "freebsd", "rocky", "ubuntu"):
+            with self.subTest(target=target), self.assertRaises(ValueError):
+                require_trusted_main(env, SHA, SHA, target)
+        for key, bad in (("GITHUB_REF", "refs/heads/feature"),
+                         ("GITHUB_EVENT_NAME", "pull_request"),
+                         ("GITHUB_EVENT_NAME", "pull_request_target"),
+                         ("GITHUB_REPOSITORY", "someone/fork"),
+                         ("GITHUB_SHA", "b" * 40)):
+            with self.subTest(key=key), self.assertRaises(ValueError):
+                require_trusted_main(dict(env, **{key: bad}), SHA, SHA, "solaris")
+        with self.assertRaises(ValueError):
+            require_trusted_main(env, SHA, "b" * 40, "solaris")
+
     def test_solaris_directory_creation_is_private_unique_and_valid(self):
         command = remote_directory_command("solaris", "/usr/bin/python3.11")
         self.assertTrue(command.startswith("umask 077; "))

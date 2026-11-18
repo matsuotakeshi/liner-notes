@@ -32,9 +32,10 @@ def timestamp():
     return datetime.now(timezone.utc).isoformat()
 
 
-def require_trusted_main(env, sha, head):
+def require_trusted_main(env, sha, head, target=None):
+    scheduled_solaris = env.get("GITHUB_EVENT_NAME") == "schedule" and target == "solaris"
     if (env.get("GITHUB_REF") != "refs/heads/main"
-            or env.get("GITHUB_EVENT_NAME") not in ("push", "workflow_dispatch")
+            or (env.get("GITHUB_EVENT_NAME") not in ("push", "workflow_dispatch") and not scheduled_solaris)
             or env.get("GITHUB_REPOSITORY") != "matsuotakeshi/liner-notes"
             or not re.fullmatch(r"[0-9a-f]{40}", sha) or sha != head
             or env.get("GITHUB_SHA") != sha):
@@ -208,7 +209,7 @@ def main():
     args = parser.parse_args()
     sha = os.environ.get("GITHUB_SHA", "")
     head = subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=ROOT, text=True).strip()
-    require_trusted_main(os.environ, sha, head)
+    require_trusted_main(os.environ, sha, head, args.target)
     if subprocess.check_output(["git", "diff", "HEAD", "--", "ci/native_ci.py", "ci/native_remote.py"], cwd=ROOT):
         raise ValueError("Native supervisor differs from committed source")
     output = args.output.resolve()

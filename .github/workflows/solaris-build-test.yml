@@ -2,8 +2,9 @@ name: Solaris Native CI
 
 # Experimental port: separate from the established three-OS release gate.
 on:
-  push:
-    branches: [main]
+  # 04:23 JST; GitHub schedules may be delayed. Manual exact-main checks remain available.
+  schedule:
+    - cron: "23 19 * * *"
   workflow_dispatch:
 permissions:
   contents: read
