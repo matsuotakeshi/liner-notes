@@ -67,3 +67,9 @@ strict Session/adapter syntax checks, i18n mapping and canonical manual. Runtime
 Session integration is not claimed by syntax checks: it runs in hosted PR CI and
 trusted-main native CI. No additional home-VM PR testing, deployment, release,
 SSH or MMM implementation is part of this change.
+
+## Native stack correction
+
+Listing scratch storage is allocated only for listing and freed after output.
+See [the exact native failure and follow-up validation](EDITOR_STACK_DIAGNOSTIC.md).
+Hosted Linux regression uses the same 8MiB stack ceiling as native Linux.
