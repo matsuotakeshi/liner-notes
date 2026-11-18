@@ -173,7 +173,7 @@ static void service_result(BoardResult *r) {
         if(c->fd==INVALID || s->id!=r->session || !s->user || s->closing || !s->binary_allowed || c->door) { strcpy(r->text,"ERR game unavailable\r\n");return; }
         c->door=door_start(r->service_number,r->service_next,s->user,s->username,s->columns,s->rows,now_ms());
         if(!c->door) { strcpy(r->text,errno==EBUSY?"ERR game busy\r\n":"ERR game unavailable\r\n");return; }
-        s->door=1;c->used=0;terminal_clear(&c->terminal);s->scanning=s->auto_read=0;
+        s->door=1;c->used=0;terminal_clear(&c->terminal);session_scan_pause(s);
         snprintf(r->text,sizeof(r->text),s->ui.language==LANGUAGE_JA?"ゲーム開始。Ctrl-] でBBSへ戻ります。\r\n":"Game started. Ctrl-] returns to BBS.\r\n");return;
     }
     if(r->all_accounts_changed)for(int i=0;i<SLOTS;i++)if(connections[i].fd!=INVALID && connections[i].app.id!=r->session)session_revoke(&connections[i].app);
@@ -188,7 +188,7 @@ static void service_result(BoardResult *r) {
     }
     if(r->service_action=='b' || r->board_refresh) {
         for(int i=0;i<SLOTS;i++)if(connections[i].fd!=INVALID) {
-            Session *s=&connections[i].app;s->page[0]=0;s->page_offset=0;s->scanning=0;s->ui.next=0;s->ui.view=UI_HOME;s->ui.board_title[0]=0;s->report[0]=0;s->report_next=0;
+            session_board_refresh(&connections[i].app);
         }
         return;
     }
@@ -304,7 +304,7 @@ static void advance(Connection *c,uint64_t now) {
     Session *s=&c->app;
     if(s->door) { door_advance(c,now);return; }
     if(s->zmodem) { connection_input(&c->clock,now);zadvance(c,now);return; }
-    if(s->auto_read && c->used) {
+    if(session_auto_read(s) && c->used) {
         size_t consumed=0;int stop=0;
         while(consumed<c->used) {
             int rc=terminal_receive(&c->terminal,c->input[consumed++],0);
@@ -314,7 +314,7 @@ static void advance(Connection *c,uint64_t now) {
         memmove(c->input,c->input+consumed,c->used-consumed);c->used-=consumed;
         if(stop) { connection_input(&c->clock,now);terminal_clear(&c->terminal);c->used=0;session_scan_stop(s); }
     }
-    if(!s->auto_read || c->queued<=OUT_CAP/2)session_tick(s,now);
+    if(!session_auto_read(s) || c->queued<=OUT_CAP/2)session_tick(s,now);
     if(!s->active) { drop(c); return; }
     if(!session_ready(s) || c->queued>OUT_CAP/2) return;
     size_t consumed=0;

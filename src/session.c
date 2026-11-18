@@ -1,6 +1,7 @@
 #define _POSIX_C_SOURCE 200809L
 #include "editor_core.h"
 #include "batch_protocol.h"
+#include "traversal_protocol.h"
 #include "editor_commands.h"
 #include "editor_view.h"
 #include "classic_input.h"
@@ -50,7 +51,7 @@ static void emit(Session *s,const char *text) {
     char formatted[CONTENT_DISPLAY];
     if(s->ui.enabled) {
         if(!ui_format(&s->ui,text,formatted,sizeof(formatted))) { session_abort(s); return; }
-        if(s->pager_enabled && !s->auto_read && terminal_pager_response(text)) {
+        if(s->pager_enabled && !s->reader.automatic && terminal_pager_response(text)) {
             snprintf(s->page,sizeof(s->page),"%s",formatted); s->page_offset=0; page_next(s);
         } else queue_text(s,formatted);
     } else queue_text(s,text);
@@ -85,7 +86,7 @@ static void show_menu(Session *s,int explicit_request) {
     s->menu_shown=1;
 }
 static void prompt(Session *s) {
-    if(s->auto_read || s->door || s->memo_input || s->application_step || (s->editing && s->editor_input==4))return;
+    if(s->reader.automatic || s->door || s->memo_input || s->application_step || (s->editing && s->editor_input==4))return;
     if(!s->zmodem && !s->chatting && !s->binary && s->ui.enabled && s->active && !s->pending && !s->closing && !s->wake && !s->page[0]) {
         if(s->game_menu && !s->editing && !s->password_mode) { queue_text(s,s->ui.language==LANGUAGE_JA?"ゲーム [番号:起動 Enter/L:一覧 0:主画面] > ":"Games [number:play Enter/L:list 0:main] > ");return; }
         if(s->gather_mode) { queue_text(s,ui_text(&s->ui,s->gather_cursor?MSG_GATHER_MORE:MSG_GATHER_PROMPT));return; }
@@ -100,8 +101,8 @@ static void prompt(Session *s) {
         if(s->mail_input) { queue_text(s,ui_text(&s->ui,s->mail_input==1?MSG_MAIL_TO_PROMPT:MSG_MAIL_TITLE_PROMPT));return; }
     if(s->mail_delete) { queue_text(s,ui_text(&s->ui,MSG_MAIL_CONFIRM));return; }
         if(s->mail_mode && !s->editing && !s->password_mode) { queue_text(s,ui_text(&s->ui,MSG_MAIL_PROMPT));return; }
-        if(s->scanning && !s->auto_read) queue_text(s,ui_text(&s->ui,MSG_SCAN_HINT));
-        if(!s->editing && !s->password_mode && !s->ui.input && !s->scanning && s->ui.view==UI_HOME)show_menu(s,0);
+        if(s->reader.active && !s->reader.automatic) queue_text(s,ui_text(&s->ui,MSG_SCAN_HINT));
+        if(!s->editing && !s->password_mode && !s->ui.input && !s->reader.active && s->ui.view==UI_HOME)show_menu(s,0);
         char text[512];size_t prefix=0;
         if(!s->editing && !s->password_mode && !s->ui.input)
             prefix=(size_t)snprintf(text,sizeof(text),"%s",s->classic_area==CM_BOARD?(s->ui.view==UI_ARTICLE?"READ ":"BOARD "):s->classic_area==CM_SETTINGS?"INSTALL ":s->classic_area==CM_PROFILE?"PROFILE ":"MAIN ");
@@ -205,18 +206,18 @@ static void submit(Session *s,BoardRequest *q) {
     q->user=s->user; q->user_epoch=s->user_epoch;if(!s->user && q->op=='P')snprintf(q->username,sizeof(q->username),"%s",*s->guest_handle?s->guest_handle:"guest");
     if(q->op=='j' && s->now<s->auth_after)q->action='t';
     if(q!=&s->scan)q->board=s->board;
-    if(q->op=='Z' && q->until && s->checking==1)q->board=s->check_board;
+    if(q->op=='Z' && q->until && s->check.active==1)q->board=s->check.board;
     memcpy(q->board_grants,s->board_grants,sizeof(q->board_grants));memcpy(q->vault_grants,s->vault_grants,sizeof(q->vault_grants));
     if(q->op=='v') s->ui.unread_root=q->number;
     if(board_submit(q)) s->pending=1;
     else emit(s,"ERR board busy\r\n");
 }
 static void check_page(Session *s) {
-    BoardRequest q={0};q.since=s->check_since;q.until=s->check_until;q.cursor=s->check_cursor;
-    if(s->checking==1) { q.op='Z';q.action=11;q.scope=s->check_scope;strcpy(q.title,"CHECK"); }
-    else if(s->checking==2) { q.op='m';q.action='L';q.number=5;strcpy(q.title,"CHECK"); }
-    else { q.op='Y';q.action=VAULT_CMD_NEWS;q.number=s->check_cursor;snprintf(q.body,sizeof(q.body),"%s%s@%llu:%llu",*s->check_key?s->check_key:"",*s->check_key?"|":"",(unsigned long long)q.since,(unsigned long long)q.until); }
-    submit(s,&q);s->check_pending=s->pending;
+    BoardRequest q={0};q.since=s->check.since;q.until=s->check.until;q.cursor=s->check.cursor;
+    if(s->check.active==1) { q.op='Z';q.action=11;q.scope=s->check.scope;strcpy(q.title,"CHECK"); }
+    else if(s->check.active==2) { q.op='m';q.action='L';q.number=5;strcpy(q.title,"CHECK"); }
+    else { q.op='Y';q.action=VAULT_CMD_NEWS;q.number=s->check.cursor;snprintf(q.body,sizeof(q.body),"%s%s@%llu:%llu",*s->check.key?s->check.key:"",*s->check.key?"|":"",(unsigned long long)q.since,(unsigned long long)q.until); }
+    submit(s,&q);s->check.pending=s->pending;
 }
 static int find_arguments(const char *arg,BoardRequest *q) {
     const char *p=strchr(arg,' '); if(!p) return 0;
@@ -248,17 +249,14 @@ static int extended_command(Session *s,const char *line) {
         if(!*path || strlen(path)>48 || !safe_text(path)) { emit(s,"ERR vault syntax\r\n");return 1; }
         BoardRequest q={0};q.op='Y';q.action=VAULT_CMD_BOARDINFO;strcpy(q.title,path);strcpy(s->vault_select,path);s->vault_selecting=1;submit(s,&q);if(!s->pending)s->vault_selecting=0;return 1;
     }
-    if(!strcmp(line,"CHECKMODE AUTO") || !strcmp(line,"CHECKMODE MANUAL")) { s->check_auto=!strcmp(line,"CHECKMODE AUTO");emit(s,s->check_auto?"CHECKMODE AUTO\r\n":"CHECKMODE MANUAL\r\n");return 1; }
+    if(!strcmp(line,"CHECKMODE AUTO") || !strcmp(line,"CHECKMODE MANUAL")) { s->check.automatic=!strcmp(line,"CHECKMODE AUTO");emit(s,s->check.automatic?"CHECKMODE AUTO\r\n":"CHECKMODE MANUAL\r\n");return 1; }
     if(!strncmp(line,"CHECK ",6)) {
         const char *kind=line+6;BoardRequest q={0};q.op='}';
-        if(!strcmp(kind,"NEXT")) { if(!s->checking || s->check_finished)emit(s,"CHECK END; CHECK DONE to save checkpoint\r\n");else check_page(s);return 1; }
-        if(!strcmp(kind,"CANCEL")) { s->checking=0;emit(s,"CHECK CANCELLED\r\n");return 1; }
-        if(!strcmp(kind,"DONE")) { if(!s->checking || !s->check_finished) { emit(s,"ERR finish CHECK NEXT first\r\n");return 1; }q.action='n';q.number=(uint32_t)s->checking-1;q.until=s->check_until;strcpy(q.title,s->check_key);submit(s,&q);s->check_committing=s->pending;return 1; }
-        q.action='N';s->check_key[0]=0;s->check_scope=1;s->check_board=s->board;
-        q.number=!strcmp(kind,"ARTICLES") || !strcmp(kind,"ARTICLES ALL")?0:!strcmp(kind,"MAIL")?1:!strcmp(kind,"FILES")?2:3;
-        if(!strcmp(kind,"ARTICLES HERE") || !strcmp(kind,"ARTICLES SUBTREE")) { q.number=0;s->check_scope=!strcmp(kind,"ARTICLES HERE")?0:2;snprintf(s->check_key,sizeof(s->check_key),"%u:%u",s->board,(unsigned)s->check_scope); }
-        else if(!strncmp(kind,"FILES ",6) && strlen(kind+6)<=48 && safe_text(kind+6) && !strchr(kind+6,'|')) { q.number=2;strcpy(s->check_key,kind+6); }
-        strcpy(q.title,s->check_key);
+        if(!strcmp(kind,"NEXT")) { if(!s->check.active || s->check.finished)emit(s,"CHECK END; CHECK DONE to save checkpoint\r\n");else check_page(s);return 1; }
+        if(!strcmp(kind,"CANCEL")) { s->check.active=0;emit(s,"CHECK CANCELLED\r\n");return 1; }
+        if(!strcmp(kind,"DONE")) { CheckCommit commit;if(!check_traversal_commit(&s->check,&commit)) { emit(s,"ERR finish CHECK NEXT first\r\n");return 1; }q.action='n';q.number=commit.kind;q.until=commit.until;strcpy(q.title,commit.key);submit(s,&q);s->check.committing=s->pending;return 1; }
+        q.action='N';q.number=check_traversal_select(&s->check,kind,s->board);
+        strcpy(q.title,s->check.key);
         if(q.number==3)emit(s,"ERR CHECK ARTICLES [HERE|SUBTREE|ALL]|MAIL|FILES [path]|NEXT|DONE|CANCEL\r\n");else submit(s,&q);return 1;
     }
     if(!strncmp(line,"SIGOPGROUP ",11) || !strncmp(line,"BOARDGROUP ",11)) {
@@ -398,7 +396,7 @@ bad_profile:emit(s,"ERR profile text\r\n");return 1;
     } else return 0;
     if(!s->board_enabled) { emit(s,"ERR no board\r\n"); return 1; }
     submit(s,&q);
-    if(q.action==4 && s->pending) { s->scan=q; s->scanning=1; }
+    if(q.action==4 && s->pending) { s->scan=q; s->reader.active=1; }
     return 1;
 syntax:
     emit(s,"ERR extended syntax\r\n"); return 1;
@@ -654,7 +652,7 @@ static int mail_command(Session *s,const char *line) {
     if(!s->user) { emit(s,"ERR login required\r\n");return 1; }
     if(explicit_mail) { s->mail_mode=1;line=line[4]?line+5:"L"; }
     if(!s->mail_input && (!strcmp(line,"G") || !strcmp(line,"GET") || !strncmp(line,"GET ",4))) { BoardRequest q={0};q.op='}';q.action='M';q.number=s->mail_current;const char *tail;if(!strncmp(line,"GET ",4) && (!number_arg(line+4,&q.number,&tail) || *tail)) { emit(s,"ERR command\r\n");return 1; }submit(s,&q);return 1; }
-    if(!s->mail_input && (!strcmp(line,"F") || !strcmp(line,"SCAN") || !strcmp(line,"SCAN ASC") || !strcmp(line,"SCAN DESC"))) { BoardRequest q={0};q.op='m';q.action='f';q.descending=!strcmp(line,"SCAN DESC");q.cursor=q.descending?UINT32_MAX:1;q.scope=s->ui.enabled?(int)s->ui.language+1:0;submit(s,&q);if(s->pending) { s->scan=q;s->scanning=1; }return 1; }
+    if(!s->mail_input && (!strcmp(line,"F") || !strcmp(line,"SCAN") || !strcmp(line,"SCAN ASC") || !strcmp(line,"SCAN DESC"))) { BoardRequest q={0};q.op='m';q.action='f';q.descending=!strcmp(line,"SCAN DESC");q.cursor=q.descending?UINT32_MAX:1;q.scope=s->ui.enabled?(int)s->ui.language+1:0;submit(s,&q);if(s->pending) { s->scan=q;s->reader.active=1; }return 1; }
     if(s->mail_delete) {
         uint32_t id=s->mail_delete;s->mail_delete=0;
         if(!strcmp(line,"Y") || !strcmp(line,"y")) { BoardRequest q={0};q.action='D';q.number=id;mail_submit(s,&q); }
@@ -1259,7 +1257,7 @@ board_syntax:emit(s,"ERR command\r\n");return;
     } else if(!strcmp(line,"LOGOUT")) {
         if(s->user && s->exit_after_save!=3) { s->exit_after_save=1;command_core(s,"PREFS SAVE");if(!s->pending)s->exit_after_save=0;return; }
         s->exit_after_save=0;selection_reset(s);
-        s->classic_input=0;s->classic_id=0;s->classic_area=CM_MAIN;s->checking=s->check_pending=s->check_finished=0;s->check_since=s->check_until=0;s->check_cursor=0;memset(s->vault_grants,0,sizeof(s->vault_grants));
+        s->classic_input=0;s->classic_id=0;s->classic_area=CM_MAIN;check_traversal_reset(&s->check);memset(s->vault_grants,0,sizeof(s->vault_grants));
         chat_disconnect(s->id);s->mail_mode=0;OPENSSL_cleanse(s->mail_query,sizeof(s->mail_query));s->mail_filter=0;s->mail_cursor=0;
         memset(s->board_grants,0,sizeof(s->board_grants));batch_reset(&s->batch);s->game_menu=0;s->vault_mode=0;notification_mail_discard(&s->notifications);s->user=0;s->ui.admin=0;s->ui.sigop=0;s->reset_target=0; s->user_epoch=0; s->current=0; s->board=1; memset(&s->draft,0,sizeof(s->draft)); s->draft_revision=0; undo_clear(s); emit(s,"LOGGED OUT\r\n");
     } else if(!strcmp(line,"NEXTBOARD")) {
@@ -1353,34 +1351,35 @@ static void command(Session *s,char *line) {
     if(s->chatting) { chat_input(s,line);return; }
     char mapped[INPUT_LINE_MAX+128]; const char *action=NULL;
     if(s->page[0]) {
-        if(s->scanning && (!strcmp(line,"F") || !strcmp(line,"f"))) { queue_text(s,s->page+s->page_offset);page_clear(s);s->auto_read=1;return; }
+        if(s->reader.active && (!strcmp(line,"F") || !strcmp(line,"f"))) { queue_text(s,s->page+s->page_offset);page_clear(s);s->reader.automatic=1;return; }
         if(!*line) page_next(s);
-        else if(!strcmp(line,"Q") || !strcmp(line,"q") || !strcmp(line,"/CANCEL")) { int help=s->help_page; s->scanning=0;if(!help)s->checking=0; page_clear(s); if(help) queue_text(s,ui_text(&s->ui,MSG_HELP_CLOSED)); else emit(s,s->editing?"PREVIEW CLOSED\r\n":"CANCELLED\r\n"); }
+        else if(!strcmp(line,"Q") || !strcmp(line,"q") || !strcmp(line,"/CANCEL")) { int help=s->help_page; s->reader.active=0;if(!help)s->check.active=0; page_clear(s); if(help) queue_text(s,ui_text(&s->ui,MSG_HELP_CLOSED)); else emit(s,s->editing?"PREVIEW CLOSED\r\n":"CANCELLED\r\n"); }
         else if(!strcmp(line,"PAGER OFF") || !strcmp(line,"OFF")) { s->pager_enabled=0; queue_text(s,s->page+s->page_offset); page_clear(s); emit(s,"PAGER OFF\r\n"); }
         else queue_text(s,ui_text(&s->ui,MSG_PAGER_MORE));
         prompt(s); return;
     }
     if(s->gather_mode) { gather_input(s,line);prompt(s);return; }
-    if(s->scanning) {
+    if(s->reader.active) {
         if(!strcmp(line,"P") || !strcmp(line,"L")) {
-            s->auto_read=0;
+            s->reader.automatic=0;
             uint32_t id=s->scan.op=='m'?s->mail_current:s->current;
-            s->scan.cursor=id;
-            if(*line=='P') { s->scan.descending=!s->scan.descending;s->scan.cursor=s->scan.descending?(id>1?id-1:0):(id<CONTENT_ID_MAX?id+1:0); }
+            ReaderPosition next=reader_move(*line=='P'?READER_PREVIOUS:READER_REPEAT,id,s->scan.descending,1);
+            s->scan.cursor=next.cursor;s->scan.descending=next.descending;
             if(s->scan.cursor)submit(s,&s->scan);else emit(s,"SCAN END\r\n");
             return;
         }
-        if(!strcmp(line,"F")) { s->auto_read=1;return; }
-        if(s->auto_read) { s->auto_read=0;page_clear(s);if(!*line || !strcmp(line,"STOP")) { s->scanning=0;prompt(s);return; } }
+        if(!strcmp(line,"F")) { s->reader.automatic=1;return; }
+        if(s->reader.automatic) { s->reader.automatic=0;page_clear(s);if(!*line || !strcmp(line,"STOP")) { s->reader.active=0;prompt(s);return; } }
         if(*line=='+' || *line=='-') {
             uint32_t distance=1;const char *tail;
             if(line[1] && (!number_arg(line+1,&distance,&tail) || *tail || !distance)) { emit(s,"ERR relative distance\r\n");prompt(s);return; }
-            s->scan.descending=*line=='-';uint32_t id=s->scan.op=='m'?s->mail_current:s->current;
-            s->scan.cursor=s->scan.descending?(id>distance?id-distance:0):distance<=CONTENT_ID_MAX-id?id+distance:0;
-            if(s->scan.cursor)submit(s,&s->scan);else { s->scanning=0;emit(s,s->scan.op=='m'?"MAIL SCAN END\r\n":"SCAN END\r\n");prompt(s); }return;
+            uint32_t id=s->scan.op=='m'?s->mail_current:s->current;
+            ReaderPosition next=reader_move(*line=='-'?READER_BACKWARD:READER_FORWARD,id,s->scan.descending,distance);
+            s->scan.cursor=next.cursor;s->scan.descending=next.descending;
+            if(s->scan.cursor)submit(s,&s->scan);else { s->reader.active=0;emit(s,s->scan.op=='m'?"MAIL SCAN END\r\n":"SCAN END\r\n");prompt(s); }return;
         }
-        if(!*line || !strcmp(line,"CONTINUE")) { if(s->scan.cursor)submit(s,&s->scan);else { s->scanning=0;emit(s,s->scan.op=='m'?"MAIL SCAN END\r\n":"SCAN END\r\n");prompt(s); }return; }
-        s->scanning=0;
+        if(!*line || !strcmp(line,"CONTINUE")) { if(s->scan.cursor)submit(s,&s->scan);else { s->reader.active=0;emit(s,s->scan.op=='m'?"MAIL SCAN END\r\n":"SCAN END\r\n");prompt(s); }return; }
+        s->reader.active=0;
         if(!strcmp(line,"0") || !strcmp(line,"Q") || !strcmp(line,"q") || !strcmp(line,"STOP") || !strcmp(line,"/CANCEL")) {
             queue_text(s,ui_text(&s->ui,MSG_SCAN_STOP)); prompt(s); return;
         }
@@ -1533,14 +1532,21 @@ static void command(Session *s,char *line) {
 }
 
 void session_init(Session *s,SessionIO io,unsigned long id,int slot,int boards,int members,int menu,Language language) {
-    memset(s,0,sizeof(*s)); s->io=io;s->menu_mode=1;s->check_auto=menu; s->active=1; s->id=id; s->slot=slot;
+    memset(s,0,sizeof(*s)); s->io=io;s->menu_mode=1;s->check.automatic=menu; s->active=1; s->id=id; s->slot=slot;
     s->binary_allowed=1; s->board_enabled=boards; s->member_mode=members; s->board=1; s->ui.language=language;
     char greeting[128]; snprintf(greeting,sizeof(greeting),"RTBBS-PROBE %lu\r\n",id); queue_text(s,greeting);
     session_dimensions(s,80,24);
     if(menu) { s->ui.enabled=1; queue_text(s,banner_text());queue_text(s,login_text(0));queue_text(s,login_text(1));show_menu(s,1); prompt(s); }
 }
+int session_auto_read(const Session *s) { return s->reader.automatic; }
+void session_scan_pause(Session *s) { s->reader.active=s->reader.automatic=0; }
+void session_board_refresh(Session *s) {
+    s->page[0]=0;s->page_offset=0;s->reader.active=0;
+    s->ui.next=0;s->ui.view=UI_HOME;s->ui.board_title[0]=0;
+    s->report[0]=0;s->report_next=0;
+}
 void session_scan_stop(Session *s) {
-    s->auto_read=0;s->scanning=0;s->scan_cancel=s->pending;page_clear(s);
+    reader_stop(&s->reader,s->pending);page_clear(s);
     if(!s->pending) { queue_text(s,ui_text(&s->ui,MSG_SCAN_STOP));prompt(s); }
 }
 void session_door_finish(Session *s) {
@@ -1558,7 +1564,7 @@ static NotificationAudience notification_audience(const Session *s) {
         (s->password_mode?NOTICE_SECRET:0)|(s->pending?NOTICE_PENDING:0)|(s->page[0]?NOTICE_PAGE:0)|
         (s->editing?NOTICE_EDITOR:0)|(s->wake?NOTICE_TIMER:0)|
         ((s->ui.input || s->classic_input || s->mail_input || s->mail_delete)?NOTICE_INPUT:0)|
-        (s->chatting?NOTICE_CHAT:0)|(s->scanning?NOTICE_SCAN:0);
+        (s->chatting?NOTICE_CHAT:0)|(s->reader.active?NOTICE_SCAN:0);
     return (NotificationAudience){s->user,blocked,s->active,s->closing,s->ui.enabled,s->binary_menu};
 }
 void session_mail_notify(Session *s,uint32_t user,int deny,uint32_t revision) {
@@ -1574,10 +1580,10 @@ void session_announce(Session *s,const char *text) {
 }
 void session_tick(Session *s,uint64_t now) {
     if(!s->connected_at)s->connected_at=now;
-    if(s->checking && s->check_auto && s->check_finished && !s->page[0] && !s->pending && !s->closing && (!s->io.drained || s->io.drained(s->io.context))) { extended_command(s,"CHECK DONE");return; }
-    if(s->auto_read && s->active && !s->pending) {
-        if(s->scanning && s->scan.cursor)submit(s,&s->scan);
-        else { s->auto_read=0;prompt(s); }
+    if(check_traversal_auto_ready(&s->check,s->page[0]!=0,s->pending,s->closing,1) && (!s->io.drained || s->io.drained(s->io.context))) { extended_command(s,"CHECK DONE");return; }
+    if(s->reader.automatic && s->active && !s->pending) {
+        if(s->reader.active && s->scan.cursor)submit(s,&s->scan);
+        else { s->reader.automatic=0;prompt(s); }
     }
     s->now=now;
     if(s->editing && s->editor_upload && now>=s->editor_deadline && !s->pending) { s->editor_upload=0;s->editor_input=0;queue_text(s,s->ui.language==LANGUAGE_JA?"受信終了。編集を続けられます。\r\n":"Text received. Continue editing.\r\n");prompt(s); }
@@ -1714,8 +1720,7 @@ int session_line(Session *s,const char *text,size_t size,uint64_t now) {
 void session_result(Session *s,const BoardResult *completion,uint64_t now) {
     if(!s->active || s->closing || s->id!=completion->session || s->slot!=completion->slot) return;
     s->now=now; s->pending=0;
-    if(s->scan_cancel && completion->sequence) { s->scan_cancel=0;s->scanning=0;s->auto_read=0;queue_text(s,ui_text(&s->ui,MSG_SCAN_STOP));prompt(s);return; }
-    s->scan_cancel=0;
+    if(reader_cancel_completion(&s->reader,completion->sequence)) { queue_text(s,ui_text(&s->ui,MSG_SCAN_STOP));prompt(s);return; }
     if(s->exit_after_save) {
         int action=s->exit_after_save;s->exit_after_save=0;
         if(!strncmp(completion->text,"PREFS SAVED",11)) { s->exit_after_save=3;command_core(s,action==1?"LOGOUT":"QUIT");prompt(s);return; }
@@ -1732,9 +1737,9 @@ void session_result(Session *s,const BoardResult *completion,uint64_t now) {
     }
     if(completion->mail_id) { s->mail_current=completion->mail_id;s->mail_reading=completion->mail_action!='S'; }
     if(completion->mail_action=='L' || completion->mail_action=='I')s->mail_reading=0;
-    if(completion->service_action=='n') { s->checking=(int)completion->service_number+1;s->check_since=completion->since;s->check_until=completion->until;s->check_cursor=s->checking==1?1:0;s->check_finished=0;check_page(s);return; }
-    if(s->check_committing) { s->check_committing=0;if(!strncmp(completion->text,"CHECKPOINT SAVED",16))s->checking=0;else s->check_auto=0;emit(s,completion->text);prompt(s);return; }
-    if(s->check_pending) { s->check_pending=0;const char *end=strstr(completion->text,"END NEXT ");unsigned next=0;if(end)sscanf(end,"END NEXT %u",&next);s->check_cursor=next;s->check_finished=end && !next;emit(s,completion->text);queue_text(s,s->check_auto?"CHECK NEXT / CHECK CANCEL (AUTO)\r\n":s->ui.language==LANGUAGE_JA?"CHECK NEXT: 続き / CHECK DONE: 確認日時を保存 / CHECK CANCEL: 中断\r\n":"CHECK NEXT / CHECK DONE / CHECK CANCEL\r\n");prompt(s);return; }
+    if(completion->service_action=='n') { check_traversal_begin(&s->check,completion->service_number,completion->since,completion->until);check_page(s);return; }
+    if(s->check.committing) { check_traversal_committed(&s->check,!strncmp(completion->text,"CHECKPOINT SAVED",16));emit(s,completion->text);prompt(s);return; }
+    if(s->check.pending) { check_traversal_response(&s->check,completion->text);emit(s,completion->text);queue_text(s,s->check.automatic?"CHECK NEXT / CHECK CANCEL (AUTO)\r\n":s->ui.language==LANGUAGE_JA?"CHECK NEXT: 続き / CHECK DONE: 確認日時を保存 / CHECK CANCEL: 中断\r\n":"CHECK NEXT / CHECK DONE / CHECK CANCEL\r\n");prompt(s);return; }
     if(!strncmp(completion->text,"MAILBATCH",9)) {
         BatchIds ids=batch_response_ids(completion->text+9);
         if(ids.count && batch_format_ids(&ids,s->zmodem_text,sizeof(s->zmodem_text))) { s->zmodem_receive=10;s->zmodem_protocol=s->mail_batch_protocol;s->zmodem_id=0;s->zmodem_start=1;BoardRequest q={0};q.op='@';q.action=1;submit(s,&q); }return;
@@ -1769,7 +1774,7 @@ void session_result(Session *s,const BoardResult *completion,uint64_t now) {
         emit(s,completion->text);prompt(s);return;
     }
     if(!strncmp(completion->text,"FILEBOARD UNLOCKED ",19)) { unsigned id,revision;if(sscanf(completion->text,"FILEBOARD UNLOCKED %u %u",&id,&revision)==2 && id<=1024)s->vault_grants[id]=revision; }
-    if(completion->auth) { s->classic_input=0;s->classic_id=0;s->classic_area=CM_MAIN;s->checking=s->check_pending=s->check_finished=0;s->check_since=s->check_until=0;s->check_cursor=0;memset(s->vault_grants,0,sizeof(s->vault_grants)); }
+    if(completion->auth) { s->classic_input=0;s->classic_id=0;s->classic_area=CM_MAIN;check_traversal_reset(&s->check);memset(s->vault_grants,0,sizeof(s->vault_grants)); }
     if(!strncmp(completion->text,"BATCHMATCH",10)) {
         BatchIds selected=batch_response_ids(completion->text+10);batch_replace(&s->batch,&selected);
         char ids[192],text[384];if(!batch_format_ids(&selected,ids,sizeof(ids))) { session_abort(s);return; }
@@ -1835,13 +1840,13 @@ void session_result(Session *s,const BoardResult *completion,uint64_t now) {
             prompt(s);
         } else if(completion->chat_action=='V') {
             s->chatting=1;s->outside_talk=1;s->talk_lost=0;s->talk_target=0;s->talk_select=1;
-            page_clear(s);s->scanning=0;
+            page_clear(s);s->reader.active=0;
             if(completion->chat_target)talk_start(s,completion->chat_target);else chat_prompt(s);
         } else if(completion->chat_action=='O') { chat_online(s->id);
         } else if(completion->chat_action=='J') {
             s->outside_talk=0;
             s->talk_target=s->reply_target=0;s->talk_select=s->talk_lost=0;
-            s->chatting=1;page_clear(s);s->scanning=0;
+            s->chatting=1;page_clear(s);s->reader.active=0;
             queue_text(s,s->ui.enabled?ui_text(&s->ui,MSG_CHAT_ENTER):"CHAT OPEN\r\n");
             if(!chat_join_config(s->id,s->user,completion->chat_login,completion->chat_name,chat_event,s,&completion->chat_preferences)) {
                 s->chatting=0;chat_error(s,MSG_CHAT_FULL,"CHAT ERROR full\r\n");prompt(s);
@@ -1876,7 +1881,7 @@ void session_result(Session *s,const BoardResult *completion,uint64_t now) {
     }
     if(s->zmodem_start) {
         s->zmodem_start=0;
-        if(completion->binary_enter) { s->zmodem=1;page_clear(s);s->scanning=0;if(s->zmodem_protocol)queue_text(s,s->ui.language==LANGUAGE_JA?"選択した方式で端末の転送を開始してください。\r\n":"Start terminal transfer using the selected protocol.\r\n");else queue_text(s,ui_text(&s->ui,(s->zmodem_receive==6 || s->zmodem_receive==9 || s->zmodem_receive==11 || s->zmodem_receive==12)?MSG_ZMODEM_BATCH_UPLOAD_READY:(s->zmodem_receive==2 || s->zmodem_receive==10)?MSG_ZMODEM_BATCH_READY:MSG_ZMODEM_READY)); }
+        if(completion->binary_enter) { s->zmodem=1;page_clear(s);s->reader.active=0;if(s->zmodem_protocol)queue_text(s,s->ui.language==LANGUAGE_JA?"選択した方式で端末の転送を開始してください。\r\n":"Start terminal transfer using the selected protocol.\r\n");else queue_text(s,ui_text(&s->ui,(s->zmodem_receive==6 || s->zmodem_receive==9 || s->zmodem_receive==11 || s->zmodem_receive==12)?MSG_ZMODEM_BATCH_UPLOAD_READY:(s->zmodem_receive==2 || s->zmodem_receive==10)?MSG_ZMODEM_BATCH_READY:MSG_ZMODEM_READY)); }
         else { emit(s,completion->text);prompt(s); }
         return;
     }
@@ -1929,8 +1934,8 @@ void session_result(Session *s,const BoardResult *completion,uint64_t now) {
     if(completion->editing) { s->editing=1;s->editor_input=0;s->editor_at=1; }
     if(s->file_selecting) { if(!strncmp(completion->text,"FILE ",5)) { s->file_selected=s->file_selecting;s->classic_input=CI_FILE_ACTION; }s->file_selecting=0; }
     if(completion->selected) { s->current=completion->selected;if(!s->mail_mode && !s->vault_mode)s->classic_area=CM_BOARD; }
-    if(completion->sequence) { s->scanning=completion->selected || completion->mail_id; s->scan.cursor=completion->sequence_next; }
-    else if(s->scanning && !strncmp(completion->text,"ERR ",4)) s->scanning=0;
+    reader_complete(&s->reader,completion->sequence,completion->selected || completion->mail_id,!strncmp(completion->text,"ERR ",4));
+    if(completion->sequence)s->scan.cursor=completion->sequence_next;
     emit(s,completion->text);
     if(s->vault_mode && !strncmp(completion->text,"FILEBOARDSETTING ",17) && strstr(completion->text,"OPTIONS MENU ")) { BoardRequest q={0};q.op='Y';q.action=VAULT_CMD_CHILDREN;strcpy(q.body,*s->vault_path?s->vault_path:"-");submit(s,&q);return; }
     if(s->ui.enabled && s->active) {
@@ -1967,14 +1972,14 @@ void session_chat_kick(Session *s) {
 }
 void session_revoke(Session *s) {
     selection_reset(s);
-    s->classic_input=0;s->classic_id=0;s->classic_area=CM_MAIN;s->checking=s->check_pending=s->check_finished=0;s->check_since=s->check_until=0;s->check_cursor=0;memset(s->vault_grants,0,sizeof(s->vault_grants));
+    s->classic_input=0;s->classic_id=0;s->classic_area=CM_MAIN;check_traversal_reset(&s->check);memset(s->vault_grants,0,sizeof(s->vault_grants));
     chat_disconnect(s->id);s->mail_mode=s->mail_input=0;s->mail_delete=0;
     if(s->chatting) { s->chatting=0;chat_leave(s->id); }
     if(s->door || s->binary || s->zmodem) { session_abort(s);return; }
     if(!s->active || s->closing) return;
     s->game_menu=0;s->vault_mode=0;notification_mail_discard(&s->notifications);s->user=0;s->ui.admin=0;s->ui.sigop=0;s->reset_target=0; s->user_epoch=0; s->current=0; s->board=1; s->password_mode=0;
     page_clear(s);
-    s->scanning=0; OPENSSL_cleanse(&s->scan,sizeof(s->scan));
+    s->reader.active=0; OPENSSL_cleanse(&s->scan,sizeof(s->scan));
     s->editing=0;s->editor_upload=s->editor_confirm=s->editor_upload_question=0; s->pending=0; s->wake=0; s->ui.input=0;
     OPENSSL_cleanse(s->old_password,sizeof(s->old_password)); OPENSSL_cleanse(s->new_password,sizeof(s->new_password));
     undo_clear(s); s->draft_revision=0;

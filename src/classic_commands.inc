@@ -13,10 +13,10 @@ static void classic_read(Session *s,int descending,uint32_t distance,int repeat)
     BoardRequest q={0};q.op=s->mail_mode?'m':'Z';q.action=s->mail_mode?'f':4;q.descending=descending;
     if(s->mail_mode)q.scope=(int)s->ui.language+1;
     strcpy(q.username,"*");strcpy(q.title,"*");
-    q.cursor=repeat?current:descending?(current>distance?current-distance:0):
-        distance<=CONTENT_ID_MAX-current?current+distance:0;
+    ReaderPosition next=reader_move(repeat?READER_REPEAT:descending?READER_BACKWARD:READER_FORWARD,current,descending,distance);
+    q.cursor=next.cursor;
     if(!q.cursor) { emit(s,"SCAN END\r\n");prompt(s);return; }
-    s->classic_direction=descending;submit(s,&q);if(s->pending) { s->scan=q;s->scanning=1; }
+    s->classic_direction=descending;submit(s,&q);if(s->pending) { s->scan=q;s->reader.active=1; }
 }
 static const char *classic_fields[]={"HANDLE","BIO","LOCATION","OCCUPATION","INTERESTS","WEBSITE","CONTACT","MACHINE","BIRTHDAY","REALNAME","KANA","ADDRESS","PHONE","GROUP"};
 static void profile_fields(Session *s,int search) {
@@ -182,7 +182,7 @@ static int classic_commands(Session *s,const char *line) {
             uint32_t distance=1;const char *tail;
             if((*line=='+' || *line=='-') && line[1] && (!number_arg(line+1,&distance,&tail) || *tail || !distance)) { emit(s,"ERR relative distance\r\n");prompt(s);return 1; }
             classic_read(s,*line=='P' || *line=='-'?1:*line=='+'?0:s->classic_direction,distance,*line=='L');
-            if(*line=='F' && s->pending)s->auto_read=1;
+            if(*line=='F' && s->pending)s->reader.automatic=1;
             return 1;
         }
         if(s->mail_input || s->mail_delete)return 0;
@@ -229,7 +229,7 @@ static int classic_commands(Session *s,const char *line) {
             uint32_t distance=1;const char *tail;
             if((*line=='+' || *line=='-') && line[1] && (!number_arg(line+1,&distance,&tail) || *tail || !distance)) { emit(s,"ERR relative distance\r\n");prompt(s);return 1; }
             int direction=*line=='P' || *line=='-'?1:*line=='+'?0:s->classic_direction;
-            classic_read(s,direction,distance,*line=='L');if(*line=='F' && s->pending)s->auto_read=1;return 1;
+            classic_read(s,direction,distance,*line=='L');if(*line=='F' && s->pending)s->reader.automatic=1;return 1;
         }
         if(!strcmp(line,"S")) { BoardRequest q={0};q.op='Z';q.action=17;q.number=s->current;submit(s,&q);return 1; }
         if(!strcmp(line,"D")) { classic_run(s,"PARENT");return 1; }

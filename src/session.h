@@ -3,6 +3,7 @@
 #include "notification_core.h"
 #include "connector_core.h"
 #include "batch_core.h"
+#include "traversal_core.h"
 #include <stddef.h>
 #include <stdint.h>
 #include "board.h"
@@ -22,7 +23,7 @@ typedef struct {
     int slot,active,board_enabled,member_mode;
     Ui ui;
     uint64_t connected_at;int talk_once,talk_return_editor,status_pending;uint32_t file_selected,file_selecting;unsigned profile_edit_target;int profile_walk,profile_walk_pending;BoardRequest profile_search;int batch_screen,batch_copying;BatchSelection batch;int profile_edit_field;int classic_area,classic_input,classic_direction;uint32_t classic_id;
-    int door,game_menu;int pager_enabled, help_page,menu_mode,menu_shown,auto_read,exit_after_save,editor_upload_question;
+    int door,game_menu;int pager_enabled, help_page,menu_mode,menu_shown,exit_after_save,editor_upload_question;
     char guest_handle[33];
     unsigned columns,rows;
     size_t page_offset;
@@ -50,8 +51,9 @@ typedef struct {
     ConnectorBlock connector_block;
     char old_password[129], new_password[129];
     BoardRequest draft, scan;
-    char check_key[80];int check_scope,check_auto,check_committing;uint32_t check_board;
-    int application_step;char application_body[8193];int scanning,scan_cancel;int checking,check_pending,check_finished;uint64_t check_since,check_until;uint32_t check_cursor;int profile_filter;unsigned profile_group;
+    CheckTraversal check;
+    ReaderState reader;
+    int application_step;char application_body[8193];int profile_filter;unsigned profile_group;
     uint32_t draft_revision;
     int undo_available;
     char undo_title[BOARD_TITLE+1], undo_body[BOARD_BODY+1];
@@ -61,6 +63,10 @@ void session_dimensions(Session *,unsigned columns,unsigned rows);
 void session_abort(Session *);
 void session_door_finish(Session *);
 void session_scan_stop(Session *);
+void session_scan_pause(Session *);
+/* Invalidate board listings without changing pending/automatic reader state. */
+void session_board_refresh(Session *);
+int session_auto_read(const Session *);
 void session_chat_kick(Session *);
 void session_revoke(Session *);
 uint64_t session_ui_signature(const Session *);
