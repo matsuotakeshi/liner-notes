@@ -310,7 +310,12 @@
         "FILE_BOARDS.md",
         "help/ja/adminfiles.txt",
         "help/ja/files.txt",
-        "src/vault.c"
+        "src/vault.c",
+        "src/download.c",
+        "src/download_core.c",
+        "src/download_core.h",
+        "src/download_repository.h",
+        "src/download_store.c"
       ]
     },
     {
@@ -327,7 +332,12 @@
         "src/activity_core.c",
         "src/activity_core.h",
         "src/activity_repository.h",
-        "src/activity_store.c"
+        "src/activity_store.c",
+        "src/download.c",
+        "src/download_core.c",
+        "src/download_core.h",
+        "src/download_repository.h",
+        "src/download_store.c"
       ]
     },
     {
@@ -404,7 +414,12 @@
         "webui/bridge.py",
         "ports/test-resume.py",
         "scripts/posix_locks.py",
-        "tests/test_resume_receipt.py"
+        "tests/test_resume_receipt.py",
+        "src/download.c",
+        "src/download_core.c",
+        "src/download_core.h",
+        "src/download_repository.h",
+        "src/download_store.c"
       ]
     },
     {

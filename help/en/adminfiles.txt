@@ -8,3 +8,5 @@ FILECATEGORY file path / FILEDESC file description
 FILEHIDE file CONFIRM / FILERESTORE file CONFIRM / FILEDELETE file CONFIRM
 FILEDELETE reclaims the physical payload. FILEAUDIT / FILEHISTORY / FILESTATS report events and counts.
 Inherited SIGOP rights apply only within scope. Private mail attachment permissions are unchanged.
+
+FILEHISTORY requires a global administrator. FILESTATS shows readable files; global administrators can also see counts retained for hidden/deleted files. Pruning retained download history preserves cumulative counts.
