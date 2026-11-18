@@ -423,10 +423,11 @@ static int edit_draft(Session *s,const char *line) {
     if(command.kind==DRAFT_INVALID) { emit(s,"ERR draft line\r\n");return 1; }
     EditorDocument d=editor_document(s);
     if(command.kind==DRAFT_LINES) {
-        char out[CONTENT_DISPLAY];
-        if(editor_view_draft(&d,out,sizeof(out))==EDITOR_VIEW_OK)emit(s,out);
+        char *out=malloc(CONTENT_DISPLAY);
+        if(!out) { emit(s,"ERR board busy\r\n");return 1; }
+        if(editor_view_draft(&d,out,CONTENT_DISPLAY)==EDITOR_VIEW_OK)emit(s,out);
         else editor_error(s,EDITOR_INVALID);
-        return 1;
+        free(out);return 1;
     }
     EditorOutcome result=editor_apply(&d,command.operation,command.line,command.line,command.text);
     if(result!=EDITOR_OK)editor_error(s,result);
@@ -505,9 +506,12 @@ static int classic_editor(Session *s,const char *line,char *translated,size_t si
         return 1;
     }
     if(request.kind==LINE_LIST) {
-        EditorDocument document=editor_document(s);char out[CONTENT_DISPLAY];
-        if(editor_view_lines(&document,first,last,s->editor_numbers,out,sizeof(out))!=EDITOR_VIEW_OK)goto invalid;
-        queue_text(s,out);return 1;
+        EditorDocument document=editor_document(s);char *out=malloc(CONTENT_DISPLAY);
+        if(!out) { emit(s,"ERR board busy\r\n");return 1; }
+        EditorViewResult result=editor_view_lines(&document,first,last,s->editor_numbers,out,CONTENT_DISPLAY);
+        if(result==EDITOR_VIEW_OK)queue_text(s,out);
+        free(out);if(result!=EDITOR_VIEW_OK)goto invalid;
+        return 1;
     }
     if(request.kind==LINE_DELETE || request.kind==LINE_QUOTE) {
         EditorOutcome result=edit_apply(s,request.kind==LINE_DELETE?EDITOR_DELETE:EDITOR_QUOTE,first,last,NULL);
