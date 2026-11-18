@@ -185,7 +185,14 @@
         "src/session.c",
         "src/editor_core.c",
         "src/editor_core.h",
-        "help/en/editor.txt"
+        "help/en/editor.txt",
+        "src/editor_commands.c",
+        "src/editor_commands.h",
+        "src/editor_view.c",
+        "src/editor_view.h",
+        "tests/test_editor_interface.c",
+        "tests/test_editor_core.c",
+        "tests/test_adapters.c"
       ]
     },
     {

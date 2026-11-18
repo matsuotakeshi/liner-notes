@@ -1,6 +1,6 @@
 {
   "LICENSE": "fb981668c18a279e285fc4d83fba1e836cc84dd4daa73c9697d3cfd2d8aca6e0",
-  "Makefile": "f995c0c50a64f50b572118d2b9ad6b1d785c377cb662a552d7c9a01be4292288",
+  "Makefile": "fa6d2e82ad7d359d52be264b02ed3f4e7133815778f2f2b30e9d7e43f18cca5a",
   "boards.example.conf": "4bd1a17ecf3966d3829510e8495a1362fb8b922cd754badccc739f5e5ab0bde8",
   "ci/build-freebsd-package.sh": "4e62899471d1f1a6c44e00a783c1aff771332140704ae778da95a95048474108",
   "debian/changelog": "8f3574a094f5a3677a9a7188e530ecdbdc006138b082b57243ca8441c644114d",
@@ -63,7 +63,7 @@
   "src/profile_store.c": "9bd14cb1a44b9e117fb9465d036f2d5417bca8188a136a9162f91f8b46f33e2a",
   "src/runtime.c": "fa1bdf184130e9db2037610bd2240395dcdfa9f5a53642b0f31c70779eeebc04",
   "src/runtime_limits.h": "82de34913914d0f81874789d473928e044225772c4db9d656bceac03920219a8",
-  "src/session.c": "913d21af2a97a82b0622ea528491231dbe46629c2c1f1d65a589c0db68563657",
+  "src/session.c": "c798c32017e686f408027cbbf5328d8da761bcb1d4bca23932afcdc87610ee86",
   "src/storage_sqlite.c": "aa8971c445e2a23ae21548fc706e318e40238f8318c2f717490b867067ab3055",
   "src/telnet.c": "a490e550fb227858727b4edc656c7c1d60bf90f6fa13a2f74dd361234b8ff422",
   "src/transfer_line.c": "5c3f9e15fd46c8569d0f2775628de7a432d60eb6bdfd93babdf7f77fb5f9f156",
@@ -229,7 +229,7 @@
   "src/connection_protocol.h": "a497663d9dbf2652c795c8394fea1b38bb66f304ba629780d2bac33484aae667",
   "tests/test_connection_core.c": "2efb380fdfc520e697bef8edb70e476d60f23cf838a992075cbb83e10124d5e0",
   "tests/test_stage57.py": "c1ea9a6a665387c5ebc4f42e75688f4c31fb8ffd702cc9a4a99b7f478d558f8f",
-  "tests/test_adapters.c": "1ba06922ca212ab8fbfbda750100332e3a15e7d4dd846a7f7343ef4598c6c6a8",
+  "tests/test_adapters.c": "e3b6f9518f2756e059224f8736ab14316048a64a5c3fcb9916ca774e008cd87e",
   "src/notification_core.c": "05f93d1b102bd276649c68cc385799f8e43fab559003200c84b5bceeca8d726d",
   "src/notification_core.h": "637cde7c1ffd893ff380c83f41ffef0f3732872b2a4c014273d0d0cc90c90de9",
   "tests/test_notification_core.c": "c9b5d4cfdb30ed385abc928a1b05ebf1d148915e2a5ab76b0b2ee1a8288cf4fe",
@@ -246,5 +246,11 @@
   "tests/test_terminal_policy.c": "9074519caaef0bcbd2a0d0ae39b41d2b9c01086d2ac7f0ddded6ec77fb548f24",
   "src/connector_protocol.c": "8781c52a1a6fb01064ccbf35b0c57d8b4450bb039b63a0a2d353e1fca5ca4929",
   "src/connector_protocol.h": "a960b49e9fdc634ea6da56cd508310350ba677a72bae3288d6a86799264cb0f4",
-  "tests/test_connector_protocol.c": "331c0c6299867cc9de0e9fb10a8a38a6da7c84bc68bc513117285d7c45ea48d8"
+  "tests/test_connector_protocol.c": "331c0c6299867cc9de0e9fb10a8a38a6da7c84bc68bc513117285d7c45ea48d8",
+  "src/editor_commands.c": "1ac88ecc751be39f496b1c46bb8671142ea64c61adb8e1472754fee12c4a6424",
+  "src/editor_commands.h": "0fe29aecf110acaaf149398d29e153d859fae5d72c36b274c0f52a3f9ed5f8cb",
+  "src/editor_view.c": "c31794da9f949df9dc1531159c6c067b798dfffb729d75f4d7f5a656f3f7f9c9",
+  "src/editor_view.h": "2a4ba93d25df0c25dd85d6b61d48d3cd6a1f644d36982c9d73985f761366cf64",
+  "tests/test_editor_interface.c": "fbde0e215d8526a1a7900ee2dc13f5da499a9f3c4622f3c8bebb5562b30a6030",
+  "tests/test_editor_core.c": "3fe34768ae09a2da388fbe75727bbc84532155f5315de1867e4e7bba83e823d5"
 }
