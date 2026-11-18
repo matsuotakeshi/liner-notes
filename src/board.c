@@ -11,6 +11,9 @@
 #include "board_topology_core.h"
 #include "board_topology_repository.h"
 #include "member_core.h"
+#include "authentication_core.h"
+#include "authentication_form.h"
+#include "authentication_repository.h"
 #include "mail_core.h"
 #include "mail_repository.h"
 #include "transfer_line.h"
@@ -917,6 +920,53 @@ static void member_result(MemberOutcome result,BoardResult *r) {
     }
 }
 
+int authentication_repository_healthy(void) {
+    return !features_broken && !policy_broken() && !move_journal.broken && !access_journal.broken;
+}
+void authentication_repository_unread(uint32_t user,uint32_t *articles,uint32_t *boards) {
+    *articles=0;*boards=0;
+    int readable[CATALOG_MAX+1]={0},has_unread[CATALOG_MAX+1]={0};
+    for(uint32_t b=1;b<=CATALOG_MAX;b++)readable[b]=catalog_read(b,user);
+    for(uint32_t i=1;i<=article_count;i++) {
+        uint32_t b=(*article_at(i-1)).board;
+        if(readable[b] && !unavailable(i) && !members_seen(user,i)) {
+            (*articles)++;if(!has_unread[b]) { has_unread[b]=1;(*boards)++; }
+        }
+    }
+}
+static void authentication_execute(const BoardRequest *q,BoardResult *r) {
+    AuthenticationDecodedForm decoded;
+    AuthenticationRequest request={.mode=q->op=='g'?AUTH_REGISTER:AUTH_LOGIN,.login=q->username,.password=q->password};
+    if(request.mode==AUTH_REGISTER) { authentication_form_decode(q->body,&decoded);request.form=&decoded.form; }
+    AuthenticationResult result;AuthenticationOutcome outcome=authentication_core(&request,&result);
+    if(request.mode==AUTH_REGISTER)OPENSSL_cleanse(&decoded,sizeof(decoded));
+    r->auth=-1;
+    switch(outcome) {
+    case AUTHENTICATED: {
+        const AuthenticationSession *a=&result.session;r->auth=(int)a->user;r->user_epoch=a->epoch;
+        r->mail_notice=a->mail_unread;r->mail_draft_notice=a->mail_draft;
+        r->mail_notify_user=a->user;r->mail_notify_deny=a->mail_deny;r->mail_notify_revision=a->mail_revision;
+        r->chat_admin=a->admin;r->chat_user=a->user;r->chat_preferences=a->chat;
+        strcpy(r->chat_login,a->login);strcpy(r->chat_name,a->handle);
+        r->menu_mode=a->menu_mode;r->preferences=a->preferences;r->language=a->language;r->pager=a->pager;
+        r->saved_draft_notice=a->saved_draft;r->unread_articles_notice=a->unread_articles;r->unread_boards_notice=a->unread_boards;
+        r->birthday=a->birthday;snprintf(r->text,sizeof(r->text),"LOGGED IN %s\r\n",a->login);break;
+    }
+    case AUTH_APPLICATION_PENDING:
+        if(result.automatic_id)snprintf(r->text,sizeof(r->text),"APPLICATION SAVED %s\r\n",result.account_name);
+        else strcpy(r->text,"APPLICATION SAVED\r\n");
+        break;
+    case AUTH_APPLICATION_STORAGE:snprintf(r->text,sizeof(r->text),"ERR application storage; account %s reserved\r\n",result.account_name);break;
+    case AUTH_REGISTRATION_CLOSED:strcpy(r->text,"ERR registration closed\r\n");break;
+    case AUTH_APPLICATION_INVALID:strcpy(r->text,"ERR application values\r\n");break;
+    case AUTH_MODERATION_STORAGE:strcpy(r->text,"ERR moderation storage unavailable\r\n");break;
+    case AUTH_BOARD_STORAGE:r->auth=0;strcpy(r->text,"ERR board policy storage\r\n");break;
+    case AUTH_EXTRAS_STORAGE:r->auth=0;strcpy(r->text,"ERR extras storage\r\n");break;
+    case AUTH_MEMBER_STORAGE:r->auth=0;strcpy(r->text,"ERR member storage unavailable\r\n");break;
+    default:strcpy(r->text,"ERR authentication\r\n");break;
+    }
+}
+
 static void execute(const BoardRequest *q,BoardResult *r) {
     memset(r,0,sizeof(*r));
     policy_context(q->board_grants);
@@ -926,55 +976,7 @@ static void execute(const BoardRequest *q,BoardResult *r) {
     if(extras_broken() || profile_store_broken()) { strcpy(r->text,"ERR extras storage\r\n"); return; }
     if(members_broken()) { strcpy(r->text,"ERR member storage unavailable\r\n"); return; }
     if(((q->op=='m' || q->op==BOARD_MAIL_TRANSFER || (q->op=='@' && q->action==1)) && !board_feature_enabled("mail")) || (q->op=='&' && !board_feature_enabled("chat")) || (strchr("@Y$^",q->op) && !(q->op=='@' && q->action==1) && !board_feature_enabled("vault"))) { strcpy(r->text,"ERR feature disabled\r\n");return; }
-    if(q->op=='a' || q->op=='g') {
-        if(moderation_broken()) { r->auth=-1; strcpy(r->text,"ERR moderation storage unavailable\r\n"); return; }
-        if(q->op=='g' && members_registration_mode()==2) { r->auth=-1;strcpy(r->text,"ERR registration closed\r\n");return; }
-        if(q->op=='g' && !registration_details(0,q->body)) { r->auth=-1;strcpy(r->text,"ERR application values\r\n");return; }
-        int id=members_auth(q->username,q->password,q->op=='g');
-        if(id && q->op=='g' && !registration_details((uint32_t)id,q->body)) { r->auth=-1;snprintf(r->text,sizeof(r->text),"ERR application storage; account %s reserved\r\n",members_name((uint32_t)id));return; }
-        if(id && q->op=='g' && members_pending((uint32_t)id)) {
-            r->auth=-1;if(members_auto_ids())snprintf(r->text,sizeof(r->text),"APPLICATION SAVED %s\r\n",members_name((uint32_t)id));else strcpy(r->text,"APPLICATION SAVED\r\n");return;
-        }
-        if(id && moderation_suspended((uint32_t)id)) id=0;
-        if(id) {
-            r->user_epoch=moderation_epoch((uint32_t)id);
-            MailActor mail_actor={(uint32_t)id,r->user_epoch};MailNotice mail_notice;
-            if(mail_core_notice(&mail_actor,&mail_notice)==MAIL_CORE_OK) {
-                r->mail_notice=mail_notice.unread;r->mail_draft_notice=mail_notice.draft_revision;
-            }
-            r->mail_notify_user=(uint32_t)id;members_mail_notify((uint32_t)id,&r->mail_notify_deny,&r->mail_notify_revision);
-            r->chat_admin=moderation_admin((uint32_t)id);r->chat_user=(uint32_t)id;members_chat_preferences((uint32_t)id,&r->chat_preferences);
-            snprintf(r->chat_login,sizeof(r->chat_login),"%s",members_name((uint32_t)id));
-            snprintf(r->chat_name,sizeof(r->chat_name),"%s",*profile_value((uint32_t)id,0)?profile_value((uint32_t)id,0):members_name((uint32_t)id));
-            MemberActor menu_actor={(uint32_t)id,r->user_epoch};MemberMenuMode menu_mode;
-            r->menu_mode=member_core_menu_get(&menu_actor,&menu_mode)==MEMBER_CORE_OK?(int)menu_mode:MEMBER_MENU_STANDARD;
-            r->preferences=members_preferences((uint32_t)id,&r->language,&r->pager);
-            MemberDraft draft={0};
-            if(members_draft((uint32_t)id,&draft)) r->saved_draft_notice=draft.revision;
-            OPENSSL_cleanse(&draft,sizeof(draft));
-            int readable[CATALOG_MAX+1]={0}, has_unread[CATALOG_MAX+1]={0};
-            for(uint32_t b=1;b<=CATALOG_MAX;b++) readable[b]=catalog_read(b,(uint32_t)id);
-            for(uint32_t i=1;i<=article_count;i++) {
-                uint32_t b=(*article_at(i-1)).board;
-                if(readable[b] && !unavailable(i) && !members_seen((uint32_t)id,i)) {
-                    r->unread_articles_notice++;
-                    if(!has_unread[b]) { has_unread[b]=1; r->unread_boards_notice++; }
-                }
-            }
-        }
-        if(id) { const char *birth=profile_value((uint32_t)id,8);time_t now=time(NULL);struct tm today;
-#ifdef _WIN32
-            struct tm *local=localtime(&now);if(local)today=*local;
-#else
-            struct tm *local=localtime_r(&now,&today);
-#endif
-            r->birthday=local && strlen(birth)==10 && atoi(birth+5)==today.tm_mon+1 && atoi(birth+8)==today.tm_mday;
-        }
-        r->auth=id?id:-1;
-        if(id) snprintf(r->text,sizeof(r->text),"LOGGED IN %s\r\n",members_name((uint32_t)id));
-        else strcpy(r->text,"ERR authentication\r\n");
-        return;
-    }
+    if(q->op=='a' || q->op=='g') { authentication_execute(q,r);return; }
     if(q->user && (moderation_suspended(q->user) || q->user_epoch!=moderation_epoch(q->user))) {
         r->revoked=1; strcpy(r->text,"ERR session revoked\r\n"); return;
     }

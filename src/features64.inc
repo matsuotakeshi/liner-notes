@@ -90,20 +90,6 @@ int application_repository_save(uint32_t user,ApplicationNoteField field,const c
            sqlite3_bind_text(s,3,value,-1,SQLITE_STATIC)==SQLITE_OK && sqlite3_step(s)==SQLITE_DONE;
     sqlite3_finalize(s);return ok;
 }
-static int application_value(uint32_t user,const char *field,const char *value) {
-    if(!strcmp(field,"FROMBBS"))return application_repository_save(user,APPLICATION_FROM_BBS,value);
-    if(!strcmp(field,"SYSOPNOTE"))return application_repository_save(user,APPLICATION_SYSOP_NOTE,value);
-    return 0;
-}
-static int registration_details(uint32_t user,const char *body) {
-    char copy[8193];if(strlen(body)>=sizeof(copy))return 0;strcpy(copy,body);char *line=copy;
-    while(*line) { char *end=strchr(line,'\n'),*bar=strchr(line,'|');if(!end || !bar || bar>end)return 0;*end=0;*bar++=0;int field=profile_field(line);
-        if(field<0 && strcmp(line,"FROMBBS") && strcmp(line,"SYSOPNOTE"))return 0;
-        if(strlen(bar)>320 || (field>=0 && !profile_text_valid((unsigned)field,bar)))return 0;
-        if(user && (field>=0?profile_set(user,(unsigned)field,bar)!=1:!application_value(user,line,bar)))return 0;
-        line=end+1;
-    }return 1;
-}
 static unsigned feature_setting(const char *table,uint32_t id) {
     char sql[128];snprintf(sql,sizeof(sql),"SELECT value FROM %s WHERE id=?",table);sqlite3_stmt *s=feature_stmt(sql);if(!s) { features_broken=1;return 0; }
     sqlite3_bind_int(s,1,(int)id);int rc=sqlite3_step(s);unsigned n=rc==SQLITE_ROW?(unsigned)sqlite3_column_int(s,0):(!strcmp(table,"menu_preferences")?1u:0u);if(rc!=SQLITE_ROW && rc!=SQLITE_DONE)features_broken=1;sqlite3_finalize(s);return n;
