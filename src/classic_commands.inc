@@ -19,9 +19,8 @@ static void classic_read(Session *s,int descending,uint32_t distance,int repeat)
     if(!q.cursor) { emit(s,"SCAN END\r\n");prompt(s);return; }
     s->classic_direction=descending;submit(s,&q);if(s->pending) { s->scan=q;s->reader.active=1; }
 }
-static const char *classic_fields[]={"HANDLE","BIO","LOCATION","OCCUPATION","INTERESTS","WEBSITE","CONTACT","MACHINE","BIRTHDAY","REALNAME","KANA","ADDRESS","PHONE","GROUP"};
 static void profile_fields(Session *s,int search) {
-    char text[96];for(unsigned i=0;i<(search?14u:13u);i++) { snprintf(text,sizeof(text),"%u: %s\r\n",i+1,classic_fields[i]);queue_text(s,text); }
+    char text[96];for(unsigned i=0;i<profile_form_count(search);i++) { snprintf(text,sizeof(text),"%u: %s\r\n",i+1,profile_form_field(i));queue_text(s,text); }
     s->classic_input=search?CI_SEARCH_FIELD:CI_PROF_FIELD;queue_text(s,s->ui.language==LANGUAGE_JA?"項目番号 (0:戻る) > ":"Field (0:back) > ");
 }
 static int classic_input(Session *s,const char *line) {
@@ -31,7 +30,7 @@ static int classic_input(Session *s,const char *line) {
     if(mode==CI_PROF_TARGET) {
         const char *end;uint32_t target=0;
         if(*line && (!number_arg(line,&target,&end) || *end)) { s->classic_input=CI_PROF_TARGET;queue_text(s,"Member ID (Enter:self) > ");return 1; }
-        s->profile_edit_target=target;profile_fields(s,0);return 1;
+        profile_form_target(&s->profile_form,target);profile_fields(s,0);return 1;
     }
     if(mode==CI_PROF_NEXT) {
         if(!strcmp(line,"0") || !strcmp(line,"N")) { s->profile_walk.active=0;prompt(s);return 1; }
@@ -54,14 +53,16 @@ static int classic_input(Session *s,const char *line) {
     if(mode==CI_FILE_DELETE) { if(!strcmp(line,"Y") || !strcmp(line,"y")) { snprintf(text,sizeof(text),"FILEDELETE %u CONFIRM",s->file_selected);classic_run(s,text); }else prompt(s);return 1; }
     if(mode==CI_PROF_FIELD || mode==CI_SEARCH_FIELD) {
         if(!strcmp(line,"0")) { prompt(s);return 1; }uint32_t field;const char *end;
-        if(!number_arg(line,&field,&end) || *end || field>(mode==CI_SEARCH_FIELD?14u:13u)) { profile_fields(s,mode==CI_SEARCH_FIELD);return 1; }
-        s->profile_edit_field=(int)field-1;s->classic_input=mode==CI_SEARCH_FIELD?CI_SEARCH_VALUE:CI_PROF_VALUE;
+        if(!number_arg(line,&field,&end) || *end || !profile_form_select(&s->profile_form,mode==CI_SEARCH_FIELD,field)) { profile_fields(s,mode==CI_SEARCH_FIELD);return 1; }
+        s->classic_input=mode==CI_SEARCH_FIELD?CI_SEARCH_VALUE:CI_PROF_VALUE;
         queue_text(s,s->ui.language==LANGUAGE_JA?"内容 > ":"Value > ");return 1;
     }
     if(mode==CI_PROF_VALUE || mode==CI_SEARCH_VALUE) {
-        if(mode==CI_SEARCH_VALUE)s->profile_walk.active=1;
-        if(mode==CI_PROF_VALUE && s->profile_edit_target) { snprintf(text,sizeof(text),"MEMBERPROFILE %u %s %s",s->profile_edit_target,classic_fields[s->profile_edit_field],line);classic_run(s,text);return 1; }
-        snprintf(text,sizeof(text),"%s %s %s",mode==CI_SEARCH_VALUE?"PROFILEFIND":"PROFILESET",classic_fields[s->profile_edit_field],line);classic_run(s,text);return 1;
+        ProfileFormRequest request=profile_form_request(&s->profile_form,mode==CI_SEARCH_VALUE);
+        if(request.kind==PROFILE_FORM_SEARCH)s->profile_walk.active=1;
+        if(request.kind==PROFILE_FORM_MEMBER)snprintf(text,sizeof(text),"MEMBERPROFILE %u %s %s",request.target,request.field,line);
+        else snprintf(text,sizeof(text),"%s %s %s",request.kind==PROFILE_FORM_SEARCH?"PROFILEFIND":"PROFILESET",request.field,line);
+        classic_run(s,text);return 1;
     }
     if(mode==CI_BATCH_CLEAR) { if(!strcmp(line,"Y") || !strcmp(line,"y"))classic_run(s,"BATCH CLEAR");else prompt(s);return 1; }
     if(mode==CI_PROTOCOL || mode==CI_SEND_PROTOCOL) {
@@ -282,7 +283,7 @@ static int classic_commands(Session *s,const char *line) {
         switch(key) {
         case 'L':action="PROFILES";break;case 'P':classic_ask(s,CI_PROFILE,MSG_CLASSIC_PROFILE);return 1;
         case 'S':profile_fields(s,1);return 1;
-        case 'W':action="BIOEDIT";break;case 'E':s->profile_edit_target=0;if(s->ui.admin) { s->classic_input=CI_PROF_TARGET;queue_text(s,"Member ID (Enter:self) > "); }else profile_fields(s,0);return 1;
+        case 'W':action="BIOEDIT";break;case 'E':profile_form_target(&s->profile_form,0);if(s->ui.admin) { s->classic_input=CI_PROF_TARGET;queue_text(s,"Member ID (Enter:self) > "); }else profile_fields(s,0);return 1;
         }
     }
     if(action)classic_run(s,action);

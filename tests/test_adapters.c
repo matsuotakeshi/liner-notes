@@ -414,5 +414,28 @@ int main(void) {
         session_dispose(&s);
     }
     puts("PASS: Japanese/English Gather and SYSOPMAIL state, stale completion refusal, failed-body retention and successful cleanup");
+    for(int lang=LANGUAGE_JA;lang<LANGUAGE_COUNT;lang++) {
+        reset(&m);session_init(&s,io,160,4,1,1,1,(Language)lang);s.pager_enabled=0;
+        application_form_begin(&s.application);
+        assert(session_line(&s,"PrivateName",11,900));assert(s.application.step==2 && strstr(s.application.body,"REALNAME|PrivateName\n"));
+        assert(session_line(&s,"bad\tvalue",9,901));assert(s.application.step==2 && !strstr(s.application.body,"bad"));
+        for(unsigned i=1;i<14;i++)assert(session_line(&s,"",0,902+i));
+        assert(s.application.step==15 && !session_secret(&s));
+        assert(session_line(&s,"N",1,920));assert(s.application.step==15 && !session_secret(&s));
+        assert(session_line(&s,"e",1,921));assert(s.application.step==1 && !s.application.body[0]);
+        for(unsigned i=0;i<14;i++)assert(session_line(&s,i==6?"MixedHandle":"",i==6?11:0,922+i));
+        assert(s.application.step==15 && !strstr(s.application.body,"PrivateName") && strstr(s.application.body,"HANDLE|MixedHandle\n"));
+        assert(session_line(&s,"y",1,940));assert(!s.application.step && session_secret(&s) && s.password_mode=='g');
+        /* Invalid password still consumes/clears the staged application as before. */
+        assert(session_line(&s,"short",5,941));assert(!session_secret(&s) && !s.application.body[0]);
+        for(size_t i=0;i<sizeof(s.application.body);i++)assert(!s.application.body[i]);
+        application_form_begin(&s.application);assert(session_line(&s,"Secret",6,1942));
+        assert(session_line(&s,"/cancel",7,1943));assert(!s.application.step);
+        for(size_t i=0;i<sizeof(s.application.body);i++)assert(!s.application.body[i]);
+        profile_form_target(&s.profile_form,42);profile_form_select(&s.profile_form,0,8);
+        session_revoke(&s);assert(!s.profile_form.target);
+        session_dispose(&s);
+    }
+    puts("PASS: Japanese/English application review/restart/validation, secret-input handoff, personal-data erase and profile target revocation");
     return 0;
 }

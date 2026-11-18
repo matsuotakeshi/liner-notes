@@ -8,6 +8,7 @@
 #include "mail_navigation_core.h"
 #include "list_navigation_core.h"
 #include "message_flow_core.h"
+#include "form_flow_core.h"
 #include <stddef.h>
 #include <stdint.h>
 #include "board.h"
@@ -26,7 +27,7 @@ typedef struct {
     unsigned long id;
     int slot,active,board_enabled,member_mode;
     Ui ui;
-    uint64_t connected_at;int talk_once,talk_return_editor,status_pending;uint32_t file_selected,file_selecting;unsigned profile_edit_target;ProfileWalk profile_walk;int batch_screen,batch_copying;BatchSelection batch;int profile_edit_field;int classic_area,classic_input,classic_direction;uint32_t classic_id;
+    uint64_t connected_at;int talk_once,talk_return_editor,status_pending;uint32_t file_selected,file_selecting;ProfileForm profile_form;ProfileWalk profile_walk;int batch_screen,batch_copying;BatchSelection batch;int classic_area,classic_input,classic_direction;uint32_t classic_id;
     int door,game_menu;int pager_enabled, help_page,menu_mode,menu_shown,editor_upload_question;
     char guest_handle[33];
     unsigned columns,rows;
@@ -57,7 +58,7 @@ typedef struct {
     BoardRequest draft, scan;
     CheckTraversal check;
     ReaderState reader;
-    int application_step;char application_body[8193];int profile_filter;unsigned profile_group;
+    ApplicationForm application;int profile_filter;unsigned profile_group;
     uint32_t draft_revision;
     int undo_available;
     char undo_title[BOARD_TITLE+1], undo_body[BOARD_BODY+1];

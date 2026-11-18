@@ -128,7 +128,14 @@
         "src/runtime.c",
         "src/authentication_core.c",
         "src/authentication_form.c",
-        "help/en/account.txt"
+        "help/en/account.txt",
+        "src/form_flow_core.c",
+        "src/form_flow_core.h",
+        "tests/test_form_flow_core.c",
+        "src/session.h",
+        "src/classic_commands.inc",
+        "tests/test_adapters.c",
+        "tests/test_stage69_ui.py"
       ]
     },
     {
@@ -318,7 +325,13 @@
         "src/list_navigation_protocol.c",
         "src/list_navigation_protocol.h",
         "tests/test_list_navigation_core.c",
-        "tests/test_stage69_ui.py"
+        "tests/test_stage69_ui.py",
+        "src/form_flow_core.c",
+        "src/form_flow_core.h",
+        "tests/test_form_flow_core.c",
+        "src/session.c",
+        "src/session.h",
+        "src/classic_commands.inc"
       ]
     },
     {

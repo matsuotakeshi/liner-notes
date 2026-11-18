@@ -70,7 +70,7 @@ static void selection_reset(Session *s) {
     vault_navigation_reset(&s->vault);
     s->game_menu=0;s->vault_mode=0;
     memset(s->vault_grants,0,sizeof(s->vault_grants));
-    s->profile_edit_target=0;profile_walk_reset(&s->profile_walk);
+    profile_form_target(&s->profile_form,0);profile_walk_reset(&s->profile_walk);
     s->talk_once=s->talk_return_editor=s->status_pending=s->memo_input=0;
     s->talk_target=s->reply_target=0;s->talk_select=s->talk_lost=s->outside_talk=0;
     s->classic_input=0;s->classic_id=0;s->classic_area=CM_MAIN;
@@ -86,7 +86,7 @@ static void show_menu(Session *s,int explicit_request) {
     s->menu_shown=1;
 }
 static void prompt(Session *s) {
-    if(s->reader.automatic || s->door || s->memo_input || s->application_step || (s->editing && s->editor_input==4))return;
+    if(s->reader.automatic || s->door || s->memo_input || s->application.step || (s->editing && s->editor_input==4))return;
     if(!s->zmodem && !s->chatting && !s->binary && s->ui.enabled && s->active && !s->pending && !s->closing && !s->wake && !s->page[0]) {
         if(s->game_menu && !s->editing && !s->password_mode) { queue_text(s,s->ui.language==LANGUAGE_JA?"ゲーム [番号:起動 Enter/L:一覧 0:主画面] > ":"Games [number:play Enter/L:list 0:main] > ");return; }
         if(s->gather.mode) { queue_text(s,ui_text(&s->ui,s->gather.cursor?MSG_GATHER_MORE:MSG_GATHER_PROMPT));return; }
@@ -840,21 +840,24 @@ static void gather_input(Session *s,const char *line) {
     }
 }
 
-static const char *application_fields[]={"REALNAME","KANA","ADDRESS","PHONE","BIRTHDAY","MACHINE","HANDLE","LOCATION","OCCUPATION","INTERESTS","WEBSITE","CONTACT","FROMBBS","SYSOPNOTE"};
-static void application_prompt(Session *s) { char text[180];snprintf(text,sizeof(text),s->ui.language==LANGUAGE_JA?"%s（省略はEnter、中止は/CANCEL）: ":"%s (Enter to skip, /CANCEL to abort): ",application_fields[s->application_step-1]);queue_text(s,text); }
+static void application_prompt(Session *s) { char text[180];snprintf(text,sizeof(text),s->ui.language==LANGUAGE_JA?"%s（省略はEnter、中止は/CANCEL）: ":"%s (Enter to skip, /CANCEL to abort): ",application_form_field(&s->application));queue_text(s,text); }
 static void command_core(Session *s,char *line) {
-    if(s->application_step) {
-        if(!strcmp(line,"/CANCEL") || !strcmp(line,"/cancel")) { s->application_step=0;OPENSSL_cleanse(s->application_body,sizeof(s->application_body));emit(s,"CANCELLED\r\n");return; }
-        if(s->application_step==15) {
-            if(!strcmp(line,"Y") || !strcmp(line,"y")) { s->application_step=0;s->password_mode='g';emit(s,"PASSWORD\r\n"); }
-            else if(!strcmp(line,"E") || !strcmp(line,"e")) { s->application_step=1;s->application_body[0]=0;application_prompt(s); }
-            else queue_text(s,"Y / E / /CANCEL > ");
-            return;
+    if(s->application.step) {
+        ApplicationInput input=(!strcmp(line,"/CANCEL") || !strcmp(line,"/cancel"))?APPLICATION_CANCEL:
+            (!strcmp(line,"Y") || !strcmp(line,"y"))?APPLICATION_CONFIRM:
+            (!strcmp(line,"E") || !strcmp(line,"e"))?APPLICATION_RESTART:APPLICATION_VALUE;
+        const char *key=application_form_field(&s->application);int field=key?profile_field(key):-1;
+        ApplicationEffect effect=application_form_input(&s->application,input,line,field<0 || profile_text_valid((unsigned)field,line));
+        switch(effect) {
+        case APPLICATION_ABORTED:emit(s,"CANCELLED\r\n");break;
+        case APPLICATION_PASSWORD:s->password_mode='g';emit(s,"PASSWORD\r\n");break;
+        case APPLICATION_CONFIRM_PROMPT:queue_text(s,"Y / E / /CANCEL > ");break;
+        case APPLICATION_INVALID:emit(s,"ERR application value\r\n");application_prompt(s);break;
+        case APPLICATION_PROMPT:application_prompt(s);break;
+        case APPLICATION_REVIEW:queue_text(s,s->application.body);queue_text(s,s->ui.language==LANGUAGE_JA?"この内容で申請しますか？ Y:確定 E:入力し直す /CANCEL:中止 > ":"Submit these details? Y:confirm E:edit /CANCEL:abort > ");break;
+        default:break;
         }
-        const char *key=application_fields[s->application_step-1];int field=profile_field(key);
-        if(strlen(line)>320 || !safe_text(line) || (field>=0 && !profile_text_valid((unsigned)field,line))) { emit(s,"ERR application value\r\n");application_prompt(s);return; }
-        size_t n=strlen(s->application_body);snprintf(s->application_body+n,sizeof(s->application_body)-n,"%s|%s\n",key,line);
-        if(++s->application_step>14) { queue_text(s,s->application_body);queue_text(s,s->ui.language==LANGUAGE_JA?"この内容で申請しますか？ Y:確定 E:入力し直す /CANCEL:中止 > ":"Submit these details? Y:confirm E:edit /CANCEL:abort > "); }else application_prompt(s);return;
+        return;
     }
     if(members_auto_ids() && !strcmp(line,"REGISTER"))line="REGISTER auto";
     if(s->editing && s->memo_input) { s->memo_input=0;if(!strcmp(line,"/CANCEL"))return;BoardRequest q={0};q.op='&';q.action='M';if(strlen(line)>80 || !safe_text(line)) { emit(s,"ERR memo\r\n");return; }strcpy(q.body,line);submit(s,&q);s->chat_pending=s->pending;return; }
@@ -897,7 +900,7 @@ static void command_core(Session *s,char *line) {
     }
     if(s->password_mode) {
         if(s->ui.enabled && !strcmp(line,"/CANCEL")) { s->password_mode=0; emit(s,"CANCELLED\r\n"); return; }
-        BoardRequest q={0}; q.op=(char)s->password_mode; strcpy(q.username,s->username);if(q.op=='g') { strcpy(q.body,s->application_body);OPENSSL_cleanse(s->application_body,sizeof(s->application_body)); }
+        BoardRequest q={0}; q.op=(char)s->password_mode; strcpy(q.username,s->username);if(q.op=='g') { strcpy(q.body,s->application.body);application_form_clear(&s->application); }
         s->password_mode=0; s->auth_after=s->now+1000;
         if(strlen(line)<8 || strlen(line)>128) emit(s,"ERR password 8..128 bytes\r\n");
         else { strcpy(q.password,line); submit(s,&q); }
@@ -1279,7 +1282,7 @@ board_syntax:emit(s,"ERR command\r\n");return;
         if(!n || n>32) { emit(s,"ERR username\r\n"); return; }
         for(size_t i=0;i<n;i++) if(!((name[i]>='a'&&name[i]<='z')||(name[i]>='0'&&name[i]<='9')||name[i]=='_'||name[i]=='-')) { emit(s,"ERR username\r\n"); return; }
         strcpy(s->username,name);
-        if(line[0]=='R' && members_detailed_form()) { s->application_body[0]=0;s->application_step=1;application_prompt(s);return; }
+        if(line[0]=='R' && members_detailed_form()) { application_form_begin(&s->application);application_prompt(s);return; }
         s->password_mode=line[0]=='L'?'a':'g'; emit(s,"PASSWORD\r\n");
     } else if(!strcmp(line,"ACCOUNT")) {
         if(!s->user) emit(s,"ERR login required\r\n");
@@ -1420,7 +1423,7 @@ static void command(Session *s,char *line) {
             queue_text(s,ui_text(&s->ui,MSG_SCAN_STOP)); prompt(s); return;
         }
     }
-    if(s->password_mode || s->editing || s->application_step) { command_core(s,line); prompt(s); return; }
+    if(s->password_mode || s->editing || s->application.step) { command_core(s,line); prompt(s); return; }
     if(!s->ui.input && !s->classic_input && !s->mail_input && !s->mail.delete_id && (!strcmp(line,"LANG") || !strncmp(line,"LANG ",5))) {
         if(line[4] && !language_parse(line+5,&s->ui.language)) queue_text(s,ui_text(&s->ui,MSG_ERR_LANGUAGE));
         else {
@@ -1645,7 +1648,7 @@ void session_tick(Session *s,uint64_t now) {
 static ClassicInput classic_input_state(const Session *s) {
     return (ClassicInput){.memo=s->memo_input,
         .selection=s->classic_input==CI_FILE_ACTION || s->classic_input==CI_BATCH,
-        .application=s->application_step,.classic=s->classic_input,.secret=session_secret(s),
+        .application=s->application.step,.classic=s->classic_input,.secret=session_secret(s),
         .input=s->ui.input,.mail_input=s->mail_input,.paging=!!s->page[0],.binary=s->binary,.transfer=s->zmodem,
         .editing=s->editing,.chatting=s->chatting,.gather=s->gather.mode,.talk=s->outside_talk,
         .line_editor=s->editor_line,.editor_input=s->editor_input,.mail_mode=s->mail_mode};
@@ -1733,7 +1736,7 @@ static int connector_line(Session *s,char *line,size_t size) {
             .editing=s->editing,.editor_kind=(unsigned char)s->draft.op,.secret=session_secret(s),.password_mode=s->password_mode,
             .mail=s->mail_mode,.mail_current=s->mail.current,.chat=s->chatting,.talk=s->outside_talk,
             .pager=!!s->page[0],.gather=s->gather.mode,
-            .input=s->application_step?s->application_step:s->classic_input?s->classic_input:s->memo_input?s->memo_input:s->mail_input?s->mail_input:s->talk_select,
+            .input=s->application.step?s->application.step:s->classic_input?s->classic_input:s->memo_input?s->memo_input:s->mail_input?s->mail_input:s->talk_select,
             .confirmation=s->mail.delete_id,.binary=s->binary,.door=s->door,.members=s->member_mode,
             .feature_mail=board_feature_enabled("mail"),.feature_chat=board_feature_enabled("chat"),.feature_vault=board_feature_enabled("vault")
         };
