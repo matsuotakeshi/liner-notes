@@ -178,5 +178,25 @@ int main(void) {
     assert(!s.active && !m.size && s.notifications.mail.arrivals==1 && !*s.notifications.announcements);
     m.fail=0;session_dispose(&s);
     puts("PASS: announcement blockers, delivery order, editor distinction, no replay and failed-output isolation");
+    const char *marker="0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
+    char wire[256];reset(&m);session_init(&s,io,120,4,1,1,0,LANGUAGE_EN);reset(&m);
+    snprintf(wire,sizeof(wire),"CONNECTOR OPEN %s",marker);
+    assert(session_line(&s,wire,strlen(wire),100));
+    assert(!strcmp(s.connector_token,marker) && strstr((char *)m.data,"CONNECTOR READY 1"));
+    reset(&m);assert(session_line(&s,"LINKSNAP 1",10,101));
+    assert(strstr((char *)m.data,"ERR link denied") && !s.pending);
+    snprintf(wire,sizeof(wire),"CONNECTOR BLOCK %s 4",marker);
+    reset(&m);assert(session_line(&s,wire,strlen(wire),102));
+    assert(strstr((char *)m.data,"ERR vault syntax") && !s.connector_block.data);
+    s.editing=1;s.password_mode=1;snprintf(wire,sizeof(wire),"CONNECTOR SYNC %s 0123456789abcdef0123456789abcdef",marker);
+    reset(&m);assert(session_line(&s,wire,strlen(wire),103));
+    assert(strstr((char *)m.data,"CONNECTOR STATE") && strstr((char *)m.data,"\"password_mode\":1") && s.editing && s.password_mode==1 && !s.pending);
+    s.password_mode=0;snprintf(wire,sizeof(wire),"CONNECTOR LITERAL %s",marker);
+    reset(&m);assert(session_line(&s,wire,strlen(wire),104));
+    assert(s.connector_literal && strstr((char *)m.data,"CONNECTOR LITERAL READY"));
+    s.editing=0;reset(&m);assert(session_line(&s,"unused text",11,105));
+    assert(!s.connector_literal && strstr((char *)m.data,"ERR connector editor state"));
+    session_dispose(&s);
+    puts("PASS: negotiated connector leaves unauthenticated LINK/BLOCK denied, SYNC read-only during secret input, literal state rechecked");
     return 0;
 }

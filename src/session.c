@@ -2,6 +2,7 @@
 #include "editor_core.h"
 #include "classic_input.h"
 #include "terminal_pager.h"
+#include "connector_protocol.h"
 #include "runtime_limits.h"
 #include "app_limits.h"
 #include "activity.h"
@@ -19,7 +20,6 @@
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
-#include <openssl/evp.h>
 #include <limits.h>
 #include <openssl/crypto.h>
 void session_abort(Session *s) { s->active=0; }
@@ -1641,10 +1641,6 @@ int session_uppercase(const Session *s,const char *line,size_t size) {
 static void normalize_command(Session *s,char *line,size_t size) {
     ClassicInput state=classic_input_state(s);classic_input_normalize(&state,line,size);
 }
-static int connector_hex(const char *text,size_t size) {
-    for(size_t i=0;i<size;i++)if(!((text[i]>='0' && text[i]<='9') || (text[i]>='a' && text[i]<='f')))return 0;
-    return 1;
-}
 /* A negotiated, unguessable marker separates responses from asynchronous notices.
  * SYNC is accepted in editors/password/chat states without becoming user content.
  * It reports state only: all operations still use the existing permission checks.
@@ -1655,71 +1651,48 @@ static void connector_transfer(Session *s,const char *line) {
     else q.op='$';
     snprintf(q.body,sizeof(q.body),"%s",line);submit(s,&q);
 }
-static int link_decode(const char *in,char *out,size_t capacity) {
-    if(!strcmp(in,"-")) { out[0]=0;return 1; }
-    size_t n=strlen(in);if(!n || n%4 || n>4*((capacity-1+2)/3))return 0;
-    unsigned char *raw=malloc(n/4*3+1);if(!raw)return 0;
-    int length=EVP_DecodeBlock(raw,(const unsigned char *)in,(int)n);
-    if(length>=0) { if(in[n-1]=='=')length--;if(n>1 && in[n-2]=='=')length--; }
-    int ok=length>=0 && (size_t)length<capacity && !memchr(raw,0,(size_t)(length<0?0:length));
-    if(ok) { memcpy(out,raw,(size_t)length);out[length]=0; }
-    free(raw);return ok;
-}
 static void connector_link(Session *s,char *line) {
     if(!s->user || s->editing || session_secret(s) || s->chatting || s->gather_mode || !board_link_enabled(s->board,s->user)) { queue_text(s,"ERR link denied\r\n");return; }
-    BoardRequest q={0};q.op=BOARD_LINK;
-    if(!strncmp(line,"LINKSNAP ",9) || !strncmp(line,"LINKSCAN ",9) || !strncmp(line,"LINKPAGE ",9)) {
-        const char *end;if(!number_arg(line+9,&q.cursor,&end) || *end)goto bad;q.action=line[4]=='P'?'B':line[5]=='N'?'S':'M';
-    } else if(!strncmp(line,"LINKLOOKUP ",11)) {
-        char extra;if(sscanf(line+11,"%64s %64s %c",q.link_origin,q.link_article,&extra)!=2)goto bad;q.action='L';
-    } else if(!strncmp(line,"LINKAPPLY ",10)) {
-        char *fields[10],*at=line+10;unsigned count=0;
-        while(at && count<10) { fields[count++]=at;char *space=strchr(at,' ');if(space)*space++=0;at=space; }
-        if(count!=9 || at || strlen(fields[0])!=64 || strlen(fields[1])!=64 || !connector_hex(fields[0],64) || !connector_hex(fields[1],64))goto bad;
-        strcpy(q.link_origin,fields[0]);strcpy(q.link_article,fields[1]);const char *end;
-        if(!number_arg(fields[2],&q.cursor,&end) || *end)goto bad;
-        if(strcmp(fields[3],"0") && (!number_arg(fields[3],&q.number,&end) || *end))goto bad;
-        if(!*fields[4] || strlen(fields[4])>12)goto bad;
-        for(const char *p=fields[4];*p;p++)if(*p<'0' || *p>'9')goto bad;
-        q.since=strtoull(fields[4],NULL,10);if(!q.since || q.since>253402300799ULL)goto bad;
-        if(strlen(fields[5])!=1 || !strchr("PTDCW",fields[5][0]))goto bad;
-        q.action=fields[5][0];
-        if(!link_decode(fields[6],q.username,sizeof(q.username)) || !link_decode(fields[7],q.title,sizeof(q.title)) || !link_decode(fields[8],q.body,sizeof(q.body)))goto bad;
-        if(!safe_text(q.username) || !safe_text(q.title))goto bad;
-        for(const unsigned char *p=(const unsigned char *)q.body;*p;p++)if((*p<32 && *p!='\r' && *p!='\n' && *p!='\t') || *p==127)goto bad;
-    } else goto bad;
-    submit(s,&q);return;
-bad:queue_text(s,"ERR link syntax\r\n");
+    BoardRequest q={0};LinkWireRequest request;
+    _Static_assert(sizeof(q.link_origin)==sizeof(request.origin),"link origin capacity");
+    _Static_assert(sizeof(q.link_article)==sizeof(request.article),"link article capacity");
+    _Static_assert(sizeof(q.username)==sizeof(request.author),"link author capacity");
+    _Static_assert(sizeof(q.title)==sizeof(request.title),"link title capacity");
+    if(!link_wire_parse(line,&request,q.body,sizeof(q.body))) { queue_text(s,"ERR link syntax\r\n");return; }
+    q.op=BOARD_LINK;q.action=request.action;q.cursor=request.cursor;
+    q.number=request.parent;q.since=request.timestamp;
+    memcpy(q.link_origin,request.origin,sizeof(q.link_origin));
+    memcpy(q.link_article,request.article,sizeof(q.link_article));
+    memcpy(q.username,request.author,sizeof(q.username));
+    memcpy(q.title,request.title,sizeof(q.title));submit(s,&q);
 }
 static int connector_line(Session *s,char *line,size_t size) {
-    if(*s->connector_token && (!strncmp(line,"LINKSNAP ",9) || !strncmp(line,"LINKSCAN ",9) || !strncmp(line,"LINKPAGE ",9) || !strncmp(line,"LINKLOOKUP ",11) || !strncmp(line,"LINKAPPLY ",10))) { connector_link(s,line);return 1; }
-    if(*s->connector_token && !strncmp(line,"CONNECTOR LINKBLOCK ",20) && size>85 && !memcmp(line+20,s->connector_token,64) && line[84]==' ') {
+    ConnectorEnvelope envelope=connector_envelope(line,size,s->connector_token);
+    if(*s->connector_token && link_wire_command(line)) { connector_link(s,line);return 1; }
+    if(envelope.kind==CONNECTOR_LINKBLOCK) {
         const char *end;uint32_t n;connector_block_clear(&s->connector_block);
-        if(!s->user || s->editing || session_secret(s) || s->chatting || s->gather_mode || !board_link_enabled(s->board,s->user) || !number_arg(line+85,&n,&end) || *end || !n || n>CONNECTOR_LINK_BLOCK_MAX) { queue_text(s,"ERR link syntax\r\n");return 1; }
+        if(!s->user || s->editing || session_secret(s) || s->chatting || s->gather_mode || !board_link_enabled(s->board,s->user) || !number_arg(envelope.payload,&n,&end) || *end || !n || n>CONNECTOR_LINK_BLOCK_MAX) { queue_text(s,"ERR link syntax\r\n");return 1; }
         if(connector_block_begin(&s->connector_block,CONNECTOR_LINK_BLOCK,n,s->now)<1)session_abort(s);
         return 1;
     }
-    if(*s->connector_token && size>84 && !memcmp(line,"CONNECTOR TRANSFER ",19) &&
-       !memcmp(line+19,s->connector_token,64) && line[83]==' ') {
-        char *cmd=line+84;
+    if(envelope.kind==CONNECTOR_TRANSFER) {
+        const char *cmd=envelope.payload;
         if(s->user && !s->password_mode && !s->chatting && !s->gather_mode &&
            (!s->editing || s->draft.op=='m') && !strncmp(cmd,"MFILE",5) && transfer_line_command(cmd+1))connector_transfer(s,cmd);
         else queue_text(s,"ERR vault syntax\r\n");
         return 1;
     }
-    if(*s->connector_token && !strncmp(line,"CONNECTOR BLOCK ",16) && size>81 &&
-       !memcmp(line+16,s->connector_token,64) && line[80]==' ') {
+    if(envelope.kind==CONNECTOR_BLOCK) {
         const char *end;uint32_t n;
         connector_block_clear(&s->connector_block);
         if(!s->user || (s->editing && s->draft.op!='m') || s->password_mode || s->chatting || s->gather_mode ||
-           !number_arg(line+81,&n,&end) || *end || !n || n>CONNECTOR_FILE_BLOCK_MAX) { queue_text(s,"ERR vault syntax\r\n");return 1; }
+           !number_arg(envelope.payload,&n,&end) || *end || !n || n>CONNECTOR_FILE_BLOCK_MAX) { queue_text(s,"ERR vault syntax\r\n");return 1; }
         if(connector_block_begin(&s->connector_block,CONNECTOR_FILE_BLOCK,n,s->now)<1)session_abort(s);
         return 1;
     }
-    if(*s->connector_token && !strncmp(line,"CONNECTOR DATA ",15) && size>80 &&
-       !memcmp(line+15,s->connector_token,64) && line[79]==' ') {
-        size_t n=size-80;
-        int received=connector_block_append(&s->connector_block,line+80,n);
+    if(envelope.kind==CONNECTOR_DATA) {
+        size_t n=envelope.size;
+        int received=connector_block_append(&s->connector_block,envelope.payload,n);
         if(received<0) { queue_text(s,"ERR vault syntax\r\n");return 1; }
         if(received>0) {
             ConnectorBlockKind kind;char *command=connector_block_take(&s->connector_block,&kind);
@@ -1729,23 +1702,27 @@ static int connector_line(Session *s,char *line,size_t size) {
             free(command);
         }return 1;
     }
-    if(*s->connector_token && size==82 && !memcmp(line,"CONNECTOR LITERAL ",18) &&
-       !memcmp(line+18,s->connector_token,64) && s->editing && !s->password_mode && !s->chatting) {
+    if(envelope.kind==CONNECTOR_LITERAL && s->editing && !s->password_mode && !s->chatting) {
         s->connector_literal=1;queue_text(s,"CONNECTOR LITERAL READY\r\n");return 1;
     }
     if(!s->ui.enabled && !s->editing && !s->chatting && !s->password_mode &&
-       size==79 && !memcmp(line,"CONNECTOR OPEN ",15) && connector_hex(line+15,64)) {
-        memcpy(s->connector_token,line+15,64);s->connector_token[64]=0;
+       envelope.kind==CONNECTOR_OPEN) {
+        memcpy(s->connector_token,envelope.payload,64);s->connector_token[64]=0;
         queue_text(s,"CONNECTOR READY 1\r\n");return 1;
     }
-    if(*s->connector_token && size==112 && !memcmp(line,"CONNECTOR SYNC ",15) &&
-       !memcmp(line+15,s->connector_token,64) && line[79]==' ' && connector_hex(line+80,32)) {
+    if(envelope.kind==CONNECTOR_SYNC) {
         char out[2048];
-        snprintf(out,sizeof(out),"CONNECTOR STATE %.32s {\"version\":1,\"transfer_block\":65536,\"connection\":%lu,\"user\":%u,\"username\":\"%s\",\"board\":%u,\"article\":%u,\"admin\":%d,\"sigop\":%d,\"level\":%u,\"editing\":%d,\"editor_kind\":%u,\"secret\":%d,\"password_mode\":%d,\"mail\":%d,\"mail_current\":%u,\"chat\":%d,\"talk\":%d,\"pager\":%d,\"gather\":%d,\"input\":%d,\"confirmation\":%u,\"binary\":%d,\"door\":%d,\"members\":%d,\"features\":{\"mail\":%d,\"chat\":%d,\"vault\":%d}}\r\n",
-            line+80,s->id,s->user,s->user?s->username:"",s->board,s->current,!!s->ui.admin,!!s->ui.sigop,s->member_level,
-            s->editing,(unsigned char)s->draft.op,session_secret(s),s->password_mode,s->mail_mode,s->mail_current,s->chatting,s->outside_talk,
-            !!s->page[0],s->gather_mode,s->application_step?s->application_step:s->classic_input?s->classic_input:s->memo_input?s->memo_input:s->mail_input?s->mail_input:s->talk_select,s->mail_delete,
-            s->binary,s->door,s->member_mode,board_feature_enabled("mail"),board_feature_enabled("chat"),board_feature_enabled("vault"));
+        ConnectorState state={
+            .connection=s->id,.user=s->user,.username=s->user?s->username:"",
+            .board=s->board,.article=s->current,.admin=!!s->ui.admin,.sigop=!!s->ui.sigop,.level=s->member_level,
+            .editing=s->editing,.editor_kind=(unsigned char)s->draft.op,.secret=session_secret(s),.password_mode=s->password_mode,
+            .mail=s->mail_mode,.mail_current=s->mail_current,.chat=s->chatting,.talk=s->outside_talk,
+            .pager=!!s->page[0],.gather=s->gather_mode,
+            .input=s->application_step?s->application_step:s->classic_input?s->classic_input:s->memo_input?s->memo_input:s->mail_input?s->mail_input:s->talk_select,
+            .confirmation=s->mail_delete,.binary=s->binary,.door=s->door,.members=s->member_mode,
+            .feature_mail=board_feature_enabled("mail"),.feature_chat=board_feature_enabled("chat"),.feature_vault=board_feature_enabled("vault")
+        };
+        if(!connector_state_format(&state,envelope.payload,out,sizeof(out))) { session_abort(s);return 1; }
         queue_text(s,out);return 1;
     }
     if(s->connector_literal) {
