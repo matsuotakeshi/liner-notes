@@ -1,6 +1,6 @@
 {
   "LICENSE": "fb981668c18a279e285fc4d83fba1e836cc84dd4daa73c9697d3cfd2d8aca6e0",
-  "Makefile": "8237f473177e20a6d542286949de82d75f7e033f45e41addfd644f621f10371c",
+  "Makefile": "4c7fa468c5851f7fa0e1d66dfd737a777b61f7b6f40f1454c2459999e711b5a4",
   "boards.example.conf": "4bd1a17ecf3966d3829510e8495a1362fb8b922cd754badccc739f5e5ab0bde8",
   "ci/build-freebsd-package.sh": "4e62899471d1f1a6c44e00a783c1aff771332140704ae778da95a95048474108",
   "debian/changelog": "8f3574a094f5a3677a9a7188e530ecdbdc006138b082b57243ca8441c644114d",
@@ -13,7 +13,7 @@
   "help/ja/admin.txt": "254e95e3af7d4e665a666069bd9347a38f1a27cd6d135530079bf987858870d6",
   "help/ja/adminboards.txt": "97f07367c06be1c89332901732f8372cefce857b6cd1da7a593a728aaa1c3530",
   "help/ja/adminconnections.txt": "975bc43d043300dd345b0b7003a74eccea680b22160dd447cf2a30e3e1015a27",
-  "help/ja/adminfiles.txt": "1eb8e8bf60e64dc79080e272a18c21efb0d8976c892e8fa48ea9c2bcf107c0e1",
+  "help/ja/adminfiles.txt": "459798b6852e9e3e9cbb6c65693463321c8bbe3d173d5a0b1d22aa976fa5c790",
   "help/ja/adminmembers.txt": "ee6bf41b4530ea15eac77d7ae9dd259da3d2423c848c617eaf52d029bf507835",
   "help/ja/adminstorage.txt": "69670ddb7cc3af53c6f0604306faec4e85bce098772569cf546461603689a154",
   "help/ja/chat.txt": "7bb3f8763e66c5f7c339640fa2f50225fc3654126cea6e5c903f66ab90716217",
@@ -182,5 +182,11 @@
   "src/activity_core.h": "5011bdb97cb1d5e03c94ecdbc7a3502576b7694e7a4524c8b79957b804201453",
   "src/activity_repository.h": "92d88e070cecebb7a587756dae3ef35e0fab7d82a54659178734cc59c7d62608",
   "src/activity_store.c": "2a4231c43eca13459a2750d57ef7892d5453cff9f4d16429fb5041321e3c8a90",
-  "help/en/adminconnections.txt": "9177a5ca1adc528da79fb9b41dae006116e012c38724e91cd10d57328dd6cfed"
+  "help/en/adminconnections.txt": "9177a5ca1adc528da79fb9b41dae006116e012c38724e91cd10d57328dd6cfed",
+  "src/download.c": "53f593fd9c6fc24460bb6c12cc9117cadf4fbf8a6ccea776a785ea575a4a783d",
+  "src/download_core.c": "85336281faf61d2d82a0982184b55763a7218faac296eb1c3497fc9af7a1b0d1",
+  "src/download_core.h": "e898067f00d0adbd6d6fde4e26f8da14ee1e6abb63cf04d80866ec8fbfc67cb2",
+  "src/download_repository.h": "55c5352e0e5f6bcea7ca7870dd638ed4d0a56b79438a41436f2793b1cb8abff2",
+  "src/download_store.c": "dbed46d53032ae3b4992827367b069dcd70aa93fd4cc299365d0752d6d11002e",
+  "help/en/adminfiles.txt": "b30d4f71423954f2a9c5b0b7f484dec921f8bdc348a4ace6e2eb69c379ce2362"
 }
