@@ -484,7 +484,11 @@
       "sources": [
         "BBS_LINKS.md",
         "scripts/link_service.py",
-        "link.example.toml"
+        "link.example.toml",
+        "src/link_core.c",
+        "src/link_repository.h",
+        "src/board_link.inc",
+        "src/link_adapter.inc"
       ]
     },
     {
@@ -496,7 +500,11 @@
         "scripts/link_service.py",
         "webui/app.py",
         "scripts/posix_locks.py",
-        "scripts/link_maintenance.py"
+        "scripts/link_maintenance.py",
+        "src/link_core.c",
+        "src/link_repository.h",
+        "src/board_link.inc",
+        "src/link_adapter.inc"
       ]
     },
     {
