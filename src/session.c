@@ -1,6 +1,7 @@
 #define _POSIX_C_SOURCE 200809L
 #include "editor_core.h"
 #include "batch_protocol.h"
+#include "list_navigation_protocol.h"
 #include "traversal_protocol.h"
 #include "editor_commands.h"
 #include "editor_view.h"
@@ -66,11 +67,10 @@ enum { CM_MAIN, CM_BOARD, CM_SETTINGS, CM_PROFILE, CM_ADMIN };
 static void selection_reset(Session *s) {
     s->file_selected=s->file_selecting=0;s->batch_screen=s->batch_copying=0;
     batch_reset(&s->batch);
-    s->vault_child_view=s->vault_child_count=s->vault_child_next=0;
-    s->game_menu=0;s->vault_mode=s->vault_selecting=0;s->vault_path[0]=s->vault_select[0]=0;
+    vault_navigation_reset(&s->vault);
+    s->game_menu=0;s->vault_mode=0;
     memset(s->vault_grants,0,sizeof(s->vault_grants));
-    s->profile_walk=s->profile_walk_pending=s->profile_edit_target=0;
-    OPENSSL_cleanse(&s->profile_search,sizeof(s->profile_search));
+    s->profile_edit_target=0;profile_walk_reset(&s->profile_walk);
     s->talk_once=s->talk_return_editor=s->status_pending=s->memo_input=0;
     s->talk_target=s->reply_target=0;s->talk_select=s->talk_lost=s->outside_talk=0;
     s->classic_input=0;s->classic_id=0;s->classic_area=CM_MAIN;
@@ -256,14 +256,14 @@ static int extended_command(Session *s,const char *line) {
         return 1;
     }
     if(!strcmp(line,"FILECHILDREN") || !strncmp(line,"FILECHILDREN ",13)) {
-        BoardRequest q={0};q.op='Y';q.action=VAULT_CMD_CHILDREN;const char *path=line[12]?line+13:(*s->vault_path?s->vault_path:"-");
+        BoardRequest q={0};q.op='Y';q.action=VAULT_CMD_CHILDREN;const char *path=line[12]?line+13:(vault_navigation_path(&s->vault));
         if(!*path || strlen(path)>48 || !safe_text(path)) { emit(s,"ERR vault syntax\r\n");return 1; }
         strcpy(q.body,path);submit(s,&q);return 1;
     }
     if(!strcmp(line,"FILEBOARD") || !strncmp(line,"FILEBOARD ",10)) {
         const char *path=line[9]?line+10:"-";
         if(!*path || strlen(path)>48 || !safe_text(path)) { emit(s,"ERR vault syntax\r\n");return 1; }
-        BoardRequest q={0};q.op='Y';q.action=VAULT_CMD_BOARDINFO;strcpy(q.title,path);strcpy(s->vault_select,path);s->vault_selecting=1;submit(s,&q);if(!s->pending)s->vault_selecting=0;return 1;
+        BoardRequest q={0};q.op='Y';q.action=VAULT_CMD_BOARDINFO;strcpy(q.title,path);vault_navigation_begin(&s->vault,path);submit(s,&q);if(!s->pending)s->vault.selecting=0;return 1;
     }
     if(!strcmp(line,"CHECKMODE AUTO") || !strcmp(line,"CHECKMODE MANUAL")) { s->check.automatic=!strcmp(line,"CHECKMODE AUTO");emit(s,s->check.automatic?"CHECKMODE AUTO\r\n":"CHECKMODE MANUAL\r\n");return 1; }
     if(!strncmp(line,"CHECK ",6)) {
@@ -340,7 +340,7 @@ static int extended_command(Session *s,const char *line) {
             if(!strncmp(line,"FILEBOARDSIGOP ",15)) { q.action=VAULT_CMD_BOARDSIGOP;if(strcmp(bar+1,"NONE") && (!number_arg(bar+1,&q.cursor,&tail) || *tail))goto newvault_bad;memcpy(q.title,arg,(size_t)(bar-arg)); }
             else { q.action=VAULT_CMD_BOARDNAME;if(strlen(arg)>129 || !safe_text(arg))goto newvault_bad;strcpy(q.body,arg); }
         }
-        submit(s,&q);if(q.action==VAULT_CMD_TEXT && s->pending) { snprintf(s->report,sizeof(s->report),"FILETYPE %u",q.number);s->report_pending=1; }return 1;
+        submit(s,&q);if(q.action==VAULT_CMD_TEXT && s->pending) { report_navigation_begin(&s->report,REPORT_FILETEXT,q.number,0); }return 1;
 newvault_bad:emit(s,"ERR vault syntax\r\n");return 1;
     }
 
@@ -357,7 +357,7 @@ newvault_bad:emit(s,"ERR vault syntax\r\n");return 1;
             else if(!strncmp(line,"PROFILEVIS ",11)) { q.action='V';q.number=(uint32_t)field;if(!strcmp(value,"PRIVATE"))q.cursor=0;else if(!strcmp(value,"MEMBERS"))q.cursor=1;else if(!strcmp(value,"MONTHDAY"))q.cursor=2;else goto bad_profile; }
             else { q.action='F';q.number=(uint32_t)field;strcpy(q.body,value); }
         }
-        if(q.op=='Z') { s->profile_filter=q.scope;s->profile_group=q.number;if(s->profile_walk) { q.notes_unread=1;s->profile_search=q;s->profile_walk_pending=1; } }
+        if(q.op=='Z') { s->profile_filter=q.scope;s->profile_group=q.number;if(s->profile_walk.active) { q.notes_unread=1;profile_walk_begin(&s->profile_walk,q.scope,q.number,q.title); } }
         submit(s,&q);return 1;
 bad_profile:emit(s,"ERR profile text\r\n");return 1;
     }
@@ -781,7 +781,7 @@ static int service_command(Session *s,const char *line) {
             snprintf(q.title,sizeof(q.title),"%u",q.cursor);
         }
         submit(s,&q);
-        if(q.action!=VAULT_CMD_BOARDSET && s->pending) { snprintf(s->report,sizeof(s->report),q.number?"%s %u":"%s ALL",q.action==VAULT_CMD_HISTORY?"FILEHISTORY":"FILESTATS",q.number);s->report_pending=1; }
+        if(q.action!=VAULT_CMD_BOARDSET && s->pending) { report_navigation_begin(&s->report,q.action==VAULT_CMD_HISTORY?REPORT_FILEHISTORY:REPORT_FILESTATS,q.number,!q.number); }
         return 1;
     }
     if(!strcmp(line,"SIGOPS"))q.action='v';
@@ -813,10 +813,8 @@ static int service_command(Session *s,const char *line) {
     } else return 0;
     submit(s,&q);
     if(s->pending && (q.action=='j' || q.action=='U' || q.action=='u')) {
-        if(q.action=='j')strcpy(s->report,"BOARDLOG");
-        else if(q.notes_unread)snprintf(s->report,sizeof(s->report),"%s ALL",q.action=='u'?"USERTABLE":"USERLOG");
-        else snprintf(s->report,sizeof(s->report),"%s %u",q.action=='u'?"USERTABLE":"USERLOG",q.number?q.number:s->user);
-        s->report_pending=1;
+        report_navigation_begin(&s->report,q.action=='j'?REPORT_BOARDLOG:q.action=='u'?REPORT_USERTABLE:REPORT_USERLOG,
+                                q.number?q.number:s->user,q.notes_unread);
     }
     return 1;
 invalid:emit(s,"ERR command\r\n");return 1;
@@ -981,7 +979,7 @@ static void command_core(Session *s,char *line) {
         if(*tail)goto board_syntax;
         if(q.action=='P' && s->now<s->auth_after) { emit(s,"ERR try later\r\n");return; }
         submit(s,&q);
-        if(q.action=='A' && s->pending) { snprintf(s->report,sizeof(s->report),"BOARDACCESS %u",q.number);s->report_pending=1; }
+        if(q.action=='A' && s->pending) { report_navigation_begin(&s->report,REPORT_BOARDACCESS,q.number,0); }
         return;
 board_syntax:emit(s,"ERR command\r\n");return;
     }
@@ -1082,7 +1080,7 @@ board_syntax:emit(s,"ERR command\r\n");return;
     if(!strcmp(line,"BATCH") || !strncmp(line,"BATCH ",6)) {
         if(!s->user) { emit(s,"ERR login required\r\n");return; }
         if(!board_feature_enabled("vault")) { emit(s,"ERR feature disabled\r\n");return; }
-        if(!strncmp(line,"BATCH MATCH ",12)) { if(!line[12] || strlen(line+12)>80 || !safe_text(line+12))goto batch_error;BoardRequest q={0};q.op='Y';q.action=VAULT_CMD_MATCH;snprintf(q.body,sizeof(q.body),"%s|%s",*s->vault_path?s->vault_path:"-",line+12);submit(s,&q);return; }
+        if(!strncmp(line,"BATCH MATCH ",12)) { if(!line[12] || strlen(line+12)>80 || !safe_text(line+12))goto batch_error;BoardRequest q={0};q.op='Y';q.action=VAULT_CMD_MATCH;snprintf(q.body,sizeof(q.body),"%s|%s",vault_navigation_path(&s->vault),line+12);submit(s,&q);return; }
         if(!strncmp(line,"BATCH COPY ",11)) {
             const char *path=line+11;if(!*path || strlen(path)>48 || !safe_text(path) || !s->batch.count)goto batch_error;
             uint32_t next;int state=batch_copy_begin(&s->batch,path,&next);
@@ -1125,7 +1123,7 @@ board_syntax:emit(s,"ERR command\r\n");return;
     if(!strncmp(line,"ZUPLOADBATCHRESUME ",19) || !strcmp(line,"ZUPLOADBATCHRESUME") || !strncmp(line,"ZUPLOADBATCH ",13) || !strcmp(line,"ZUPLOADBATCH") || !strncmp(line,"ZRESUME ",8) || !strcmp(line,"ZRESUME")) {
         if(!s->user) { emit(s,"ERR login required\r\n");return; }
         if(!s->zmodem_available || !s->binary_allowed) { queue_text(s,ui_text(&s->ui,MSG_ZMODEM_UNAVAILABLE));return; }
-        int batch_resume=!strncmp(line,"ZUPLOADBATCHRESUME",18);int resume=!strncmp(line,"ZRESUME",7);size_t prefix=batch_resume?18:resume?7:12;const char *arg=line[prefix]?line+prefix+1:((resume || batch_resume) && *s->vault_path?s->vault_path:"-");
+        int batch_resume=!strncmp(line,"ZUPLOADBATCHRESUME",18);int resume=!strncmp(line,"ZRESUME",7);size_t prefix=batch_resume?18:resume?7:12;const char *arg=line[prefix]?line+prefix+1:((resume || batch_resume)?vault_navigation_path(&s->vault):"-");
         size_t n=strcspn(arg,"|");if(!n || n>48 || strlen(arg)>289 || !safe_text(arg)) { emit(s,"ERR vault syntax\r\n");return; }
         s->zmodem_protocol=0;s->zmodem_receive=batch_resume?9:resume?7:6;s->zmodem_id=0;strcpy(s->zmodem_text,arg);s->zmodem_start=1;
         BoardRequest q={0};q.op='@';submit(s,&q);if(!s->pending)s->zmodem_start=0;return;
@@ -1377,6 +1375,12 @@ board_syntax:emit(s,"ERR command\r\n");return;
     }
     else emit(s,"ERR command\r\n");
 }
+static void profile_continue(Session *s) {
+    ProfileWalkQuery plan=profile_walk_next(&s->profile_walk);
+    BoardRequest q={0};q.op='Z';q.action=10;q.notes_unread=1;
+    q.scope=plan.field;q.number=plan.group;q.cursor=plan.cursor;strcpy(q.title,plan.query);
+    submit(s,&q);
+}
 #include "classic_commands.inc"
 
 static void command(Session *s,char *line) {
@@ -1440,11 +1444,12 @@ static void command(Session *s,char *line) {
         queue_text(s,s->ui.language==LANGUAGE_JA?"ゲーム番号、L（一覧）、0（主画面）を入力してください。\r\n":"Enter a game number, L (list), or 0 (main).\r\n");prompt(s);return;
     }
     if(classic_commands(s,line))return;
-    if(!strcmp(line,"+") && *s->report) {
-        if(!s->report_next) { queue_text(s,ui_text(&s->ui,MSG_NO_PAGE));prompt(s);return; }
-        snprintf(mapped,sizeof(mapped),"%s %u",s->report,s->report_next);command_core(s,mapped);prompt(s);return;
+    if(!strcmp(line,"+") && s->report.kind!=REPORT_NONE) {
+        if(!s->report.next) { queue_text(s,ui_text(&s->ui,MSG_NO_PAGE));prompt(s);return; }
+        if(report_navigation_command(&s->report,mapped,sizeof(mapped)))command_core(s,mapped);
+        prompt(s);return;
     }
-    s->report[0]=0;s->report_next=0;
+    report_navigation_clear(&s->report);
     if(!s->ui.input && !strcmp(line,"VAULT")) {
         if(!s->user) { emit(s,"ERR login required\r\n");prompt(s);return; }
         if(!board_feature_enabled("vault")) { emit(s,"ERR feature disabled\r\n");prompt(s);return; }
@@ -1453,26 +1458,27 @@ static void command(Session *s,char *line) {
     if(s->vault_mode) {
         if(!strcmp(line,"CD .."))line="0";
         if(!strcmp(line,"MAIL") || !strncmp(line,"MAIL ",5))s->vault_mode=0;
-        if(!strcmp(line,"0") && *s->vault_path && strcmp(s->vault_path,"-")) { char parent[49];strcpy(parent,s->vault_path);char *slash=strrchr(parent,'/');if(slash)*slash=0;else parent[0]=0;snprintf(mapped,sizeof(mapped),"FILEBOARD %s",*parent?parent:"-");command_core(s,mapped);prompt(s);return; }
+        char parent[49];
+        if(!strcmp(line,"0") && vault_navigation_parent(&s->vault,parent)) { snprintf(mapped,sizeof(mapped),"FILEBOARD %s",parent);command_core(s,mapped);prompt(s);return; }
         if(!strcmp(line,"0") || !strcmp(line,"EXIT")) { s->vault_mode=0;s->ui.view=UI_HOME;show_menu(s,1);prompt(s);return; }
         if(!strcmp(line,"H") || !strcmp(line,"?")) { show_help(s,"FILES");prompt(s);return; }
-        if(!strcmp(line,"L")) { s->vault_child_view=0;snprintf(mapped,sizeof(mapped),"FILESIN %s",*s->vault_path?s->vault_path:"-"); }
+        if(!strcmp(line,"L")) { s->vault.child_view=0;snprintf(mapped,sizeof(mapped),"FILESIN %s",vault_navigation_path(&s->vault)); }
         else if(!strncmp(line,"UIN ",4))snprintf(mapped,sizeof(mapped),"ZUPLOADIN %s",line+4);
-        else if(!strcmp(line,"BOARDS") || !strcmp(line,"DIR"))snprintf(mapped,sizeof(mapped),"FILECHILDREN %s",*s->vault_path?s->vault_path:"-");
-        else if(!strcmp(line,"U") || !strncmp(line,"U ",2))snprintf(mapped,sizeof(mapped),"UPLOAD %s|%s",*s->vault_path?s->vault_path:"-",line+2);
+        else if(!strcmp(line,"BOARDS") || !strcmp(line,"DIR"))snprintf(mapped,sizeof(mapped),"FILECHILDREN %s",vault_navigation_path(&s->vault));
+        else if(!strcmp(line,"U") || !strncmp(line,"U ",2))snprintf(mapped,sizeof(mapped),"UPLOAD %s|%s",vault_navigation_path(&s->vault),line+2);
         else if(!strncmp(line,"D ",2))snprintf(mapped,sizeof(mapped),"DOWNLOAD %s",line+2);
-        else if(!strncmp(line,"N ",2))snprintf(mapped,sizeof(mapped),"FILENEWS %s|%s",*s->vault_path?s->vault_path:"-",line+2);
-        else if(!strncmp(line,"S ",2))snprintf(mapped,sizeof(mapped),"FILESEARCH %s|%s",*s->vault_path?s->vault_path:"-",line+2);
+        else if(!strncmp(line,"N ",2))snprintf(mapped,sizeof(mapped),"FILENEWS %s|%s",vault_navigation_path(&s->vault),line+2);
+        else if(!strncmp(line,"S ",2))snprintf(mapped,sizeof(mapped),"FILESEARCH %s|%s",vault_navigation_path(&s->vault),line+2);
         else if(!strcmp(line,"C"))snprintf(mapped,sizeof(mapped),"FILECATEGORIES");
         else if(!strncmp(line,"I ",2))snprintf(mapped,sizeof(mapped),"FILEBOARD %s",line+2);
-        else if(!strncmp(line,"CD ",3))snprintf(mapped,sizeof(mapped),"FILEBOARD %s%s%s",*s->vault_path && strcmp(s->vault_path,"-")?s->vault_path:"",*s->vault_path && strcmp(s->vault_path,"-")?"/":"",line+3);
+        else if(!strncmp(line,"CD ",3))snprintf(mapped,sizeof(mapped),"FILEBOARD %s%s%s",*s->vault.path && strcmp(s->vault.path,"-")?s->vault.path:"",*s->vault.path && strcmp(s->vault.path,"-")?"/":"",line+3);
         else if(!strcmp(line,"+")) {
-            if(s->vault_child_view) { if(!s->vault_child_next) { emit(s,"END CHILDREN\r\n");prompt(s);return; }BoardRequest q={0};q.op='Y';q.action=VAULT_CMD_CHILDREN;q.number=s->vault_child_next;strcpy(q.body,*s->vault_path?s->vault_path:"-");submit(s,&q);return; }
+            if(s->vault.child_view) { if(!s->vault.next) { emit(s,"END CHILDREN\r\n");prompt(s);return; }BoardRequest q={0};q.op='Y';q.action=VAULT_CMD_CHILDREN;q.number=s->vault.next;strcpy(q.body,vault_navigation_path(&s->vault));submit(s,&q);return; }
             if(!s->ui.next) { queue_text(s,ui_text(&s->ui,MSG_NO_PAGE));prompt(s);return; }
             if(s->ui.view==UI_FILES && s->ui.file_mode)snprintf(mapped,sizeof(mapped),s->ui.file_mode==3?"FILENEWSFROM %u %s":s->ui.file_mode==1?"FILESEARCHFROM %u %s":"FILESINFROM %u %s",s->ui.next,s->ui.file_query);
             else snprintf(mapped,sizeof(mapped),s->ui.view==UI_FILEBOARDS?"FILEBOARDS %u":s->ui.view==UI_FILECATEGORIES?"FILECATEGORIES %u":"FILES %u",s->ui.next);
         }
-        else if(*line>='0' && *line<='9') { const char *end;uint32_t selected;if(!number_arg(line,&selected,&end) || *end) { emit(s,"ERR file number\r\n");return; }if(s->vault_child_view) { if(selected>s->vault_child_count) { emit(s,"ERR board number\r\n");prompt(s);return; }snprintf(mapped,sizeof(mapped),"FILEBOARD %s",s->vault_children[selected-1]); }else { s->file_selecting=selected;snprintf(mapped,sizeof(mapped),"FILE %u",selected); } }
+        else if(*line>='0' && *line<='9') { const char *end;uint32_t selected;if(!number_arg(line,&selected,&end) || *end) { emit(s,"ERR file number\r\n");return; }if(s->vault.child_view) { const char *path=vault_children_select(&s->vault,selected);if(!path) { emit(s,"ERR board number\r\n");prompt(s);return; }snprintf(mapped,sizeof(mapped),"FILEBOARD %s",path); }else { s->file_selecting=selected;snprintf(mapped,sizeof(mapped),"FILE %u",selected); } }
         else snprintf(mapped,sizeof(mapped),"%s",line);
         command_core(s,mapped);prompt(s);return;
     }
@@ -1575,7 +1581,10 @@ void session_scan_pause(Session *s) { s->reader.active=s->reader.automatic=0; }
 void session_board_refresh(Session *s) {
     s->page[0]=0;s->page_offset=0;s->reader.active=0;
     s->ui.next=0;s->ui.view=UI_HOME;s->ui.board_title[0]=0;
-    s->report[0]=0;s->report_next=0;
+    report_navigation_clear(&s->report);
+}
+void session_access_refresh(Session *s) {
+    if(report_navigation_access_refresh(&s->report)) { s->page[0]=0;s->page_offset=0; }
 }
 void session_scan_stop(Session *s) {
     reader_stop(&s->reader,s->pending);page_clear(s);
@@ -1763,9 +1772,8 @@ void session_result(Session *s,const BoardResult *completion,uint64_t now) {
     if(completion->mail_notify_user)session_mail_notify(s,completion->mail_notify_user,completion->mail_notify_deny,completion->mail_notify_revision);
     if(completion->chat_user)chat_apply_preferences(completion->chat_user,&completion->chat_preferences);
     if(completion->revoked) { session_revoke(s); return; }
-    if(s->vault_selecting) {
-        s->vault_selecting=0;
-        if(!strncmp(completion->text,"FILEBOARDSETTING ",17)) { strcpy(s->vault_path,s->vault_select);s->vault_child_view=0;s->vault_child_count=0;s->file_selected=0;s->vault_mode=1;s->mail_mode=0; }
+    if(vault_navigation_complete(&s->vault,!strncmp(completion->text,"FILEBOARDSETTING ",17))) {
+        s->file_selected=0;s->vault_mode=1;s->mail_mode=0;
     }
     mail_navigation_observe(&s->mail,mail_event(completion->mail_action),completion->mail_id);
     if(completion->service_action=='n') { check_traversal_begin(&s->check,completion->service_number,completion->since,completion->until);check_page(s);return; }
@@ -1776,21 +1784,17 @@ void session_result(Session *s,const BoardResult *completion,uint64_t now) {
         if(ids.count && batch_format_ids(&ids,s->zmodem_text,sizeof(s->zmodem_text))) { s->zmodem_receive=10;s->zmodem_protocol=s->mail_batch_protocol;s->zmodem_id=0;s->zmodem_start=1;BoardRequest q={0};q.op='@';q.action=1;submit(s,&q); }return;
     }
     if(!strncmp(completion->text,"FILECHILDREN ",13)) {
-        s->vault_child_count=0;s->vault_child_view=1;s->vault_child_next=0;
-        const char *row=strstr(completion->text,"\r\n");
-        while(row && *row) { row+=2;unsigned n=0;char path[49];
-            if(sscanf(row,"CHILD %u %48[^|]",&n,path)==2 && n && n<=16) { strcpy(s->vault_children[n-1],path);s->vault_child_count=n; }
-            if(sscanf(row,"END CHILDREN NEXT %u",&s->vault_child_next)==1)break;
-            row=strstr(row,"\r\n");
-        }
+        vault_children_response(&s->vault,completion->text);
         queue_text(s,completion->text);prompt(s);return;
     }
     if(s->status_pending) { s->status_pending=0;emit(s,completion->text);if(s->chatting)chat_prompt(s);else prompt(s);return; }
-    if(s->profile_walk_pending) {
-        s->profile_walk_pending=0;unsigned next=0;const char *end=strstr(completion->text,"END NEXT ");if(end)sscanf(end,"END NEXT %u",&next);
+    if(s->profile_walk.pending) {
+        ListContinuation page=list_continuation_parse(completion->text,0);
+        profile_walk_complete(&s->profile_walk,page.next);
         queue_text(s,completion->text);
-        if(next) { s->profile_search.cursor=next;s->classic_input=CI_PROF_NEXT;queue_text(s,s->ui.language==LANGUAGE_JA?"次の会員:Enter / 0:終了 > ":"Next:Enter / 0:stop > "); }
-        else { s->profile_walk=0;prompt(s); }return;
+        if(page.next) { s->classic_input=CI_PROF_NEXT;queue_text(s,s->ui.language==LANGUAGE_JA?"次の会員:Enter / 0:終了 > ":"Next:Enter / 0:stop > "); }
+        else prompt(s);
+        return;
     }
     if(s->batch_copying) {
         queue_text(s,completion->text);
@@ -1799,9 +1803,9 @@ void session_result(Session *s,const BoardResult *completion,uint64_t now) {
         if(next) { BoardRequest q={0};q.op='Y';q.action=VAULT_CMD_COPY;q.number=next;strcpy(q.body,s->batch.copy_path);submit(s,&q); }
         else { s->batch_copying=0;prompt(s); }return;
     }
-    if(s->report_pending) {
-        s->report_pending=0;s->report_next=0;const char *end=strstr(completion->text,"END NEXT ");
-        if(end)sscanf(end,"END NEXT %u",&s->report_next);else { end=strstr(completion->text,"\r\nEND TEXT NEXT ");if(end)sscanf(end+2,"END TEXT NEXT %u",&s->report_next);else s->report[0]=0; }
+    if(s->report.pending) {
+        ListContinuation page=list_continuation_parse(completion->text,1);
+        report_navigation_complete(&s->report,page.found,page.next);
         emit(s,completion->text);prompt(s);return;
     }
     if(!strncmp(completion->text,"FILEBOARD UNLOCKED ",19)) { unsigned id,revision;if(sscanf(completion->text,"FILEBOARD UNLOCKED %u %u",&id,&revision)==2 && id<=1024)s->vault_grants[id]=revision; }
@@ -1841,10 +1845,6 @@ void session_result(Session *s,const BoardResult *completion,uint64_t now) {
             if(effect==MAIL_DRAFT_SENT) { OPENSSL_cleanse(&s->draft,sizeof(s->draft));s->editing=0;s->editor_upload=s->editor_confirm=s->editor_upload_question=0; }
             else { s->editing=1;s->editor_input=0;s->editor_at=1; }
         }
-        if(s->vault_selecting) {
-        s->vault_selecting=0;
-        if(!strncmp(completion->text,"FILEBOARDSETTING ",17)) { strcpy(s->vault_path,s->vault_select);s->vault_child_view=0;s->vault_child_count=0;s->file_selected=0;s->vault_mode=1;s->mail_mode=0; }
-    }
 
         mail_navigation_page(&s->mail,mail_event(completion->mail_action),completion->mail_next);
         if(s->ui.enabled && s->pager_enabled && strchr("ILRNT",completion->mail_action) && completion->mail_action) {
@@ -1973,7 +1973,7 @@ void session_result(Session *s,const BoardResult *completion,uint64_t now) {
     reader_complete(&s->reader,completion->sequence,completion->selected || completion->mail_id,!strncmp(completion->text,"ERR ",4));
     if(completion->sequence)s->scan.cursor=completion->sequence_next;
     emit(s,completion->text);
-    if(s->vault_mode && !strncmp(completion->text,"FILEBOARDSETTING ",17) && strstr(completion->text,"OPTIONS MENU ")) { BoardRequest q={0};q.op='Y';q.action=VAULT_CMD_CHILDREN;strcpy(q.body,*s->vault_path?s->vault_path:"-");submit(s,&q);return; }
+    if(s->vault_mode && !strncmp(completion->text,"FILEBOARDSETTING ",17) && strstr(completion->text,"OPTIONS MENU ")) { BoardRequest q={0};q.op='Y';q.action=VAULT_CMD_CHILDREN;strcpy(q.body,vault_navigation_path(&s->vault));submit(s,&q);return; }
     if(s->ui.enabled && s->active) {
         if(completion->auth>0) {
             char notice[512];

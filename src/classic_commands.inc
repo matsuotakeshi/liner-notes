@@ -27,18 +27,18 @@ static void profile_fields(Session *s,int search) {
 static int classic_input(Session *s,const char *line) {
     int mode=s->classic_input;if(!mode)return 0;
     char text[INPUT_LINE_MAX+128];s->classic_input=0;
-    if(!strcmp(line,"/CANCEL")) { s->batch_screen=0;s->file_selected=0;s->profile_walk=0;emit(s,"CANCELLED\r\n");prompt(s);return 1; }
+    if(!strcmp(line,"/CANCEL")) { s->batch_screen=0;s->file_selected=0;s->profile_walk.active=0;emit(s,"CANCELLED\r\n");prompt(s);return 1; }
     if(mode==CI_PROF_TARGET) {
         const char *end;uint32_t target=0;
         if(*line && (!number_arg(line,&target,&end) || *end)) { s->classic_input=CI_PROF_TARGET;queue_text(s,"Member ID (Enter:self) > ");return 1; }
         s->profile_edit_target=target;profile_fields(s,0);return 1;
     }
     if(mode==CI_PROF_NEXT) {
-        if(!strcmp(line,"0") || !strcmp(line,"N")) { s->profile_walk=0;prompt(s);return 1; }
-        s->profile_walk_pending=1;submit(s,&s->profile_search);return 1;
+        if(!strcmp(line,"0") || !strcmp(line,"N")) { s->profile_walk.active=0;prompt(s);return 1; }
+        profile_continue(s);return 1;
     }
     if(mode==CI_BATCH_COPY) {
-        snprintf(text,sizeof(text),"BATCH COPY %s",*line?line:(*s->vault_path?s->vault_path:"-"));classic_run(s,text);return 1;
+        snprintf(text,sizeof(text),"BATCH COPY %s",*line?line:(vault_navigation_path(&s->vault)));classic_run(s,text);return 1;
     }
     if(mode==CI_FILE_ACTION) {
         if(!strcmp(line,"0")) { s->file_selected=0;prompt(s);return 1; }
@@ -59,7 +59,7 @@ static int classic_input(Session *s,const char *line) {
         queue_text(s,s->ui.language==LANGUAGE_JA?"内容 > ":"Value > ");return 1;
     }
     if(mode==CI_PROF_VALUE || mode==CI_SEARCH_VALUE) {
-        if(mode==CI_SEARCH_VALUE)s->profile_walk=1;
+        if(mode==CI_SEARCH_VALUE)s->profile_walk.active=1;
         if(mode==CI_PROF_VALUE && s->profile_edit_target) { snprintf(text,sizeof(text),"MEMBERPROFILE %u %s %s",s->profile_edit_target,classic_fields[s->profile_edit_field],line);classic_run(s,text);return 1; }
         snprintf(text,sizeof(text),"%s %s %s",mode==CI_SEARCH_VALUE?"PROFILEFIND":"PROFILESET",classic_fields[s->profile_edit_field],line);classic_run(s,text);return 1;
     }
@@ -79,7 +79,7 @@ static int classic_input(Session *s,const char *line) {
     }
     if(mode==CI_FILESIZE) {
         uint32_t bytes;const char *tail;if((!strcmp(line,"0")?(bytes=0,tail=line+1,0):!number_arg(line,&bytes,&tail)) || *tail || bytes>ln_limit("FILE",1073741824u)) { classic_ask(s,CI_FILESIZE,MSG_TRANSFER_SIZE);return 1; }
-        snprintf(text,sizeof(text),"UPLOAD %s|%s|%u|%s",*s->vault_path?s->vault_path:"-",s->upload_filename,bytes,s->upload_description);classic_run(s,text);return 1;
+        snprintf(text,sizeof(text),"UPLOAD %s|%s|%u|%s",vault_navigation_path(&s->vault),s->upload_filename,bytes,s->upload_description);classic_run(s,text);return 1;
     }
     if(mode==CI_BATCH) {
         if(!strcmp(line,"1"))classic_ask(s,CI_BATCH_ADD,MSG_TRANSFER_ID);
@@ -112,8 +112,8 @@ static int classic_input(Session *s,const char *line) {
         if(!strcmp(line,"Y") || !strcmp(line,"y"))snprintf(text,sizeof(text),"WITHDRAW %u CONFIRM",s->classic_id);
         else { emit(s,"CANCELLED\r\n");prompt(s);return 1; }
     } else if(mode==CI_DATE) {
-        if(!*line) { if(s->vault_mode)snprintf(text,sizeof(text),"CHECK FILES %s",*s->vault_path?s->vault_path:"-");else snprintf(text,sizeof(text),"CHECK %s",s->mail_mode?"MAIL":"ARTICLES HERE"); }
-        else if(s->vault_mode)snprintf(text,sizeof(text),"FILENEWS %s|%s",*s->vault_path?s->vault_path:"-",line);
+        if(!*line) { if(s->vault_mode)snprintf(text,sizeof(text),"CHECK FILES %s",vault_navigation_path(&s->vault));else snprintf(text,sizeof(text),"CHECK %s",s->mail_mode?"MAIL":"ARTICLES HERE"); }
+        else if(s->vault_mode)snprintf(text,sizeof(text),"FILENEWS %s|%s",vault_navigation_path(&s->vault),line);
         else snprintf(text,sizeof(text),"%s %s",s->mail_mode?"MAIL NEWS":s->vault_mode?"FILENEWS":"NEWS HERE",line);
     } else if(mode==CI_FILEINFO)snprintf(text,sizeof(text),"FILEBOARDINFO %s",*line?line:"-");
     else if(mode==CI_DOWNLOAD)snprintf(text,sizeof(text),"DOWNLOAD %s",line);
@@ -121,7 +121,7 @@ static int classic_input(Session *s,const char *line) {
         if(strlen(line)>240 || !safe_text(line) || strchr(line,'|')) { classic_ask(s,CI_UPLOAD,MSG_CLASSIC_UPLOAD);return 1; }
         strcpy(s->upload_description,line);
         if(s->transfer_protocol==1 || s->transfer_protocol>=5) { classic_ask(s,CI_FILENAME,MSG_TRANSFER_FILENAME);return 1; }
-        snprintf(text,sizeof(text),"%s %s|%s",s->upload_batch?"UPLOADBATCH":"UPLOAD",*s->vault_path?s->vault_path:"-",line);
+        snprintf(text,sizeof(text),"%s %s|%s",s->upload_batch?"UPLOADBATCH":"UPLOAD",vault_navigation_path(&s->vault),line);
     }
     else if(mode==CI_AUTHOR)snprintf(text,sizeof(text),"FIND HERE %s *",line);
     else if(mode==CI_HANDLE)snprintf(text,sizeof(text),"HANDLE %s",line);
@@ -195,7 +195,7 @@ static int classic_commands(Session *s,const char *line) {
     if(s->vault_mode) {
         if(!strcmp(line,"N")) { classic_ask(s,CI_DATE,MSG_CLASSIC_DATE);return 1; }
         if(!strcmp(line,"B")) { s->batch_screen=1;s->file_selected=0;classic_ask(s,CI_BATCH,MSG_TRANSFER_BATCH);return 1; }
-        if(!strcmp(line,"I")) { char info[80];snprintf(info,sizeof(info),"FILEBOARDINFO %s",*s->vault_path?s->vault_path:"-");classic_run(s,info);return 1; }
+        if(!strcmp(line,"I")) { char info[80];snprintf(info,sizeof(info),"FILEBOARDINFO %s",vault_navigation_path(&s->vault));classic_run(s,info);return 1; }
         if(!strcmp(line,"D")) { classic_ask(s,CI_DOWNLOAD,MSG_CLASSIC_DOWNLOAD);return 1; }
         if(!strcmp(line,"U") || !strcmp(line,"UB")) { s->upload_batch=!strcmp(line,"UB");classic_ask(s,CI_PROTOCOL,MSG_TRANSFER_PROTOCOL);return 1; }
         if(!strcmp(line,"0") || !strcmp(line,"EXIT"))s->classic_area=CM_MAIN;

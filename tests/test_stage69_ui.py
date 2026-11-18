@@ -30,10 +30,16 @@ def run(binary,ctl):
    ui(a,'LOGIN admin');ui(a,PASSWORD);ui(b,'LOGIN bob');birth=ui(b,PASSWORD);assert b'BIRTHDAY MESSAGE' in birth,birth
    ui(a,'PAGER OFF');ui(b,'PAGER OFF')
    ui(a,'P');assert b'Field' in ui(a,'E')+ui(a,'2');assert b'Value' in ui(a,'8');assert b'saved' in ui(a,'X68000').lower()
-   ui(a,'MENU');ui(a,'P');ui(a,'S');ui(a,'8');result=ui(a,'X68000');assert b'MACHINE X68000' in result,result
-   # Last matching member may have a next cursor even when the rest do not match.
+   ui(a,'PROFILESET MACHINE X68000')
+   ui(a,'MENU');ui(a,'P');ui(a,'S');ui(a,'8');result=ui(a,'X68000')
+   assert b'PROFILE 1 admin' in result and b'MACHINE X68000' in result and b'Next:Enter' in result,result
+   result=ui(a,'')
+   assert b'PROFILE 2 bob' in result and b'MACHINE X68000' in result,result
+   # The same field/query must survive the continuation request.
    if b'Next:Enter' in result:ui(a,'0')
    ui(a,'MENU');ui(a,'VAULT');ui(a,'FILEBOARD files');assert b'CHILD 1 files/child' in ui(a,'DIR')
+   ui(a,'FILEBOARD absent')
+   assert b'CHILD 1 files/child' in ui(a,'DIR') # Failed selection retains current directory.
    assert b'files/child' in ui(a,'1');assert b'files|' in ui(a,'0')
    assert b'readme.txt' in ui(a,'L');selected=ui(a,'1');assert b'T:view' in selected and b'file description' in selected,selected
    assert b'BATCH FILE 1 PENDING' in ui(a,'b');ui(a,'0')

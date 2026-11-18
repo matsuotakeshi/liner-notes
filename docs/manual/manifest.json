@@ -271,7 +271,13 @@
         "src/runtime.c",
         "src/session.h",
         "tests/test_adapters.c",
-        "tests/test_stage68_batch.py"
+        "tests/test_stage68_batch.py",
+        "src/list_navigation_core.c",
+        "src/list_navigation_core.h",
+        "src/list_navigation_protocol.c",
+        "src/list_navigation_protocol.h",
+        "tests/test_list_navigation_core.c",
+        "tests/test_stage69_ui.py"
       ]
     },
     {
@@ -292,7 +298,13 @@
         "tests/test_adapters.c",
         "src/preference_core.c",
         "src/preference_core.h",
-        "tests/test_preference_core.c"
+        "tests/test_preference_core.c",
+        "src/list_navigation_core.c",
+        "src/list_navigation_core.h",
+        "src/list_navigation_protocol.c",
+        "src/list_navigation_protocol.h",
+        "tests/test_list_navigation_core.c",
+        "tests/test_stage69_ui.py"
       ]
     },
     {
@@ -406,7 +418,14 @@
         "src/vault_query_core.c",
         "src/vault_bridge.c",
         "src/vault_management_core.h",
-        "src/vault_management_core.c"
+        "src/vault_management_core.c",
+        "src/list_navigation_core.c",
+        "src/list_navigation_core.h",
+        "src/list_navigation_protocol.c",
+        "src/list_navigation_protocol.h",
+        "tests/test_list_navigation_core.c",
+        "tests/test_stage69_ui.py",
+        "tests/test_adapters.c"
       ]
     },
     {

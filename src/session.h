@@ -6,6 +6,7 @@
 #include "traversal_core.h"
 #include "preference_core.h"
 #include "mail_navigation_core.h"
+#include "list_navigation_core.h"
 #include <stddef.h>
 #include <stdint.h>
 #include "board.h"
@@ -24,7 +25,7 @@ typedef struct {
     unsigned long id;
     int slot,active,board_enabled,member_mode;
     Ui ui;
-    uint64_t connected_at;int talk_once,talk_return_editor,status_pending;uint32_t file_selected,file_selecting;unsigned profile_edit_target;int profile_walk,profile_walk_pending;BoardRequest profile_search;int batch_screen,batch_copying;BatchSelection batch;int profile_edit_field;int classic_area,classic_input,classic_direction;uint32_t classic_id;
+    uint64_t connected_at;int talk_once,talk_return_editor,status_pending;uint32_t file_selected,file_selecting;unsigned profile_edit_target;ProfileWalk profile_walk;int batch_screen,batch_copying;BatchSelection batch;int profile_edit_field;int classic_area,classic_input,classic_direction;uint32_t classic_id;
     int door,game_menu;int pager_enabled, help_page,menu_mode,menu_shown,editor_upload_question;
     char guest_handle[33];
     unsigned columns,rows;
@@ -32,11 +33,11 @@ typedef struct {
     char page[CONTENT_DISPLAY];
     uint64_t now,wake,auth_after;
     int closing,editing,pending,password_mode;uint32_t reset_target,boardpass_target,board_enter,board_lock;uint32_t board_grants[1025],vault_grants[1025];char filepass_path[49];int filepass_setting;
-    char report[80];uint32_t report_next;int report_pending;
+    ReportNavigation report;
     int gather_mode,gather_pending,service_pending;uint32_t gather_cursor;unsigned gather_lines;uint64_t sysop_mail_after;NotificationState notifications;
     int editor_line,editor_input,editor_numbers,editor_upload,editor_confirm;uint64_t editor_deadline;uint32_t editor_at;
     char upload_description[241],upload_filename[101];int upload_batch;
-    char vault_children[16][49];unsigned vault_child_count;uint32_t vault_child_next;int vault_child_view;char vault_path[49],vault_select[49];int vault_selecting;
+    VaultNavigation vault;
     unsigned mail_batch_protocol;
     MailNavigation mail;
     int outside_talk,mail_mode,mail_pending,mail_input; uint32_t mail_revision;
@@ -68,6 +69,8 @@ void session_scan_stop(Session *);
 void session_scan_pause(Session *);
 /* Invalidate board listings without changing pending/automatic reader state. */
 void session_board_refresh(Session *);
+/* Invalidate only access-log paging, keeping outstanding worker state. */
+void session_access_refresh(Session *);
 int session_auto_read(const Session *);
 void session_chat_kick(Session *);
 void session_revoke(Session *);
