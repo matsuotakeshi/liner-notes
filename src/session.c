@@ -1,5 +1,6 @@
 #define _POSIX_C_SOURCE 200809L
 #include "editor_core.h"
+#include "batch_protocol.h"
 #include "editor_commands.h"
 #include "editor_view.h"
 #include "classic_input.h"
@@ -63,8 +64,7 @@ enum { CM_MAIN, CM_BOARD, CM_SETTINGS, CM_PROFILE, CM_ADMIN };
 /* Do not carry per-account selection or private search state across login. */
 static void selection_reset(Session *s) {
     s->file_selected=s->file_selecting=0;s->batch_screen=s->batch_copying=0;
-    s->batch_count=s->batch_copy_at=0;memset(s->batch_done,0,sizeof(s->batch_done));
-    memset(s->batch_copied,0,sizeof(s->batch_copied));s->batch_copy_path[0]=0;
+    batch_reset(&s->batch);
     s->vault_child_view=s->vault_child_count=s->vault_child_next=0;
     s->game_menu=0;s->vault_mode=s->vault_selecting=0;s->vault_path[0]=s->vault_select[0]=0;
     memset(s->vault_grants,0,sizeof(s->vault_grants));
@@ -1050,34 +1050,32 @@ board_syntax:emit(s,"ERR command\r\n");return;
         if(!board_feature_enabled("vault")) { emit(s,"ERR feature disabled\r\n");return; }
         if(!strncmp(line,"BATCH MATCH ",12)) { if(!line[12] || strlen(line+12)>80 || !safe_text(line+12))goto batch_error;BoardRequest q={0};q.op='Y';q.action=VAULT_CMD_MATCH;snprintf(q.body,sizeof(q.body),"%s|%s",*s->vault_path?s->vault_path:"-",line+12);submit(s,&q);return; }
         if(!strncmp(line,"BATCH COPY ",11)) {
-            const char *path=line+11;if(!*path || strlen(path)>48 || !safe_text(path) || !s->batch_count)goto batch_error;
-            if(strcmp(path,s->batch_copy_path))memset(s->batch_copied,0,sizeof(s->batch_copied));
-            strcpy(s->batch_copy_path,path);
-            s->batch_copy_at=0;while(s->batch_copy_at<s->batch_count && s->batch_copied[s->batch_copy_at])s->batch_copy_at++;
-            if(s->batch_copy_at==s->batch_count) { emit(s,"BATCH COPY COMPLETE\r\n");return; }
-            BoardRequest q={0};q.op='Y';q.action=VAULT_CMD_COPY;q.number=s->batch[s->batch_copy_at];strcpy(q.body,path);submit(s,&q);s->batch_copying=s->pending;return;
+            const char *path=line+11;if(!*path || strlen(path)>48 || !safe_text(path) || !s->batch.count)goto batch_error;
+            uint32_t next;int state=batch_copy_begin(&s->batch,path,&next);
+            if(state<0)goto batch_error;
+            if(!state) { emit(s,"BATCH COPY COMPLETE\r\n");return; }
+            BoardRequest q={0};q.op='Y';q.action=VAULT_CMD_COPY;q.number=next;strcpy(q.body,path);submit(s,&q);s->batch_copying=s->pending;return;
         }
-        if(!strcmp(line,"BATCH CLEAR")) { s->batch_count=0;memset(s->batch_copied,0,sizeof(s->batch_copied)); }
+        if(!strcmp(line,"BATCH CLEAR"))batch_reset(&s->batch);
         else if(!strncmp(line,"BATCH ADD ",10) || !strncmp(line,"BATCH REMOVE ",13)) {
             int add=!strncmp(line,"BATCH ADD ",10);const char *tail;uint32_t id;
             if(!number_arg(line+(add?10:13),&id,&tail) || *tail || id>VAULT_ID_MAX)goto batch_error;
-            unsigned i=0;while(i<s->batch_count && s->batch[i]!=id)i++;
-            if(add && i==s->batch_count) { if(s->batch_count>=ln_limit("BATCH_FILES",16))goto batch_error;s->batch_done[s->batch_count]=0;s->batch_copied[s->batch_count]=0;s->batch[s->batch_count++]=id; }
-            if(!add && i<s->batch_count) { memmove(s->batch_copied+i,s->batch_copied+i+1,s->batch_count-i-1);memmove(s->batch_done+i,s->batch_done+i+1,s->batch_count-i-1);memmove(s->batch+i,s->batch+i+1,(s->batch_count-i-1)*sizeof(s->batch[0]));s->batch_count--; }
+            if(add) { if(!batch_add(&s->batch,id,ln_limit("BATCH_FILES",BATCH_CAPACITY)))goto batch_error; }
+            else batch_remove(&s->batch,id);
         } else if(!strcmp(line,"BATCH SEND")) {
-            if(!s->batch_count)goto batch_error;
+            if(!s->batch.count)goto batch_error;
             if(!s->zmodem_available || !s->binary_allowed) { queue_text(s,ui_text(&s->ui,MSG_ZMODEM_UNAVAILABLE));return; }
-            size_t used=0;unsigned pending=0;
-            for(unsigned i=0;i<s->batch_count;i++)if(!s->batch_done[i]) { used+=(size_t)snprintf(s->zmodem_text+used,sizeof(s->zmodem_text)-used,"%s%u",pending?",":"",s->batch[i]);pending++; }
+            BatchIds remaining=batch_ids(&s->batch,1);unsigned pending=remaining.count;
+            if(!batch_format_ids(&remaining,s->zmodem_text,sizeof(s->zmodem_text)))goto batch_error;
             if(!pending) { emit(s,"BATCH COMPLETE\r\n");return; }
             s->zmodem_protocol=s->transfer_protocol;if(s->zmodem_protocol==1 || s->zmodem_protocol>=5)goto batch_error;
             s->zmodem_receive=2;s->zmodem_id=pending;s->zmodem_start=1;
             BoardRequest q={0};q.op='@';submit(s,&q);if(!s->pending)s->zmodem_start=0;return;
         } else if(strcmp(line,"BATCH") && strcmp(line,"BATCH LIST"))goto batch_error;
-        char text[384],ids[192]="";size_t used=0;
-        for(unsigned i=0;i<s->batch_count;i++)used+=(size_t)snprintf(ids+used,sizeof(ids)-used,"%s%u",i?",":"",s->batch[i]);
-        snprintf(text,sizeof(text),s->ui.enabled?ui_text(&s->ui,MSG_BATCH_LIST):"BATCH %u %s\r\n",s->batch_count,*ids?ids:"-");queue_text(s,text);
-        for(unsigned i=0;i<s->batch_count;i++) { snprintf(text,sizeof(text),"BATCH FILE %u %s\r\n",s->batch[i],s->batch_done[i]?"DONE":"PENDING");queue_text(s,text);if(s->batch_copied[i]) { snprintf(text,sizeof(text),"BATCH COPY %u DONE\r\n",s->batch[i]);queue_text(s,text); } }return;
+        char text[384],ids[192];BatchIds selected=batch_ids(&s->batch,0);
+        if(!batch_format_ids(&selected,ids,sizeof(ids)))goto batch_error;
+        snprintf(text,sizeof(text),s->ui.enabled?ui_text(&s->ui,MSG_BATCH_LIST):"BATCH %u %s\r\n",s->batch.count,*ids?ids:"-");queue_text(s,text);
+        for(unsigned i=0;i<s->batch.count;i++) { snprintf(text,sizeof(text),"BATCH FILE %u %s\r\n",s->batch.ids[i],s->batch.done[i]?"DONE":"PENDING");queue_text(s,text);if(s->batch.copied[i]) { snprintf(text,sizeof(text),"BATCH COPY %u DONE\r\n",s->batch.ids[i]);queue_text(s,text); } }return;
     batch_error:queue_text(s,ui_text(&s->ui,MSG_BATCH_ERROR));return;
     }
     if(!strcmp(line,"ZMAILRESUME") || !strncmp(line,"ZMAILRESUME ",12) || !strcmp(line,"ZMAILUPLOAD") || !strncmp(line,"ZMAILUPLOAD ",12) || !strncmp(line,"ZMAILDOWNLOAD ",14)) {
@@ -1259,7 +1257,7 @@ board_syntax:emit(s,"ERR command\r\n");return;
         s->exit_after_save=0;selection_reset(s);
         s->classic_input=0;s->classic_id=0;s->classic_area=CM_MAIN;s->checking=s->check_pending=s->check_finished=0;s->check_since=s->check_until=0;s->check_cursor=0;memset(s->vault_grants,0,sizeof(s->vault_grants));
         chat_disconnect(s->id);s->mail_mode=0;OPENSSL_cleanse(s->mail_query,sizeof(s->mail_query));s->mail_filter=0;s->mail_cursor=0;
-        memset(s->board_grants,0,sizeof(s->board_grants));s->batch_count=0;s->game_menu=0;s->vault_mode=0;notification_mail_discard(&s->notifications);s->user=0;s->ui.admin=0;s->ui.sigop=0;s->reset_target=0; s->user_epoch=0; s->current=0; s->board=1; memset(&s->draft,0,sizeof(s->draft)); s->draft_revision=0; undo_clear(s); emit(s,"LOGGED OUT\r\n");
+        memset(s->board_grants,0,sizeof(s->board_grants));batch_reset(&s->batch);s->game_menu=0;s->vault_mode=0;notification_mail_discard(&s->notifications);s->user=0;s->ui.admin=0;s->ui.sigop=0;s->reset_target=0; s->user_epoch=0; s->current=0; s->board=1; memset(&s->draft,0,sizeof(s->draft)); s->draft_revision=0; undo_clear(s); emit(s,"LOGGED OUT\r\n");
     } else if(!strcmp(line,"NEXTBOARD")) {
         if(!s->board_enabled) { emit(s,"ERR no board\r\n"); return; }
         if(!s->user) { emit(s,"ERR login required\r\n"); return; }
@@ -1733,7 +1731,10 @@ void session_result(Session *s,const BoardResult *completion,uint64_t now) {
     if(completion->service_action=='n') { s->checking=(int)completion->service_number+1;s->check_since=completion->since;s->check_until=completion->until;s->check_cursor=s->checking==1?1:0;s->check_finished=0;check_page(s);return; }
     if(s->check_committing) { s->check_committing=0;if(!strncmp(completion->text,"CHECKPOINT SAVED",16))s->checking=0;else s->check_auto=0;emit(s,completion->text);prompt(s);return; }
     if(s->check_pending) { s->check_pending=0;const char *end=strstr(completion->text,"END NEXT ");unsigned next=0;if(end)sscanf(end,"END NEXT %u",&next);s->check_cursor=next;s->check_finished=end && !next;emit(s,completion->text);queue_text(s,s->check_auto?"CHECK NEXT / CHECK CANCEL (AUTO)\r\n":s->ui.language==LANGUAGE_JA?"CHECK NEXT: 続き / CHECK DONE: 確認日時を保存 / CHECK CANCEL: 中断\r\n":"CHECK NEXT / CHECK DONE / CHECK CANCEL\r\n");prompt(s);return; }
-    if(!strncmp(completion->text,"MAILBATCH",9)) { const char *p=completion->text+9;size_t n=0;unsigned count=0;while(*p==' ' && count<16) { const char *tail;uint32_t id;if(!number_arg(++p,&id,&tail))break;n+=(size_t)snprintf(s->zmodem_text+n,sizeof(s->zmodem_text)-n,"%s%u",count++?",":"",id);p=tail; }if(count) { s->zmodem_receive=10;s->zmodem_protocol=s->mail_batch_protocol;s->zmodem_id=0;s->zmodem_start=1;BoardRequest q={0};q.op='@';q.action=1;submit(s,&q); }return; }
+    if(!strncmp(completion->text,"MAILBATCH",9)) {
+        BatchIds ids=batch_response_ids(completion->text+9);
+        if(ids.count && batch_format_ids(&ids,s->zmodem_text,sizeof(s->zmodem_text))) { s->zmodem_receive=10;s->zmodem_protocol=s->mail_batch_protocol;s->zmodem_id=0;s->zmodem_start=1;BoardRequest q={0};q.op='@';q.action=1;submit(s,&q); }return;
+    }
     if(!strncmp(completion->text,"FILECHILDREN ",13)) {
         s->vault_child_count=0;s->vault_child_view=1;s->vault_child_next=0;
         const char *row=strstr(completion->text,"\r\n");
@@ -1753,10 +1754,9 @@ void session_result(Session *s,const BoardResult *completion,uint64_t now) {
     }
     if(s->batch_copying) {
         queue_text(s,completion->text);
-        if(!strncmp(completion->text,"FILE COPIED ",12))s->batch_copied[s->batch_copy_at]=1;
-        else { s->batch_copying=0;prompt(s);return; }
-        while(++s->batch_copy_at<s->batch_count && s->batch_copied[s->batch_copy_at]);
-        if(s->batch_copy_at<s->batch_count) { BoardRequest q={0};q.op='Y';q.action=VAULT_CMD_COPY;q.number=s->batch[s->batch_copy_at];strcpy(q.body,s->batch_copy_path);submit(s,&q); }
+        if(strncmp(completion->text,"FILE COPIED ",12)) { s->batch_copying=0;prompt(s);return; }
+        uint32_t next=batch_copy_complete(&s->batch);
+        if(next) { BoardRequest q={0};q.op='Y';q.action=VAULT_CMD_COPY;q.number=next;strcpy(q.body,s->batch.copy_path);submit(s,&q); }
         else { s->batch_copying=0;prompt(s); }return;
     }
     if(s->report_pending) {
@@ -1766,9 +1766,10 @@ void session_result(Session *s,const BoardResult *completion,uint64_t now) {
     }
     if(!strncmp(completion->text,"FILEBOARD UNLOCKED ",19)) { unsigned id,revision;if(sscanf(completion->text,"FILEBOARD UNLOCKED %u %u",&id,&revision)==2 && id<=1024)s->vault_grants[id]=revision; }
     if(completion->auth) { s->classic_input=0;s->classic_id=0;s->classic_area=CM_MAIN;s->checking=s->check_pending=s->check_finished=0;s->check_since=s->check_until=0;s->check_cursor=0;memset(s->vault_grants,0,sizeof(s->vault_grants)); }
-    if(!strncmp(completion->text,"BATCHMATCH",10)) { const char *p=completion->text+10;s->batch_count=0;memset(s->batch_done,0,sizeof(s->batch_done));char ids[192]="",text[384];size_t used=0;
-        while(*p==' ' && s->batch_count<16) { const char *tail;uint32_t id;if(!number_arg(++p,&id,&tail))break;s->batch_done[s->batch_count]=0;s->batch_copied[s->batch_count]=0;s->batch[s->batch_count++]=id;p=tail;used+=(size_t)snprintf(ids+used,sizeof(ids)-used,"%s%u",used?",":"",id); }
-        snprintf(text,sizeof(text),s->ui.enabled?ui_text(&s->ui,MSG_BATCH_LIST):"BATCH %u %s\r\n",s->batch_count,*ids?ids:"-");queue_text(s,text);prompt(s);return;
+    if(!strncmp(completion->text,"BATCHMATCH",10)) {
+        BatchIds selected=batch_response_ids(completion->text+10);batch_replace(&s->batch,&selected);
+        char ids[192],text[384];if(!batch_format_ids(&selected,ids,sizeof(ids))) { session_abort(s);return; }
+        snprintf(text,sizeof(text),s->ui.enabled?ui_text(&s->ui,MSG_BATCH_LIST):"BATCH %u %s\r\n",s->batch.count,*ids?ids:"-");queue_text(s,text);prompt(s);return;
     }
     if(!strncmp(completion->text,"FILEBOARD EDIT ",15)) { const char *body=strstr(completion->text,"\r\n");if(body) { memset(&s->draft,0,sizeof(s->draft));s->draft.op='Y';s->draft.action=VAULT_CMD_BOARDGUIDE;size_t n=(size_t)(body-(completion->text+15));if(n<=48) { memcpy(s->draft.title,completion->text+15,n);snprintf(s->draft.body,sizeof(s->draft.body),"%s",body+2);s->editing=1;s->editor_input=0;s->editor_at=1;undo_clear(s);queue_text(s,s->ui.language==LANGUAGE_JA?"ファイルボード案内文を編集します。/SAVE で保存。\r\n":"Edit file-board guide. /SAVE to save.\r\n");prompt(s);return; } } }
     if(s->editing && s->draft.op=='Y' && !strcmp(completion->text,"FILEBOARD UPDATED\r\n")) { s->editing=0;s->editor_upload=s->editor_confirm=s->editor_upload_question=0;memset(&s->draft,0,sizeof(s->draft)); }
@@ -1994,6 +1995,11 @@ int session_binary_byte(Session *s,unsigned char byte,uint64_t now) {
         if(frame.size)memcpy(q.body,frame.data,frame.size);
     }
     submit(s,&q);return 1;
+}
+
+void session_transfer_receipt(Session *s,const char *text) {
+    uint32_t id;
+    if(s->zmodem_receive==2 && batch_download_receipt(text,&id))batch_downloaded(&s->batch,id);
 }
 
 void session_zmodem_finish(Session *s,int success,unsigned id,uint64_t size,int recovery) {

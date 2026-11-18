@@ -520,9 +520,7 @@ int main(int argc,char **argv) {
                 if(completion.slot>=0 && completion.slot<SLOTS) {
                     Connection *c=&connections[completion.slot];
                     if(c->fd!=INVALID && c->app.id==completion.session && c->zhost && c->zgeneration==completion.zcontrol) {
-                        unsigned done_id=0;
-                        if(c->app.zmodem_receive==2 && sscanf(completion.text,"DOWNLOADED %u",&done_id)==1)
-                            for(unsigned b=0;b<c->app.batch_count;b++)if(c->app.batch[b]==done_id)c->app.batch_done[b]=1;
+                        session_transfer_receipt(&c->app,completion.text);
                         if(completion.revoked || !zhost_answer(c->zhost,completion.text))drop(c);
                     }
                 }

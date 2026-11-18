@@ -214,5 +214,21 @@ int main(void) {
     assert(session_line(&s,"E",1,210));assert(!s.editor_confirm && s.editing && !s.pending);
     session_dispose(&s);
     puts("PASS: Session preserves draft case, Undo, ranged listing, prompted search, line replacement and return from write confirmation");
+    reset(&m);session_init(&s,io,122,4,1,1,0,LANGUAGE_EN);reset(&m);
+    assert(session_line(&s,"BATCH ADD 10",12,300));assert(!s.batch.count && strstr((char *)m.data,"ERR login required"));
+    s.user=2;reset(&m);assert(session_line(&s,"BATCH ADD 10",12,301));assert(session_line(&s,"BATCH ADD 20",12,302));
+    assert(s.batch.count==2);s.zmodem_receive=10;session_transfer_receipt(&s,"DOWNLOADED 10\r\n");assert(!s.batch.done[0]);
+    s.zmodem_receive=2;session_transfer_receipt(&s,"DOWNLOADED 10\r\n");session_transfer_receipt(&s,"ERR failed\r\n");
+    assert(s.batch.done[0] && !s.batch.done[1]);session_zmodem_finish(&s,0,0,0,0);assert(s.batch.done[0] && !s.batch.done[1]);
+    reset(&m);assert(session_line(&s,"BATCH LIST",10,303));
+    assert(strstr((char *)m.data,"BATCH FILE 10 DONE") && strstr((char *)m.data,"BATCH FILE 20 PENDING"));
+    assert(session_line(&s,"BATCH REMOVE 10",15,304));assert(session_line(&s,"BATCH ADD 10",12,305));assert(!s.batch.done[1]);
+    memset(&result,0,sizeof(result));result.session=121;result.slot=4;strcpy(result.text,"BATCHMATCH 30 40\r\n");
+    session_result(&s,&result,306);assert(s.batch.ids[0]==20); /* old connection result ignored */
+    result.session=122;session_result(&s,&result,307);assert(s.batch.count==2 && s.batch.ids[0]==30 && !s.batch.done[0]);
+    uint32_t copy_id;assert(batch_copy_begin(&s.batch,"tools",&copy_id)==1);s.batch_copying=1;strcpy(result.text,"ERR file copy\r\n");
+    session_result(&s,&result,308);assert(!s.batch_copying && !s.batch.copied[0]);
+    session_revoke(&s);assert(!s.batch.count && !s.batch.copy_path[0]);session_dispose(&s);
+    puts("PASS: Session batch auth, individual transfer receipts, partial failure retention, remove/re-add, stale result rejection, copy failure and revocation");
     return 0;
 }
