@@ -1,6 +1,6 @@
 {
   "LICENSE": "fb981668c18a279e285fc4d83fba1e836cc84dd4daa73c9697d3cfd2d8aca6e0",
-  "Makefile": "eb827b915402c7d5ded25491c803d557229915e7abd6bf29eb7de5a732eac325",
+  "Makefile": "a4bd3af5380fc49f1cba3371d936541cc0165f254a4477f397acf6263a8ea9ae",
   "boards.example.conf": "4bd1a17ecf3966d3829510e8495a1362fb8b922cd754badccc739f5e5ab0bde8",
   "ci/build-freebsd-package.sh": "4e62899471d1f1a6c44e00a783c1aff771332140704ae778da95a95048474108",
   "debian/changelog": "8f3574a094f5a3677a9a7188e530ecdbdc006138b082b57243ca8441c644114d",
@@ -63,7 +63,7 @@
   "src/profile_store.c": "9bd14cb1a44b9e117fb9465d036f2d5417bca8188a136a9162f91f8b46f33e2a",
   "src/runtime.c": "fa1bdf184130e9db2037610bd2240395dcdfa9f5a53642b0f31c70779eeebc04",
   "src/runtime_limits.h": "82de34913914d0f81874789d473928e044225772c4db9d656bceac03920219a8",
-  "src/session.c": "0936bfd2e68b086654fbad1ed874a759578689dfc88b47ca15dff39c854723ec",
+  "src/session.c": "9aad5c89aa15c6c9dbbb9d1be8a2265b5d35c9b8bd2d54ef01cbee6b6965aca0",
   "src/storage_sqlite.c": "aa8971c445e2a23ae21548fc706e318e40238f8318c2f717490b867067ab3055",
   "src/telnet.c": "a490e550fb227858727b4edc656c7c1d60bf90f6fa13a2f74dd361234b8ff422",
   "src/transfer_line.c": "5c3f9e15fd46c8569d0f2775628de7a432d60eb6bdfd93babdf7f77fb5f9f156",
@@ -229,5 +229,9 @@
   "src/connection_protocol.h": "a497663d9dbf2652c795c8394fea1b38bb66f304ba629780d2bac33484aae667",
   "tests/test_connection_core.c": "2efb380fdfc520e697bef8edb70e476d60f23cf838a992075cbb83e10124d5e0",
   "tests/test_stage57.py": "c1ea9a6a665387c5ebc4f42e75688f4c31fb8ffd702cc9a4a99b7f478d558f8f",
-  "tests/test_adapters.c": "d0b418a276156f4138ef02b3285e0644bc8092645d401a81d54e400de4828657"
+  "tests/test_adapters.c": "26d02582e6284f64fbf5f895d86450661b62b2971978cddaed7bffce0f731141",
+  "src/notification_core.c": "05f93d1b102bd276649c68cc385799f8e43fab559003200c84b5bceeca8d726d",
+  "src/notification_core.h": "637cde7c1ffd893ff380c83f41ffef0f3732872b2a4c014273d0d0cc90c90de9",
+  "tests/test_notification_core.c": "c9b5d4cfdb30ed385abc928a1b05ebf1d148915e2a5ab76b0b2ee1a8288cf4fe",
+  "src/session.h": "6619919beab1a013152f704c480c2789c20cba46b71fd66868efe7c4e499b48a"
 }

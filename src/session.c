@@ -1334,7 +1334,7 @@ board_syntax:emit(s,"ERR command\r\n");return;
         s->exit_after_save=0;selection_reset(s);
         s->classic_input=0;s->classic_id=0;s->classic_area=CM_MAIN;s->checking=s->check_pending=s->check_finished=0;s->check_since=s->check_until=0;s->check_cursor=0;memset(s->vault_grants,0,sizeof(s->vault_grants));
         chat_disconnect(s->id);s->mail_mode=0;OPENSSL_cleanse(s->mail_query,sizeof(s->mail_query));s->mail_filter=0;s->mail_cursor=0;
-        memset(s->board_grants,0,sizeof(s->board_grants));s->batch_count=0;s->game_menu=0;s->vault_mode=0;s->mail_arrivals=0;s->user=0;s->ui.admin=0;s->ui.sigop=0;s->reset_target=0; s->user_epoch=0; s->current=0; s->board=1; memset(&s->draft,0,sizeof(s->draft)); s->draft_revision=0; undo_clear(s); emit(s,"LOGGED OUT\r\n");
+        memset(s->board_grants,0,sizeof(s->board_grants));s->batch_count=0;s->game_menu=0;s->vault_mode=0;notification_mail_discard(&s->notifications);s->user=0;s->ui.admin=0;s->ui.sigop=0;s->reset_target=0; s->user_epoch=0; s->current=0; s->board=1; memset(&s->draft,0,sizeof(s->draft)); s->draft_revision=0; undo_clear(s); emit(s,"LOGGED OUT\r\n");
     } else if(!strcmp(line,"NEXTBOARD")) {
         if(!s->board_enabled) { emit(s,"ERR no board\r\n"); return; }
         if(!s->user) { emit(s,"ERR login required\r\n"); return; }
@@ -1626,17 +1626,24 @@ uint64_t session_ui_signature(const Session *s) { return (uint64_t)s->ui.languag
 void session_dispose(Session *s) { free(s->connector_block);s->connector_block=NULL;s->active=0;chat_disconnect(s->id);OPENSSL_cleanse(s,sizeof(*s)); }
 int session_ready(const Session *s) { return s->active && !s->wake && !s->pending && !s->closing && !s->zmodem; }
 int session_secret(const Session *s) { return s->password_mode!=0; }
+static NotificationAudience notification_audience(const Session *s) {
+    unsigned blocked=(s->door?NOTICE_DOOR:0)|(s->binary?NOTICE_BINARY:0)|(s->zmodem?NOTICE_TRANSFER:0)|
+        (s->password_mode?NOTICE_SECRET:0)|(s->pending?NOTICE_PENDING:0)|(s->page[0]?NOTICE_PAGE:0)|
+        (s->editing?NOTICE_EDITOR:0)|(s->wake?NOTICE_TIMER:0)|
+        ((s->ui.input || s->classic_input || s->mail_input || s->mail_delete)?NOTICE_INPUT:0)|
+        (s->chatting?NOTICE_CHAT:0)|(s->scanning?NOTICE_SCAN:0);
+    return (NotificationAudience){s->user,blocked,s->active,s->closing,s->ui.enabled,s->binary_menu};
+}
 void session_mail_notify(Session *s,uint32_t user,int deny,uint32_t revision) {
-    if(!user || s->user!=user || revision<s->mail_notify_revision)return;
-    s->mail_notify_revision=revision;s->mail_notify_deny=deny;if(deny)s->mail_arrivals=0;
+    notification_mail_preference(&s->notifications,s->user,user,deny,revision);
 }
 void session_mail_arrived(Session *s,uint32_t recipient) {
-    if(!s->mail_notify_deny && s->active && !s->closing && recipient && s->user==recipient && (s->ui.enabled || (s->binary && s->binary_menu)) && s->mail_arrivals<UINT32_MAX)s->mail_arrivals++;
+    NotificationAudience audience=notification_audience(s);
+    notification_mail_arrived(&s->notifications,&audience,recipient);
 }
 void session_announce(Session *s,const char *text) {
-    if(!s->active || s->closing || !s->ui.enabled)return;
-    size_t n=strlen(s->notices),size=strlen(text);
-    if(n+size+3<sizeof(s->notices)) { memcpy(s->notices+n,text,size);strcpy(s->notices+n+size,"\r\n"); }
+    NotificationAudience audience=notification_audience(s);
+    notification_announce(&s->notifications,&audience,text);
 }
 void session_tick(Session *s,uint64_t now) {
     if(!s->connected_at)s->connected_at=now;
@@ -1647,9 +1654,14 @@ void session_tick(Session *s,uint64_t now) {
     }
     s->now=now;
     if(s->editing && s->editor_upload && now>=s->editor_deadline && !s->pending) { s->editor_upload=0;s->editor_input=0;queue_text(s,s->ui.language==LANGUAGE_JA?"受信終了。編集を続けられます。\r\n":"Text received. Continue editing.\r\n");prompt(s); }
-    if(*s->notices && !s->door && !s->binary && !s->zmodem && !s->password_mode && !s->pending && !s->page[0]) { queue_text(s,s->notices);s->notices[0]=0; }
-    if(!s->door && !s->mail_notify_deny && s->mail_arrivals && s->user && s->ui.enabled && s->active && !s->closing && !s->editing && !s->pending && !s->password_mode && !s->binary && !s->zmodem && !s->wake && !s->page[0] && !s->ui.input && !s->classic_input && !s->mail_input && !s->mail_delete && !s->chatting && !s->scanning) {
-        char text[256];snprintf(text,sizeof(text),ui_text(&s->ui,MSG_MAIL_ARRIVED),s->mail_arrivals);s->mail_arrivals=0;
+    NotificationAudience audience=notification_audience(s);
+    const char *announcement=notification_announcement_peek(&s->notifications,&audience);
+    if(announcement) { queue_text(s,announcement);notification_announcement_clear(&s->notifications); }
+    /* A failed announcement write may abort the session before mail delivery. */
+    audience=notification_audience(s);
+    uint32_t arrivals=notification_mail_take(&s->notifications,&audience);
+    if(arrivals) {
+        char text[256];snprintf(text,sizeof(text),ui_text(&s->ui,MSG_MAIL_ARRIVED),arrivals);
         s->chat_notice=1;queue_text(s,text);s->chat_prompting=1;prompt(s);s->chat_prompting=0;s->chat_notice=0;
     }
     if(s->connector_block && now>=s->connector_block_until) { free(s->connector_block);s->connector_block=NULL;session_abort(s);return; }
@@ -2013,7 +2025,7 @@ void session_result(Session *s,const BoardResult *completion,uint64_t now) {
         s->binary_deadline=now+60000;return;
     }
     if(completion->preferences) { s->menu_mode=completion->menu_mode;s->menu_shown=0;s->ui.language=(Language)completion->language; s->pager_enabled=completion->pager;s->editor_line=completion->editor_preference;s->editor_numbers=completion->ui_aux&1;s->transfer_protocol=completion->ui_aux>>1;if(completion->columns && completion->rows)session_dimensions(s,completion->columns,completion->rows); }
-    if(completion->auth) { selection_reset(s);memset(s->board_grants,0,sizeof(s->board_grants));OPENSSL_cleanse(s->mail_query,sizeof(s->mail_query));s->mail_filter=0;s->mail_cursor=0;s->mail_notify_deny=0;s->mail_notify_revision=0;s->mail_arrivals=0;chat_disconnect(s->id);s->user=completion->auth>0?(uint32_t)completion->auth:0; s->user_epoch=completion->user_epoch; s->current=0; s->board=1; s->auth_after=now+1000; }
+    if(completion->auth) { selection_reset(s);memset(s->board_grants,0,sizeof(s->board_grants));OPENSSL_cleanse(s->mail_query,sizeof(s->mail_query));s->mail_filter=0;s->mail_cursor=0;notification_mail_reset(&s->notifications);chat_disconnect(s->id);s->user=completion->auth>0?(uint32_t)completion->auth:0; s->user_epoch=completion->user_epoch; s->current=0; s->board=1; s->auth_after=now+1000; }
     if(completion->auth>0)snprintf(s->username,sizeof(s->username),"%s",completion->chat_login);
     if(completion->auth>0)session_mail_notify(s,completion->mail_notify_user,completion->mail_notify_deny,completion->mail_notify_revision);
     if(completion->auth>0)s->member_level=(unsigned)completion->member_level;
@@ -2095,7 +2107,7 @@ void session_revoke(Session *s) {
     if(s->chatting) { s->chatting=0;chat_leave(s->id); }
     if(s->door || s->binary || s->zmodem) { session_abort(s);return; }
     if(!s->active || s->closing) return;
-    s->game_menu=0;s->vault_mode=0;s->mail_arrivals=0;s->user=0;s->ui.admin=0;s->ui.sigop=0;s->reset_target=0; s->user_epoch=0; s->current=0; s->board=1; s->password_mode=0;
+    s->game_menu=0;s->vault_mode=0;notification_mail_discard(&s->notifications);s->user=0;s->ui.admin=0;s->ui.sigop=0;s->reset_target=0; s->user_epoch=0; s->current=0; s->board=1; s->password_mode=0;
     page_clear(s);
     s->scanning=0; OPENSSL_cleanse(&s->scan,sizeof(s->scan));
     s->editing=0;s->editor_upload=s->editor_confirm=s->editor_upload_question=0; s->pending=0; s->wake=0; s->ui.input=0;

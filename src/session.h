@@ -1,5 +1,6 @@
 #ifndef SESSION_H
 #define SESSION_H
+#include "notification_core.h"
 #include <stddef.h>
 #include <stdint.h>
 #include "board.h"
@@ -27,14 +28,13 @@ typedef struct {
     uint64_t now,wake,auth_after;
     int closing,editing,pending,password_mode;uint32_t reset_target,boardpass_target,board_enter,board_lock;uint32_t board_grants[1025],vault_grants[1025];char filepass_path[49];int filepass_setting;
     char report[80];uint32_t report_next;int report_pending;
-    int gather_mode,gather_pending,service_pending;uint32_t gather_cursor;unsigned gather_lines;uint64_t sysop_mail_after;char notices[4096];
+    int gather_mode,gather_pending,service_pending;uint32_t gather_cursor;unsigned gather_lines;uint64_t sysop_mail_after;NotificationState notifications;
     int editor_line,editor_input,editor_numbers,editor_upload,editor_confirm;uint64_t editor_deadline;uint32_t editor_at;
     char upload_description[241],upload_filename[101];int upload_batch;
     char vault_children[16][49];unsigned vault_child_count;uint32_t vault_child_next;int vault_child_view;char vault_path[49],vault_select[49];int vault_selecting;
     unsigned mail_batch_protocol;
     int mail_reading;
-    int mail_notify_deny;uint32_t mail_notify_revision;
-    int outside_talk,mail_mode,mail_pending,mail_input; uint32_t mail_current,mail_cursor,mail_delete,mail_revision,mail_arrivals; int mail_filter; char mail_query[81];
+    int outside_talk,mail_mode,mail_pending,mail_input; uint32_t mail_current,mail_cursor,mail_delete,mail_revision; int mail_filter; char mail_query[81];
     unsigned search_first,search_last;int memo_input;int chatting,chat_notice,chat_pending,chat_prompting,talk_select,talk_lost;
     unsigned long talk_target,reply_target;
     uint64_t saved_ui;unsigned transfer_protocol,zmodem_protocol;int zmodem_available,zmodem,zmodem_start,zmodem_receive,vault_mode;uint32_t batch[16];unsigned char batch_done[16];unsigned batch_count;uint32_t zmodem_id;char zmodem_text[513];
