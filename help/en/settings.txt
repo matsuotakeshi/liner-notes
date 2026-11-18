@@ -12,6 +12,7 @@ Use D in Settings to inspect all current values.
 MENUMODE BEGINNER / STANDARD / EXPERT: home menu always / initially / explicitly; saved per account.
 LOGOUT saves settings and returns to guest; QUIT saves and disconnects. Network disconnects also queue a save; process failure or revocation can prevent it.
 GAME / GAMES opens the game menu. Enter a number to play; exit returns to the game list. Enter/L relists; 0 returns to main. DOOR id also starts a game directly.
+The game list requires login and shows only games allowed for your current member level.
 
 D in Settings displays actual language, editor, menu verbosity, paging, screen dimensions, timezone and transfer protocol. S reads external sysinfo.txt; V shows version. O/Q ask Y/N; QUIT is immediate. goodbye.txt is displayed on exit.
 

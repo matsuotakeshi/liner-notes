@@ -12,8 +12,11 @@ def run(binary):
   conf=p/'doors';conf.write_text(f'1|0|10|{game}|{p}|Test game\n2|5|10|{game}|{p}|Restricted\n3|0|1|{game}|{p}|Timed game\n')
   s=Server(binary,p/'notes',members=p/'members',options=['--doors',str(conf)],language='en');a=Client(s.port);g=Client(s.port)
   try:
-   assert cmd(g,'DOOR 1')==b'ERR login required';auth(a,'alice',True)
+   assert cmd(g,'DOOR 1')==b'ERR login required';assert cmd(g,'GAMES')==b'ERR login required';auth(a,'alice',True)
    listing=rows(a,'GAMES',b'END GAMES');assert any(b'GAME 1 ' in x for x in listing) and not any(b'GAME 2 ' in x for x in listing),listing
+   assert listing==[b'GAMES',b'GAME 1 10 Test game',b'GAME 3 1 Timed game',b'END GAMES'],listing
+   assert str(p).encode() not in b' '.join(listing)
+   assert cmd(a,'DOOR 999')==b'ERR game unavailable'
    assert cmd(a,'DOOR 2')==b'ERR game unavailable'
    assert cmd(a,'DOOR 1').startswith(b'Game started')
    assert a.line()==b'GAME_USER=1:alice'
