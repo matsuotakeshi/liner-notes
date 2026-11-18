@@ -3,6 +3,7 @@
 #include "terminal.h"
 #include <assert.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 typedef struct { unsigned char data[65536]; size_t size; int fail; } Memory;
 static int bytes(void *ctx,const unsigned char *p,size_t n) {
@@ -276,5 +277,35 @@ int main(void) {
     check_traversal_begin(&s.check,1,500,600);s.check.pending=1;session_revoke(&s);
     assert(!s.check.active && !s.check.pending && !s.check.finished && !s.check.until);session_dispose(&s);
     puts("PASS: Session scan filters, mail/article boundaries, stale/cancelled result suppression, Door pause and checkpoint retry/reset");
+    reset(&m);session_init(&s,io,124,4,1,1,0,LANGUAGE_EN);reset(&m);
+    BoardRequest *save=malloc(sizeof(*save));assert(save);memset(save,0xff,sizeof(*save));
+    assert(!session_disconnect_preferences(&s,save) && !save->op && !save->user);
+    s.user=2;s.user_epoch=17;s.pager_enabled=1;s.editor_line=1;s.editor_numbers=1;s.transfer_protocol=3;
+    session_dimensions(&s,120,40);assert(session_disconnect_preferences(&s,NULL));
+    assert(session_disconnect_preferences(&s,save));
+    assert(save->op=='V' && save->number==1 && save->user==2 && save->user_epoch==17);
+    assert(save->cursor==LANGUAGE_EN && !strcmp(save->title,"1") && save->scope==1 && save->ui_aux==7);
+    assert(save->audit_article==120 && save->audit_actor==40 && !save->session && !save->board);
+    s.preferences.baseline=session_ui_signature(&s);assert(!session_disconnect_preferences(&s,NULL));
+    s.rows=41;assert(session_disconnect_preferences(&s,NULL));
+    memset(&result,0,sizeof(result));result.session=124;result.slot=4;result.preferences=1;
+    result.language=LANGUAGE_JA;result.pager=0;result.editor_preference=0;result.ui_aux=4;
+    strcpy(result.text,"PREFS LOADED ja OFF\r\n");session_result(&s,&result,500);
+    assert(s.ui.language==LANGUAGE_JA && !s.pager_enabled && !s.editor_line && !s.editor_numbers && s.transfer_protocol==2);
+    assert(s.columns==120 && s.rows==41 && !session_disconnect_preferences(&s,NULL));
+    result.columns=999;result.rows=999;session_result(&s,&result,501);
+    assert(s.columns==80 && s.rows==24 && !session_disconnect_preferences(&s,NULL));
+    s.preferences.exit_action=PREF_EXIT_QUIT;memset(&result,0,sizeof(result));result.session=123;result.slot=4;
+    strcpy(result.text,"PREFS SAVED ja OFF\r\n");reset(&m);session_result(&s,&result,502);
+    assert(s.preferences.exit_action==PREF_EXIT_QUIT && !s.closing && !m.size);
+    result.session=124;strcpy(result.text,"ERR settings storage\r\n");session_result(&s,&result,503);
+    assert(!s.preferences.exit_action && !s.closing && s.user==2);
+    s.preferences.exit_action=PREF_EXIT_LOGOUT;strcpy(result.text,"PREFS SAVED ja OFF\r\n");
+    session_result(&s,&result,504);assert(!s.user && !s.closing && !s.preferences.exit_action);
+    assert(!session_disconnect_preferences(&s,NULL));session_dispose(&s);
+    reset(&m);session_init(&s,io,125,4,1,1,0,LANGUAGE_EN);s.user=2;s.preferences.exit_action=PREF_EXIT_QUIT;
+    result.session=125;session_result(&s,&result,505);assert(s.closing && !s.preferences.exit_action);
+    free(save);session_dispose(&s);
+    puts("PASS: Session disconnect snapshot/epoch, guest/clean exclusion, legacy restore/clamping, stale/save-failure refusal and logout/quit routing");
     return 0;
 }

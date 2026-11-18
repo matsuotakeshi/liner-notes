@@ -200,9 +200,25 @@ static int safe_text(const char *p) {
     for(;*p;p++) if((unsigned char)*p<32 || (unsigned char)*p==127) return 0;
     return 1;
 }
+static PreferenceValues session_preferences(const Session *s) {
+    return (PreferenceValues){s->ui.language,s->pager_enabled,s->editor_line,s->columns,s->rows,
+                              (unsigned)s->editor_numbers,s->transfer_protocol};
+}
+static void preferences_request(const Session *s,BoardRequest *q) {
+    PreferenceValues values=session_preferences(s);PreferenceRecord record=preference_pack(&values);
+    q->ui_aux=record.aux;q->scope=record.editor;q->audit_article=record.columns;q->audit_actor=record.rows;
+    q->cursor=(uint32_t)record.language;q->title[0]=record.pager?'1':'0';
+}
+int session_disconnect_preferences(const Session *s,BoardRequest *out) {
+    PreferenceValues values=session_preferences(s);
+    if(out)memset(out,0,sizeof(*out));
+    if(!preference_disconnect_needed(&s->preferences,s->user,&values))return 0;
+    if(out) { out->op='V';out->number=1;out->user=s->user;out->user_epoch=s->user_epoch;preferences_request(s,out); }
+    return 1;
+}
 static void submit(Session *s,BoardRequest *q) {
     q->session=s->id; q->slot=s->slot;
-    if(q->op=='V') { q->ui_aux=(unsigned)s->editor_numbers | (s->transfer_protocol<<1);q->scope=s->editor_line;q->audit_article=s->columns;q->audit_actor=s->rows; }
+    if(q->op=='V')preferences_request(s,q);
     q->user=s->user; q->user_epoch=s->user_epoch;if(!s->user && q->op=='P')snprintf(q->username,sizeof(q->username),"%s",*s->guest_handle?s->guest_handle:"guest");
     if(q->op=='j' && s->now<s->auth_after)q->action='t';
     if(q!=&s->scan)q->board=s->board;
@@ -1017,7 +1033,7 @@ board_syntax:emit(s,"ERR command\r\n");return;
     if(!strcmp(line,"PREFS") || !strcmp(line,"PREFS SAVE") || !strcmp(line,"PREFS LOAD")) {
         if(!s->user) { emit(s,"ERR login required\r\n"); return; }
         BoardRequest q={0}; q.op='V'; q.number=!strcmp(line,"PREFS SAVE")?1:!strcmp(line,"PREFS LOAD")?2:0;
-        q.cursor=(uint32_t)s->ui.language; q.title[0]=s->pager_enabled?'1':'0'; submit(s,&q); return;
+        submit(s,&q); return;
     }
     if(!strcmp(line,"PAGER") || !strcmp(line,"PAGER ON") || !strcmp(line,"PAGER OFF")) {
         if(!strcmp(line,"PAGER ON")) s->pager_enabled=1;
@@ -1255,8 +1271,8 @@ board_syntax:emit(s,"ERR command\r\n");return;
         if(!s->user) emit(s,"ERR login required\r\n");
         else { snprintf(out,sizeof(out),"ACCOUNT %u %s\r\n",s->user,s->username); emit(s,out); }
     } else if(!strcmp(line,"LOGOUT")) {
-        if(s->user && s->exit_after_save!=3) { s->exit_after_save=1;command_core(s,"PREFS SAVE");if(!s->pending)s->exit_after_save=0;return; }
-        s->exit_after_save=0;selection_reset(s);
+        if(preference_exit_begin(&s->preferences,s->user,PREF_EXIT_LOGOUT)) { command_core(s,"PREFS SAVE");preference_exit_submitted(&s->preferences,s->pending);return; }
+        s->preferences.exit_action=PREF_EXIT_NONE;selection_reset(s);
         s->classic_input=0;s->classic_id=0;s->classic_area=CM_MAIN;check_traversal_reset(&s->check);memset(s->vault_grants,0,sizeof(s->vault_grants));
         chat_disconnect(s->id);s->mail_mode=0;OPENSSL_cleanse(s->mail_query,sizeof(s->mail_query));s->mail_filter=0;s->mail_cursor=0;
         memset(s->board_grants,0,sizeof(s->board_grants));batch_reset(&s->batch);s->game_menu=0;s->vault_mode=0;notification_mail_discard(&s->notifications);s->user=0;s->ui.admin=0;s->ui.sigop=0;s->reset_target=0; s->user_epoch=0; s->current=0; s->board=1; memset(&s->draft,0,sizeof(s->draft)); s->draft_revision=0; undo_clear(s); emit(s,"LOGGED OUT\r\n");
@@ -1340,8 +1356,8 @@ board_syntax:emit(s,"ERR command\r\n");return;
         if(end==line+5 || *end || n<1 || n>5000) emit(s,"ERR WAIT 1..5000\r\n");
         else { s->wake=s->now+(uint64_t)n; emit(s,"WAITING\r\n"); }
     } else if(!strcmp(line,"QUIT")) {
-        if(s->user && s->exit_after_save!=3) { s->exit_after_save=2;command_core(s,"PREFS SAVE");if(!s->pending)s->exit_after_save=0;return; }
-        s->exit_after_save=0;if(s->ui.enabled)queue_text(s,site_text(1));emit(s,"BYE\r\n");s->closing=1;
+        if(preference_exit_begin(&s->preferences,s->user,PREF_EXIT_QUIT)) { command_core(s,"PREFS SAVE");preference_exit_submitted(&s->preferences,s->pending);return; }
+        s->preferences.exit_action=PREF_EXIT_NONE;if(s->ui.enabled)queue_text(s,site_text(1));emit(s,"BYE\r\n");s->closing=1;
     }
     else emit(s,"ERR command\r\n");
 }
@@ -1555,7 +1571,7 @@ void session_door_finish(Session *s) {
     if(s->ui.enabled)show_menu(s,0);
     prompt(s);
 }
-uint64_t session_ui_signature(const Session *s) { return (uint64_t)s->ui.language | ((uint64_t)s->pager_enabled<<2) | ((uint64_t)s->editor_line<<3) | ((uint64_t)s->columns<<8) | ((uint64_t)s->rows<<24) | ((uint64_t)s->editor_numbers<<32) | ((uint64_t)s->transfer_protocol<<33); }
+uint64_t session_ui_signature(const Session *s) { PreferenceValues values=session_preferences(s);return preference_signature(&values); }
 void session_dispose(Session *s) { connector_block_clear(&s->connector_block);s->active=0;chat_disconnect(s->id);OPENSSL_cleanse(s,sizeof(*s)); }
 int session_ready(const Session *s) { return s->active && !s->wake && !s->pending && !s->closing && !s->zmodem; }
 int session_secret(const Session *s) { return s->password_mode!=0; }
@@ -1721,9 +1737,9 @@ void session_result(Session *s,const BoardResult *completion,uint64_t now) {
     if(!s->active || s->closing || s->id!=completion->session || s->slot!=completion->slot) return;
     s->now=now; s->pending=0;
     if(reader_cancel_completion(&s->reader,completion->sequence)) { queue_text(s,ui_text(&s->ui,MSG_SCAN_STOP));prompt(s);return; }
-    if(s->exit_after_save) {
-        int action=s->exit_after_save;s->exit_after_save=0;
-        if(!strncmp(completion->text,"PREFS SAVED",11)) { s->exit_after_save=3;command_core(s,action==1?"LOGOUT":"QUIT");prompt(s);return; }
+    if(s->preferences.exit_action) {
+        PreferenceExit action=preference_exit_complete(&s->preferences,!strncmp(completion->text,"PREFS SAVED",11));
+        if(action!=PREF_EXIT_NONE) { command_core(s,action==PREF_EXIT_LOGOUT?"LOGOUT":"QUIT");prompt(s);return; }
         emit(s,completion->text);prompt(s);return;
     }
     if(completion->sigop>=0)s->ui.sigop=completion->sigop;
@@ -1894,14 +1910,21 @@ void session_result(Session *s,const BoardResult *completion,uint64_t now) {
         else binary_frame(s,'T',completion->text,strlen(completion->text));
         connector_reader_touch(&s->binary_reader,now);return;
     }
-    if(completion->preferences) { s->menu_mode=completion->menu_mode;s->menu_shown=0;s->ui.language=(Language)completion->language; s->pager_enabled=completion->pager;s->editor_line=completion->editor_preference;s->editor_numbers=completion->ui_aux&1;s->transfer_protocol=completion->ui_aux>>1;if(completion->columns && completion->rows)session_dimensions(s,completion->columns,completion->rows); }
+    if(completion->preferences) {
+        PreferenceValues current=session_preferences(s);
+        PreferenceRecord stored={completion->language,completion->pager,completion->editor_preference,completion->columns,completion->rows,completion->ui_aux};
+        PreferenceValues loaded=preference_unpack(&stored,&current);
+        s->menu_mode=completion->menu_mode;s->menu_shown=0;s->ui.language=(Language)loaded.language;
+        s->pager_enabled=loaded.pager;s->editor_line=loaded.editor;s->editor_numbers=(int)loaded.line_numbers;s->transfer_protocol=loaded.transfer_protocol;
+        if(completion->columns && completion->rows)session_dimensions(s,loaded.columns,loaded.rows);
+    }
     if(completion->auth) { selection_reset(s);memset(s->board_grants,0,sizeof(s->board_grants));OPENSSL_cleanse(s->mail_query,sizeof(s->mail_query));s->mail_filter=0;s->mail_cursor=0;notification_mail_reset(&s->notifications);chat_disconnect(s->id);s->user=completion->auth>0?(uint32_t)completion->auth:0; s->user_epoch=completion->user_epoch; s->current=0; s->board=1; s->auth_after=now+1000; }
     if(completion->auth>0)snprintf(s->username,sizeof(s->username),"%s",completion->chat_login);
     if(completion->auth>0)session_mail_notify(s,completion->mail_notify_user,completion->mail_notify_deny,completion->mail_notify_revision);
     if(completion->auth>0)s->member_level=(unsigned)completion->member_level;
     if(completion->auth>0) { s->menu_mode=completion->menu_mode;s->menu_shown=0; }
     if(completion->auth>0 && s->ui.enabled) { queue_text(s,login_text(1));time_t greet_now=time(NULL);struct tm *greet_tm=localtime(&greet_now);if(greet_tm)queue_text(s,hourly_greeting((unsigned)greet_tm->tm_hour));if(completion->birthday)queue_text(s,*login_text(2)?login_text(2):s->ui.language==LANGUAGE_JA?"お誕生日おめでとうございます！\r\n":"Happy birthday!\r\n"); }
-    if(completion->auth>0 || completion->preferences)s->saved_ui=session_ui_signature(s);
+    if(completion->auth>0 || completion->preferences) { PreferenceValues values=session_preferences(s);preference_observed(&s->preferences,&values); }
     if(completion->auth>0 && board_feature_enabled("chat"))chat_register(s->id,s->user,completion->chat_login,completion->chat_name,chat_event,s,&completion->chat_preferences);
     if(completion->service_action=='1') { s->board_enter=completion->service_number;s->board_lock=completion->board_grant;s->password_mode='b'; }
     if(completion->service_action=='2') {

@@ -4,6 +4,7 @@
 #include "connector_core.h"
 #include "batch_core.h"
 #include "traversal_core.h"
+#include "preference_core.h"
 #include <stddef.h>
 #include <stdint.h>
 #include "board.h"
@@ -23,7 +24,7 @@ typedef struct {
     int slot,active,board_enabled,member_mode;
     Ui ui;
     uint64_t connected_at;int talk_once,talk_return_editor,status_pending;uint32_t file_selected,file_selecting;unsigned profile_edit_target;int profile_walk,profile_walk_pending;BoardRequest profile_search;int batch_screen,batch_copying;BatchSelection batch;int profile_edit_field;int classic_area,classic_input,classic_direction;uint32_t classic_id;
-    int door,game_menu;int pager_enabled, help_page,menu_mode,menu_shown,exit_after_save,editor_upload_question;
+    int door,game_menu;int pager_enabled, help_page,menu_mode,menu_shown,editor_upload_question;
     char guest_handle[33];
     unsigned columns,rows;
     size_t page_offset;
@@ -40,7 +41,7 @@ typedef struct {
     int outside_talk,mail_mode,mail_pending,mail_input; uint32_t mail_current,mail_cursor,mail_delete,mail_revision; int mail_filter; char mail_query[81];
     unsigned search_first,search_last;int memo_input;int chatting,chat_notice,chat_pending,chat_prompting,talk_select,talk_lost;
     unsigned long talk_target,reply_target;
-    uint64_t saved_ui;unsigned transfer_protocol,zmodem_protocol;int zmodem_available,zmodem,zmodem_start,zmodem_receive,vault_mode;uint32_t zmodem_id;char zmodem_text[513];
+    PreferenceLifecycle preferences;unsigned transfer_protocol,zmodem_protocol;int zmodem_available,zmodem,zmodem_start,zmodem_receive,vault_mode;uint32_t zmodem_id;char zmodem_text[513];
     int binary,binary_allowed,binary_menu;
     ConnectorReader binary_reader;
     uint32_t current,user,board,user_epoch;unsigned member_level;
@@ -70,6 +71,9 @@ int session_auto_read(const Session *);
 void session_chat_kick(Session *);
 void session_revoke(Session *);
 uint64_t session_ui_signature(const Session *);
+/* NULL queries eligibility only. Otherwise zero/fill a caller-owned request.
+ * Runtime allocates/enqueues it; Member Core still authorizes the saved epoch. */
+int session_disconnect_preferences(const Session *,BoardRequest *);
 void session_dispose(Session *);
 int session_ready(const Session *);
 int session_secret(const Session *);

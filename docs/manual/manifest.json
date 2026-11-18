@@ -285,7 +285,10 @@
         "src/terminal_pager.c",
         "src/terminal_pager.h",
         "tests/test_terminal_policy.c",
-        "tests/test_adapters.c"
+        "tests/test_adapters.c",
+        "src/preference_core.c",
+        "src/preference_core.h",
+        "tests/test_preference_core.c"
       ]
     },
     {
