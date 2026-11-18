@@ -252,10 +252,10 @@ int main(void) {
     assert(!s.reader.active && !session_auto_read(&s));
     s.reader.active=1;s.reader.automatic=1;s.reader.cancel_pending=1;s.pending=1;
     strcpy(s.page,"outdated page");s.page_offset=4;s.ui.next=19;s.ui.view=UI_ARTICLE;
-    strcpy(s.ui.board_title,"old board");strcpy(s.report,"BOARDACCESS 42");s.report_next=23;
+    strcpy(s.ui.board_title,"old board");report_navigation_begin(&s.report,REPORT_BOARDACCESS,42,0);s.report.next=23;
     reset(&m);session_board_refresh(&s);
     assert(!s.page[0] && !s.page_offset && !s.reader.active && !s.ui.next && s.ui.view==UI_HOME);
-    assert(!s.ui.board_title[0] && !s.report[0] && !s.report_next && !m.size);
+    assert(!s.ui.board_title[0] && s.report.kind==REPORT_NONE && !s.report.next && !m.size);
     assert(s.reader.automatic && s.reader.cancel_pending && s.pending);
     assert(s.scan.board==42 && s.scan.scope==2 && !strcmp(s.scan.title,"needle"));
     s.pending=0;s.reader.cancel_pending=0;session_tick(&s,404);
@@ -344,5 +344,46 @@ int main(void) {
         session_dispose(&s);
     }
     puts("PASS: Japanese/English mail response mapping, stale identity refusal, filter retention, cursor ownership, draft failure/success and confirmation revocation");
+    for(int lang=LANGUAGE_JA;lang<LANGUAGE_COUNT;lang++) {
+        reset(&m);session_init(&s,io,140,4,1,1,1,(Language)lang);s.user=2;s.pager_enabled=0;
+        report_navigation_begin(&s.report,REPORT_BOARDACCESS,42,0);s.report.next=8;
+        strcpy(s.page,"old access rows");s.page_offset=3;s.pending=1;s.reader.active=1;
+        reset(&m);session_access_refresh(&s);
+        assert(s.report.kind==REPORT_NONE && !s.report.next && s.report.pending && s.pending && s.reader.active);
+        assert(!s.page[0] && !s.page_offset && !m.size);
+        report_navigation_begin(&s.report,REPORT_USERLOG,2,0);s.report.next=8;
+        strcpy(s.page,"unrelated rows");s.page_offset=2;session_access_refresh(&s);
+        assert(s.report.kind==REPORT_USERLOG && s.report.next==8 && s.page[0] && s.page_offset==2);
+        s.page[0]=0;s.page_offset=0;s.reader.active=0;
+        memset(&result,0,sizeof(result));result.session=139;result.slot=4;strcpy(result.text,"END NEXT 19\r\n");
+        session_result(&s,&result,700);assert(s.report.pending && s.report.next==8);
+        result.session=140;session_result(&s,&result,701);
+        assert(!s.report.pending && s.report.next==19 && s.report.kind==REPORT_USERLOG);
+        s.report.pending=1;strcpy(result.text,"ERR admin required\r\n");session_result(&s,&result,702);
+        assert(!s.report.pending && !s.report.next && s.report.kind==REPORT_NONE);
+        s.profile_walk.active=1;profile_walk_begin(&s.profile_walk,100,7,"*");
+        result.session=139;strcpy(result.text,"END NEXT 12\r\n");session_result(&s,&result,703);
+        assert(s.profile_walk.pending && !s.profile_walk.query.cursor);
+        result.session=140;session_result(&s,&result,704);
+        assert(s.profile_walk.active && !s.profile_walk.pending && s.profile_walk.query.cursor==12);
+        assert(s.profile_walk.query.field==100 && s.profile_walk.query.group==7 && !strcmp(s.profile_walk.query.query,"*"));
+        s.profile_walk.pending=1;strcpy(result.text,"END NEXT 0\r\n");session_result(&s,&result,705);
+        assert(!s.profile_walk.active && !s.profile_walk.pending);s.classic_input=0;
+        strcpy(s.vault.path,"public");vault_navigation_begin(&s.vault,"restricted");s.file_selected=4;
+        strcpy(result.text,"ERR access denied\r\n");session_result(&s,&result,706);
+        assert(!s.vault.selecting && !strcmp(s.vault.path,"public") && s.file_selected==4);
+        vault_navigation_begin(&s.vault,"games");result.session=139;strcpy(result.text,"FILEBOARDSETTING games\r\n");
+        session_result(&s,&result,707);assert(s.vault.selecting && !strcmp(s.vault.path,"public"));
+        result.session=140;session_result(&s,&result,708);
+        assert(!s.vault.selecting && !strcmp(s.vault.path,"games") && !s.file_selected && s.vault_mode && !s.mail_mode);
+        strcpy(result.text,"FILECHILDREN games\r\nCHILD 1 games/tools|Tools\r\nEND CHILDREN NEXT 17\r\n");
+        session_result(&s,&result,709);assert(s.vault.child_view && s.vault.count==1 && s.vault.next==17);
+        assert(!strcmp(vault_children_select(&s.vault,1),"games/tools"));
+        profile_walk_begin(&s.profile_walk,3,0,"private-query");s.profile_walk.active=1;
+        session_revoke(&s);assert(!s.profile_walk.active && !s.profile_walk.pending && !s.profile_walk.query.query[0]);
+        assert(!s.vault.path[0] && !s.vault.count && !s.vault.child_view);
+        session_dispose(&s);
+    }
+    puts("PASS: Japanese/English report invalidation, profile continuation, vault acceptance/denial, stale completion and revocation isolation");
     return 0;
 }

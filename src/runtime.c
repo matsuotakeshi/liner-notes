@@ -179,7 +179,7 @@ static void service_result(BoardResult *r) {
     if(r->all_accounts_changed)for(int i=0;i<SLOTS;i++)if(connections[i].fd!=INVALID && connections[i].app.id!=r->session)session_revoke(&connections[i].app);
     if(r->access_refresh)for(int i=0;i<SLOTS;i++)if(connections[i].fd!=INVALID) {
         Session *s=&connections[i].app;
-        if(!strncmp(s->report,"BOARDACCESS ",12)) { s->report[0]=0;s->report_next=0;s->page[0]=0;s->page_offset=0; }
+        session_access_refresh(s);
     }
     if((!r->service_action || strchr("GgM",r->service_action)) && !r->board_refresh)return;
     if(r->service_action=='u') { userlog_table(r->service_number,r->service_next,!strcmp(r->service_text,"ALL"),now_ms(),r->text,sizeof(r->text));return; }
