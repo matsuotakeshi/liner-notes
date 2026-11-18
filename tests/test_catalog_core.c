@@ -73,6 +73,8 @@ int main(void) {
     strcpy(config.title,"changed");assert(!strcmp(info.title,"managed"));
     assert(catalog_core_info(&actor,3,&info)==CATALOG_CORE_DENIED);zero(&info,sizeof(info));
     info_ok=0;assert(catalog_core_info(&actor,2,&info)==CATALOG_CORE_STORAGE);zero(&info,sizeof(info));
+    assert(catalog_core_admin(&actor)==CATALOG_CORE_DENIED);
+    admin=1;assert(catalog_core_admin(&actor)==CATALOG_CORE_OK);admin=0;
     puts("PASS: settings snapshot ownership, actual-board authority and failed-output clearing");
 
     actor=reset();const char *text="002|1|all|member|title|description";
@@ -136,6 +138,7 @@ int main(void) {
         case 7:store_error=1;wanted=CATALOG_CORE_STORAGE;break;
         }
         memset(&info,0xff,sizeof(info));memset(&roles,0xff,sizeof(roles));memset(&page,0xff,sizeof(page));id=99;
+        assert(catalog_core_admin(&actor)==wanted);
         assert(catalog_core_manage(&actor,2)==wanted);
         assert(catalog_core_info(&actor,2,&info)==wanted);zero(&info,sizeof(info));
         assert(catalog_core_roles(&actor,&roles)==wanted);zero(&roles,sizeof(roles));
