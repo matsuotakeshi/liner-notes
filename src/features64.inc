@@ -5,23 +5,7 @@ static int features_broken;
 static int feature_exec(const char *sql) { return sqlite3_exec(features_db,sql,NULL,NULL,NULL)==SQLITE_OK; }
 static sqlite3_stmt *feature_stmt(const char *sql) { sqlite3_stmt *s=NULL;if(sqlite3_prepare_v2(features_db,sql,-1,&s,NULL)!=SQLITE_OK)return NULL;return s; }
 #include "member_settings_store.inc"
-static int feature_groups_recover(void) {
-    for(;;) {
-        sqlite3_stmt *s=feature_stmt("SELECT board,actor,source,destination FROM group_moves WHERE done=0 LIMIT 1");if(!s)return 0;
-        int rc=sqlite3_step(s);if(rc==SQLITE_DONE) { sqlite3_finalize(s);return 1; }if(rc!=SQLITE_ROW) { sqlite3_finalize(s);return 0; }
-        uint32_t board=(uint32_t)sqlite3_column_int(s,0),actor=(uint32_t)sqlite3_column_int(s,1);unsigned from=(unsigned)sqlite3_column_int(s,2),to=(unsigned)sqlite3_column_int(s,3);sqlite3_finalize(s);
-        if(catalog_replace_group(board,actor,from,to)<=0 || members_group_move(actor,from,to)<=0)return 0;
-        if(!feature_exec("BEGIN IMMEDIATE"))return 0;
-        s=feature_stmt("INSERT OR IGNORE INTO delegated SELECT board,? FROM delegated WHERE board=? AND gid=?");if(!s)goto rollback;
-        sqlite3_bind_int(s,1,(int)to);sqlite3_bind_int(s,2,(int)board);sqlite3_bind_int(s,3,(int)from);rc=sqlite3_step(s);sqlite3_finalize(s);if(rc!=SQLITE_DONE)goto rollback;
-        s=feature_stmt("DELETE FROM delegated WHERE board=? AND gid=?");if(!s)goto rollback;
-        sqlite3_bind_int(s,1,(int)board);sqlite3_bind_int(s,2,(int)from);rc=sqlite3_step(s);sqlite3_finalize(s);if(rc!=SQLITE_DONE)goto rollback;
-        s=feature_stmt("UPDATE group_moves SET done=1 WHERE board=?");if(!s)goto rollback;
-        sqlite3_bind_int(s,1,(int)board);rc=sqlite3_step(s);sqlite3_finalize(s);if(rc!=SQLITE_DONE || !feature_exec("COMMIT"))goto rollback;
-        continue;
-rollback:feature_exec("ROLLBACK");return 0;
-    }
-}
+#include "catalog_group_store.inc"
 static int delete_recover(void) {
     for(;;) {
         sqlite3_stmt *s=feature_stmt("SELECT board,actor FROM board_deletions WHERE done=0 ORDER BY depth DESC,board LIMIT 1");if(!s)return 0;
@@ -76,7 +60,7 @@ static int features_open(const char *base) {
     if(!storage_database() && chmod(path,0600))return 0;
 #endif
     sqlite3_busy_timeout(features_db,5000);
-    return feature_exec(storage_database()?"PRAGMA journal_mode=WAL":"PRAGMA journal_mode=DELETE") && feature_exec("PRAGMA synchronous=FULL;CREATE TABLE IF NOT EXISTS board_deletions(board INTEGER PRIMARY KEY,actor INTEGER,depth INTEGER,done INTEGER);CREATE TABLE IF NOT EXISTS menu_preferences(id INTEGER PRIMARY KEY,value INTEGER);CREATE TABLE IF NOT EXISTS guest_boards(id INTEGER PRIMARY KEY,value INTEGER);CREATE TABLE IF NOT EXISTS news_scoped(user INTEGER,kind INTEGER,scope TEXT,stamp INTEGER NOT NULL,PRIMARY KEY(user,kind,scope));CREATE TABLE IF NOT EXISTS news(user INTEGER,kind INTEGER,stamp INTEGER NOT NULL,PRIMARY KEY(user,kind));CREATE TABLE IF NOT EXISTS delegated(board INTEGER,gid INTEGER,PRIMARY KEY(board,gid));CREATE TABLE IF NOT EXISTS group_moves(board INTEGER PRIMARY KEY,actor INTEGER,source INTEGER,destination INTEGER,done INTEGER);CREATE TABLE IF NOT EXISTS applications(user INTEGER,field TEXT,value TEXT,PRIMARY KEY(user,field));") && feature_exec(LINK_ARTICLES_SCHEMA) && features_import(base) && feature_groups_recover() && delete_recover();
+    return feature_exec(storage_database()?"PRAGMA journal_mode=WAL":"PRAGMA journal_mode=DELETE") && feature_exec("PRAGMA synchronous=FULL;CREATE TABLE IF NOT EXISTS board_deletions(board INTEGER PRIMARY KEY,actor INTEGER,depth INTEGER,done INTEGER);CREATE TABLE IF NOT EXISTS menu_preferences(id INTEGER PRIMARY KEY,value INTEGER);CREATE TABLE IF NOT EXISTS guest_boards(id INTEGER PRIMARY KEY,value INTEGER);CREATE TABLE IF NOT EXISTS news_scoped(user INTEGER,kind INTEGER,scope TEXT,stamp INTEGER NOT NULL,PRIMARY KEY(user,kind,scope));CREATE TABLE IF NOT EXISTS news(user INTEGER,kind INTEGER,stamp INTEGER NOT NULL,PRIMARY KEY(user,kind));CREATE TABLE IF NOT EXISTS delegated(board INTEGER,gid INTEGER,PRIMARY KEY(board,gid));CREATE TABLE IF NOT EXISTS group_moves(board INTEGER PRIMARY KEY,actor INTEGER,source INTEGER,destination INTEGER,done INTEGER);CREATE TABLE IF NOT EXISTS applications(user INTEGER,field TEXT,value TEXT,PRIMARY KEY(user,field));") && feature_exec(LINK_ARTICLES_SCHEMA) && features_import(base) && catalog_group_repository_recover() && delete_recover();
 }
 int application_repository_load(uint32_t user,ApplicationNotes *out) {
     if(!out)return 0;
@@ -137,6 +121,31 @@ void article_repository_author_changed(uint32_t id,uint32_t user,const char *nam
     if(old && user_posts[old])user_posts[old]--;
     user_posts[user]++;
 }
+static void catalog_group_result(CatalogGroupOutcome result,BoardResult *r) {
+    const char *error="ERR command\r\n";
+    switch(result) {
+    case GROUP_CORE_OK:return;
+    case GROUP_CORE_ADMIN_REQUIRED:error="ERR admin required\r\n";break;
+    case GROUP_CORE_REVOKED:r->revoked=1;error="ERR session revoked\r\n";break;
+    case GROUP_CORE_MEMBER_STORAGE:error="ERR member storage unavailable\r\n";break;
+    case GROUP_CORE_MODERATION_STORAGE:error="ERR moderation storage unavailable\r\n";break;
+    case GROUP_CORE_POLICY_STORAGE:error="ERR board policy storage\r\n";break;
+    case GROUP_CORE_CATALOG_STORAGE:error="ERR catalog storage\r\n";break;
+    case GROUP_CORE_SETTINGS_STORAGE:error="ERR settings storage\r\n";break;
+    case GROUP_CORE_INVALID:break;
+    }
+    snprintf(r->text,sizeof(r->text),"%s",error);
+}
+static void catalog_group_execute(const BoardRequest *q,BoardResult *r) {
+    CatalogActor actor={q->user,q->user_epoch};CatalogGroupChange change;
+    CatalogGroupOutcome result=q->action=='G'?catalog_group_delegate(&actor,q->number,q->cursor):
+        catalog_group_move(&actor,q->number,q->cursor,q->audit_actor,&change);
+    if(result!=GROUP_CORE_OK) { catalog_group_result(result,r);return; }
+    if(q->action=='G') { strcpy(r->text,"SIGOP GROUP SAVED\r\n");return; }
+    for(uint32_t u=1;u<=change.through;u++)vault_worker_account(u,moderation_epoch(u));
+    r->all_accounts_changed=1;r->board_refresh=1;r->password_changed=1;
+    r->account_epoch=change.actor_epoch;strcpy(r->text,"BOARD GROUP MOVED\r\n");
+}
 static void article_management_result(ArticleOutcome result,BoardResult *r) {
     switch(result) {
     case ARTICLE_REVOKED:r->revoked=1;strcpy(r->text,"ERR session revoked\r\n");break;
@@ -196,19 +205,8 @@ static void advanced_execute(const BoardRequest *q,BoardResult *r) {
         snprintf(r->text+n,sizeof(r->text)-n,"\r\n");return;
     }
     if(q->action=='D') { board_topology_execute(q,q->number,1,r);return; }
+    if(q->action=='G' || q->action=='g') { catalog_group_execute(q,r);return; }
     if(!moderation_admin(q->user)) { strcpy(r->text,"ERR admin required\r\n");return; }
-    if(q->action=='G') {
-        if(!catalog_exists(q->number) || q->cursor>100 || (q->cursor && !catalog_group(q->number,q->cursor)))goto invalid;
-        sqlite3_stmt *s=feature_stmt(q->cursor?"INSERT OR IGNORE INTO delegated VALUES(?,?)":"DELETE FROM delegated WHERE board=?");if(!s)goto storage;
-        sqlite3_bind_int(s,1,(int)q->number);if(q->cursor)sqlite3_bind_int(s,2,(int)q->cursor);int ok=sqlite3_step(s)==SQLITE_DONE;sqlite3_finalize(s);if(!ok)goto storage;strcpy(r->text,"SIGOP GROUP SAVED\r\n");return;
-    }
-    if(q->action=='g') {
-        if(!catalog_exists(q->number) || !q->cursor || q->cursor>100 || !q->audit_actor || q->audit_actor>100 || q->cursor==q->audit_actor || !catalog_group(q->number,q->cursor))goto invalid;
-        sqlite3_stmt *s=feature_stmt("INSERT INTO group_moves VALUES(?,?,?,?,0) ON CONFLICT(board) DO UPDATE SET actor=excluded.actor,source=excluded.source,destination=excluded.destination,done=0");if(!s)goto storage;
-        sqlite3_bind_int(s,1,(int)q->number);sqlite3_bind_int(s,2,(int)q->user);sqlite3_bind_int(s,3,(int)q->cursor);sqlite3_bind_int(s,4,(int)q->audit_actor);int ok=sqlite3_step(s)==SQLITE_DONE;sqlite3_finalize(s);if(!ok)goto storage;if(!feature_groups_recover()) { features_broken=1;goto storage; }
-        for(uint32_t u=1;u<=members_count();u++) { moderation_credentials_changed(u);vault_worker_account(u,moderation_epoch(u)); }
-        r->all_accounts_changed=1;r->board_refresh=1;r->password_changed=1;r->account_epoch=moderation_epoch(q->user);strcpy(r->text,"BOARD GROUP MOVED\r\n");return;
-    }
     if(q->action=='A') {
         MemberActor actor={q->user,q->user_epoch};MemberApplication application;
         MemberOutcome result=member_core_application_get(&actor,q->number,&application);
@@ -229,5 +227,4 @@ static void advanced_execute(const BoardRequest *q,BoardResult *r) {
         return;
     }
 invalid:strcpy(r->text,"ERR command\r\n");return;
-storage:strcpy(r->text,"ERR settings storage\r\n");
 }

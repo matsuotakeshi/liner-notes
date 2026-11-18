@@ -290,7 +290,11 @@
         "src/board_features.inc",
         "src/board_topology_core.c",
         "src/board_topology_core.h",
-        "src/board_topology_repository.h"
+        "src/board_topology_repository.h",
+        "src/catalog_group_core.c",
+        "src/catalog_group_core.h",
+        "src/catalog_group_repository.h",
+        "src/catalog_group_store.inc"
       ]
     },
     {
