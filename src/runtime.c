@@ -1,6 +1,8 @@
 /* Liner notes: a native C BBS inspired by RTBBS. No legacy ASM/ABI emulation. */
 #define _POSIX_C_SOURCE 200809L
 #include "runtime_limits.h"
+#include "connection_core.h"
+#include "connection_protocol.h"
 #include "storage_sqlite.h"
 #include <stdio.h>
 #include <stdlib.h>
@@ -85,7 +87,7 @@ static int listener_error(socket_t listener, const char *operation,
 typedef struct {
     socket_t fd;
     char peer[64];uint64_t rx_bytes,tx_bytes;
-    int userlog_registered,idle_warned,time_warning,time_grace;uint64_t last_input,idle_close,started;
+    int userlog_registered;ConnectionClock clock;
     Session app;
     Terminal terminal;
     unsigned char input[CAP],output[OUT_CAP];
@@ -101,10 +103,10 @@ static TerminalMode terminal_mode=TERMINAL_RAW;
 static const char *admins_path;
 static const char *link_accounts_path;
 static Language default_language=LANGUAGE_JA;
-static uint64_t shutdown_at,shutdown_drain;static char shutdown_reason[513];
+static ConnectionShutdown shutdown_state;
 static volatile sig_atomic_t stopping;
 static int log_failed;
-static uint32_t idle_seconds=600,time_limits[6],time_warning_seconds=60,time_grace_seconds=30;
+static ConnectionPolicy policy={.idle_seconds=600,.warning_seconds=60,.grace_seconds=30};
 static void stop(int sig) { (void)sig; stopping=1; }
 static void drop(Connection *c) {
     if(c->fd==INVALID)return; /* Unused slots contain no live secrets/resources. */
@@ -125,6 +127,11 @@ static void drop(Connection *c) {
     OPENSSL_cleanse(c->input,sizeof(c->input));OPENSSL_cleanse(c->output,c->output_highwater);
     OPENSSL_cleanse(c,offsetof(Connection,app));
     OPENSSL_cleanse((char *)c+offsetof(Connection,used),sizeof(*c)-offsetof(Connection,used));c->fd=INVALID;
+}
+static ConnectionState connection_state(Connection *c) {
+    Session *s=&c->app;
+    return (ConnectionState){s->user,s->member_level,s->ui.admin,s->closing,s->door,s->zmodem,
+        s->binary,s->pending,session_secret(s),s->ui.enabled,s->chatting,s->editing};
 }
 static int app_drained(void *context) { return ((Connection *)context)->queued==0; }
 static int queue_bytes(void *context,const unsigned char *data,size_t size) {
@@ -186,19 +193,28 @@ static void service_result(BoardResult *r) {
         return;
     }
     if(r->service_action=='L') {
-        size_t used=(size_t)snprintf(r->text,sizeof(r->text),"CONNECTIONS\r\n");
-        for(int i=0;i<SLOTS;i++) { Connection *c=&connections[i];if(c->fd==INVALID)continue;
-            used+=(size_t)snprintf(r->text+used,sizeof(r->text)-used,"CONNECTION %lu %s %s %s %s %llu %llu %llu %llu %zu %u %u\r\n",c->app.id,c->app.user?c->app.username:"guest",c->app.door?"DOOR":c->app.zmodem?"ZMODEM":c->app.binary?"BINARY":session_secret(&c->app)?"AUTH":c->app.chatting?"CHAT":c->app.editing?"EDITOR":"BBS",c->terminal.mode==TERMINAL_TELNET?"TELNET":"RAW",*c->peer?c->peer:"unknown",(unsigned long long)((now_ms()-c->started)/1000),(unsigned long long)((now_ms()-c->last_input)/1000),(unsigned long long)c->rx_bytes,(unsigned long long)c->tx_bytes,c->queued,c->app.columns,c->app.rows);
+        ConnectionSummary rows[SLOTS];size_t count=0;
+        for(int i=0;i<SLOTS;i++) {
+            Connection *c=&connections[i];if(c->fd==INVALID)continue;
+            ConnectionState state=connection_state(c);ConnectionSummary *row=&rows[count++];
+            memset(row,0,sizeof(*row));row->id=c->app.id;row->mode=connection_mode(&state);
+            row->telnet=c->terminal.mode==TERMINAL_TELNET;
+            snprintf(row->login,sizeof(row->login),"%s",c->app.user?c->app.username:"guest");
+            snprintf(row->peer,sizeof(row->peer),"%s",c->peer);
+            row->elapsed=connection_elapsed(now_ms(),c->clock.started)/1000;
+            row->idle=connection_elapsed(now_ms(),c->clock.last_input)/1000;
+            row->rx=c->rx_bytes;row->tx=c->tx_bytes;row->queued=c->queued;
+            row->columns=c->app.columns;row->rows=c->app.rows;
         }
-        snprintf(r->text+used,sizeof(r->text)-used,"END CONNECTIONS\r\n");
+        if(!connection_protocol_list(rows,count,r->text,sizeof(r->text)))strcpy(r->text,"ERR connection report\r\n");
     } else if(r->service_action=='A') { notify_all(MSG_ADMIN_NOTICE,0,r->service_text);strcpy(r->text,"ANNOUNCE SENT\r\n"); }
     else if(r->service_action=='K') {
         int found=0;for(int i=0;i<SLOTS;i++)if(connections[i].fd!=INVALID && connections[i].app.id==r->service_number) { drop(&connections[i]);found=1;break; }
         snprintf(r->text,sizeof(r->text),found?"DISCONNECTED %u\r\n":"ERR no connection\r\n",r->service_number);
-    } else if(r->service_action=='C') { shutdown_at=shutdown_drain=0;shutdown_reason[0]=0;notify_all(MSG_SHUTDOWN_CANCELLED,0,"");strcpy(r->text,"SHUTDOWN CANCELLED\r\n"); }
+    } else if(r->service_action=='C') { connection_shutdown_cancel(&shutdown_state);notify_all(MSG_SHUTDOWN_CANCELLED,0,"");strcpy(r->text,"SHUTDOWN CANCELLED\r\n"); }
     else if(r->service_action=='S') {
-        shutdown_at=now_ms()+(uint64_t)r->service_number*1000;shutdown_drain=0;snprintf(shutdown_reason,sizeof(shutdown_reason),"%s",r->service_text);
-        notify_all(MSG_SHUTDOWN_NOTICE,r->service_number,shutdown_reason);snprintf(r->text,sizeof(r->text),"SHUTDOWN SCHEDULED %u\r\n",r->service_number);
+        connection_shutdown_schedule(&shutdown_state,now_ms(),r->service_number,r->service_text);
+        notify_all(MSG_SHUTDOWN_NOTICE,r->service_number,shutdown_state.reason);snprintf(r->text,sizeof(r->text),"SHUTDOWN SCHEDULED %u\r\n",r->service_number);
     }
 }
 static int zbytes(void *context,const unsigned char *bytes,size_t size) {
@@ -268,7 +284,7 @@ static void door_advance(Connection *c,uint64_t now) {
     unsigned old_width=c->terminal.telnet.width,old_height=c->terminal.telnet.height;
     while(used<c->used && door_room(c->door)) {
         unsigned char byte;int rc=terminal_binary_receive(&c->terminal,c->input[used++],&byte);
-        if(rc<0) { drop(c);return; }if(!rc)continue;c->last_input=now;c->idle_warned=0;
+        if(rc<0) { drop(c);return; }if(!rc)continue;connection_input(&c->clock,now);
         if(byte==29) { done=1;break; }if(!door_input(c->door,byte)) { done=-1;break; }
     }
     memmove(c->input,c->input+used,c->used-used);c->used-=used;
@@ -287,7 +303,7 @@ static void door_advance(Connection *c,uint64_t now) {
 static void advance(Connection *c,uint64_t now) {
     Session *s=&c->app;
     if(s->door) { door_advance(c,now);return; }
-    if(s->zmodem) { c->last_input=now;c->idle_warned=0;zadvance(c,now);return; }
+    if(s->zmodem) { connection_input(&c->clock,now);zadvance(c,now);return; }
     if(s->auto_read && c->used) {
         size_t consumed=0;int stop=0;
         while(consumed<c->used) {
@@ -296,7 +312,7 @@ static void advance(Connection *c,uint64_t now) {
             if(rc>0 || c->terminal.size) { stop=1;break; }
         }
         memmove(c->input,c->input+consumed,c->used-consumed);c->used-=consumed;
-        if(stop) { c->last_input=now;c->idle_warned=0;terminal_clear(&c->terminal);c->used=0;session_scan_stop(s); }
+        if(stop) { connection_input(&c->clock,now);terminal_clear(&c->terminal);c->used=0;session_scan_stop(s); }
     }
     if(!s->auto_read || c->queued<=OUT_CAP/2)session_tick(s,now);
     if(!s->active) { drop(c); return; }
@@ -316,7 +332,7 @@ static void advance(Connection *c,uint64_t now) {
         size_t old_size=c->terminal.size;
         c->terminal.uppercase=session_uppercase(s,c->terminal.line,c->terminal.size);
         int result=terminal_receive(&c->terminal,c->input[consumed++],session_secret(s));
-        if(result>0 || c->terminal.size!=old_size) { c->last_input=now;c->idle_warned=0; }
+        if(result>0 || c->terminal.size!=old_size) { connection_input(&c->clock,now); }
         if(c->terminal.mode==TERMINAL_TELNET && (old_width!=c->terminal.telnet.width || old_height!=c->terminal.telnet.height))
             session_dimensions(s,c->terminal.telnet.width,c->terminal.telnet.height);
         if(result<0) { drop(c); return; }
@@ -368,10 +384,10 @@ int main(int argc,char **argv) {
         else if(!strcmp(argv[1],"--userlog-public")) { userlog_public=1;argc--;argv++; }
         else if((!strcmp(argv[1],"--userlog-keep") || !strcmp(argv[1],"--time-warning") || !strcmp(argv[1],"--time-grace")) && argc>2) {
             char *end;unsigned long n=strtoul(argv[2],&end,10);if(*argv[2]<'0' || *argv[2]>'9' || *end || n>1000000)return 2;
-            if(!strcmp(argv[1],"--userlog-keep"))userlog_keep=(unsigned)n;else if(!strcmp(argv[1],"--time-warning"))time_warning_seconds=(unsigned)n;else time_grace_seconds=(unsigned)n;argc-=2;argv+=2;
+            if(!strcmp(argv[1],"--userlog-keep"))userlog_keep=(unsigned)n;else if(!strcmp(argv[1],"--time-warning"))policy.warning_seconds=(unsigned)n;else policy.grace_seconds=(unsigned)n;argc-=2;argv+=2;
         }
         else if(!strcmp(argv[1],"--level-seconds") && argc>2) {
-            unsigned level,seconds;int n=0;if(sscanf(argv[2],"%u:%u%n",&level,&seconds,&n)!=2 || argv[2][n] || level>5 || seconds>86400)return 2;time_limits[level]=seconds;argc-=2;argv+=2;
+            unsigned level,seconds;int n=0;if(sscanf(argv[2],"%u:%u%n",&level,&seconds,&n)!=2 || argv[2][n] || level>5 || seconds>86400)return 2;policy.level_seconds[level]=seconds;argc-=2;argv+=2;
         }
         else if(!strcmp(argv[1],"--user-log") && argc>2) { user_log=argv[2];argc-=2;argv+=2; }
         else if(!strcmp(argv[1],"--chat-log") && argc>2) { chat_log=argv[2];argc-=2;argv+=2; }
@@ -398,7 +414,7 @@ int main(int argc,char **argv) {
         else if(!strcmp(argv[1],"--idle-seconds") && argc>2) {
             char *tail;unsigned long n=strtoul(argv[2],&tail,10);
             if(!*argv[2] || *tail || argv[2][0]=='-' || argv[2][0]=='+' || n>86400) { fprintf(stderr,"idle-seconds: use 0..86400\n");return 2; }
-            idle_seconds=(uint32_t)n;argc-=2;argv+=2;
+            policy.idle_seconds=(uint32_t)n;argc-=2;argv+=2;
         }
         else if(!strcmp(argv[1],"--zmodem-helper") && argc>2) { zhelper=argv[2];argc-=2;argv+=2; }
         else if(!strcmp(argv[1],"--admins") && argc>2) { admins_path=argv[2]; argc-=2; argv+=2; }
@@ -486,14 +502,15 @@ int main(int argc,char **argv) {
     int result=0;
     while(!stopping) {
         uint64_t clock=now_ms();
-        if(shutdown_at && clock>=shutdown_at && !shutdown_drain) {
-            shutdown_drain=clock+500;notify_all(MSG_SHUTDOWN_STOPPING,0,"");
+        ShutdownDecision shutdown=connection_shutdown_step(&shutdown_state,clock);
+        if(shutdown==SHUTDOWN_DRAIN) {
+            notify_all(MSG_SHUTDOWN_STOPPING,0,"");
             for(int i=0;i<SLOTS;i++)if(connections[i].fd!=INVALID) {
                 Connection *c=&connections[i];if(c->app.zmodem || c->app.binary)drop(c);
                 else { session_tick(&c->app,clock);c->app.closing=1; }
             }
         }
-        if(shutdown_drain && clock>=shutdown_drain) { stopping=1;break; }
+        if(shutdown==SHUTDOWN_STOP) { stopping=1;break; }
         zhost_reap(now_ms());
         BoardResult completion;
         board_completion_drain();
@@ -569,28 +586,26 @@ int main(int argc,char **argv) {
         for(int i=0;i<SLOTS;i++) {
             Connection *c=&connections[i]; if(c->fd==INVALID) continue;
             if(!userlog_update(i,c->app.user,now) || !userlog_maintain()) { fprintf(stderr,"userlog: write failed\n");result=1;stopping=1;break; }
-            if(!c->app.ui.admin && !c->app.closing) {
-                unsigned level=c->app.user && c->app.member_level<6?c->app.member_level:0;uint64_t limit=(uint64_t)time_limits[level]*1000,elapsed=now>=c->started?now-c->started:0;
-                if(limit && elapsed>=limit+(uint64_t)time_grace_seconds*1000) { drop(c);continue; }
-                if(limit && !c->app.door && !c->app.zmodem && !c->app.binary && !session_secret(&c->app)) {
-                    const char *message=NULL;
-                    if(elapsed>=limit && !c->time_grace) { c->time_grace=1;message=c->app.ui.language==LANGUAGE_JA?"接続時間の上限です。猶予時間後に切断します。保存して終了してください。\r\n":"Session limit reached. Save your work before the grace period ends.\r\n"; }
-                    else if(!c->time_warning && elapsed+(uint64_t)time_warning_seconds*1000>=limit) { c->time_warning=1;message=c->app.ui.language==LANGUAGE_JA?"接続時間の上限が近づいています。\r\n":"Your session time limit is approaching.\r\n"; }
-                    if(message && !app_write(c,message,strlen(message))) { drop(c);continue; }
-                }
+            ConnectionState state=connection_state(c);
+            ConnectionDecision decision=connection_time_check(&policy,&c->clock,&state,now);
+            if(decision==CONNECTION_DROP) { drop(c);continue; }
+            if(decision==CONNECTION_WARNING || decision==CONNECTION_GRACE) {
+                const char *message=decision==CONNECTION_GRACE?
+                    (c->app.ui.language==LANGUAGE_JA?"接続時間の上限です。猶予時間後に切断します。保存して終了してください。\r\n":"Session limit reached. Save your work before the grace period ends.\r\n"):
+                    (c->app.ui.language==LANGUAGE_JA?"接続時間の上限が近づいています。\r\n":"Your session time limit is approaching.\r\n");
+                if(!app_write(c,message,strlen(message))) { drop(c);continue; }
             }
-            if(c->idle_close && now>=c->idle_close) { drop(c);continue; }
-            if(c->app.binary || c->app.pending || c->app.zmodem) { c->last_input=now;c->idle_warned=0; }
+            if(connection_idle_drained(&c->clock,now)) { drop(c);continue; }
+            connection_busy_activity(&c->clock,&state,now);
             advance(c,now);
-            if(c->fd!=INVALID && idle_seconds && !c->app.ui.admin && !c->app.closing && !c->app.pending && !c->app.binary && !c->app.zmodem) {
-                uint64_t elapsed=now>=c->last_input?now-c->last_input:0,limit=(uint64_t)idle_seconds*1000;
-                uint64_t warning=idle_seconds>120?60000:limit/2;
-                if(elapsed>=limit) {
+            if(c->fd!=INVALID) {
+                state=connection_state(c);decision=connection_idle_check(&policy,&c->clock,&state,now);
+                if(decision==CONNECTION_CLOSE) {
                     const char *msg=c->app.ui.enabled?ui_text(&c->app.ui,MSG_IDLE_CLOSED):"BYE idle timeout\r\n";
                     if(!app_write(c,msg,strlen(msg))) { drop(c);continue; }
-                    c->app.closing=1;c->idle_close=now+1000;
-                } else if(!c->idle_warned && elapsed>=limit-warning && c->app.ui.enabled && !session_secret(&c->app)) {
-                    const char *msg=ui_text(&c->app.ui,MSG_IDLE_WARNING);if(!app_write(c,msg,strlen(msg))) { drop(c);continue; }c->idle_warned=1;
+                    c->app.closing=1;
+                } else if(decision==CONNECTION_WARNING) {
+                    const char *msg=ui_text(&c->app.ui,MSG_IDLE_WARNING);if(!app_write(c,msg,strlen(msg))) { drop(c);continue; }
                 }
             }
             if(c->fd!=INVALID && !userlog_update(i,c->app.user,now)) { result=1;stopping=1;break; }
@@ -631,7 +646,7 @@ int main(int argc,char **argv) {
             if(fd!=INVALID) {
                 int slot=-1;
                 for(int i=0;i<SLOTS;i++) if(connections[i].fd==INVALID) { slot=i; break; }
-                if(slot<0 || online(NULL)>=ln_limit("CONNECTIONS",CONNECTION_MAX) || shutdown_drain || next_id>CONTENT_ID_MAX || nonblock(fd)) close_socket(fd);
+                if(slot<0 || online(NULL)>=ln_limit("CONNECTIONS",CONNECTION_MAX) || shutdown_state.drain || next_id>CONTENT_ID_MAX || nonblock(fd)) close_socket(fd);
                 else {
                     /* Interactive commands and connector receipts must not wait
                      * for a delayed ACK on a preceding short response. */
@@ -642,9 +657,9 @@ int main(int argc,char **argv) {
                     SessionIO io={c,app_write,online,app_drained};
                     session_init(&c->app,io,next_id++,slot,board_enabled,member_mode,menu_mode,default_language);
                     if(!userlog_connect(slot,terminal_mode==TERMINAL_TELNET?"TELNET":"RAW",now_ms())) { fprintf(stderr,"userlog: connection write failed\n");drop(c);result=1;stopping=1;break; }
-                    c->userlog_registered=1;c->started=c->last_input=now_ms();
+                    c->userlog_registered=1;c->clock.started=c->clock.last_input=now_ms();
                     c->app.zmodem_available=zhelper!=NULL;
-                    if(shutdown_at) { char text[900];uint64_t clock=now_ms();unsigned remaining=clock<shutdown_at?(unsigned)((shutdown_at-clock+999)/1000):0;snprintf(text,sizeof(text),ui_text(&c->app.ui,MSG_SHUTDOWN_NOTICE),remaining,shutdown_reason);session_announce(&c->app,text); }
+                    if(shutdown_state.at) { char text[900];uint64_t clock=now_ms();unsigned remaining=connection_shutdown_remaining(&shutdown_state,clock);snprintf(text,sizeof(text),ui_text(&c->app.ui,MSG_SHUTDOWN_NOTICE),remaining,shutdown_state.reason);session_announce(&c->app,text); }
 
                     vault_worker_session(slot,c->app.id,1);
                 }

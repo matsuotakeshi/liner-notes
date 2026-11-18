@@ -382,7 +382,13 @@
         "src/activity_core.c",
         "src/activity_core.h",
         "src/activity_repository.h",
-        "src/activity_store.c"
+        "src/activity_store.c",
+        "src/connection_core.c",
+        "src/connection_core.h",
+        "src/connection_protocol.c",
+        "src/connection_protocol.h",
+        "tests/test_connection_core.c",
+        "tests/test_stage57.py"
       ]
     },
     {
