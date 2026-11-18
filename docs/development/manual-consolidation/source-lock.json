@@ -1,6 +1,6 @@
 {
   "LICENSE": "fb981668c18a279e285fc4d83fba1e836cc84dd4daa73c9697d3cfd2d8aca6e0",
-  "Makefile": "39c978721d4aa8bc091c0fd203226353314f2a432e2bda2afb5b67ede5cb7634",
+  "Makefile": "5a98e087ff88b0c152ee8ea0c8ea7cf403330576b8db3331bc826614e792067a",
   "boards.example.conf": "4bd1a17ecf3966d3829510e8495a1362fb8b922cd754badccc739f5e5ab0bde8",
   "ci/build-freebsd-package.sh": "4e62899471d1f1a6c44e00a783c1aff771332140704ae778da95a95048474108",
   "debian/changelog": "8f3574a094f5a3677a9a7188e530ecdbdc006138b082b57243ca8441c644114d",
@@ -53,7 +53,7 @@
   "scripts/serial_connector.py": "3de6ad32005c5dff9b474d8f550a534232d88f4be73b59b5dcfc15cc11d0e670",
   "scripts/transfer_spool.py": "f7c590b73368c330da611d8ce41f0fd6fe5d8ad3b3e9ae9165e258d1e501db46",
   "scripts/vault_zmodem.py": "ace554ea5b6ab8d479ec39ad7daf7f5f7f34ca34ba13d5b9a73b115a0d63ef15",
-  "src/board.c": "77a8b8f0aece1e0e3376b760cba3ce2cbfac0917ebb72bf8906c29315a0f67e2",
+  "src/board.c": "7605cc32b072909233c7004795dd240d1bb127895186a3a97be5d314d9c496af",
   "src/board_link.inc": "95a85be0a6ca2d77380775b25befb51a72971908d266c6b72f76fc7ca94e1d4a",
   "src/board_policy.c": "898862d27114ca09a86ac6d4a6bc1494c46598ff473bcf07b96b545a390b355a",
   "src/catalog.c": "49ed8eff1efe2ace300b92d20e1c91491523ba6e896bed270457afbccd865d68",
@@ -153,7 +153,7 @@
   "src/member_core.h": "5085ce3069720d9de53deb7504055c05bbf518c95f933a9c20a49ee250daabed",
   "src/members.h": "b860c0aaf4ea15e027c8517758e161e3ae5ab74ad2194aec0982405f4f56d87d",
   "src/chat_preferences.h": "5ccd981f5282ab0e0161d923fba6935b543136e3fad5dacf78f91bba3859bdc0",
-  "src/features64.inc": "bebca7e844234ac6cc6876c72c18d1d28e6552c321174110e8c395d1fddbe302",
+  "src/features64.inc": "d8c0cc38718e139c60f46c27d67268c2063179d7b8116e9baa4b01da0f39b38c",
   "src/application_repository.h": "44685017695e60734b4fac1f3470fdf3a08733553142031cea2f5dcc9cca4adb",
   "src/mail_core.c": "d49cfdc519e9668f26918338c4a93d17172d335ec3caaad11bff7255e08fb220",
   "src/mail_core.h": "f46c2ecba47975debc48bebc63a7f2836dfa5ca07bb8297a2b89d4c062f4772b",
@@ -164,10 +164,13 @@
   "src/member_settings_repository.h": "00d652c65d31166ae5105f1df5214b7b0d7c53b6b6d2f6dc038c33abf2ff3f13",
   "src/member_settings_store.inc": "85fe1336fca4d63d2d326b222dc941d5281cfcf372db12f9c46dda1426ae1d15",
   "src/catalog.h": "5c0c6f1f32460dd62f5f87d5f73fc2df96abe645182dc19369a151dd9a6e4e44",
-  "src/catalog_core.c": "c1aa0c7830aed0728bcb98c094e7e67ae6fed336953d89b5576b76ae30271cb3",
-  "src/catalog_core.h": "370e62c6d647cb9eb02581b68c1d5309662f23a019fe41ca58e18673623da7dd",
+  "src/catalog_core.c": "4f94f5c05e3ec729583ae8710b80f68d4c74a5cf26da671ca14e09b858dd3ac2",
+  "src/catalog_core.h": "53c8dfde11fbdbda7fd30f95825a4c02015d79da9e51085f8f9451e8ffa8aa5f",
   "src/catalog_policy_core.c": "45cbab466fc2580d8ded4a1a70ec38e3553351eb056512a30d6c2f1f01446e6d",
   "src/catalog_policy_core.h": "d950fbf2b21646d16da45aeba24b336964eadf77865fd6b2a85590cdeaee52e5",
   "src/board_policy_repository.h": "de5b468416d7b63f4fcf729bbc4e7c7507104c04dd0a86c64425db36dd146aae",
-  "src/board_features.inc": "9490ee5b5b204877f1d305f43afb335e918f7dd7750a19e4278afac5eb049cc2"
+  "src/board_features.inc": "80d54eeb413df30aeafc3330445cfca6ac4c6f9193660c134599199700383cb0",
+  "src/board_topology_core.c": "9796559998dc5e0cbb575e0d02f4b261d0d3bbf72f8231e3de5ea2a51159b5d4",
+  "src/board_topology_core.h": "7aa77923f0763a384b891046d911191d064b9b6a9761bbe0981375b36fd59ae4",
+  "src/board_topology_repository.h": "9f3c046a7300eaa670304421ff5e81c10d38b422dc1e6b4c9005e4d50c567702"
 }

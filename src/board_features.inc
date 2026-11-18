@@ -182,10 +182,58 @@ static void board_policy_execute(const BoardRequest *q,uint32_t b,BoardResult *r
     if(result==CATALOG_CORE_OK)strcpy(r->text,"BOARD INFO SAVED\r\n");
     else board_policy_result(result,r);
 }
+uint32_t board_topology_repository_count(void) { return article_count; }
+int board_topology_repository_article(uint32_t id,BoardTopologyArticle *out) {
+    memset(out,0,sizeof(*out));
+    if(!id || id>article_count || board_policy_repository_broken() || extras_broken())return 0;
+    const Article *a=article_at(id-1);
+    *out=(BoardTopologyArticle){a->board,a->parent,a->root,a->body_size,extras_removed(id)};return 1;
+}
+int board_topology_repository_delete(uint32_t board,uint32_t actor) {
+    if(!policy_delete(board,actor) || !access_prune(1)) { access_journal.broken=1;return 0; }
+    return 1;
+}
+int board_topology_repository_move(uint32_t actor,uint32_t from,uint32_t to,
+                                   uint32_t root,uint32_t through,int branch) {
+    if(through!=article_count)return 0;
+    DurableRow row={0};row.kind=branch?'S':'M';row.actor=actor;row.target=root;
+    snprintf(row.text,sizeof(row.text),"%u %u %u",from,to,through);
+    if(!dj_append(&move_journal,&row) || !move_load(NULL,&row) || !moves_at(through)) {
+        move_journal.broken=1;return 0;
+    }
+    return 1;
+}
 static int board_usage(uint32_t board,uint32_t extra_count,uint64_t extra_bytes) {
-    uint64_t bytes=extra_bytes;uint32_t count=extra_count;
-    for(uint32_t i=1;i<=article_count;i++)if(on_board(i,board) && !extras_removed(i)) { count++;bytes+=(*article_at(i-1)).body_size; }
-    return (!policy_max_articles(board) || count<=policy_max_articles(board)) && (!policy_max_bytes(board) || bytes<=policy_max_bytes(board));
+    return board_topology_capacity(board,extra_count,extra_bytes)>0;
+}
+static void board_topology_result(BoardTopologyOutcome result,BoardResult *r) {
+    const char *error="ERR command\r\n";
+    switch(result) {
+    case TOPOLOGY_OK:return;
+    case TOPOLOGY_DENIED:error="ERR admin required\r\n";break;
+    case TOPOLOGY_REVOKED:r->revoked=1;error="ERR session revoked\r\n";break;
+    case TOPOLOGY_MEMBER_STORAGE:error="ERR member storage unavailable\r\n";break;
+    case TOPOLOGY_MODERATION_STORAGE:error="ERR moderation storage unavailable\r\n";break;
+    case TOPOLOGY_POLICY_STORAGE:error="ERR board policy storage\r\n";break;
+    case TOPOLOGY_CATALOG_STORAGE:error="ERR catalog storage\r\n";break;
+    case TOPOLOGY_EXTRAS_STORAGE:error="ERR extras storage\r\n";break;
+    case TOPOLOGY_SETTINGS_STORAGE:error="ERR settings storage\r\n";break;
+    case TOPOLOGY_NOT_EMPTY:error="ERR board not empty\r\n";break;
+    case TOPOLOGY_MOVE_TARGET:error="ERR move target\r\n";break;
+    case TOPOLOGY_FULL:error="ERR board full\r\n";break;
+    case TOPOLOGY_INVALID:break;
+    }
+    snprintf(r->text,sizeof(r->text),"%s",error);
+}
+static void board_topology_execute(const BoardRequest *q,uint32_t board,int cascade,BoardResult *r) {
+    CatalogActor actor={q->user,q->user_epoch};
+    BoardTopologyOutcome result=q->action=='D'?board_topology_delete(&actor,board,cascade):
+        board_topology_move(&actor,board,q->cursor,q->audit_article,q->action=='B');
+    if(result!=TOPOLOGY_OK) { board_topology_result(result,r);return; }
+    r->board_refresh=1;
+    if(q->action=='D') {
+        r->board=1;strcpy(r->text,cascade?"BOARD TREE DELETED\r\n":"BOARD DELETED\r\n");
+    }else snprintf(r->text,sizeof(r->text),"THREAD MOVED %u %u\r\n",q->cursor,q->audit_article);
 }
 static void board_features(const BoardRequest *q,BoardResult *r) {
     uint32_t b=q->number?q->number:q->board;
@@ -205,24 +253,7 @@ static void board_features(const BoardRequest *q,BoardResult *r) {
         return;
     }
     if(q->action && strchr("AOPSCIW",q->action)) { board_policy_execute(q,b,r);return; }
-    if(!catalog_manage(b,q->user)) { strcpy(r->text,"ERR admin required\r\n");return; }
-    if(strchr("DMB",q->action) && !require_v5()) { strcpy(r->text,"ERR board policy storage\r\n");return; }
-    if(!moderation_admin(q->user)) { strcpy(r->text,"ERR admin required\r\n");return; }
-    if(q->action=='D') {
-        if(b==1) { strcpy(r->text,"ERR board not empty\r\n");return; }
-        for(uint32_t i=1;i<=article_count;i++)if(on_board(i,b)) { strcpy(r->text,"ERR board not empty\r\n");return; }
-        for(uint32_t i=1;i<=CATALOG_MAX;i++)if(catalog_exists(i) && catalog_parent(i)==b) { strcpy(r->text,"ERR board not empty\r\n");return; }
-        if(!policy_delete(b,q->user) || !access_prune(1)) { access_journal.broken=1;strcpy(r->text,"ERR board policy storage\r\n"); }else { r->board_refresh=1;r->board=1;strcpy(r->text,"BOARD DELETED\r\n"); }return;
-    }
-    if(q->action=='M' || q->action=='B') {
-        uint32_t root=q->cursor,to=q->audit_article;
-        if(!on_board(root,b) || (q->action=='M' && (*article_at(root-1)).parent) || !catalog_exists(to) || policy_menu(to) || b==to) { strcpy(r->text,"ERR move target\r\n");return; }
-        uint32_t count=0;uint64_t bytes=0;for(uint32_t i=root;i<=article_count;i++)if((q->action=='B'?in_branch(i,root):article_at(i-1)->root==root) && !extras_removed(i)) { count++;bytes+=(*article_at(i-1)).body_size; }
-        if(!board_usage(to,count,bytes)) { strcpy(r->text,"ERR board full\r\n");return; }
-        
-        DurableRow row={0};row.kind=q->action=='B'?'S':'M';row.actor=q->user;row.target=root;snprintf(row.text,sizeof(row.text),"%u %u %u",b,to,article_count);
-        if(!dj_append(&move_journal,&row) || !move_load(NULL,&row) || !moves_at(article_count)) { move_journal.broken=1;strcpy(r->text,"ERR board policy storage\r\n");return; }
-        r->board_refresh=1;snprintf(r->text,sizeof(r->text),"THREAD MOVED %u %u\r\n",root,to);return;
-    }
+    if(q->action && strchr("DMB",q->action)) { board_topology_execute(q,b,0,r);return; }
+    if(!catalog_manage(b,q->user) || !moderation_admin(q->user)) { strcpy(r->text,"ERR admin required\r\n");return; }
     strcpy(r->text,"ERR command\r\n");
 }

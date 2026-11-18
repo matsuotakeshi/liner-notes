@@ -33,6 +33,20 @@ static int delete_recover(void) {
         s=feature_stmt("UPDATE board_deletions SET done=1 WHERE board=?");if(!s)return 0;sqlite3_bind_int(s,1,(int)b);rc=sqlite3_step(s);sqlite3_finalize(s);if(rc!=SQLITE_DONE)return 0;
     }
 }
+int board_topology_repository_ready(void) { return features_db && !features_broken; }
+int board_topology_repository_cascade(uint32_t actor,const BoardDeletion *plan,size_t count) {
+    if(!feature_exec("BEGIN IMMEDIATE"))return 0;
+    for(size_t i=0;i<count;i++) {
+        sqlite3_stmt *s=feature_stmt("INSERT INTO board_deletions VALUES(?,?,?,0) ON CONFLICT(board) DO UPDATE SET actor=excluded.actor,depth=excluded.depth,done=0");
+        if(!s) { feature_exec("ROLLBACK");return 0; }
+        sqlite3_bind_int(s,1,(int)plan[i].board);sqlite3_bind_int(s,2,(int)actor);
+        sqlite3_bind_int(s,3,(int)plan[i].depth);int ok=sqlite3_step(s)==SQLITE_DONE;sqlite3_finalize(s);
+        if(!ok) { feature_exec("ROLLBACK");return 0; }
+    }
+    if(!feature_exec("COMMIT")) { feature_exec("ROLLBACK");return 0; }
+    if(!delete_recover() || !access_prune(1)) { features_broken=1;return 0; }
+    return 1;
+}
 static int features_import(const char *base) {
     if(!storage_database())return 1;
     if(!feature_exec("CREATE TABLE IF NOT EXISTS storage_imports(name TEXT PRIMARY KEY)"))return 0;
@@ -181,19 +195,8 @@ static void advanced_execute(const BoardRequest *q,BoardResult *r) {
         for(unsigned i=0;i<attachments.count;i++)n+=(size_t)snprintf(r->text+n,sizeof(r->text)-n," %u",attachments.ids[i]);
         snprintf(r->text+n,sizeof(r->text)-n,"\r\n");return;
     }
+    if(q->action=='D') { board_topology_execute(q,q->number,1,r);return; }
     if(!moderation_admin(q->user)) { strcpy(r->text,"ERR admin required\r\n");return; }
-    if(q->action=='D') {
-        if(q->number==1 || !catalog_exists(q->number) || !require_v5())goto invalid;
-        if(!feature_exec("BEGIN IMMEDIATE"))goto storage;
-        for(uint32_t b=2;b<=CATALOG_MAX;b++)if(catalog_under(b,q->number)) {
-            sqlite3_stmt *s=feature_stmt("INSERT INTO board_deletions VALUES(?,?,?,0) ON CONFLICT(board) DO UPDATE SET actor=excluded.actor,depth=excluded.depth,done=0");
-            if(!s) { feature_exec("ROLLBACK");goto storage; }
-            sqlite3_bind_int(s,1,(int)b);sqlite3_bind_int(s,2,(int)q->user);sqlite3_bind_int(s,3,(int)catalog_depth(b));int ok=sqlite3_step(s)==SQLITE_DONE;sqlite3_finalize(s);if(!ok) { feature_exec("ROLLBACK");goto storage; }
-        }
-        if(!feature_exec("COMMIT")) { feature_exec("ROLLBACK");goto storage; }
-        if(!delete_recover() || !access_prune(1)) { features_broken=1;goto storage; }
-        r->board_refresh=1;r->board=1;strcpy(r->text,"BOARD TREE DELETED\r\n");return;
-    }
     if(q->action=='G') {
         if(!catalog_exists(q->number) || q->cursor>100 || (q->cursor && !catalog_group(q->number,q->cursor)))goto invalid;
         sqlite3_stmt *s=feature_stmt(q->cursor?"INSERT OR IGNORE INTO delegated VALUES(?,?)":"DELETE FROM delegated WHERE board=?");if(!s)goto storage;

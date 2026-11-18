@@ -287,7 +287,10 @@
         "src/catalog_policy_core.c",
         "src/catalog_policy_core.h",
         "src/board_policy_repository.h",
-        "src/board_features.inc"
+        "src/board_features.inc",
+        "src/board_topology_core.c",
+        "src/board_topology_core.h",
+        "src/board_topology_repository.h"
       ]
     },
     {

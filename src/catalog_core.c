@@ -14,6 +14,10 @@ static CatalogOutcome authorize(const CatalogActor *actor) {
        moderation_epoch(actor->user)!=actor->epoch)return CATALOG_CORE_REVOKED;
     return CATALOG_CORE_OK;
 }
+CatalogOutcome catalog_core_admin(const CatalogActor *actor) {
+    CatalogOutcome result=authorize(actor);if(result!=CATALOG_CORE_OK)return result;
+    return moderation_admin(actor->user)?CATALOG_CORE_OK:CATALOG_CORE_DENIED;
+}
 CatalogOutcome catalog_core_manage(const CatalogActor *actor,uint32_t board) {
     CatalogOutcome result=authorize(actor);
     if(result!=CATALOG_CORE_OK)return result;

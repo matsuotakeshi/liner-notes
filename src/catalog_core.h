@@ -17,6 +17,7 @@ typedef struct { uint32_t board,user; } CatalogRole;
 typedef struct { unsigned count;CatalogRole rows[CATALOG_MAX]; } CatalogRoles;
 typedef struct { unsigned count;uint32_t next;CatalogChange rows[8]; } CatalogHistory;
 /* Shared authorization for worker-owned board management services. */
+CatalogOutcome catalog_core_admin(const CatalogActor *);
 CatalogOutcome catalog_core_manage(const CatalogActor *,uint32_t board);
 CatalogOutcome catalog_core_info(const CatalogActor *,uint32_t board,CatalogConfig *out);
 /* Declarative six-field catalog specification, not a BBS command. Keep exact
