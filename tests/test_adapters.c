@@ -249,6 +249,16 @@ int main(void) {
     assert(!s.reader.cancel_pending && !s.reader.active && !strstr((char *)m.data,"must not display"));
     s.reader.active=1;s.reader.automatic=1;session_scan_pause(&s);
     assert(!s.reader.active && !session_auto_read(&s));
+    s.reader.active=1;s.reader.automatic=1;s.reader.cancel_pending=1;s.pending=1;
+    strcpy(s.page,"outdated page");s.page_offset=4;s.ui.next=19;s.ui.view=UI_ARTICLE;
+    strcpy(s.ui.board_title,"old board");strcpy(s.report,"BOARDACCESS 42");s.report_next=23;
+    reset(&m);session_board_refresh(&s);
+    assert(!s.page[0] && !s.page_offset && !s.reader.active && !s.ui.next && s.ui.view==UI_HOME);
+    assert(!s.ui.board_title[0] && !s.report[0] && !s.report_next && !m.size);
+    assert(s.reader.automatic && s.reader.cancel_pending && s.pending);
+    assert(s.scan.board==42 && s.scan.scope==2 && !strcmp(s.scan.title,"needle"));
+    s.pending=0;s.reader.cancel_pending=0;session_tick(&s,404);
+    assert(!session_auto_read(&s)); /* existing tick ends automatic mode */
     reset(&m);assert(session_line(&s,"CHECKMODE AUTO",14,405));assert(s.check.automatic);
     strcpy(s.check.key,"42:2");s.check.board=42;s.check.scope=2;
     check_traversal_begin(&s.check,0,100,200);s.check.pending=1;

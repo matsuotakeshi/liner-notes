@@ -1540,6 +1540,11 @@ void session_init(Session *s,SessionIO io,unsigned long id,int slot,int boards,i
 }
 int session_auto_read(const Session *s) { return s->reader.automatic; }
 void session_scan_pause(Session *s) { s->reader.active=s->reader.automatic=0; }
+void session_board_refresh(Session *s) {
+    s->page[0]=0;s->page_offset=0;s->reader.active=0;
+    s->ui.next=0;s->ui.view=UI_HOME;s->ui.board_title[0]=0;
+    s->report[0]=0;s->report_next=0;
+}
 void session_scan_stop(Session *s) {
     reader_stop(&s->reader,s->pending);page_clear(s);
     if(!s->pending) { queue_text(s,ui_text(&s->ui,MSG_SCAN_STOP));prompt(s); }

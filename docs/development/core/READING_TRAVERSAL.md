@@ -19,7 +19,9 @@ storage formats, timestamps or the worker's result selection.
   term, scope and direction. Continued requests refresh user epoch and grants;
   the existing Article/Mail/Vault Core checks ACLs on every worker operation.
 - Runtime: `session_auto_read`, `session_scan_stop` and `session_scan_pause`
-  replace direct scan flag access. Socket backpressure and input interruption
+  replace direct scan flag access. Board refresh uses `session_board_refresh`
+  to clear stale pages/list cursors and stop scanning, preserving the existing
+  pending-result and automatic-mode behavior. Socket backpressure and input interruption
   remain in Runtime. Door entry pauses the reader; it does not generate a
   pending-read cancellation or alter the existing Door/PTY contract.
 
@@ -69,3 +71,15 @@ that remains hosted PR CI, then trusted-main native CI after merge. Canonical
 manual generation, offline parity and internal/legacy links are checked too.
 The first syntax check found three old field accesses in classic_commands.inc;
 these were updated and the focused checks passed. No tests or limits weakened.
+
+## PR CI correction
+
+Head `8c17b924ea2f410cb20bdb415e2701edce3051b8` failed eight hosted jobs
+at the same `src/runtime.c:191` reference to the removed `Session.scanning`
+field. Local Session-only syntax checks had not compiled this Runtime path.
+The board-refresh invalidation now calls a Session API retaining the original
+page, view, report and reader reset behavior. Adapter regression checks also
+assert that pending state, automatic-mode tick behavior and scan filters are
+preserved. The former-field reference scan covers all source and tests.
+Runtime compilation and adapter execution must pass the normal hosted CI;
+local syntax checks do not replace them. No CI condition or test is disabled.

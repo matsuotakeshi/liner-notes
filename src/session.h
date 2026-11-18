@@ -64,6 +64,8 @@ void session_abort(Session *);
 void session_door_finish(Session *);
 void session_scan_stop(Session *);
 void session_scan_pause(Session *);
+/* Invalidate board listings without changing pending/automatic reader state. */
+void session_board_refresh(Session *);
 int session_auto_read(const Session *);
 void session_chat_kick(Session *);
 void session_revoke(Session *);

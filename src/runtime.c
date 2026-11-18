@@ -188,7 +188,7 @@ static void service_result(BoardResult *r) {
     }
     if(r->service_action=='b' || r->board_refresh) {
         for(int i=0;i<SLOTS;i++)if(connections[i].fd!=INVALID) {
-            Session *s=&connections[i].app;s->page[0]=0;s->page_offset=0;s->scanning=0;s->ui.next=0;s->ui.view=UI_HOME;s->ui.board_title[0]=0;s->report[0]=0;s->report_next=0;
+            session_board_refresh(&connections[i].app);
         }
         return;
     }
