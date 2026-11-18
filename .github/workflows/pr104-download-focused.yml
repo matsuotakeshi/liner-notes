@@ -23,7 +23,6 @@ jobs:
     env:
       SOURCE_SHA: a6dbea6a1af7a80e18072b92486eef981aa1b910
       IMAGE: ${{ matrix.image }}
-      EVIDENCE: ${{ runner.temp }}/focused-download
     steps:
       - uses: actions/checkout@v4
         with:
@@ -31,6 +30,8 @@ jobs:
           persist-credentials: false
       - name: Verify exact source and run only download socket regression
         shell: bash
+        env:
+          EVIDENCE: ${{ runner.temp }}/focused-download
         run: |
           set -euo pipefail
           test "$(git rev-parse HEAD)" = "$SOURCE_SHA"
@@ -60,6 +61,7 @@ jobs:
         if: ${{ always() }}
         env:
           RESULT: ${{ job.status }}
+          EVIDENCE: ${{ runner.temp }}/focused-download
         run: |
           mkdir -p "$EVIDENCE"
           printf 'source=%s\nresult=%s\n' "$SOURCE_SHA" "$RESULT" > "$EVIDENCE/result.txt"
