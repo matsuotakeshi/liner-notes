@@ -35,7 +35,7 @@ GATES = {
     'connectivity': ('production-ssh-smoke.yml', 'workflow_dispatch', 'Verify production SSH access', None),
     'deployment': ('deployment-safety.yml', 'push', 'Test closed deployment policy and isolated three-node transactions', None),
     'freebsd_upgrade': ('freebsd-upgrade-acceptance.yml', 'workflow_run', 'Verify full package upgrade in a disposable VNET jail', 'liner-notes-freebsd-upgrade'),
-    'solaris': ('solaris-build-test.yml', 'push', 'Build and test exact main using the existing Solaris CI account', 'native-ci-solaris-results'),
+    'solaris': ('solaris-build-test.yml', 'schedule', 'Build and test exact main using the existing Solaris CI account', 'native-ci-solaris-results'),
     'selinux': ('selinux.yml', 'push', 'Verify the installed root-owned acceptance helper and run exact main', 'selinux-native-acceptance'),
     'doctor': ('doctor.yml', 'push', 'Read-only, malformed configuration, WAL and policy tests', 'doctor-evidence'),
 }
@@ -84,6 +84,9 @@ def latest_full_run(document, sha, event, label):
     for executing the required build/test steps on this exact main revision.
     """
     events = {event, 'workflow_dispatch'}
+    if label == 'solaris' and event == 'schedule':
+        # Retain exact-SHA evidence created before Solaris switched to daily CI.
+        events.add('push')
     candidates = [r for r in document.get('workflow_runs', []) if r.get('head_sha') == sha
                   and r.get('head_branch') == 'main' and r.get('event') in events]
     require(candidates, 'No exact-main automatic/manual CI run')

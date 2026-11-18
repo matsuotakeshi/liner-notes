@@ -72,6 +72,14 @@ class SolarisContracts(unittest.TestCase):
             self.assertNotIn("pull_request", triggers)
             self.assertNotIn("pull_request_target", triggers)
 
+    def test_native_schedule_is_daily_with_manual_override_and_same_lock(self):
+        doc = yaml.safe_load((ROOT / ".github/workflows/solaris-build-test.yml").read_text())
+        triggers = doc.get("on", doc.get(True))
+        self.assertEqual(set(triggers), {"schedule", "workflow_dispatch"})
+        self.assertEqual(triggers["schedule"], [{"cron": "23 19 * * *"}])
+        self.assertEqual(doc["concurrency"], {"group": "liner-notes-native-solaris", "cancel-in-progress": False})
+        self.assertIn("--target solaris", doc["jobs"]["test"]["steps"][1]["run"])
+
     def test_build_uses_native_libc_pty_and_socket_libraries(self):
         with patch.object(solaris_ci, "find_tool", side_effect=["/usr/bin/gmake", "/usr/bin/gcc"]), \
              patch.object(solaris_ci.shutil, "which", return_value=None), \

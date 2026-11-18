@@ -67,3 +67,7 @@ install-linux.mdの同一SHAによるRelease Set・パッケージ検証説明�
 正本42ページ、HTML 131ページ、内部リンク2,812件、旧URL 172件、検索8ケースと
 Markdown/HTML/ZIPの一致を確認しました。ブラウザー描画・RPM/DEBの再生成は
 このローカル検証には含めず、通常のPR CIへ委ねます。
+
+## Solarisの自動実行頻度
+
+Solaris Native CIは毎日1回（UTC 19:23、日本時間04:23予定）のscheduleと、main限定workflow_dispatchに変更しました。マージごとのpush起動は行いません。定期実行は既存scope判定で全検証となり、main/repository/SHA検査と同じ排他を維持します。配備判定は同一SHAのschedule/manualと従来pushの最新結果を検証し、別コミットの成功で代用しません。手動・再実行を含む厳密な24時間レート制限ではありません。

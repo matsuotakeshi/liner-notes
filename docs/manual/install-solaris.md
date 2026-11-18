@@ -8,6 +8,8 @@
 
 `Solaris Native CI`は信頼済みmainの正確なコミットだけを、既存のCIアカウントと固定ホスト鍵で取得します。独立した作業ディレクトリでビルドし、OSのパッケージ導入は行いません。SMF試験は、別途承認して準備した専用fixtureがある場合にだけ、固定の試験サービスを登録・操作します。PRでは接続を伴わないCI制御のテストを実行します。従来のFreeBSD・Rocky Linux・Ubuntuの3環境の検証は維持しています。
 
+Solarisの自動CIは毎日1回、日本時間04:23（UTC 19:23）を予定し、mainへのマージごとには実行しません。開始時点のmainを検証します。GitHub側の都合で遅延・未実行になる場合があり、変更がない日も検証します。必要時はmainを選んで手動実行できます。配備前には対象リリースと同じSHAの成功証跡が必要で、別SHAの日次成功では代用できません。手動実行・再実行は日次枠外です。
+
 必要な構築環境はGNU make、64ビットC11コンパイラ（ClangまたはGCC）、SQLiteとOpenSSLの開発用ヘッダー・ライブラリ、Python 3.11以上です。読み取り専用診断ツールdoctorも含めて検証します。WebUIとBBS間リンクは、それぞれaiohttp、cryptographyを必要とします。独立したPTYアプリのサイズ検査は`/usr/gnu/bin/stty`を使用します。Solaris標準sttyには`size`オプションがないためです。ZMODEM相互運用試験はlrz/lszを使います。未導入の場合、既存の公式ソース取得・SHA-256検証helperで作業コピー内だけにビルドします。Solarisではgcc/gmakeと64ビット指定を使用し、OSのパッケージは変更しません。
 
 CIログにはOS、コンパイラ候補、ライブラリ配置、Python、正確なソースSHAを記録します。OSパッケージは自動導入しません。WebUI・リンクのPython依存は作業コピー内の専用venvにrequirementsから導入し、既存のsystem Pythonを変更しません。インストール失敗もCI失敗として記録します。ビルド、排他寿命、SMF定義検証、基本BBS、Door、WebUI、リンク、ZMODEMの検証状態は`SOLARIS_CAPABILITIES`行で区別します。追加依存がなく実行できなかった機能を成功扱いしません。
