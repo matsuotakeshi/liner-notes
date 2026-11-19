@@ -103,7 +103,9 @@ int main(void) {
     session_result(&s,r,52);assert(!delivered && s.core.user==12 && s.ui_binding.states[0]);
     r->session=77;session_result(&s,r,53);assert(delivered==1 && s.core.user==9 && !s.ui_binding.states[0] && discarded==1);
     assert(session_ui_select(&s,"first")==SESSION_UI_SELECTED && !state(&s)->draft[0]);
+    s.ui_binding.restore_pending=1;
     assert(session_logout(&s) && !s.core.user && !s.ui_binding.states[1] && discarded==2);
+    assert(!s.ui_binding.restore_pending && !s.ui_binding.preferred[0] && !s.ui_binding.explicit_choice);
     assert(!session_chat_event(&s,&event));
     assert(session_ui_select(&s,"second")==SESSION_UI_SELECTED);
     s.core.user=9;session_revoke(&s);assert(!s.core.user && s.core.closing && !s.ui_binding.states[0] && revoked==1);
