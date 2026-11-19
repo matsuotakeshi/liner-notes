@@ -1,0 +1,89 @@
+"""Broker authority, one-use/revocation, UID roles and bounded protocol tests."""
+import asyncio,json,sys,unittest
+from pathlib import Path
+sys.path.insert(0,str(Path(__file__).resolve().parents[1]/'scripts'))
+from door_broker_core import Broker,Denied
+from door_broker import Server
+
+class Core(unittest.TestCase):
+    def setUp(self):
+        self.now=100;self.b=Broker('bbs-a',{40:[1],41:[2]},clock=lambda:self.now,ttl=10,session_ttl=60,capacity=4)
+    def opened(self,member=1,session='s1',generation=1,door=1):
+        s=self.b.open(member,door,session,generation);return s,self.b.issue(s)
+    def test_two_members_and_door_scope(self):
+        s,a=self.opened();t,b=self.opened(2,'s2')
+        one=self.b.consume(40,1,'bbs-a',a);two=self.b.consume(40,1,'bbs-a',b)
+        self.assertEqual((one['claims']['member'],two['claims']['member']),(1,2))
+        self.assertNotEqual(one['lease'],two['lease'])
+        with self.assertRaises(Denied):self.b.consume(40,1,'bbs-a',a)
+        with self.assertRaises(Denied):self.b.check(41,2,'bbs-a',one['lease'])
+    def test_forgery_and_wrong_bbs_do_not_consume(self):
+        s,token=self.opened()
+        for uid,door,bbs,ticket in [(40,1,'foreign',token),(41,2,'bbs-a',token),(99,1,'bbs-a',token),(40,1,'bbs-a','0'*64),(40,1,'bbs-a','invalid')]:
+            with self.assertRaises(Denied):self.b.consume(uid,door,bbs,ticket)
+        self.assertEqual(self.b.consume(40,1,'bbs-a',token)['claims']['member'],1)
+    def test_expiry_and_disconnect(self):
+        s,token=self.opened();self.now+=11
+        with self.assertRaises(Denied):self.b.consume(40,1,'bbs-a',token)
+        token=self.b.issue(s);lease=self.b.consume(40,1,'bbs-a',token)['lease'];self.b.close(s)
+        with self.assertRaises(Denied):self.b.check(40,1,'bbs-a',lease)
+    def test_generation_old_close_does_not_revoke_new(self):
+        old,token=self.opened();lease=self.b.consume(40,1,'bbs-a',token)['lease']
+        new,token=self.opened(generation=2)
+        with self.assertRaises(Denied):self.b.check(40,1,'bbs-a',lease)
+        self.b.close(old)
+        self.assertEqual(self.b.consume(40,1,'bbs-a',token)['claims']['generation'],2)
+        with self.assertRaises(Denied):self.opened(generation=1)
+    def test_issue_replaces_ticket_and_broker_restart_revokes(self):
+        s,old=self.opened();new=self.b.issue(s)
+        with self.assertRaises(Denied):self.b.consume(40,1,'bbs-a',old)
+        lease=self.b.consume(40,1,'bbs-a',new)['lease']
+        replacement=Broker('bbs-a',{40:[1]})
+        with self.assertRaises(Denied):replacement.check(40,1,'bbs-a',lease)
+    def test_session_timeout_and_capacity(self):
+        s,token=self.opened();lease=self.b.consume(40,1,'bbs-a',token)['lease'];self.now+=61
+        with self.assertRaises(Denied):self.b.check(40,1,'bbs-a',lease)
+        for i in range(4):self.opened(session='n'+str(i))
+        with self.assertRaises(Denied):self.opened(session='extra')
+    def test_invalid_identity_types(self):
+        for value in (True,0,-1,1000000,'1'):
+            with self.assertRaises(Denied):self.opened(member=value)
+        with self.assertRaises(Denied):self.opened(session='bad\nname')
+        with self.assertRaises(Denied):self.opened(door=3)
+
+class Writer:
+    def __init__(self,uid):self.uid=uid;self.data=bytearray();self.closed=False
+    def get_extra_info(self,name):return self.uid
+    def write(self,data):self.data.extend(data)
+    async def drain(self):pass
+    def close(self):self.closed=True
+    async def wait_closed(self):pass
+
+class Protocol(unittest.IsolatedAsyncioTestCase):
+    async def request(self,uid,request):
+        reader=asyncio.StreamReader(limit=4096);writer=Writer(uid)
+        reader.feed_data(json.dumps(request).encode()+b'\n');reader.feed_eof()
+        await self.server.handle(reader,writer);return bytes(writer.data)
+    async def asyncSetUp(self):
+        self.b=Broker('bbs',{40:[1]});self.server=Server(self.b,peer=lambda uid:uid)
+    async def test_door_and_bbs_cannot_issue(self):
+        request=dict(op='open',member=2,door=1,session='a',generation=1)
+        for uid in (20,30,40):
+            result=await self.request(uid,request);self.assertIn(b'"ok":false',result);self.assertNotIn(b'ticket',result)
+        self.assertFalse(self.b.sessions)
+    async def test_live_issuer_owns_lease(self):
+        reader=asyncio.StreamReader(limit=4096);writer=Writer(0)
+        reader.feed_data(b'{"op":"open","member":1,"door":1,"session":"s","generation":1}\n')
+        task=asyncio.create_task(self.server.handle(reader,writer))
+        for _ in range(5):await asyncio.sleep(0)
+        token=json.loads(writer.data)['result']['ticket']
+        result=json.loads(await self.request(40,dict(op='consume',door=1,bbs='bbs',token=token)))['result']
+        self.assertEqual(result['claims']['member'],1)
+        reader.feed_eof();await task
+        check=await self.request(40,dict(op='check',door=1,bbs='bbs',token=result['lease']))
+        self.assertIn(b'"ok":false',check)
+    async def test_malformed_request_has_no_secret_echo(self):
+        result=await self.request(0,{'op':'wrong','secret':'do-not-echo'})
+        self.assertIn(b'"ok":false',result);self.assertNotIn(b'do-not-echo',result)
+
+if __name__=='__main__':unittest.main()

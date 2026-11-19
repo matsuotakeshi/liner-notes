@@ -33,13 +33,15 @@
 #endif
 /* Solaris 11.4 declares openpty/login_tty in <termios.h>, in libc. */
 static DoorCatalog catalog;
-struct Door { pid_t pid;int fd,exited,after_cr,lock;char run[1200];uint64_t until,stop_until;unsigned char input[8192];size_t used;struct Door *next; };
+struct Door { pid_t pid;int fd,exited,after_cr,lock,remote;char run[1200];uint64_t until,stop_until;unsigned char input[8192];size_t used;struct Door *next; };
+#include "door_isolation.inc"
 static uint64_t door_clock(void) { struct timespec t;clock_gettime(CLOCK_MONOTONIC,&t);return (uint64_t)t.tv_sec*1000+(uint64_t)t.tv_nsec/1000000; }
 /* Keep the slot until the leader AND its process group have gone. */
 static Door *reaping;
 static void door_clean(Door *d) {
     if(*d->run) { char path[1240];snprintf(path,sizeof(path),"%s/DORINFO1.DEF",d->run);unlink(path);rmdir(d->run); }
     if(d->lock>=0)door_lock_release(d->lock);
+    if(d->remote>=0)close(d->remote);
     free(d);
 }
 int doors_pending(void) { return reaping!=NULL; }
@@ -48,6 +50,10 @@ void doors_reap(void) {
     Door **link=&reaping;
     while(*link) {
         Door *d=*link;int status;
+        if(d->remote>=0) {
+            if(isolated_done(d)) { *link=d->next;door_clean(d); }else link=&d->next;
+            continue;
+        }
         if(door_clock()>=d->stop_until) { kill(-d->pid,SIGKILL);if(!d->exited)kill(d->pid,SIGKILL); }
         if(!d->exited) { pid_t p=waitpid(d->pid,&status,WNOHANG);if(p==d->pid || (p<0 && errno==ECHILD))d->exited=1; }
         if(d->exited && kill(-d->pid,0)<0 && errno==ESRCH) { *link=d->next;door_clean(d); }
@@ -91,11 +97,12 @@ void doors_list(unsigned level,char *out,size_t size) {
     DoorListing listing;door_core_list(&catalog,level,&listing);
     door_protocol_list(&listing,out,size);
 }
-Door *door_start(unsigned id,unsigned level,uint32_t user,const char *name,unsigned columns,unsigned rows,uint64_t now) {
+Door *door_start(unsigned id,unsigned level,uint32_t user,const char *name,unsigned columns,unsigned rows,uint64_t now,unsigned long session,uint32_t epoch) {
     errno=0;if(!user || geteuid()==0)return NULL;doors_reap();errno=0;
     const DoorSpec *g=door_core_launch(&catalog,id,level,user,geteuid()==0);
     if(!g)return NULL;
-    Door *d=calloc(1,sizeof(*d));if(!d)return NULL;d->lock=-1;d->fd=-1;
+    if(isolation_enabled())return isolated_start(g,level,user,name,columns,rows,now,session,epoch);
+    Door *d=calloc(1,sizeof(*d));if(!d)return NULL;d->lock=-1;d->fd=-1;d->remote=-1;
     unsigned node=0;
     if((g->slots && !door_slot(d,g,&node)) || (g->drop && !door_drop(d,g,user,level))) { int saved=errno;door_clean(d);errno=saved;return NULL; }
     int master,slave;struct winsize ws={0};ws.ws_col=(unsigned short)columns;ws.ws_row=(unsigned short)rows;
@@ -142,10 +149,17 @@ int door_pump(Door *d,int (*write_bytes)(void *,const unsigned char *,size_t),vo
     unsigned char buffer[4096];ssize_t n=read(d->fd,buffer,sizeof(buffer));
     if(n>0) { if(!write_bytes(context,buffer,(size_t)n))return -1;return 0; }
     if(n<0 && errno!=EAGAIN && errno!=EINTR && errno!=EIO)return -1;
+    if(d->remote>=0)return isolated_done(d)?1:0;
     int status;pid_t p=waitpid(d->pid,&status,WNOHANG);if(p==d->pid || (p<0 && errno==ECHILD)) { d->exited=1;return 1; }return 0;
 }
 void door_stop(Door *d) {
     if(!d)return;
+    if(d->remote>=0) {
+#ifdef __linux__
+        shutdown(d->remote,SHUT_WR);
+#endif
+        close(d->fd);d->fd=-1;d->next=reaping;reaping=d;doors_reap();return;
+    }
     /* Let terminal-aware games save/clear their own semaphores on hangup.
      * The main event loop never blocks; ignored hangups get a bounded grace. */
     d->stop_until=door_clock()+250;kill(-d->pid,SIGHUP);if(!d->exited)kill(d->pid,SIGHUP);close(d->fd);d->fd=-1;
@@ -153,9 +167,10 @@ void door_stop(Door *d) {
 
 }
 #else
+int doors_isolation_config(const char *p) { (void)p;return 0; }
 int doors_config(const char *p) { return !p; }
 void doors_list(unsigned l,char *s,size_t n) { (void)l;snprintf(s,n,"GAMES\r\nEND GAMES\r\n"); }
-Door *door_start(unsigned i,unsigned l,uint32_t u,const char *s,unsigned c,unsigned r,uint64_t t) { (void)i;(void)l;(void)u;(void)s;(void)c;(void)r;(void)t;return NULL; }
+Door *door_start(unsigned i,unsigned l,uint32_t u,const char *s,unsigned c,unsigned r,uint64_t t,unsigned long session,uint32_t epoch) { (void)session;(void)epoch;(void)i;(void)l;(void)u;(void)s;(void)c;(void)r;(void)t;return NULL; }
 int door_input(Door *d,unsigned char b) { (void)d;(void)b;return 0; }
 int door_room(Door *d) { (void)d;return 0; }
 int door_resize(Door *d,unsigned c,unsigned r) { (void)d;(void)c;(void)r;return 0; }

@@ -176,7 +176,7 @@ static void service_result(BoardResult *r) {
         if(r->slot<0 || r->slot>=SLOTS) return;
         Connection *c=&connections[r->slot];Session *s=&c->app;
         if(c->fd==INVALID || s->core.id!=r->session || !s->core.user || s->core.closing || !s->connection.binary_allowed || c->door) { (r->feedback.failed=1,strcpy(r->text,"ERR game unavailable\r\n"));return; }
-        c->door=door_start(r->service_number,r->service_next,s->core.user,s->core.username,s->connection.columns,s->connection.rows,now_ms());
+        c->door=door_start(r->service_number,r->service_next,s->core.user,s->core.username,s->connection.columns,s->connection.rows,now_ms(),s->core.id,s->core.user_epoch);
         if(!c->door) { r->feedback.failed=1;strcpy(r->text,errno==EBUSY?"ERR game busy\r\n":"ERR game unavailable\r\n");return; }
         s->connection.door=1;c->used=0;terminal_clear(&c->terminal);session_scan_pause(s);
         if(!session_notice(s,SESSION_NOTICE_DOOR,0,0,0,r->text,sizeof(r->text)))session_abort(s);
@@ -395,6 +395,7 @@ int main(int argc,char **argv) {
         else if(!strcmp(argv[1],"--sysinfo") && argc>2) { site_info=argv[2];argc-=2;argv+=2; }
         else if(!strcmp(argv[1],"--goodbye") && argc>2) { site_bye=argv[2];argc-=2;argv+=2; }
         else if(!strcmp(argv[1],"--timezone") && argc>2) { timezone=argv[2];argc-=2;argv+=2; }
+        else if(!strcmp(argv[1],"--door-isolation-socket") && argc>2) { if(!doors_isolation_config(argv[2])) { fprintf(stderr,"Door isolation unsupported or invalid socket\n");return 2; }argc-=2;argv+=2; }
         else if(!strcmp(argv[1],"--doors") && argc>2) { doors_path=argv[2];argc-=2;argv+=2; }
         else if(!strcmp(argv[1],"--gather-count") && argc>2) {
             char *end;unsigned long n=strtoul(argv[2],&end,10);if(*argv[2]<'0' || *argv[2]>'9' || *end || n>1000) { fprintf(stderr,"gather-count: 0..1000 required\n");return 2; }gather_limit=(unsigned)n;argc-=2;argv+=2;
@@ -454,7 +455,7 @@ int main(int argc,char **argv) {
     if(!doors_config(doors_path)) { fprintf(stderr,"invalid doors configuration\n");return 2; }
     long port=(argc>=2 && argc<=5) ? strtol(argv[1],&end,10) : -1;
     if(port<0 || port>65535 || !end || end==argv[1] || *end) {
-        fprintf(stderr,"usage: runtime [--ssh-port PORT --ssh-host-key FILE] [--ssh-bind IPv4] [--ssh-member-keys FILE] [--ssh-attempts N] [--ssh-timeout SECONDS] [--database FILE | --database-structured FILE] [--level-seconds LEVEL:SECONDS] [--time-warning N] [--time-grace N] [--userlog-public] [--userlog-keep N] [--idle-seconds N] [--user-log FILE|-] [--gather-count N] [--chat-log FILE|-] [--max-articles N] [--max-mail N] [--max-user-posts N] [--banner FILE] [--disable chat|mail|vault] [--registration open|approval|closed] [--id-mode free|auto] [--id-prefix PREFIX] [--id-digits 1..8] [--id-first NAME] [--rtbbs-member-policy] [--login-text-dir DIR] [--registration-form simple|detailed] [--doors FILE] [--link-accounts FILE] [--zmodem-helper FILE] [--vault-dir DIR] [--bind IPv4] [--menu] [--menu-dir DIR] [--help-dir DIR] [--telnet] [--lang ja|en] [--admins FILE] PORT [BOARD_FILE [MEMBERS_FILE [CATALOG_FILE]]] (default bind: 127.0.0.1)\n"); return 2;
+        fprintf(stderr,"usage: runtime [--ssh-port PORT --ssh-host-key FILE] [--ssh-bind IPv4] [--ssh-member-keys FILE] [--ssh-attempts N] [--ssh-timeout SECONDS] [--database FILE | --database-structured FILE] [--level-seconds LEVEL:SECONDS] [--time-warning N] [--time-grace N] [--userlog-public] [--userlog-keep N] [--idle-seconds N] [--user-log FILE|-] [--gather-count N] [--chat-log FILE|-] [--max-articles N] [--max-mail N] [--max-user-posts N] [--banner FILE] [--disable chat|mail|vault] [--registration open|approval|closed] [--id-mode free|auto] [--id-prefix PREFIX] [--id-digits 1..8] [--id-first NAME] [--rtbbs-member-policy] [--login-text-dir DIR] [--registration-form simple|detailed] [--door-isolation-socket FILE] [--doors FILE] [--link-accounts FILE] [--zmodem-helper FILE] [--vault-dir DIR] [--bind IPv4] [--menu] [--menu-dir DIR] [--help-dir DIR] [--telnet] [--lang ja|en] [--admins FILE] PORT [BOARD_FILE [MEMBERS_FILE [CATALOG_FILE]]] (default bind: 127.0.0.1)\n"); return 2;
     }
 #ifdef _WIN32
     WSADATA data; if(WSAStartup(MAKEWORD(2,2),&data)) return 1;

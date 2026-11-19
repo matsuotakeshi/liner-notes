@@ -438,3 +438,7 @@ bin/liner-notes-serial
 %%DATADIR%%/scripts/deploy_restore.py
 %%DATADIR%%/scripts/deploy_transaction.py
 %%DATADIR%%/scripts/ssh-key-fingerprint.py
+%%DATADIR%%/scripts/door_broker_core.py
+%%DATADIR%%/scripts/door_broker.py
+%%DATADIR%%/scripts/door_isolation.py
+%%DATADIR%%/scripts/door_auth_client.py

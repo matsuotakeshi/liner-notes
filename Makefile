@@ -634,3 +634,11 @@ test-ssh-sources:
 	$(PYTHON) tests/test_ssh_sources.py
 
 check: test-ssh-sources
+
+# All Door launch paths rebuild when the opt-in isolation adapter changes.
+runtime: src/door_isolation.inc
+
+.PHONY: test-door-broker
+check: test-door-broker
+test-door-broker:
+	$(PYTHON) tests/test_door_broker.py
