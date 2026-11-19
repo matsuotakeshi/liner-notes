@@ -153,6 +153,21 @@ new confined process is alive.
   paths and dependency names. All test units have a 300-second runtime watchdog.
   No existing BBS service is changed. Test units and port mappings have unique
   names recorded in the root-only fixture record.
+  The Broker uses a temporary locked/non-login NSS account with its own group
+  and a separate consumer group. Numeric UIDs alone are insufficient when
+  systemd initializes `SupplementaryGroups` (observed `217/USER` before exec).
+  All fixture IDs and generated names must be unused; existing identities are
+  never reused or changed. No home directory is created. The native fixture
+  records both creation intent (`door_account_plan`) and created identities
+  (`door_accounts`) in `fixture-state.json`, stops its units first,
+  and removes only unchanged identities after verifying no process references
+  their UIDs/GIDs. Changed entries or live tasks cause a retained-state failure.
+  Hosted Rocky checks real NSS creation, group assignment and removal inside
+  its disposable container; this is not systemd/Enforcing runtime evidence.
+  On startup failure, including `ExecStartPre`, the adapter captures at most
+  40 journal lines/16 KiB from that unique unit before unit-file removal. A
+  journal failure is recorded without replacing the original startup error.
+  These diagnostics flow into `acceptance.log` and the native CI Artifact.
 
 Native helper cleanup now recognizes all three new domains. Therefore the
 installed root-owned `liner-notes-ci-selinux` hash must be refreshed to the
@@ -162,7 +177,57 @@ update after Hosted checks/main integration. Keep the workflow's hash check.
 
 In interrupted native tests retain `fixture-state.json`, `acceptance.log` and
 the exact SHA. Stop only recorded units, confirm all test tasks are gone, then
-remove only their unchanged runtime unit files and port mappings. Do not unload
+remove only their unchanged runtime unit files and port mappings. If temporary
+`door_accounts` remain, verify their recorded names/IDs and non-login properties,
+absence of foreign group members and primary-group references, and absence of
+processes using any fixture UID/GID before removing only those entries. Never
+force removal or remove a home directory. Do not unload
 the policy while any candidate domain survives. Independent security review,
 Solaris isolation and a production game-server policy remain separate gates;
 no local portable test or earlier commit's CI certifies them.
+
+## PR 142 manual/source review
+
+Reviewed `ci/selinux_native.py` against `docs/manual/security.md`: the change
+adds `door_accounts` and `door_account_plan` to the recovery record. The guarded
+main/Enforcing admission, service permissions and policy removal checks are
+unchanged. The manual now distinguishes the original `liner_notes_ci` services
+from temporary Broker NSS identities and describes safe interrupted cleanup and
+bounded pre-cleanup unit journals. Only the reviewed native source fingerprint
+is refreshed; this records documentation correspondence, not native acceptance.
+The initial PR checks failed on that omitted source-lock refresh in manual/RPM/DEB.
+The separate doctor failure was an Ubuntu mirror connection timeout while
+fetching clang, before its functional tests; no application defect was inferred.
+
+## Hosted download recovery (2026-11-20)
+
+PR 142's later failures were external retrieval failures: the Ubuntu kernel.org
+mirror failed to supply clang, and both EL9 jobs timed out during the upstream
+lrzsz TLS handshake. Manual/RPM/DEB checks and the SELinux policy/NSS test passed.
+
+The restricted hosted Ubuntu mirror helper now selects JAIST:
+https://ftp.jaist.ac.jp/pub/Linux/ubuntu/ . Ubuntu Japanese Team lists JAIST and
+Yamagata University as domestic archive mirrors:
+https://www.ubuntulinux.jp/ubuntu/mirrors . A local HTTPS probe retrieved noble,
+updates, security and backports InRelease files plus the failed clang package;
+this does not establish performance or reachability from every hosted runner.
+Suites, components, Signed-By and APT freshness/signature verification remain
+unchanged. Only disposable GitHub-hosted Ubuntu 24.04 amd64 may use the helper.
+
+The lrzsz builder preserves its existing URL, fixed digest and build/CRC patch.
+Network failures and selected transient HTTP statuses retry at most three times
+(30-second socket timeout, 2/5-second backoff); certificate/integrity/permanent
+HTTP errors are not retried. Redirects must remain HTTPS. The new download-only
+mode publishes verified bytes atomically without overwriting existing files.
+Cache hits and --archive input are always rehashed; corrupt cache fails closed.
+Linux compatibility and hosted SELinux restore an exact digest-keyed source-only
+cache, verify it on the host, and pass it into the existing private build. No
+compiled engine or test outcome is cached, and there are no broad restore keys.
+If a cache is corrupt, investigate/remove that cache entry; do not change the
+pinned digest to accept it. Exhausted upstream failures remain CI failures.
+
+Reviewed build-lrzsz.py against the canonical Linux installation chapter and
+updated the source-lock for that file only. FreeBSD/Linux/Solaris build commands,
+archive entry validation, CRC patch and resume receipt behavior are preserved.
+The new unit tests cover retry exhaustion, HTTP/certificate/hash/size refusal,
+HTTPS downgrade rejection, and verified/corrupt cache handling.

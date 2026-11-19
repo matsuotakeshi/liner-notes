@@ -2,6 +2,8 @@ name: Rocky SELinux policy
 on:
   pull_request:
     paths:
+      - 'scripts/build-lrzsz.py'
+      - 'tests/test_lrzsz_download.py'
       - 'scripts/release_manifest.py'
       - 'tests/test_release_manifest.py'
       - 'linux/selinux/**'
@@ -16,6 +18,8 @@ on:
   push:
     branches: [main]
     paths:
+      - 'scripts/build-lrzsz.py'
+      - 'tests/test_lrzsz_download.py'
       - 'scripts/release_manifest.py'
       - 'tests/test_release_manifest.py'
       - 'linux/selinux/**'
@@ -38,6 +42,15 @@ jobs:
       - uses: actions/checkout@v4
         with:
           persist-credentials: false
+      - name: Restore pinned lrzsz source
+        uses: actions/cache@v4
+        with:
+          path: build/lrzsz-source
+          key: lrzsz-source-0.13.1-112f91059fbd118e016d800c1a5c5a1702e965d8b9bfbda6015e44e20bfb93c9
+      - name: Verify or fetch pinned lrzsz source
+        run: |
+          python3 tests/test_lrzsz_download.py
+          python3 scripts/build-lrzsz.py --download-archive build/lrzsz-source/lrzsz-0.13.1.tar.gz
       - name: Verify fresh-instance bootstrap against the real runtime
         run: |
           sudo apt-get update
@@ -45,7 +58,7 @@ jobs:
           python3 -m venv build/selinux-bootstrap-venv
           build/selinux-bootstrap-venv/bin/pip install -r link-requirements.txt
           make -j2 runtime vaultctl dbconvert CC=clang SQLITE_CFLAGS= SQLITE_LIBS=-lsqlite3
-          python3 scripts/build-lrzsz.py build/selinux-lrzsz
+          python3 scripts/build-lrzsz.py build/selinux-lrzsz --archive build/lrzsz-source/lrzsz-0.13.1.tar.gz
           build/selinux-bootstrap-venv/bin/python -B tests/test_selinux_bootstrap.py ./runtime \
             build/selinux-lrzsz/local/bin/lrz build/selinux-lrzsz/local/bin/lsz
       - name: Compile the policy and its optional RPM in Rocky 10
@@ -57,7 +70,8 @@ jobs:
           mkdir -p build/selinux
           docker run --rm -e SOURCE_SHA="$GITHUB_SHA" -v "$GITHUB_WORKSPACE:/source:ro" -v "$GITHUB_WORKSPACE/build/selinux:/out" \
             rockylinux/rockylinux:10 bash -euc '
-              dnf install -y --setopt=install_weak_deps=False selinux-policy-devel rpm-build make python3 procps-ng setools-console
+              dnf install -y --setopt=install_weak_deps=False selinux-policy-devel rpm-build make python3 procps-ng setools-console shadow-utils
+              CI_SELINUX_DISPOSABLE=1 python3 /source/tests/test_selinux_door_services.py --accounts-in-disposable-container
               mkdir -p /build/{SOURCES,SPECS,BUILD,BUILDROOT,RPMS,SRPMS}
               cp /source/linux/selinux/liner_notes.te /source/linux/selinux/liner_notes.fc /source/linux/selinux/selinux_labels.py /build/SOURCES/
               cp /source/LICENSE /build/SOURCES/

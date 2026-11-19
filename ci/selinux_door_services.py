@@ -1,9 +1,12 @@
 """Reviewed-main-only adapter: run the existing Door suite in real systemd domains.
 
-No installed service or account is changed. Units have unique fixture names;
+No existing service or account is changed. Temporary non-login fixture identities
+are owned by this run and removed only after all fixture processes exit.
+Units have unique names;
 only their own runtime unit files are removed. The parent SELinux fixture owns
 policy loading, the VM gate, state record, audit filtering and final cleanup.
 """
+import hashlib
 import io
 import json
 import os
@@ -19,6 +22,97 @@ def argv(arguments):
     # systemd expands specifiers and variables even without an OS shell.
     return ' '.join(json.dumps(str(value).replace('%', '%%').replace('$', '$$'))
                     for value in arguments)
+
+
+class Accounts:
+    """NSS identities needed by systemd SupplementaryGroups, never shared users."""
+    def __init__(self, fixture, command, broker, game, uids):
+        import grp
+        import pwd
+        self.pwd, self.grp = pwd, grp
+        self.fixture, self.command = fixture, command
+        self.broker, self.game, self.uids = broker, game, tuple(uids)
+        suffix = hashlib.sha256(str(fixture.path).encode()).hexdigest()[:12]
+        self.user = 'lnci_b_' + suffix
+        self.groups = [('lnci_bg_' + suffix, broker), ('lnci_g_' + suffix, game)]
+        self.created = []
+
+    def record(self):
+        self.fixture.door_accounts = list(self.created)
+        self.fixture.save_record()
+
+    def idle(self):
+        # Examine all real/effective/saved/fs IDs, including root workers that
+        # have not completely dropped a fixture identity. Races fail closed.
+        for path in Path('/proc').glob('[0-9]*/status'):
+            try:
+                lines = path.read_text().splitlines()
+            except FileNotFoundError:
+                continue
+            for line in lines:
+                if line.startswith(('Uid:', 'Gid:', 'Groups:')):
+                    if set(map(int, line.split()[1:])) & set(self.uids):
+                        raise ValueError('Fixture identity still has a live process')
+
+    @staticmethod
+    def absent(lookup, key):
+        try:
+            lookup(key)
+        except KeyError:
+            return
+        raise ValueError('Fixture identity already allocated')
+
+    def create(self):
+        self.idle()
+        # Check every name and number before making any change. Shadow tools
+        # also refuse collisions atomically; never use non-unique/force flags.
+        for uid in self.uids:
+            self.absent(self.pwd.getpwuid, uid)
+            self.absent(self.grp.getgrgid, uid)
+        self.absent(self.pwd.getpwnam, self.user)
+        for name, gid in self.groups:
+            self.absent(self.grp.getgrnam, name)
+        self.fixture.door_account_plan = [
+            {'kind': 'group', 'name': name, 'id': gid} for name, gid in self.groups
+        ] + [{'kind': 'user', 'name': self.user, 'id': self.broker}]
+        self.record()  # recovery intent survives interruption during account tools
+        for name, gid in self.groups:
+            self.command('/usr/sbin/groupadd', '--gid', str(gid), name)
+            self.created.append({'kind': 'group', 'name': name, 'id': gid})
+            self.record()
+        self.command('/usr/sbin/useradd', '--uid', str(self.broker),
+                     '--gid', str(self.broker), '--no-user-group', '--no-create-home',
+                     '--no-log-init', '-K', 'SUB_UID_COUNT=0', '-K', 'SUB_GID_COUNT=0', '--home-dir', '/nonexistent', '--shell', '/usr/sbin/nologin',
+                     '--password', '!', self.user)
+        self.created.append({'kind': 'user', 'name': self.user, 'id': self.broker})
+        self.record()
+
+    def close(self):
+        if not self.created:
+            return
+        self.idle()
+        # Validate the entire set before deleting anything. Preserve changed
+        # identities for explicit recovery instead of deleting foreign state.
+        for entry in reversed(self.created):
+            name, uid = entry['name'], entry['id']
+            if entry['kind'] == 'user':
+                user = self.pwd.getpwnam(name)
+                if (user.pw_uid != uid or user.pw_gid != uid or
+                        user.pw_dir != '/nonexistent' or user.pw_shell != '/usr/sbin/nologin' or
+                        self.pwd.getpwuid(uid).pw_name != name):
+                    raise ValueError('Fixture account changed; retain for recovery')
+            else:
+                group = self.grp.getgrnam(name)
+                if group.gr_gid != uid or group.gr_mem or self.grp.getgrgid(uid).gr_name != name:
+                    raise ValueError('Fixture group changed; retain for recovery')
+                for user in self.pwd.getpwall():
+                    if user.pw_gid == uid and (user.pw_name != self.user or user.pw_uid != self.broker):
+                        raise ValueError('Foreign user references fixture group')
+        for entry in reversed(self.created.copy()):
+            tool = '/usr/sbin/userdel' if entry['kind'] == 'user' else '/usr/sbin/groupdel'
+            self.command(tool, entry['name'])  # no force, no home/data removal
+            self.created.remove(entry)
+            self.record()
 
 
 class Process:
@@ -40,7 +134,11 @@ class Process:
         backend.fixture.units.append(self.name)
         backend.fixture.save_record()
         backend.command('systemctl', 'daemon-reload')
-        backend.command('systemctl', 'start', self.name)
+        try:
+            backend.command('systemctl', 'start', self.name)
+        except Exception:
+            self.diagnostics()
+            raise
         for _ in range(60):
             fields = self.state()
             pid = int(fields.get('MainPID', '0'))
@@ -56,7 +154,22 @@ class Process:
             if fields.get('ActiveState') == 'failed':
                 break
             time.sleep(.1)
-        raise AssertionError(('Door service domain/startup', role, self.stderr.read(4096)))
+        self.diagnostics()
+        raise AssertionError(('Door service domain/startup', role))
+
+    def diagnostics(self):
+        # Capture before unit removal/daemon-reload, even if ExecStartPre fails.
+        # Only this unique fixture unit is queried; never export whole journals.
+        try:
+            result = self.backend.command('journalctl', '--no-pager', '-u', self.name,
+                                          '-n', '40', '-o', 'short-iso', check=False)
+            self.stderr_cache = io.BytesIO(result.stdout.encode()[-16384:])
+            print('DOOR_UNIT_JOURNAL ' + self.name + '\n' + self.stderr_cache.getvalue().decode(errors='replace'), flush=True)
+            if result.returncode:
+                print('DOOR_UNIT_JOURNAL unavailable (exit ' + str(result.returncode) + ')', flush=True)
+        except Exception as error:
+            # Keep the original startup/cleanup exception, not a diagnostic error.
+            print('DOOR_UNIT_JOURNAL unavailable: ' + type(error).__name__, flush=True)
 
     def state(self):
         result = self.backend.command('systemctl', 'show', self.name,
@@ -125,6 +238,7 @@ class Backend:
         self.fixture, self.command = fixture, command
         self.path = fixture.path
         self.units = []
+        self.accounts = Accounts(fixture, command, BROKER, GAME, (BBS, BROKER, GAME, SLOT1, SLOT2))
         fixture.door_slot_uids = [SLOT1, SLOT2]
         fixture.save_record()
 
@@ -232,17 +346,22 @@ class Backend:
         # Never erase another file, reset BUSY or kill every process of an UID.
         # The original fixture has already checked/reclaimed its owned slots.
         for process in reversed(self.units):
-            process.terminate()
-            process.wait(15)
+            try:
+                process.terminate()
+                process.wait(15)
+            finally:
+                process.diagnostics()
             assert process.file.read_text() == process.content, 'fixture unit changed'
             process.file.unlink()
         self.command('systemctl', 'daemon-reload')
+        self.accounts.close()
 
 
 def acceptance(fixture, command):
     from test_door_broker_linux import run
     backend = Backend(fixture, command)
     try:
+        backend.accounts.create()
         run(str(ROOT/'runtime'), backend=backend)
         fixture.results.append({'door_broker':'systemd + Enforcing identity/lifecycle/revocation/PTY/persistence/crash refusal'})
     finally:

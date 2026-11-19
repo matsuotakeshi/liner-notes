@@ -2,6 +2,8 @@
 import importlib.util
 from pathlib import Path
 import subprocess
+import tempfile
+from types import SimpleNamespace
 import sys
 import unittest
 from unittest.mock import Mock, patch
@@ -87,4 +89,167 @@ class Units(unittest.TestCase):
                         self.assertIn(line,text)
 
 
-if __name__=='__main__':unittest.main()
+class FixtureAccounts(unittest.TestCase):
+    def setUp(self):
+        self.users, self.groups, self.calls = {}, {}, []
+        def lookup(data, key, field):
+            for value in data.values():
+                if getattr(value, field) == key: return value
+            raise KeyError(key)
+        self.pwd = Mock()
+        self.pwd.getpwnam.side_effect = lambda key: lookup(self.users, key, 'pw_name')
+        self.pwd.getpwuid.side_effect = lambda key: lookup(self.users, key, 'pw_uid')
+        self.pwd.getpwall.side_effect = lambda: list(self.users.values())
+        self.grp = Mock()
+        self.grp.getgrnam.side_effect = lambda key: lookup(self.groups, key, 'gr_name')
+        self.grp.getgrgid.side_effect = lambda key: lookup(self.groups, key, 'gr_gid')
+        with patch.dict(sys.modules, {'pwd': self.pwd, 'grp': self.grp}):
+            self.accounts = services.Accounts(Mock(path=Path('/fixture/generation')), self.command,
+                                              30, 40, (20, 30, 40, 50, 51))
+        self.idle = patch.object(self.accounts, 'idle'); self.idle.start(); self.addCleanup(self.idle.stop)
+
+    def command(self, *args):
+        self.calls.append(args)
+        name = args[-1]
+        if args[0].endswith('/groupadd'):
+            self.groups[name] = SimpleNamespace(gr_name=name, gr_gid=int(args[2]), gr_mem=[])
+        elif args[0].endswith('/useradd'):
+            self.users[name] = SimpleNamespace(pw_name=name, pw_uid=30, pw_gid=30,
+                                               pw_dir='/nonexistent', pw_shell='/usr/sbin/nologin')
+        elif args[0].endswith('/userdel'): del self.users[name]
+        elif args[0].endswith('/groupdel'): del self.groups[name]
+
+    def test_create_nonlogin_identity_and_remove_only_owned_entries(self):
+        self.accounts.create()
+        self.assertEqual(self.pwd.getpwuid(30).pw_name, self.accounts.user)
+        self.assertEqual(self.grp.getgrgid(40).gr_gid, 40)
+        call = self.calls[-1]
+        for flag in ('--no-create-home', '--no-log-init', '--no-user-group'): self.assertIn(flag, call)
+        self.assertEqual(call[call.index('--password')+1], '!')
+        self.accounts.close()
+        self.assertFalse(self.users); self.assertFalse(self.groups)
+        self.assertEqual([c[0] for c in self.calls[-3:]],
+                         ['/usr/sbin/userdel', '/usr/sbin/groupdel', '/usr/sbin/groupdel'])
+        for c in self.calls[-3:]: self.assertEqual(len(c), 2)
+        self.assertEqual(self.accounts.fixture.door_accounts, [])
+
+    def test_collision_causes_no_changes(self):
+        self.groups['foreign'] = SimpleNamespace(gr_name='foreign', gr_gid=40, gr_mem=[])
+        with self.assertRaisesRegex(ValueError, 'already allocated'): self.accounts.create()
+        self.assertFalse(self.calls)
+
+    def test_name_collision_causes_no_changes(self):
+        name = self.accounts.groups[0][0]
+        self.groups[name] = SimpleNamespace(gr_name=name, gr_gid=1234, gr_mem=[])
+        with self.assertRaisesRegex(ValueError, 'already allocated'): self.accounts.create()
+        self.assertFalse(self.calls)
+
+    def test_partial_creation_is_recoverable(self):
+        original = self.accounts.command
+        def fail(*args):
+            if args[0].endswith('/useradd'): raise RuntimeError('creation failed')
+            return original(*args)
+        self.accounts.command = fail
+        with self.assertRaisesRegex(RuntimeError, 'creation failed'): self.accounts.create()
+        self.assertEqual(len(self.accounts.fixture.door_accounts), 2)
+        self.accounts.close()
+        self.assertFalse(self.groups)
+
+    def test_changed_user_retained(self):
+        self.accounts.create(); self.calls.clear()
+        self.users[self.accounts.user].pw_uid = 999
+        with self.assertRaisesRegex(ValueError, 'account changed'): self.accounts.close()
+        self.assertFalse(self.calls)
+
+    def test_foreign_group_member_retained(self):
+        self.accounts.create(); self.calls.clear()
+        self.groups[self.accounts.groups[1][0]].gr_mem = ['foreign']
+        with self.assertRaisesRegex(ValueError, 'group changed'): self.accounts.close()
+        self.assertFalse(self.calls)
+
+    def test_foreign_primary_group_retained(self):
+        self.accounts.create(); self.calls.clear()
+        self.users['foreign'] = SimpleNamespace(pw_name='foreign', pw_uid=888, pw_gid=40)
+        with self.assertRaisesRegex(ValueError, 'Foreign user'): self.accounts.close()
+        self.assertFalse(self.calls)
+
+    def test_live_process_prevents_cleanup(self):
+        self.accounts.create(); self.calls.clear()
+        self.accounts.idle.side_effect = ValueError('Fixture identity still has a live process')
+        with self.assertRaisesRegex(ValueError, 'live process'): self.accounts.close()
+        self.assertFalse(self.calls)
+
+    def test_proc_scan_includes_saved_uid_and_supplementary_groups(self):
+        self.idle.stop()
+        for line in ('Uid: 0 0 30 0', 'Gid: 0 40 0 0', 'Groups: 1 51'):
+            path = Mock(); path.read_text.return_value = line
+            with patch.object(services.Path, 'glob', return_value=[path]):
+                with self.assertRaisesRegex(ValueError, 'live process'): self.accounts.idle()
+
+
+class Diagnostics(unittest.TestCase):
+    def test_start_failure_records_journal_and_preserves_original_error(self):
+        backend = Mock(); backend.fixture.path = Path('/fixture/test'); backend.units = []
+        backend.fixture.units = []
+        def command(*args, **kw):
+            if args[:2] == ('systemctl', 'show'): return Mock(stdout='not-found')
+            if args[:2] == ('systemctl', 'start'): raise RuntimeError('original startup failure')
+            if args[0] == 'journalctl': return Mock(stdout='status=217/USER', returncode=0)
+            return Mock(stdout='')
+        backend.command.side_effect = command
+        from unittest.mock import mock_open
+        with patch.object(services.Path, 'open', mock_open()), patch.object(services.Path, 'chmod'), \
+             patch('builtins.print') as output:
+            with self.assertRaisesRegex(RuntimeError, 'original startup failure'):
+                services.Process(backend, 'broker', 'unit', 'liner_notes_broker_t')
+            self.assertTrue(any('217/USER' in str(c) for c in output.call_args_list))
+        journal = [c for c in backend.command.call_args_list if c.args[0] == 'journalctl']
+        self.assertEqual(len(journal), 1)
+        self.assertIn('test-door-broker-0', journal[0].args)
+        self.assertFalse(journal[0].kwargs['check'])
+
+    def test_diagnostics_are_bounded_and_keep_journal_failure_visible(self):
+        p = services.Process.__new__(services.Process); p.name = 'unique-fixture'; p.backend = Mock()
+        p.backend.command.return_value = Mock(stdout='あ'*20000, returncode=1)
+        with patch('builtins.print') as output: p.diagnostics()
+        self.assertLessEqual(len(p.stderr_cache.getvalue()), 16384)
+        self.assertIn('unavailable (exit 1)', output.call_args.args[0])
+
+    def test_failed_diagnostics_does_not_mask_start_failure(self):
+        p = services.Process.__new__(services.Process); p.name = 'unique-fixture'; p.backend = Mock()
+        p.backend.command.side_effect = RuntimeError('journal unavailable')
+        with patch('builtins.print') as output: p.diagnostics()
+        self.assertIn('unavailable', output.call_args.args[0])
+
+
+def real_accounts():
+    """Only inside the disposable hosted Rocky container, never a host setup."""
+    import os, pwd, grp
+    if os.environ.get('CI_SELINUX_DISPOSABLE') != '1' or not Path('/.dockerenv').is_file() or os.geteuid() != 0:
+        raise RuntimeError('Disposable container required')
+    def command(*args): subprocess.run(args, check=True, capture_output=True, text=True)
+    with tempfile.TemporaryDirectory(prefix='lnci-accounts-') as directory:
+        fixture = Mock(path=Path(directory))
+        accounts = services.Accounts(fixture, command, 64502, 64503, range(64501, 64506))
+        try:
+            accounts.create()
+            assert pwd.getpwuid(64502).pw_name == accounts.user
+            assert grp.getgrgid(64503).gr_mem == []
+            # The broker primary group and explicit supplementary consumer group
+            # must resolve via NSS before systemd can execute the entrypoint.
+            assert os.getgrouplist(accounts.user, 64502) == [64502]
+            subprocess.run([sys.executable, '-c',
+                'import os; assert os.getuid()==64502; assert os.getgid()==64502; assert os.getgroups()==[64503]'],
+                user=64502, group=64502, extra_groups=[64503], check=True)
+        finally:
+            accounts.close()
+        for lookup, key in ((pwd.getpwuid, 64502), (grp.getgrgid, 64502), (grp.getgrgid, 64503)):
+            try: lookup(key)
+            except KeyError: pass
+            else: raise AssertionError('Fixture identity survived cleanup')
+    print('PASS disposable Rocky fixture NSS identity lifecycle')
+
+
+if __name__=='__main__':
+    if sys.argv[1:] == ['--accounts-in-disposable-container']: real_accounts()
+    else: unittest.main()
