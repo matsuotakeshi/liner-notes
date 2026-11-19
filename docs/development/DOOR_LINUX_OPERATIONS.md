@@ -312,3 +312,46 @@ canonical Door guidance: ACL, peer UID/FD validation, timeouts, replies and proc
 cleanup are unchanged. `Makefile` only adds the header dependency and focused test.
 Their source-lock hashes are updated after this review. The stable public manual
 remains unchanged; this candidate diagnostic is documented here until release.
+
+
+## Worker exception evidence (2026-11-20, candidate only)
+
+At main `985b9a8f2ed54f4e11a14d199df72d5a876e6dcd`, native run
+[44588358780](https://github.com/matsuotakeshi/liner-notes/actions/runs/44588358780),
+Artifact 14564151540, the C client reports `isolation-rejected errno=0`.
+It connected, verified the root peer, sent the request and received three bytes
+that were not `OK\n`. This does not distinguish `ERR` from `DON` (the first
+three bytes of cleanup's `DONE\n`), or prove a SELinux denial.
+
+Inspection found that `start_worker` used `finally: os._exit(0)`, suppressing
+unexpected exceptions and normal traceback reporting. The existing supervisor
+only logged selected exception types. The candidate now records unexpected
+launch failures before cleanup, cleanup failures at their own phase, and exits
+unexpectedly failed workers with status 1. The parent reports nonzero worker
+wait status. Successful workers retain status 0; ordinary handled refusals
+retain their existing ERR/DONE and cleanup behavior. This closes an evidence
+gap; it does not claim to fix the unknown native game-launch failure.
+
+Events: `launch-rejected` (handled validation/OS error), `launch-failed`
+(unexpected launch exception), `cleanup-failed`, `worker-failed`, and
+`worker-exit`. Fields contain fixed phases, exception class, numeric errno or
+wait status only. No exception message, traceback, request, ticket, path,
+member/session identifier or local variable is included. New phases distinguish
+scope setup, broker request, ticket pipe, dropfile, PTY, handoff and runtime;
+cleanup distinguishes revocation, descriptors, scope stop, dropfile removal,
+slot release and connection close. Failed stderr output cannot interrupt the
+ERR response or cleanup. Failed scope cleanup still retains the slot reservation.
+
+Fault-injection tests run without forking, signaling real processes or changing
+privileges. Windows substitutes Unix-only import modules; those control-flow
+checks are not evidence of native privilege isolation. The same tests run in
+Hosted SELinux CI and `make check`; real Linux/FreeBSD lifecycle checks remain.
+Do not run the candidate on home VMs until Hosted CI passes and it is merged
+into trusted main. The existing main push workflow then supplies the next
+Enforcing evidence without a privileged helper update or extra root login.
+
+Reviewed the canonical Door recovery guidance against `scripts/door_isolation.py`:
+revocation precedes cleanup, reservation release remains after successful scope
+cleanup, and authentication/ACL/timeouts are unchanged. Updated its source-lock
+and the Makefile lock (one focused test added). Public stable documentation
+remains unchanged; the new diagnostic is a candidate behavior described here.

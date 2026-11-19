@@ -1,6 +1,6 @@
 {
   "LICENSE": "fb981668c18a279e285fc4d83fba1e836cc84dd4daa73c9697d3cfd2d8aca6e0",
-  "Makefile": "9ddff1ed61b70f2e94fabe5d9645cf87ed84aafbe79837db8983be075421da08",
+  "Makefile": "2e5bbb16b7749501b9858bace66a6b5044aafa2e3743875025a3d18207afb90f",
   "boards.example.conf": "4bd1a17ecf3966d3829510e8495a1362fb8b922cd754badccc739f5e5ab0bde8",
   "ci/build-freebsd-package.sh": "4e62899471d1f1a6c44e00a783c1aff771332140704ae778da95a95048474108",
   "debian/changelog": "8f3574a094f5a3677a9a7188e530ecdbdc006138b082b57243ca8441c644114d",
@@ -333,7 +333,7 @@
   "scripts/door_broker.py": "acb971bf1e5461ce28861e7583df9db9ee1665eeac2f8eb1e612366cf652aec4",
   "scripts/door_broker_core.py": "94f2f5fa0747236f5d8592b10d63d5bae34767a0401a615de58c6398b712424c",
   "scripts/door_auth_client.py": "c36c345de7b4a6be82067ecb52e4e52e5c0f887e6008840243ca11a22688aa4e",
-  "scripts/door_isolation.py": "f7f51223e194c29f57e9ff332d9f3b9689bf3064f9d31f24fb8ed92cfbe93968",
+  "scripts/door_isolation.py": "f68fb3cef23815ad3371fce262070b0151a41dc792df457b4de10f8c5b630930",
   "scripts/door_processes.py": "b32cb7cff9b6bd5c40154c7a9f258fed826a634954f25f592018569ea26864f1",
   "src/door_isolation.inc": "bece1ad4cb98d7ae96b1da33f75395120ae05c52aef365e01b6f27c98ebee363",
   "tests/test_door_broker.py": "3b1f82d95f8a2af531e4aa11f7b2483ec57a8aa614b9366f155074336b95c948",

@@ -646,6 +646,7 @@ runtime: src/door_diagnostics.h
 .PHONY: test-door-broker
 check: test-door-broker
 test-door-broker:
+	$(PYTHON) tests/test_door_worker_diagnostics.py
 	$(PYTHON) tests/test_door_diagnostics.py
 	$(PYTHON) tests/test_door_broker.py
 	$(PYTHON) tests/test_door_processes.py
