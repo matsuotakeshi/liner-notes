@@ -29,7 +29,7 @@ def run(binary,ctl):
    aid=first.split(b'RTBBS-PROBE ')[1].split()[0].decode();bid=second.split(b'RTBBS-PROBE ')[1].split()[0].decode()
    ui(a,'LOGIN admin');ui(a,PASSWORD);ui(b,'LOGIN bob');birth=ui(b,PASSWORD);assert b'BIRTHDAY MESSAGE' in birth,birth
    ui(a,'PAGER OFF');ui(b,'PAGER OFF')
-   ui(a,'P');assert b'Field' in ui(a,'E')+ui(a,'2');assert b'Value' in ui(a,'8');assert b'saved' in ui(a,'X68000').lower()
+   ui(a,'P');assert b'Field' in ui(a,'E')+ui(a,'2');assert b'Field' in ui(a,'14');assert b'Value' in ui(a,'8');assert b'saved' in ui(a,'X68000').lower()
    ui(a,'PROFILESET MACHINE X68000')
    ui(a,'MENU');ui(a,'P');ui(a,'S');ui(a,'8');result=ui(a,'X68000')
    assert b'PROFILE 1 admin' in result and b'MACHINE X68000' in result and b'Next:Enter' in result,result
@@ -71,7 +71,11 @@ def run(binary,ctl):
    a.until();a.cmd('REGISTER',b': ')
    for i in range(14):a.cmd('MixedName' if i==6 else '',b'> ' if i==13 else b': ')
    assert b'Y / E' in a.cmd('N',b'> ')
+   assert b'REALNAME' in a.cmd('E',b': ')
+   for i in range(14):review=a.cmd('FinalHandle' if i==6 else '',b'> ' if i==13 else b': ')
+   assert b'HANDLE|FinalHandle' in review and b'MixedName' not in review,review
    ui(a,'Y');result=ui(a,PASSWORD);assert b'bbs00001' in result,result
+   assert b'FinalHandle' in ui(a,'PROFILE bbs00001')
   finally:a.close();s.close()
  print('PASS stage69 Telnet file/batch/hierarchy, profile forms, editor ranges/highlights/numbers, memo, W/#/one-shot T, birthday and registration confirmation')
 
