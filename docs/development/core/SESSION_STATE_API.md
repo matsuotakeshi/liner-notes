@@ -36,6 +36,9 @@ Include session_core.h; neither Ui, Session nor a terminal is required.
 The trusted owner initializes SessionCore.id/slot/active and advances its clock.
 BoardRequest expresses the existing domain operation and its arguments; the
 operation codes are the internal board worker contract, not terminal commands.
+Bodies use the existing editor/storage representation: CRLF-delimited lines with
+a final CRLF. The API does not silently normalize input. The real-store test
+checks rejection of an unterminated mail body before sending its valid form.
 
 session_core_submit(core, request, port) validates active/pending/cooldown state,
 replaces request session/slot/user/epoch/grants with the owner's authenticated
@@ -107,3 +110,14 @@ in-process APIs in a new Web/SSH transport is a separate integration step.
   Hosted/native CI are required; syntax/unit success is not runtime success.
 
 No MMM, SSH server, authentication Broker, DB migration or release is included.
+
+## PR #128 Linux test correction
+
+At b955a7c750d98706051479c1e39cc24e27b12df6, Linux compatibility run
+44439513837 failed on both Rocky 9 and AlmaLinux 9 at
+ tests/test_session_operations.c:43 (mail_id assertion). The new headless test
+submitted `private body` without the final CRLF required by mailbox.c:text_ok.
+The production implementation correctly refused it. Correct the positive fixture,
+retain an explicit rejection assertion for the malformed body, and make the guest
+ACL-denial fixture syntactically valid as well. No production validation, timeout
+or test assertions are weakened. Full corrected runtime validation is pending CI.

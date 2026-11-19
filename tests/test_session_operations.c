@@ -38,9 +38,11 @@ int session_operations_test(const char *directory) {
     memset(q,0,sizeof(*q));q->op='s';q->board=1;q->number=article;exchange(&s,q,r);assert(r->feedback.seen && !r->feedback.failed);
     memset(q,0,sizeof(*q));q->op='L';q->board=1;q->number=1;exchange(&s,q,r);assert(r->feedback.page_found && !r->feedback.page_next);
     SessionCore guest={.active=1,.structured=1,.id=901,.slot=1,.board=1,.now=1000};
-    memset(q,0,sizeof(*q));q->op='P';q->board=1;q->user=s.user;q->user_epoch=s.user_epoch;strcpy(q->title,"must fail");strcpy(q->body,"forged actor");
+    memset(q,0,sizeof(*q));q->op='P';q->board=1;q->user=s.user;q->user_epoch=s.user_epoch;strcpy(q->title,"must fail");strcpy(q->body,"forged actor\r\n");
     exchange(&guest,q,r);assert(r->feedback.failed && !r->selected && !q->user);
-    memset(q,0,sizeof(*q));q->op='m';q->action='S';q->number=s.user;strcpy(q->title,"API mail");strcpy(q->body,"private body");exchange(&s,q,r);assert(r->mail_id);uint32_t mail=r->mail_id;
+    memset(q,0,sizeof(*q));q->op='m';q->action='S';q->number=s.user;strcpy(q->title,"API mail");/* The internal operation API requires the same canonical CRLF body as the editor. */
+    strcpy(q->body,"private body");exchange(&s,q,r);assert(r->feedback.failed && !r->mail_id);
+    strcpy(q->body,"private body\r\n");exchange(&s,q,r);assert(!r->feedback.failed && r->mail_id);uint32_t mail=r->mail_id;
     memset(q,0,sizeof(*q));q->op='m';q->action='R';q->number=mail;exchange(&s,q,r);assert(r->content.kind==2 && r->content.id==mail && strstr(r->draft_body,"private body"));
     memset(q,0,sizeof(*q));q->op='m';q->action='R';q->number=mail;exchange(&guest,q,r);assert(r->feedback.failed && !r->content.kind && !r->mail_id && !strstr(r->draft_body,"private body"));
     board_stop();assert(board_start(notes,members,NULL));

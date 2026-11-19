@@ -316,6 +316,6 @@
   "src/session_core.h": "b7616aa8a9e4e4122fc36bb2ac5102b527da8ea1215f86ee20e92caa97c7342a",
   "src/session_state.h": "6f19ea390f7a6c89d924302df9e4efd2305f190d0c35f3c3c6a9256598b7ae2e",
   "tests/test_session_core.c": "541a7aefaf85a0e465839ed370f12edd0c8afa19ef2e6bccaaa62b5a083695a2",
-  "tests/test_session_operations.c": "e485f9b00ab4c4abea1c063684ae560504d2be1a1919afd7ccd8ac29f7139a05",
+  "tests/test_session_operations.c": "fad0c62a627a9513150997f074936e93000f27886d3eda0af211a1c5f7c55183",
   "tests/test_session_operations.py": "e9d93452dc01b86b80d9c962319e5ee98ca01f267058d6592ef9232a5eb451ec"
 }
