@@ -241,3 +241,25 @@ and add a native, unprivileged self-UID inventory check to `make check`. The
 existing privileged jail fixture still has to pass after trusted-main integration.
 This correction does not change permissions, process signalling or activation
 policy. Stable user instructions remain unchanged; no production host was used.
+
+### Restrictive-umask fixture correction
+
+At main `57f03cca78ca98a0cdab840130169caef7c98184`, acceptance run
+`44500498907` passed UID discovery but failed before Broker startup:
+Python could not open the fixture's `scripts/door_broker.py` (permission denied).
+The root jail helper sets umask `077`, inherited by the fixture. `mkdir(mode=...)`
+is still filtered by that mask; the scripts directory was consequently private.
+The same issue also affects cross-UID traversal of socket/run directories and
+reading generated, non-secret fixture policy.
+
+The fixture now applies explicit modes only to shared code, public policy and
+required traversal directories. It retains private BBS data, state files,
+per-run directories, tickets and game saves. No recursive permission change or
+process-wide mask relaxation is used. The existing Linux root fixture runs with
+umask `077` too, so Hosted CI exercises the same access constraints before merge.
+No extra test matrix or weakened assertion is introduced. FreeBSD jail acceptance
+still requires trusted-main integration; this change alone is not success evidence.
+
+Reviewed `docs/manual/external-games.md` and `docs/manual/security.md`: this is
+a test fixture correction, with no product command, permission or setup change.
+The stable manual remains unchanged.

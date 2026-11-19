@@ -86,16 +86,21 @@ def run(binary):
     # orphans. FreeBSD signalling stays within the kernel-owned reaper subtree.
     fixture_scope=Scope(SLOT1)
     with tempfile.TemporaryDirectory(prefix='ln-broker-',dir='/var/run' if sys.platform.startswith('freebsd') else '/run') as tmp:
-        p=Path(tmp);p.chmod(0o755);scripts=p/'scripts';scripts.mkdir()
-        for name in ('door_broker.py','door_broker_core.py','door_isolation.py','door_auth_client.py','door_processes.py'):shutil.copy2(ROOT/'scripts'/name,scripts/name)
+        p=Path(tmp);p.chmod(0o755);scripts=p/'scripts';scripts.mkdir();scripts.chmod(0o755)
+        # The jail helper deliberately retains umask 077. Publish only fixture
+        # code and non-secret policy explicitly; do not relax the process umask
+        # or recursively expose BBS data, reservations, tickets or game saves.
+        for name in ('door_broker.py','door_broker_core.py','door_isolation.py','door_auth_client.py','door_processes.py'):
+            shutil.copy2(ROOT/'scripts'/name,scripts/name);(scripts/name).chmod(0o644)
         runtime=p/'runtime';shutil.copy2(binary,runtime);runtime.chmod(0o755)
         data=p/'data';data.mkdir(mode=0o700);os.chown(data,BBS,BBS)
         (data/'private').write_text('private BBS fixture');os.chown(data/'private',BBS,BBS);(data/'private').chmod(0o600)
-        broker_dir=p/'broker';broker_dir.mkdir(mode=0o755);os.chown(broker_dir,BROKER,BROKER)
-        state=p/'state';state.mkdir(mode=0o711)
-        game_dir=p/'server';game_dir.mkdir(mode=0o711);os.chown(game_dir,GAME,GAME)
+        broker_dir=p/'broker';broker_dir.mkdir(mode=0o755);broker_dir.chmod(0o755);os.chown(broker_dir,BROKER,BROKER)
+        state=p/'state';state.mkdir(mode=0o711);state.chmod(0o711)
+        game_dir=p/'server';game_dir.mkdir(mode=0o711);game_dir.chmod(0o711);os.chown(game_dir,GAME,GAME)
         endpoint=broker_dir/'broker.sock';game_socket=game_dir/'game.sock'
         broker_conf=p/'broker.json';broker_conf.write_text(json.dumps(dict(bbs='fixture',bbs_uid=BBS,broker_uid=BROKER,socket=str(endpoint),socket_gid=GAME,door_uids=[SLOT1,SLOT2],consumers={str(GAME):[1]})))
+        broker_conf.chmod(0o644)
         wrapper=p/'game';wrapper.write_text('#!'+sys.executable+'\n'+r"""
 import json,os,socket,sys,tty,signal,time
 from pathlib import Path
@@ -135,6 +140,7 @@ while True:
         isolation=p/'isolation.sock';launch_conf=p/'isolation.json'
         launch_conf.write_text(json.dumps(dict(bbs_uid=BBS,socket=str(isolation),socket_gid=BBS,broker_config=str(broker_conf),state_dir=str(state),slots=slots)))
         doors=p/'doors.conf';doors.write_text(f'1|0|30|{wrapper}|{p}|Authenticated fixture|dorinfo1:2\n')
+        doors.chmod(0o644)
         commands=[([sys.executable,str(scripts/'door_broker.py'),'--config',str(broker_conf)],identity(BROKER,[GAME])),([sys.executable,str(scripts/'door_isolation.py'),'--config',str(launch_conf)],None)]
         services=[];clients=[];bbs=None;game=None;crash_marker=None
         def released():return all(slot_released(state,uid,processes) for uid in (SLOT1,SLOT2))
