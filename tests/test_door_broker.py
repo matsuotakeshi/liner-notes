@@ -87,6 +87,21 @@ class Writer:
     async def wait_closed(self):pass
 
 class Protocol(unittest.IsolatedAsyncioTestCase):
+    async def live_issuer(self,name):
+        blocked=asyncio.Event()
+        class Reader(asyncio.StreamReader):
+            calls=0
+            async def readline(self):
+                self.calls+=1
+                if self.calls==2:blocked.set()
+                return await super().readline()
+        reader=Reader(limit=4096);writer=Writer(0)
+        reader.feed_data(json.dumps(dict(op='open',member=1,door=1,session=name,generation=0)).encode()+b'\n')
+        task=asyncio.create_task(self.server.handle(reader,writer))
+        try:await asyncio.wait_for(blocked.wait(),5)
+        except BaseException:
+            reader.feed_eof();await asyncio.wait_for(task,5);raise
+        return reader,writer,task
     async def request(self,uid,request):
         reader=asyncio.StreamReader(limit=4096);writer=Writer(uid)
         reader.feed_data(json.dumps(request).encode()+b'\n');reader.feed_eof()
@@ -112,5 +127,43 @@ class Protocol(unittest.IsolatedAsyncioTestCase):
     async def test_malformed_request_has_no_secret_echo(self):
         result=await self.request(0,{'op':'wrong','secret':'do-not-echo'})
         self.assertIn(b'"ok":false',result);self.assertNotIn(b'do-not-echo',result)
+    async def test_oversize_truncated_and_nonobject_requests_release_client(self):
+        payloads=[b'x'*4097+b'\n',b'{"secret":"do-not-echo"}',b'[]\n',b'null\n',b'\xff\n']
+        for payload in payloads:
+            with self.subTest(kind=payload[:1],length=len(payload)):
+                reader=asyncio.StreamReader(limit=4096);writer=Writer(0)
+                reader.feed_data(payload);reader.feed_eof()
+                await self.server.handle(reader,writer)
+                self.assertEqual(writer.data,b'{"ok":false,"error":"authorization denied"}\n')
+                self.assertTrue(writer.closed)
+                self.assertFalse(self.server.clients);self.assertFalse(self.b.sessions)
+                self.assertFalse(self.b.tickets);self.assertFalse(self.b.leases)
+    async def test_connection_capacity_recovers_after_issuer_disconnect(self):
+        self.b.capacity=1
+        reader,writer,task=await self.live_issuer('capacity')
+        try:
+            self.assertTrue(self.b.sessions)
+            denied=await self.request(40,dict(op='consume',door=1,bbs='bbs',token='0'*64))
+            self.assertIn(b'"ok":false',denied)
+            self.assertEqual(len(self.server.clients),1)
+        finally:
+            reader.feed_eof();await asyncio.wait_for(task,5)
+        self.assertFalse(self.server.clients)
+        # The same session identifier with a newer generation is still allowed;
+        # unrelated generation-capacity limits are not bypassed by this check.
+        result=await self.request(0,dict(op='open',member=1,door=1,session='capacity',generation=1))
+        self.assertIn(b'"ok":true',result)
+        self.assertFalse(self.server.clients);self.assertFalse(self.b.tickets)
+    async def test_cancelled_handler_revokes_consumed_lease(self):
+        reader,writer,task=await self.live_issuer('cancelled')
+        try:
+            ticket=json.loads(writer.data)['result']['ticket']
+            lease=self.b.consume(40,1,'bbs',ticket)['lease']
+        finally:
+            task.cancel()
+            with self.assertRaises(asyncio.CancelledError):await asyncio.wait_for(task,5)
+        with self.assertRaises(Denied):self.b.check(40,1,'bbs',lease)
+        self.assertTrue(writer.closed);self.assertFalse(self.server.clients)
+        self.assertFalse(self.b.sessions);self.assertFalse(self.b.leases)
 
 if __name__=='__main__':unittest.main()
