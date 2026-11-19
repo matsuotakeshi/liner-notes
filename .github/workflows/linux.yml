@@ -34,6 +34,17 @@ jobs:
           fi
       - uses: actions/checkout@v4
         if: ${{ needs.changes.outputs.build == 'true' }}
+      - name: Restore pinned lrzsz source
+        if: ${{ needs.changes.outputs.build == 'true' }}
+        uses: actions/cache@v4
+        with:
+          path: build/lrzsz-source
+          key: lrzsz-source-0.13.1-112f91059fbd118e016d800c1a5c5a1702e965d8b9bfbda6015e44e20bfb93c9
+      - name: Verify or fetch pinned lrzsz source
+        if: ${{ needs.changes.outputs.build == 'true' }}
+        run: |
+          python3 tests/test_lrzsz_download.py
+          python3 scripts/build-lrzsz.py --download-archive build/lrzsz-source/lrzsz-0.13.1.tar.gz
       - name: Build and test in the target distribution
         if: ${{ needs.changes.outputs.build == 'true' }}
         env:

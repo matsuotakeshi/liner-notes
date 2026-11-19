@@ -4,12 +4,14 @@ from pathlib import Path
 import platform
 import re
 
-MIRROR = 'https://mirrors.edge.kernel.org/ubuntu/'
+# Listed by Ubuntu Japanese Team; HTTPS package archive, not an ISO mirror.
+MIRROR = 'https://ftp.jaist.ac.jp/pub/Linux/ubuntu/'
 SOURCES = Path('/etc/apt/sources.list.d/ubuntu.sources')
 KNOWN = {
     'mirror+file:/etc/apt/apt-mirrors.txt',
     'mirror+file:/etc/apt/apt-security-mirrors.txt',
     MIRROR.rstrip('/'),
+    'https://mirrors.edge.kernel.org/ubuntu',
 }
 
 

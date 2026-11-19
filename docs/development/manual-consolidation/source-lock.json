@@ -98,7 +98,7 @@
   "scripts/link_maintenance.py": "ee76d893e80f536f65bcf869348d7a083eafc3f0d5280dcd35de431dbfc16c30",
   "src/door_lock.c": "6e6e2798a5c626767a89f2cb1ef8f8cc79f13caaba879e45155f13c6bc421e34",
   "scripts/posix_locks.py": "657d3bbe77a63e9ee0a2e586f2aa8528ba1401cbbc9f879a0302ab81b1fbcfca",
-  "scripts/build-lrzsz.py": "6cd25f538e9b3320ba199aef5285156e973be999243bff972eba3482a37357de",
+  "scripts/build-lrzsz.py": "3abff4444b43dd70b1d3b143e4ca8e8faae402db0806c9074bd51e5a198895f0",
   "ci/native_ci.py": "08cd77d248ee884bbf005cbedab5510a2a3ee8800d54cf207da61742a32b8ff4",
   "ci/deploy_release.py": "284bb9fdd3ea00211c86ea7ac59a40697133b211378b2a58d81bcbf2e3aeec4b",
   "scripts/deploy_policy.py": "650baa5a8246e859158791d93c4f64cc3b5bc6003f1fa25608f06a13c870e958",

@@ -198,3 +198,36 @@ is refreshed; this records documentation correspondence, not native acceptance.
 The initial PR checks failed on that omitted source-lock refresh in manual/RPM/DEB.
 The separate doctor failure was an Ubuntu mirror connection timeout while
 fetching clang, before its functional tests; no application defect was inferred.
+
+## Hosted download recovery (2026-11-20)
+
+PR 142's later failures were external retrieval failures: the Ubuntu kernel.org
+mirror failed to supply clang, and both EL9 jobs timed out during the upstream
+lrzsz TLS handshake. Manual/RPM/DEB checks and the SELinux policy/NSS test passed.
+
+The restricted hosted Ubuntu mirror helper now selects JAIST:
+https://ftp.jaist.ac.jp/pub/Linux/ubuntu/ . Ubuntu Japanese Team lists JAIST and
+Yamagata University as domestic archive mirrors:
+https://www.ubuntulinux.jp/ubuntu/mirrors . A local HTTPS probe retrieved noble,
+updates, security and backports InRelease files plus the failed clang package;
+this does not establish performance or reachability from every hosted runner.
+Suites, components, Signed-By and APT freshness/signature verification remain
+unchanged. Only disposable GitHub-hosted Ubuntu 24.04 amd64 may use the helper.
+
+The lrzsz builder preserves its existing URL, fixed digest and build/CRC patch.
+Network failures and selected transient HTTP statuses retry at most three times
+(30-second socket timeout, 2/5-second backoff); certificate/integrity/permanent
+HTTP errors are not retried. Redirects must remain HTTPS. The new download-only
+mode publishes verified bytes atomically without overwriting existing files.
+Cache hits and --archive input are always rehashed; corrupt cache fails closed.
+Linux compatibility and hosted SELinux restore an exact digest-keyed source-only
+cache, verify it on the host, and pass it into the existing private build. No
+compiled engine or test outcome is cached, and there are no broad restore keys.
+If a cache is corrupt, investigate/remove that cache entry; do not change the
+pinned digest to accept it. Exhausted upstream failures remain CI failures.
+
+Reviewed build-lrzsz.py against the canonical Linux installation chapter and
+updated the source-lock for that file only. FreeBSD/Linux/Solaris build commands,
+archive entry validation, CRC patch and resume receipt behavior are preserved.
+The new unit tests cover retry exhaustion, HTTP/certificate/hash/size refusal,
+HTTPS downgrade rejection, and verified/corrupt cache handling.

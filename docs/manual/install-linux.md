@@ -169,6 +169,20 @@ sudo -u liner_notes /usr/local/bin/liner-notes-vaultctl init /var/lib/liner-note
 
 `LINER_NOTES_OPTIONS`へ`--vault-dir /var/lib/liner-notes/vault`を追加します。ZMODEM用のlrz/lszは別途必要です。LP64のCRC修正を含む0.13.1は、従来と同じ`python3.11 scripts/build-lrzsz.py 新しいビルド先`で構築できます。既存のビルド先は上書きしません。
 
+次期版の取得補助では、公式アーカイブの通信失敗を最大3回まで再試行します。
+TLS証明書の検証失敗・SHA-256不一致・サイズ上限超過はそのままエラーとし、検査を省略しません。
+事前取得とビルドを分ける場合は次を使用します（`--download-archive`は次期版で追加）。
+
+```sh
+python3.11 scripts/build-lrzsz.py --download-archive cache/lrzsz-0.13.1.tar.gz
+python3.11 scripts/build-lrzsz.py 新しいビルド先 --archive cache/lrzsz-0.13.1.tar.gz
+```
+
+固定SHA-256は `112f91059fbd118e016d800c1a5c5a1702e965d8b9bfbda6015e44e20bfb93c9` です。
+既存の取得ファイルも毎回照合し、不一致の場合は自動上書きせず停止します。
+CIではこの原本だけをキャッシュし、各OSのバイナリは従来どおりビルド・転送試験します。
+
+
 サービスが実行できる場所へ配置し、環境ファイルの`LINER_NOTES_LRZ`と`LINER_NOTES_LSZ`へ絶対パスを書きます。unitの`ProtectHome=yes`により、サービスからユーザーのホームディレクトリは参照できません。例えば`/opt`配下に配布物一式を配置してください。上流ソースとライセンスも保管します。
 
 ```sh

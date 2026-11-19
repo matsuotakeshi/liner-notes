@@ -31,7 +31,9 @@ class Mirror(unittest.TestCase):
         self.assertEqual(mirror.rewrite_sources(actual), actual)
 
     def test_known_runner_sources(self):
-        for uri in ('http://azure.archive.ubuntu.com/ubuntu/',
+        for uri in ('https://mirrors.edge.kernel.org/ubuntu/',
+                    'https://ftp.jaist.ac.jp/pub/Linux/ubuntu/',
+                    'http://azure.archive.ubuntu.com/ubuntu/',
                     'https://archive.ubuntu.com/ubuntu',
                     'http://us-east-2.ec2.archive.ubuntu.com/ubuntu/',
                     'mirror+file:/etc/apt/apt-security-mirrors.txt'):
