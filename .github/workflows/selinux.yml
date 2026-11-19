@@ -57,7 +57,8 @@ jobs:
           mkdir -p build/selinux
           docker run --rm -e SOURCE_SHA="$GITHUB_SHA" -v "$GITHUB_WORKSPACE:/source:ro" -v "$GITHUB_WORKSPACE/build/selinux:/out" \
             rockylinux/rockylinux:10 bash -euc '
-              dnf install -y --setopt=install_weak_deps=False selinux-policy-devel rpm-build make python3 procps-ng setools-console
+              dnf install -y --setopt=install_weak_deps=False selinux-policy-devel rpm-build make python3 procps-ng setools-console shadow-utils
+              CI_SELINUX_DISPOSABLE=1 python3 /source/tests/test_selinux_door_services.py --accounts-in-disposable-container
               mkdir -p /build/{SOURCES,SPECS,BUILD,BUILDROOT,RPMS,SRPMS}
               cp /source/linux/selinux/liner_notes.te /source/linux/selinux/liner_notes.fc /source/linux/selinux/selinux_labels.py /build/SOURCES/
               cp /source/LICENSE /build/SOURCES/

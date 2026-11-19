@@ -65,7 +65,9 @@ class Fixture:
         temporary = self.record.with_suffix('.new')
         with temporary.open('x', encoding='utf8') as stream:
             json.dump({'fixture': str(self.path), 'units': self.units, 'ports': self.ports,
-                       'door_slot_uids': getattr(self, 'door_slot_uids', [])}, stream)
+                       'door_slot_uids': getattr(self, 'door_slot_uids', []),
+                       'door_accounts': getattr(self, 'door_accounts', []),
+                       'door_account_plan': getattr(self, 'door_account_plan', [])}, stream)
             stream.flush()
             os.fsync(stream.fileno())
         temporary.chmod(0o600)

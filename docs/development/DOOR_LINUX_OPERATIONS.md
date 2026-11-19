@@ -153,6 +153,21 @@ new confined process is alive.
   paths and dependency names. All test units have a 300-second runtime watchdog.
   No existing BBS service is changed. Test units and port mappings have unique
   names recorded in the root-only fixture record.
+  The Broker uses a temporary locked/non-login NSS account with its own group
+  and a separate consumer group. Numeric UIDs alone are insufficient when
+  systemd initializes `SupplementaryGroups` (observed `217/USER` before exec).
+  All fixture IDs and generated names must be unused; existing identities are
+  never reused or changed. No home directory is created. The native fixture
+  records both creation intent (`door_account_plan`) and created identities
+  (`door_accounts`) in `fixture-state.json`, stops its units first,
+  and removes only unchanged identities after verifying no process references
+  their UIDs/GIDs. Changed entries or live tasks cause a retained-state failure.
+  Hosted Rocky checks real NSS creation, group assignment and removal inside
+  its disposable container; this is not systemd/Enforcing runtime evidence.
+  On startup failure, including `ExecStartPre`, the adapter captures at most
+  40 journal lines/16 KiB from that unique unit before unit-file removal. A
+  journal failure is recorded without replacing the original startup error.
+  These diagnostics flow into `acceptance.log` and the native CI Artifact.
 
 Native helper cleanup now recognizes all three new domains. Therefore the
 installed root-owned `liner-notes-ci-selinux` hash must be refreshed to the
@@ -162,7 +177,11 @@ update after Hosted checks/main integration. Keep the workflow's hash check.
 
 In interrupted native tests retain `fixture-state.json`, `acceptance.log` and
 the exact SHA. Stop only recorded units, confirm all test tasks are gone, then
-remove only their unchanged runtime unit files and port mappings. Do not unload
+remove only their unchanged runtime unit files and port mappings. If temporary
+`door_accounts` remain, verify their recorded names/IDs and non-login properties,
+absence of foreign group members and primary-group references, and absence of
+processes using any fixture UID/GID before removing only those entries. Never
+force removal or remove a home directory. Do not unload
 the policy while any candidate domain survives. Independent security review,
 Solaris isolation and a production game-server policy remain separate gates;
 no local portable test or earlier commit's CI certifies them.
