@@ -13,6 +13,17 @@ from door_processes import Scope, processes, supported, no_new_privileges
 
 class Rejected(ValueError):pass
 
+
+def failure_event(event,phase,error):
+    # Fixed call-site labels, exception class and numeric errno only. Never log
+    # str(error), traceback locals, request data, tickets or configured paths.
+    number=getattr(error,'errno',None)
+    if not isinstance(number,int):number=None
+    try:
+        print(json.dumps(dict(event=event,phase=phase,error=type(error).__name__,errno=number)),file=sys.stderr,flush=True)
+    except Exception:
+        pass # failed diagnostics must not prevent revocation/cleanup or ERR
+
 def read_line(sock,timeout=3):
     deadline=time.monotonic()+timeout
     data=bytearray()
@@ -101,13 +112,15 @@ def supervise(config,connection,parent_watch=None):
         phase='slot'
         slot,lock=slot_acquire(config,request['door'],request['level'])
         # This supervisor is trusted, single-threaded, and owns one unique slot UID.
-        scope=Scope(slot['uid'])
+        phase='scope';scope=Scope(slot['uid'])
         token=None
         phase='broker'
         if slot['auth']:issuer,token=broker_open(config,request)
+        phase='ticket-pipe'
         if token:
             ticket_read,ticket_write=os.pipe();os.write(ticket_write,(token+'\n').encode());os.close(ticket_write)
         if slot['drop']:
+            phase='dropfile'
             run=Path(config['state_dir'])/('run-'+secrets.token_hex(16));run.mkdir(mode=0o700)
             drop=run/'DORINFO1.DEF'
             drop.write_text('Liner notes\r\nSYSOP\r\n\r\nCOM0\r\n0 BAUD,N,8,1\r\n0\r\nLN%09d\r\n\r\n\r\n1\r\n%d\r\n%d\r\n'%(request['user'],request['level'],(slot['seconds']+59)//60),newline='')
@@ -137,7 +150,9 @@ def supervise(config,connection,parent_watch=None):
             except BaseException:os._exit(126)
         os.close(slave);slave=None
         if ticket_read is not None:os.close(ticket_read);ticket_read=None
+        phase='handoff'
         connection.sendmsg([b'OK\n'],[(socket.SOL_SOCKET,socket.SCM_RIGHTS,array.array('i',[master]))]);os.close(master);master=None
+        phase='running'
         connection.settimeout(None);until=time.monotonic()+slot['seconds']
         while time.monotonic()<until:
             sockets=[connection]+([issuer] if issuer else [])+([parent_watch] if parent_watch is not None else [])
@@ -148,19 +163,32 @@ def supervise(config,connection,parent_watch=None):
                 if status:print(json.dumps(dict(event='door-exit',status=os.waitstatus_to_exitcode(status))),file=sys.stderr,flush=True)
                 pid=None;break
     except (OSError,ValueError,KeyError,TypeError) as error:
-        print(json.dumps(dict(event='launch-rejected',phase=phase,error=type(error).__name__,errno=getattr(error,'errno',None))),file=sys.stderr,flush=True)
+        failure_event('launch-rejected',phase,error)
         with contextlib.suppress(OSError):connection.sendall(b'ERR\n')
+    except BaseException as error:
+        failure_event('launch-failed',phase,error)
+        raise
     finally:
-        if issuer:issuer.close() # invalidate even consumed leases before cleanup
-        for fd in (master,slave,ticket_read):
-            if fd is not None:os.close(fd)
-        if scope:scope.stop()
-        elif slot:raise Rejected('Cleanup scope unavailable; slot stays reserved')
-        if run:
-            with contextlib.suppress(OSError):(run/'DORINFO1.DEF').unlink();run.rmdir()
-        if lock is not None:os.ftruncate(lock,0);os.fsync(lock);os.close(lock)
-        with contextlib.suppress(OSError):connection.sendall(b'DONE\n')
-        connection.close()
+        cleanup_phase='revoke'
+        try:
+            if issuer:issuer.close() # invalidate even consumed leases before cleanup
+            cleanup_phase='descriptors'
+            for fd in (master,slave,ticket_read):
+                if fd is not None:os.close(fd)
+            cleanup_phase='scope-stop'
+            if scope:scope.stop()
+            elif slot:raise Rejected('Cleanup scope unavailable; slot stays reserved')
+            cleanup_phase='dropfile-remove'
+            if run:
+                with contextlib.suppress(OSError):(run/'DORINFO1.DEF').unlink();run.rmdir()
+            cleanup_phase='slot-release'
+            if lock is not None:os.ftruncate(lock,0);os.fsync(lock);os.close(lock)
+            cleanup_phase='connection-close'
+            with contextlib.suppress(OSError):connection.sendall(b'DONE\n')
+            connection.close()
+        except BaseException as error:
+            failure_event('cleanup-failed',cleanup_phase,error)
+            raise
 
 def termios_TIOCSWINSZ():
     import termios
@@ -187,10 +215,14 @@ def start_worker(config,connection,listener,watch,alive,children):
         print('{"event":"admission-unavailable"}',file=sys.stderr,flush=True)
         return
     if pid==0:
-        listener.close();os.close(alive)
-        signal.signal(signal.SIGTERM,signal.SIG_IGN);signal.signal(signal.SIGINT,signal.SIG_IGN)
-        try:supervise(config,connection,watch)
-        finally:os._exit(0)
+        status=0;phase='setup'
+        try:
+            listener.close();os.close(alive)
+            signal.signal(signal.SIGTERM,signal.SIG_IGN);signal.signal(signal.SIGINT,signal.SIG_IGN)
+            phase='supervise';supervise(config,connection,watch)
+        except BaseException as error:
+            status=1;failure_event('worker-failed',phase,error)
+        finally:os._exit(status)
     children.add(pid)
 
 
@@ -220,8 +252,12 @@ def main():
     for sig in (signal.SIGTERM,signal.SIGINT):signal.signal(sig,stop)
     def reap():
         for child in list(children):
-            done,_=os.waitpid(child,os.WNOHANG)
-            if done:children.remove(child)
+            done,status=os.waitpid(child,os.WNOHANG)
+            if done:
+                children.remove(child)
+                if status:
+                    with contextlib.suppress(Exception):
+                        print(json.dumps(dict(event='worker-exit',status=os.waitstatus_to_exitcode(status))),file=sys.stderr,flush=True)
     try:
         while not stopping:
             reap()
