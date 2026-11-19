@@ -204,6 +204,28 @@ the earlier raw-process fixture is not evidence that these new service tests pas
 
 ### Stop and crash reservations
 
+The FreeBSD rc fixture at main `d60f46dc819813526129b92b3a1ed82a01c7850d`
+failed final cleanup in [run 44539986417](https://github.com/matsuotakeshi/liner-notes/actions/runs/44539986417).
+The private failure log identifies `RcProcess.wait`: an earlier supervisor had
+already completed its stop and readiness checks, but final cleanup repeated its
+status check after another generation had started under the same rc name.
+That newer live service caused `stopped rc service still ready`.
+
+The fixture adapter now caches a completed wait only after child exit, PID-file
+release, successful requested stop and a negative service-readiness result.
+Later waits on that object return its own completed result, as `Popen.wait` does;
+they do not inspect or stop a newer generation. First-wait readiness/stop failures
+and pending PID-file cleanup remain failures/timeouts. The adapter lives in
+`tests/door_rc_process.py` so portable tests can reproduce the old failure without
+starting services or importing Unix-only integration code. The four added tests
+run through the existing `test-door-broker` target.
+
+This is a fixture correction, not a change to installed rc scripts, Broker,
+launcher or BBS behavior. Reviewed the stable Door/security chapters: no user
+operation changes. Local reproduction fails on the old adapter and passes with
+this correction. Native acceptance still requires the corrected trusted-main
+CI; the previous failure is not relabeled as success.
+
 Each worker watches a parent-owned pipe. Parent termination, including SIGKILL,
 closes that pipe; workers revoke the issuer connection and clean up their Door
 descendants. The normal parent stop waits for workers. No forced worker kill is
