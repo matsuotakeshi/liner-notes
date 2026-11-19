@@ -338,5 +338,5 @@
   "src/door_isolation.inc": "8a9630b140e70713de21d2820a0fc639c9392f21d5a390900d32a824f743173e",
   "tests/test_door_broker.py": "38e6ff60ef3115caa95cf616c274996db85fa787ebb0eb13f5adde6f96335137",
   "tests/test_door_broker_linux.py": "1ef3de46cd68a2273a4cbb2bf3d9381a6e635c2136acabd33e336b5caf08306a",
-  "tests/test_door_processes.py": "29da7e5a6c1d4b3b20042dddbea44ed45b14a51466890ec97074bb7c3c01b7bf"
+  "tests/test_door_processes.py": "447674595672e57d851ef65430fb954a90d6a0a29125a5286e2e92c73673defa"
 }

@@ -181,6 +181,11 @@ not a fully offline diagnostic. It does not attest every possible game launch.
 The Linux systemd samples use configuration checks as ExecStartPre too; Linux
 boot/service validation remains a separate gate.
 
+The service-template regression permits exactly the read-only `--check-config`
+preflight and normal start command. Other Exec hooks (including reservation
+reset/cleanup) remain rejected. The preflight tests separately verify that the
+check does not start a server, bind a socket or fork a worker.
+
 Start refuses a duplicate process and reports readiness only after both child
 PID and socket identity checks succeed. Stop uses rc.subr TERM-and-wait behavior.
 The samples do not use automatic restart, SIGKILL, socket unlink, or reservation
