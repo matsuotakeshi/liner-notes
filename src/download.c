@@ -19,7 +19,8 @@ static const char *download_error(DownloadOutcome r) {
     default:return "ERR vault syntax";
     }
 }
-int downloads_command(Vault *v,const Principal *p,const char *line,const char *protocol,char *out,size_t size) {
+int downloads_command_result(Vault *v,const Principal *p,const char *line,const char *protocol,char *out,size_t size,int *failed) {
+    *failed=0;
     int block=!strncmp(line,"FILEFETCHBLOCK ",15);
     if(!block && strncmp(line,"FILEOPEN ",9) && strncmp(line,"FILEFETCH ",10) && strncmp(line,"FILEDONE ",9) && strncmp(line,"FILEABORT ",10))return 0;
     DownloadOutcome status=download_core_access(p);if(status!=DOWNLOAD_OK)goto fail;
@@ -47,9 +48,10 @@ int downloads_command(Vault *v,const Principal *p,const char *line,const char *p
     if(sscanf(line+10,"%32s%n",token,&n)!=1 || line[10+n])goto fail;
     status=download_core_abort(p,token);if(status!=DOWNLOAD_OK)goto fail;
     snprintf(out,size,"DOWNLOAD ABORTED\r\n");return 1;
-fail:snprintf(out,size,"%s\r\n",download_error(status));return 1;
+fail:*failed=1;snprintf(out,size,"%s\r\n",download_error(status));return 1;
 }
-void downloads_report(Vault *v,const Principal *p,int history,uint32_t file,uint32_t cursor,char *out,size_t size) {
+int downloads_report_page(Vault *v,const Principal *p,int history,uint32_t file,uint32_t cursor,char *out,size_t size,uint32_t *next) {
+    *next=0;
     DownloadOutcome status;
     if(history) {
         DownloadHistory page;status=download_core_history(p,file,cursor,&page);if(status!=DOWNLOAD_OK)goto fail;
@@ -58,11 +60,15 @@ void downloads_report(Vault *v,const Principal *p,int history,uint32_t file,uint
             const DownloadHistoryRow *r=&page.rows[i];
             used+=(size_t)snprintf(out+used,size-used,"DOWNLOADROW %zu %u %s %" PRIu64 " %u %s\r\n",r->sequence,r->file,r->subject,r->at,r->size,r->protocol);
         }
-        snprintf(out+used,size-used,"END NEXT %zu\r\n",page.next);return;
+        snprintf(out+used,size-used,"END NEXT %zu\r\n",page.next);*next=(uint32_t)page.next;return 1;
     }
     DownloadStats page;status=download_core_stats(v,p,file,cursor,&page);if(status!=DOWNLOAD_OK)goto fail;
     size_t used=(size_t)snprintf(out,size,"FILESTATS\r\n");
     for(size_t i=0;i<page.count;i++)used+=(size_t)snprintf(out+used,size-used,"DOWNLOADCOUNT %u %" PRIu64 "\r\n",page.rows[i].file,page.rows[i].count);
-    snprintf(out+used,size-used,"END NEXT %u\r\n",page.next);return;
-fail:snprintf(out,size,"%s\r\n",download_error(status));
+    snprintf(out+used,size-used,"END NEXT %u\r\n",page.next);*next=(uint32_t)page.next;return 1;
+fail:snprintf(out,size,"%s\r\n",download_error(status));return 0;
 }
+
+void downloads_report(Vault *v,const Principal *p,int history,uint32_t file,uint32_t cursor,char *out,size_t size) { uint32_t next;(void)downloads_report_page(v,p,history,file,cursor,out,size,&next); }
+
+int downloads_command(Vault *v,const Principal *p,const char *line,const char *protocol,char *out,size_t size) { int failed;return downloads_command_result(v,p,line,protocol,out,size,&failed); }

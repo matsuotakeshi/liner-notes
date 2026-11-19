@@ -9,4 +9,6 @@ int downloads_prune(Vault *);
 void downloads_guard(int (*guard)(void *),void *context);
 int downloads_command(Vault *,const Principal *,const char *,const char *,char *,size_t);
 void downloads_report(Vault *,const Principal *,int history,uint32_t file,uint32_t cursor,char *,size_t);
+int downloads_report_page(Vault *,const Principal *,int history,uint32_t file,uint32_t cursor,char *,size_t,uint32_t *next);
+int downloads_command_result(Vault *,const Principal *,const char *,const char *,char *,size_t,int *failed);
 #endif

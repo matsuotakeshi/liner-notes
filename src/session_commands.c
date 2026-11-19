@@ -34,16 +34,16 @@ static int utility_command(Session *s,char *line) {
     char out[128];
     if(!strcmp(line,"PING")) session_impl_emit(s,"PONG\r\n");
     else if(!strcmp(line,"WHO")) {
-        unsigned n=s->io.online?s->io.online(s->io.context):1;
+        unsigned n=s->connection.io.online?s->connection.io.online(s->connection.io.context):1;
         snprintf(out,sizeof(out),"WHO %u\r\n",n); session_impl_emit(s,out);
     } else if(!strncmp(line,"ECHO ",5)) { session_impl_emit(s,line+5); session_impl_emit(s,"\r\n"); }
     else if(!strncmp(line,"WAIT ",5)) {
         char *end; long n=strtol(line+5,&end,10);
         if(end==line+5 || *end || n<1 || n>5000) session_impl_emit(s,"ERR WAIT 1..5000\r\n");
-        else { s->wake=s->now+(uint64_t)n; session_impl_emit(s,"WAITING\r\n"); }
+        else { s->core.wake=s->core.now+(uint64_t)n; session_impl_emit(s,"WAITING\r\n"); }
     } else if(!strcmp(line,"QUIT")) {
-        if(preference_exit_begin(&s->preferences,s->user,PREF_EXIT_QUIT)) { session_impl_command_core(s,"PREFS SAVE");preference_exit_submitted(&s->preferences,s->pending);return 1; }
-        s->preferences.exit_action=PREF_EXIT_NONE;if(s->ui.enabled)session_impl_queue_text(s,site_text(1));session_impl_emit(s,"BYE\r\n");s->closing=1;
+        if(preference_exit_begin(&s->presentation.preferences,s->core.user,PREF_EXIT_QUIT)) { session_impl_command_core(s,"PREFS SAVE");preference_exit_submitted(&s->presentation.preferences,s->core.pending);return 1; }
+        s->presentation.preferences.exit_action=PREF_EXIT_NONE;if(s->presentation.ui.enabled)session_impl_queue_text(s,site_text(1));session_impl_emit(s,"BYE\r\n");s->core.closing=1;
     }
     else session_impl_emit(s,"ERR command\r\n");
 

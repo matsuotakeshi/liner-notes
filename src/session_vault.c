@@ -35,7 +35,7 @@ int session_impl_vault_command(Session *s,char *line) {
        !strncmp(line,"FILESEARCHFROM ",15) || !strncmp(line,"FILESIN ",8) || !strncmp(line,"FILESINFROM ",12) ||
        !strncmp(line,"FILECATEGORY ",13) || !strcmp(line,"FILECATEGORIES") || !strncmp(line,"FILECATEGORIES ",15) ||
        !strcmp(line,"FILEBOARDS") || !strncmp(line,"FILEBOARDS ",11) || !strcmp(line,"FILEAUDIT") || !strncmp(line,"FILEAUDIT ",10)) {
-        if(!s->board_enabled) { session_impl_emit(s,"ERR no board\r\n");return 1; }
+        if(!s->core.board_enabled) { session_impl_emit(s,"ERR no board\r\n");return 1; }
         BoardRequest q={0};q.op='Y';const char *tail=NULL,*argument=NULL;
         if(!strncmp(line,"FILEDELETE ",11)) {
             q.action=VAULT_CMD_DELETE;if(!session_impl_number_arg(line+11,&q.number,&tail) || strcmp(tail," CONFIRM"))goto vault_syntax;
@@ -90,8 +90,8 @@ int session_impl_vault_command(Session *s,char *line) {
 
 int session_impl_vault_children_result(Session *s,const BoardResult *completion,uint64_t now) {
     (void)now;
-    if(!strncmp(completion->text,"FILECHILDREN ",13)) {
-        vault_children_response(&s->vault,completion->text);
+    if(completion->feedback.file_children) {
+        vault_children_begin(&s->files.vault);for(unsigned i=0;i<completion->feedback.child_count && i<16;i++)vault_children_row(&s->files.vault,i+1,completion->feedback.children[i]);s->files.vault.next=completion->feedback.child_next;
         session_impl_queue_text(s,completion->text);session_impl_prompt(s);return 1;
     }
 
@@ -100,12 +100,12 @@ int session_impl_vault_children_result(Session *s,const BoardResult *completion,
 
 int session_impl_batch_copy_result(Session *s,const BoardResult *completion,uint64_t now) {
     (void)now;
-    if(s->batch_copying) {
+    if(s->files.batch_copying) {
         session_impl_queue_text(s,completion->text);
-        if(strncmp(completion->text,"FILE COPIED ",12)) { s->batch_copying=0;session_impl_prompt(s);return 1; }
-        uint32_t next=batch_copy_complete(&s->batch);
-        if(next) { BoardRequest q={0};q.op='Y';q.action=VAULT_CMD_COPY;q.number=next;strcpy(q.body,s->batch.copy_path);session_impl_submit(s,&q); }
-        else { s->batch_copying=0;session_impl_prompt(s); }return 1;
+        if(!completion->feedback.file_copied) { s->files.batch_copying=0;session_impl_prompt(s);return 1; }
+        uint32_t next=batch_copy_complete(&s->files.batch);
+        if(next) { BoardRequest q={0};q.op='Y';q.action=VAULT_CMD_COPY;q.number=next;strcpy(q.body,s->files.batch.copy_path);session_impl_submit(s,&q); }
+        else { s->files.batch_copying=0;session_impl_prompt(s); }return 1;
     }
 
     return 0;
@@ -113,13 +113,16 @@ int session_impl_batch_copy_result(Session *s,const BoardResult *completion,uint
 
 int session_impl_vault_edit_result(Session *s,const BoardResult *completion,uint64_t now) {
     (void)now;
-    if(!strncmp(completion->text,"BATCHMATCH",10)) {
-        BatchIds selected=batch_response_ids(completion->text+10);batch_replace(&s->batch,&selected);
+    if(completion->feedback.batch_match) {
+        BatchIds selected={.count=completion->feedback.count};memcpy(selected.ids,completion->feedback.ids,sizeof(selected.ids));batch_replace(&s->files.batch,&selected);
         char ids[192],text[384];if(!batch_format_ids(&selected,ids,sizeof(ids))) { session_abort(s);return 1; }
-        snprintf(text,sizeof(text),s->ui.enabled?ui_text(&s->ui,MSG_BATCH_LIST):"BATCH %u %s\r\n",s->batch.count,*ids?ids:"-");session_impl_queue_text(s,text);session_impl_prompt(s);return 1;
+        snprintf(text,sizeof(text),s->presentation.ui.enabled?ui_text(&s->presentation.ui,MSG_BATCH_LIST):"BATCH %u %s\r\n",s->files.batch.count,*ids?ids:"-");session_impl_queue_text(s,text);session_impl_prompt(s);return 1;
     }
-    if(!strncmp(completion->text,"FILEBOARD EDIT ",15)) { const char *body=strstr(completion->text,"\r\n");if(body) { memset(&s->draft,0,sizeof(s->draft));s->draft.op='Y';s->draft.action=VAULT_CMD_BOARDGUIDE;size_t n=(size_t)(body-(completion->text+15));if(n<=48) { memcpy(s->draft.title,completion->text+15,n);snprintf(s->draft.body,sizeof(s->draft.body),"%s",body+2);s->editing=1;s->editor_input=0;s->editor_at=1;session_impl_undo_clear(s);session_impl_queue_text(s,s->ui.language==LANGUAGE_JA?"ファイルボード案内文を編集します。/SAVE で保存。\r\n":"Edit file-board guide. /SAVE to save.\r\n");session_impl_prompt(s);return 1; } } }
-    if(s->editing && s->draft.op=='Y' && !strcmp(completion->text,"FILEBOARD UPDATED\r\n")) { s->editing=0;s->editor_upload=s->editor_confirm=s->editor_upload_question=0;memset(&s->draft,0,sizeof(s->draft)); }
+    if(completion->feedback.file_guide) { memset(&s->editor.draft,0,sizeof(s->editor.draft));s->editor.draft.op='Y';s->editor.draft.action=VAULT_CMD_BOARDGUIDE;
+        snprintf(s->editor.draft.title,sizeof(s->editor.draft.title),"%s",completion->draft_title);snprintf(s->editor.draft.body,sizeof(s->editor.draft.body),"%s",completion->draft_body);
+        s->editor.editing=1;s->editor.editor_input=0;s->editor.editor_at=1;session_impl_undo_clear(s);session_impl_queue_text(s,s->presentation.ui.language==LANGUAGE_JA?"ファイルボード案内文を編集します。/SAVE で保存。\r\n":"Edit file-board guide. /SAVE to save.\r\n");session_impl_prompt(s);return 1; }
+
+    if(s->editor.editing && s->editor.draft.op=='Y' && completion->feedback.file_updated) { s->editor.editing=0;s->editor.editor_upload=s->editor.editor_confirm=s->editor.editor_upload_question=0;memset(&s->editor.draft,0,sizeof(s->editor.draft)); }
 
     return 0;
 }

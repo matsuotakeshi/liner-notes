@@ -30,23 +30,22 @@
 
 void session_result(Session *s,const BoardResult *completion,uint64_t now) {
 
-    if(!s->active || s->closing || s->id!=completion->session || s->slot!=completion->slot) return;
-    s->now=now; s->pending=0;
-    if(reader_cancel_completion(&s->reader,completion->sequence)) { session_impl_queue_text(s,ui_text(&s->ui,MSG_SCAN_STOP));session_impl_prompt(s);return; }
-    if(s->preferences.exit_action) {
-        PreferenceExit action=preference_exit_complete(&s->preferences,!strncmp(completion->text,"PREFS SAVED",11));
+    if(!session_core_complete(&s->core,completion,now))return;
+    if(reader_cancel_completion(&s->reading.reader,completion->sequence)) { session_impl_queue_text(s,ui_text(&s->presentation.ui,MSG_SCAN_STOP));session_impl_prompt(s);return; }
+    if(s->presentation.preferences.exit_action) {
+        PreferenceExit action=preference_exit_complete(&s->presentation.preferences,completion->feedback.preferences_saved);
         if(action!=PREF_EXIT_NONE) { session_impl_command_core(s,action==PREF_EXIT_LOGOUT?"LOGOUT":"QUIT");session_impl_prompt(s);return; }
         session_impl_emit(s,completion->text);session_impl_prompt(s);return;
     }
-    if(completion->sigop>=0)s->ui.sigop=completion->sigop;
-    if(completion->service_action=='E') { s->ui.input=completion->service_number==2?UI_REPLY:UI_POST;session_impl_prompt(s);return; }
+    if(completion->sigop>=0)s->presentation.ui.sigop=completion->sigop;
+    if(completion->service_action=='E') { s->presentation.ui.input=completion->service_number==2?UI_REPLY:UI_POST;session_impl_prompt(s);return; }
     if(completion->mail_notify_user)session_mail_notify(s,completion->mail_notify_user,completion->mail_notify_deny,completion->mail_notify_revision);
     if(completion->chat_user)chat_apply_preferences(completion->chat_user,&completion->chat_preferences);
     if(completion->revoked) { session_revoke(s); return; }
-    if(vault_navigation_complete(&s->vault,!strncmp(completion->text,"FILEBOARDSETTING ",17))) {
-        s->file_selected=0;s->vault_mode=1;s->mail_mode=0;
+    if(vault_navigation_complete(&s->files.vault,completion->feedback.file_board_info)) {
+        s->files.file_selected=0;s->files.vault_mode=1;s->mail_state.mail_mode=0;
     }
-    mail_navigation_observe(&s->mail,session_impl_mail_event(completion->mail_action),completion->mail_id);
+    mail_navigation_observe(&s->mail_state.mail,session_impl_mail_event(completion->mail_action),completion->mail_id);
     if(session_impl_traversal_result(s,completion,now))return;
     if(session_impl_mail_batch_result(s,completion,now))return;
     if(session_impl_vault_children_result(s,completion,now))return;
@@ -54,8 +53,8 @@ void session_result(Session *s,const BoardResult *completion,uint64_t now) {
     if(session_impl_profile_walk_result(s,completion,now))return;
     if(session_impl_batch_copy_result(s,completion,now))return;
     if(session_impl_report_result(s,completion,now))return;
-    if(!strncmp(completion->text,"FILEBOARD UNLOCKED ",19)) { unsigned id,revision;if(sscanf(completion->text,"FILEBOARD UNLOCKED %u %u",&id,&revision)==2 && id<=1024)s->vault_grants[id]=revision; }
-    if(completion->auth) { s->classic_input=0;s->classic_id=0;s->classic_area=CM_MAIN;check_traversal_reset(&s->check);memset(s->vault_grants,0,sizeof(s->vault_grants)); }
+    if(completion->feedback.file_unlocked && completion->feedback.grant_board<=1024)s->core.vault_grants[completion->feedback.grant_board]=completion->feedback.grant_revision;
+    if(completion->auth) { s->presentation.classic_input=0;s->presentation.classic_id=0;s->presentation.classic_area=CM_MAIN;check_traversal_reset(&s->reading.check);memset(s->core.vault_grants,0,sizeof(s->core.vault_grants)); }
     if(session_impl_vault_edit_result(s,completion,now))return;
     if(session_impl_message_result(s,completion,now))return;
     if(session_impl_mail_result(s,completion,now))return;

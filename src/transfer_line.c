@@ -31,7 +31,8 @@ static int decode(const char *s,unsigned char *out,size_t max,size_t *count) {
     EVP_EncodeBlock(canonical,decoded,n);if(strcmp((char *)canonical,s))return 0;
     memcpy(out,decoded,(size_t)n);*count=(size_t)n;return 1;
 }
-void transfer_line_execute(TransferBackend backend,const Principal *p,const char *line,char *out,size_t capacity) {
+VaultResult transfer_line_result(TransferBackend backend,const Principal *p,const char *line,char *out,size_t capacity,uint32_t *started) {
+    if(started)*started=0;
     TransferRequest q={0};TransferReply reply={0};char copy[90001],*tokens[6];size_t n=0;
     VaultResult r=VAULT_INVALID;
     if(strlen(line)>90000)goto error;
@@ -88,7 +89,10 @@ void transfer_line_execute(TransferBackend backend,const Principal *p,const char
         snprintf(out,capacity,"UPLOADSTATUS %u %s %u %u %s\r\n",q.id,reply.upload.state==VAULT_UPLOAD_ACTIVE?"ACTIVE":reply.upload.state==VAULT_UPLOAD_COMMITTED?"COMMITTED":"CANCELLED",reply.upload.received,reply.upload.size,digest);
     } else if(q.operation==TRANSFER_CHECK)snprintf(out,capacity,"FILEBOARD READY\r\n");
     else snprintf(out,capacity,"UPLOAD CANCELLED %u\r\n",q.id);
-    return;
+    if(started && q.operation==TRANSFER_START)*started=reply.id;
+    return VAULT_OK;
 error:
-    snprintf(out,capacity,"%s\r\n",r==VAULT_DENIED?"ERR vault denied":r==VAULT_NOT_FOUND?"ERR no file":r==VAULT_BUSY?"ERR vault busy":r==VAULT_LIMIT?"ERR vault limit":r==VAULT_STORAGE?"ERR vault storage":"ERR vault syntax");
+    snprintf(out,capacity,"%s\r\n",r==VAULT_DENIED?"ERR vault denied":r==VAULT_NOT_FOUND?"ERR no file":r==VAULT_BUSY?"ERR vault busy":r==VAULT_LIMIT?"ERR vault limit":r==VAULT_STORAGE?"ERR vault storage":"ERR vault syntax");return r;
 }
+
+void transfer_line_execute(TransferBackend backend,const Principal *p,const char *line,char *out,size_t capacity) { (void)transfer_line_result(backend,p,line,out,capacity,NULL); }

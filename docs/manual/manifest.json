@@ -146,7 +146,12 @@
         "src/session_policy_core.c",
         "src/session_policy_core.h",
         "tests/test_session_policy_core.c",
-        "tests/test_session_boundaries.py"
+        "tests/test_session_boundaries.py",
+        "src/session_core.h",
+        "src/session_core.c",
+        "src/session_state.h",
+        "tests/test_session_core.c",
+        "tests/test_session_operations.c"
       ]
     },
     {
@@ -185,7 +190,12 @@
         "src/session_policy_core.h",
         "tests/test_session_policy_core.c",
         "tests/test_session_boundaries.py",
-        "tests/test_adapters.c"
+        "tests/test_adapters.c",
+        "src/session_core.h",
+        "src/session_core.c",
+        "src/session_state.h",
+        "tests/test_session_core.c",
+        "tests/test_session_operations.c"
       ]
     },
     {
@@ -218,7 +228,12 @@
         "src/session_policy_core.c",
         "src/session_policy_core.h",
         "tests/test_session_policy_core.c",
-        "tests/test_session_boundaries.py"
+        "tests/test_session_boundaries.py",
+        "src/session_core.h",
+        "src/session_core.c",
+        "src/session_state.h",
+        "tests/test_session_core.c",
+        "tests/test_session_operations.c"
       ]
     },
     {
@@ -254,7 +269,12 @@
         "src/session_policy_core.c",
         "src/session_policy_core.h",
         "tests/test_session_policy_core.c",
-        "tests/test_session_boundaries.py"
+        "tests/test_session_boundaries.py",
+        "src/session_core.h",
+        "src/session_core.c",
+        "src/session_state.h",
+        "tests/test_session_core.c",
+        "tests/test_session_operations.c"
       ]
     },
     {
@@ -292,7 +312,12 @@
         "src/session_policy_core.c",
         "src/session_policy_core.h",
         "tests/test_session_policy_core.c",
-        "tests/test_session_boundaries.py"
+        "tests/test_session_boundaries.py",
+        "src/session_core.h",
+        "src/session_core.c",
+        "src/session_state.h",
+        "tests/test_session_core.c",
+        "tests/test_session_operations.c"
       ]
     },
     {
@@ -336,7 +361,12 @@
         "src/session_policy_core.c",
         "src/session_policy_core.h",
         "tests/test_session_policy_core.c",
-        "tests/test_session_boundaries.py"
+        "tests/test_session_boundaries.py",
+        "src/session_core.h",
+        "src/session_core.c",
+        "src/session_state.h",
+        "tests/test_session_core.c",
+        "tests/test_session_operations.c"
       ]
     },
     {
@@ -381,7 +411,12 @@
         "src/session_policy_core.c",
         "src/session_policy_core.h",
         "tests/test_session_policy_core.c",
-        "tests/test_session_boundaries.py"
+        "tests/test_session_boundaries.py",
+        "src/session_core.h",
+        "src/session_core.c",
+        "src/session_state.h",
+        "tests/test_session_core.c",
+        "tests/test_session_operations.c"
       ]
     },
     {
@@ -425,7 +460,12 @@
         "src/session_policy_core.c",
         "src/session_policy_core.h",
         "tests/test_session_policy_core.c",
-        "tests/test_session_boundaries.py"
+        "tests/test_session_boundaries.py",
+        "src/session_core.h",
+        "src/session_core.c",
+        "src/session_state.h",
+        "tests/test_session_core.c",
+        "tests/test_session_operations.c"
       ]
     },
     {
@@ -463,7 +503,12 @@
         "src/session_policy_core.h",
         "tests/test_session_policy_core.c",
         "tests/test_session_boundaries.py",
-        "tests/test_adapters.c"
+        "tests/test_adapters.c",
+        "src/session_core.h",
+        "src/session_core.c",
+        "src/session_state.h",
+        "tests/test_session_core.c",
+        "tests/test_session_operations.c"
       ]
     },
     {
@@ -840,7 +885,12 @@
         "src/session_policy_core.c",
         "src/session_policy_core.h",
         "tests/test_session_policy_core.c",
-        "tests/test_session_boundaries.py"
+        "tests/test_session_boundaries.py",
+        "src/session_core.h",
+        "src/session_core.c",
+        "src/session_state.h",
+        "tests/test_session_core.c",
+        "tests/test_session_operations.c"
       ]
     },
     {

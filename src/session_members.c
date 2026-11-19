@@ -61,7 +61,7 @@ int session_impl_member_rights_command(Session *s,char *line) {
 int session_impl_member_directory_command(Session *s,char *line) {
     if(!strcmp(line,"MEMBERS") || !strncmp(line,"MEMBERS ",8) || !strncmp(line,"MEMBER ",7) ||
        !strncmp(line,"SUSPEND ",8) || !strncmp(line,"RESUME ",7)) {
-        if(!s->board_enabled) { session_impl_emit(s,"ERR no board\r\n"); return 1; }
+        if(!s->core.board_enabled) { session_impl_emit(s,"ERR no board\r\n"); return 1; }
         BoardRequest q={0}; q.op=!strncmp(line,"MEMBERS",7)?'l':!strncmp(line,"MEMBER ",7)?'t':line[0]=='S'?'x':'y';
         q.number=q.op=='l'?1:0;
         const char *arg=strchr(line,' ');
@@ -70,9 +70,9 @@ int session_impl_member_directory_command(Session *s,char *line) {
     }
     if(!strcmp(line,"ADMIN") || !strcmp(line,"HIDE") || !strncmp(line,"HIDE ",5) ||
        !strcmp(line,"RESTORE") || !strncmp(line,"RESTORE ",8) || !strcmp(line,"INSPECT") || !strncmp(line,"INSPECT ",8)) {
-        if(!s->board_enabled) { session_impl_emit(s,"ERR no board\r\n"); return 1; }
+        if(!s->core.board_enabled) { session_impl_emit(s,"ERR no board\r\n"); return 1; }
         BoardRequest q={0}; q.op=!strcmp(line,"ADMIN")?'z':line[0]=='H'?'h':line[0]=='R'?'r':'i';
-        q.number=s->current;
+        q.number=s->core.current;
         const char *arg=strchr(line,' ');
         if(arg) { const char *tail; if(!session_impl_number_arg(arg+1,&q.number,&tail)||*tail) { session_impl_emit(s,"ERR article number\r\n"); return 1; } }
         session_impl_submit(s,&q); return 1;
