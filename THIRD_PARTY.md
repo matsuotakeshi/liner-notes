@@ -37,3 +37,10 @@ file or environment variables; game code is not incorporated into this BBS.
 Binary redistributors must also provide the corresponding Liner notes source
 under GPLv3. The versioned source archive alongside the FreeBSD package contains
 the source and build scripts; the ports archive contains its packaging recipe.
+
+## Optional libssh
+
+The optional built-in SSH listener dynamically links the system libssh library
+(LGPL-2.1-or-later). No SSH cryptography is implemented here or vendored.
+See https://www.libssh.org/ and https://www.libssh.org/about/ . Keep the system
+library updated through the OS package manager. The BBS remains GPL-3.0-only.

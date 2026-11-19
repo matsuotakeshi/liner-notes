@@ -39,6 +39,12 @@ fi
 : ${liner_notes_run_user:=liner_notes}
 : ${liner_notes_bind:=127.0.0.1}
 : ${liner_notes_port:=2222}
+: ${liner_notes_ssh_port:=0}
+: ${liner_notes_ssh_bind:=127.0.0.1}
+: ${liner_notes_ssh_host_key:=}
+: ${liner_notes_ssh_member_keys:=}
+: ${liner_notes_ssh_attempts:=6}
+: ${liner_notes_ssh_timeout:=60}
 : ${liner_notes_language:=ja}
 : ${liner_notes_database:=}
 : ${liner_notes_database_mode:=blocks}
@@ -197,6 +203,11 @@ liner_notes_start()
     [ "$liner_notes_chat" = YES ] || set -- "$@" --disable chat
     [ "$liner_notes_mail" = YES ] || set -- "$@" --disable mail
     [ "$liner_notes_vault" = YES ] || set -- "$@" --disable vault
+    if [ "$liner_notes_ssh_port" != 0 ]; then
+        set -- "$@" --ssh-port "$liner_notes_ssh_port" --ssh-bind "$liner_notes_ssh_bind" \
+            --ssh-host-key "$liner_notes_ssh_host_key" --ssh-attempts "$liner_notes_ssh_attempts" --ssh-timeout "$liner_notes_ssh_timeout"
+        [ -z "$liner_notes_ssh_member_keys" ] || set -- "$@" --ssh-member-keys "$liner_notes_ssh_member_keys"
+    fi
     set -- "$@" "$liner_notes_port" "$liner_notes_board" "$liner_notes_members"
     [ -z "$liner_notes_catalog" ] || set -- "$@" "$liner_notes_catalog"
     if [ "$_ln_me" = 0 ]; then set -- -u "$liner_notes_run_user" "$@"; fi

@@ -7,6 +7,8 @@
 #define BOARD_MEMBER_LIFECYCLE '{'
 #define BOARD_MAIL_TRANSFER '='
 #define BOARD_LINK '\x1e'
+/* Internal only: signed SSH key proof verified by the transport, never decoded from text. */
+#define BOARD_SSH_KEY '\x1d'
 #define BOARD_TITLE 80
 #include "content_limits.h"
 #include "mail_attachments.h"

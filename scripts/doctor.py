@@ -71,7 +71,7 @@ FIX = {
  'default': ('統合マニュアルの該当設定・所有者・依存関係を確認し、修正後に再診断してください。', 'Review the corresponding manual settings, ownership and dependencies, then rerun the check.'),
 }
 FLAGS = {'--menu', '--telnet', '--rtbbs-member-policy', '--userlog-public'}
-VALUES = set('database database-structured limits timezone sysinfo goodbye doors link-accounts zmodem-helper vault-dir menu-dir help-dir admins lang bind banner disable registration id-mode id-prefix id-digits id-first login-text-dir registration-form max-articles max-mail max-user-posts gather-count user-log chat-log userlog-keep idle-seconds level-seconds time-warning time-grace'.split())
+VALUES = set('ssh-port ssh-bind ssh-host-key ssh-member-keys ssh-attempts ssh-timeout database database-structured limits timezone sysinfo goodbye doors link-accounts zmodem-helper vault-dir menu-dir help-dir admins lang bind banner disable registration id-mode id-prefix id-digits id-first login-text-dir registration-form max-articles max-mail max-user-posts gather-count user-log chat-log userlog-keep idle-seconds level-seconds time-warning time-grace'.split())
 
 
 class InspectionChanged(ValueError):
@@ -154,6 +154,13 @@ def options(text):
     for key,maximum in [('max-articles',2147483646),('max-mail',2147483646),('max-user-posts',2147483646),('idle-seconds',86400),('userlog-keep',1000000),('time-warning',1000000),('time-grace',1000000),('gather-count',1000)]:
         if key in out and (not out[key].isascii() or not out[key].isdigit() or int(out[key]) > maximum):
             raise ValueError('number')
+    for key, low, high in [('ssh-port', 0, 65535), ('ssh-attempts', 1, 20), ('ssh-timeout', 1, 300)]:
+        if key in out and (not out[key].isascii() or not out[key].isdigit() or not low <= int(out[key]) <= high):
+            raise ValueError('SSH number')
+    if 'ssh-bind' in out:
+        ipaddress.IPv4Address(out['ssh-bind'])
+    if int(out.get('ssh-port', 0)) and not out.get('ssh-host-key'):
+        raise ValueError('SSH host key required')
     if 'id-digits' in out and (len(out['id-digits'])!=1 or out['id-digits'] not in '12345678'):
         raise ValueError('id digits')
     if 'disable' in out and out['disable'] not in {'chat','mail','vault'}:

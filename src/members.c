@@ -4,6 +4,7 @@
 #include "app_limits.h"
 /* Single board-worker ownership. Append-only account/read-state journal. */
 #include "members.h"
+#include "member_keys.h"
 int members_rtbbs_policy;
 #include "store_limits.h"
 #include <stdio.h>
@@ -476,4 +477,17 @@ int members_compact(const char *output) {
     if(ok && profile_required) { memset(row,0,128);row[0]='p';put32(row+4,1);ok=snapshot_row(out,row,128); }
     if(ok)ok=SYNC(out)==0;
     CLOSE(out);OPENSSL_cleanse(row,sizeof(row));return ok;
+}
+
+/* Key proofs are only submitted by the SSH transport after libssh verifies the
+ * signature. Reload the administrator's allowlist at each login for revocation.
+ * This never bypasses pending/deleted/member-store checks or Core suspension. */
+static const char *ssh_keys_path;
+void members_keys_path(const char *path) { ssh_keys_path=path; }
+int members_key_auth(const char *name,const char *fingerprint) {
+    if(fd<0 || broken || !ssh_keys_path || !name || !fingerprint || strlen(fingerprint)!=64 ||
+       strspn(fingerprint,"0123456789abcdef")!=64)return 0;
+    uint32_t id=members_find(name);
+    if(!id || !members_active(id) || members_pending(id))return 0;
+    return member_key_allowed(ssh_keys_path,id,fingerprint)?(int)id:0;
 }

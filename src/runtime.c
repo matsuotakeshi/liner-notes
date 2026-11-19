@@ -16,6 +16,7 @@
 #include "vault.h"
 #include "ui.h"
 #include "session.h"
+#include "ssh_transport.h"
 #include "doors.h"
 #include "door_lock.h"
 #include "store_limits.h"
@@ -88,6 +89,7 @@ typedef struct {
     socket_t fd;
     char peer[64];uint64_t rx_bytes,tx_bytes;
     int userlog_registered;ConnectionClock clock;
+    LnSsh *ssh;
     Session app;
     Terminal terminal;
     unsigned char input[CAP],output[OUT_CAP];
@@ -120,6 +122,7 @@ static void drop(Connection *c) {
     door_stop(c->door);c->door=NULL;
     zhost_stop(c->zhost);c->zhost=NULL;
     vault_worker_session(c->app.core.slot,c->app.core.id,0);
+    ln_ssh_free(c->ssh);c->ssh=NULL;
     if(c->fd!=INVALID) close_socket(c->fd);
     session_dispose(&c->app); terminal_dispose(&c->terminal);
     /* Only output bytes ever written can contain data. Avoid touching several
@@ -131,7 +134,7 @@ static void drop(Connection *c) {
 static ConnectionState connection_state(Connection *c) {
     Session *s=&c->app;SessionUiSnapshot ui=session_ui_snapshot(s);
     return (ConnectionState){s->core.user,s->core.member_level,s->core.admin,s->core.closing,s->connection.door,s->connection.zmodem,
-        s->connection.binary,s->core.pending,ui.secret,ui.menu,ui.chatting,ui.editing};
+        s->connection.binary,s->core.pending,ui.secret || (c->ssh && !ln_ssh_ready(c->ssh)),ui.menu,ui.chatting,ui.editing};
 }
 static int app_drained(void *context) { return ((Connection *)context)->queued==0; }
 static int queue_bytes(void *context,const unsigned char *data,size_t size) {
@@ -148,6 +151,13 @@ static int app_write(void *context,const char *data,size_t size) {
     if(session_ui_snapshot(&c->app).redraw && c->terminal.size && c->terminal.mode!=TERMINAL_RAW)
         return terminal_write(&c->terminal,(unsigned char *)c->terminal.line,c->terminal.size);
     return 1;
+}
+static int ssh_authenticate(void *context,const char *name,const char *proof,int key) {
+    Connection *c=context;BoardRequest *q=calloc(1,sizeof(*q));if(!q)return 0;
+    q->op=key?BOARD_SSH_KEY:'a';snprintf(q->username,sizeof(q->username),"%s",name);
+    snprintf(q->password,sizeof(q->password),"%s",proof);c->app.core.now=now_ms();
+    int accepted=session_submit(&c->app,q)==SESSION_OPERATION_ACCEPTED;
+    OPENSSL_cleanse(q,sizeof(*q));free(q);return accepted;
 }
 static unsigned online(void *context) {
     (void)context; unsigned n=0;
@@ -194,7 +204,7 @@ static void service_result(BoardResult *r) {
             Connection *c=&connections[i];if(c->fd==INVALID)continue;
             ConnectionState state=connection_state(c);ConnectionSummary *row=&rows[count++];
             memset(row,0,sizeof(*row));row->id=c->app.core.id;row->mode=connection_mode(&state);
-            row->telnet=c->terminal.mode==TERMINAL_TELNET;
+            row->telnet=c->ssh?2:c->terminal.mode==TERMINAL_TELNET;
             snprintf(row->login,sizeof(row->login),"%s",c->app.core.user?c->app.core.username:"guest");
             snprintf(row->peer,sizeof(row->peer),"%s",c->peer);
             row->elapsed=connection_elapsed(now_ms(),c->clock.started)/1000;
@@ -348,7 +358,9 @@ static void advance(Connection *c,uint64_t now) {
 }
 int main(int argc,char **argv) {
     const char *program=argv[0];
-    const char *doors_path=NULL;
+    const char *doors_path=NULL,*ssh_keys=NULL;
+    LnSshConfig ssh_config={.bind="127.0.0.1",.attempts=6,.timeout=60};
+    LnSshServer *ssh_server=NULL;
     const char *help_directory="help";int help_required=0;
     const char *user_log=NULL;
     const char *chat_log=NULL;char chat_default[4096];
@@ -366,6 +378,17 @@ int main(int argc,char **argv) {
             else limit_user_posts=(uint32_t)n;
             argc-=2;argv+=2;
         }
+        else if((!strcmp(argv[1],"--ssh-port") || !strcmp(argv[1],"--ssh-attempts") || !strcmp(argv[1],"--ssh-timeout")) && argc>2) {
+            char *tail;unsigned long n=strtoul(argv[2],&tail,10);
+            if(argv[2][0]<'0' || argv[2][0]>'9' || *tail || n>65535)return 2;
+            if(!strcmp(argv[1],"--ssh-port"))ssh_config.port=(unsigned)n;
+            else if(!strcmp(argv[1],"--ssh-attempts"))ssh_config.attempts=(unsigned)n;
+            else ssh_config.timeout=(unsigned)n;
+            argc-=2;argv+=2;
+        }
+        else if(!strcmp(argv[1],"--ssh-bind") && argc>2) { ssh_config.bind=argv[2];argc-=2;argv+=2; }
+        else if(!strcmp(argv[1],"--ssh-host-key") && argc>2) { ssh_config.host_key=argv[2];argc-=2;argv+=2; }
+        else if(!strcmp(argv[1],"--ssh-member-keys") && argc>2) { ssh_keys=argv[2];argc-=2;argv+=2; }
         else if(!strcmp(argv[1],"--database-structured") && argc>2) { structured_database=1;database_path=argv[2];argc-=2;argv+=2; }
         else if(!strcmp(argv[1],"--database") && argc>2) { database_path=argv[2];argc-=2;argv+=2; }
         else if(!strcmp(argv[1],"--limits") && argc>2) { limits_path=argv[2];argc-=2;argv+=2; }
@@ -431,7 +454,7 @@ int main(int argc,char **argv) {
     if(!doors_config(doors_path)) { fprintf(stderr,"invalid doors configuration\n");return 2; }
     long port=(argc>=2 && argc<=5) ? strtol(argv[1],&end,10) : -1;
     if(port<0 || port>65535 || !end || end==argv[1] || *end) {
-        fprintf(stderr,"usage: runtime [--database FILE | --database-structured FILE] [--level-seconds LEVEL:SECONDS] [--time-warning N] [--time-grace N] [--userlog-public] [--userlog-keep N] [--idle-seconds N] [--user-log FILE|-] [--gather-count N] [--chat-log FILE|-] [--max-articles N] [--max-mail N] [--max-user-posts N] [--banner FILE] [--disable chat|mail|vault] [--registration open|approval|closed] [--id-mode free|auto] [--id-prefix PREFIX] [--id-digits 1..8] [--id-first NAME] [--rtbbs-member-policy] [--login-text-dir DIR] [--registration-form simple|detailed] [--doors FILE] [--link-accounts FILE] [--zmodem-helper FILE] [--vault-dir DIR] [--bind IPv4] [--menu] [--menu-dir DIR] [--help-dir DIR] [--telnet] [--lang ja|en] [--admins FILE] PORT [BOARD_FILE [MEMBERS_FILE [CATALOG_FILE]]] (default bind: 127.0.0.1)\n"); return 2;
+        fprintf(stderr,"usage: runtime [--ssh-port PORT --ssh-host-key FILE] [--ssh-bind IPv4] [--ssh-member-keys FILE] [--ssh-attempts N] [--ssh-timeout SECONDS] [--database FILE | --database-structured FILE] [--level-seconds LEVEL:SECONDS] [--time-warning N] [--time-grace N] [--userlog-public] [--userlog-keep N] [--idle-seconds N] [--user-log FILE|-] [--gather-count N] [--chat-log FILE|-] [--max-articles N] [--max-mail N] [--max-user-posts N] [--banner FILE] [--disable chat|mail|vault] [--registration open|approval|closed] [--id-mode free|auto] [--id-prefix PREFIX] [--id-digits 1..8] [--id-first NAME] [--rtbbs-member-policy] [--login-text-dir DIR] [--registration-form simple|detailed] [--doors FILE] [--link-accounts FILE] [--zmodem-helper FILE] [--vault-dir DIR] [--bind IPv4] [--menu] [--menu-dir DIR] [--help-dir DIR] [--telnet] [--lang ja|en] [--admins FILE] PORT [BOARD_FILE [MEMBERS_FILE [CATALOG_FILE]]] (default bind: 127.0.0.1)\n"); return 2;
     }
 #ifdef _WIN32
     WSADATA data; if(WSAStartup(MAKEWORD(2,2),&data)) return 1;
@@ -466,6 +489,13 @@ int main(int argc,char **argv) {
     signal(SIGINT,stop); signal(SIGTERM,stop);
     if(admins_path && argc<4) { fprintf(stderr,"admins: requires board and member files\n"); return 2; }
     if(link_accounts_path && (argc<4 || !board_link_config(link_accounts_path))) { fprintf(stderr,"link: invalid board/account allowlist\n");return 2; }
+    if(ssh_config.port) {
+        struct in_addr ssh_addr;
+        if(argc<4 || !ssh_config.host_key || inet_pton(AF_INET,ssh_config.bind,&ssh_addr)!=1) { fprintf(stderr,"SSH requires members, a host key and numeric IPv4 bind\n");return 2; }
+        ssh_config.public_keys=ssh_keys!=NULL;members_keys_path(ssh_keys);
+        ssh_server=ln_ssh_server(&ssh_config);
+        if(!ssh_server) { fprintf(stderr,"SSH setup failed: check SSH-enabled build, host key permissions and listener settings\n");return 2; }
+    }
     if(argc>=3) { if(!board_start_config(argv[2],argc>=4?argv[3]:NULL,argc==5?argv[4]:NULL,admins_path)) return 1; board_enabled=1; member_mode=argc>=4; }
     if(board_enabled && (!user_log || strcmp(user_log,"-")) && !(user_log?userlog_open_file(user_log):userlog_open(argc>=4?argv[3]:argv[2]))) { fprintf(stderr,"userlog: cannot open/lock/validate\n");board_stop();return 1; }
     if(!chat_log && argc>=4) { int n=snprintf(chat_default,sizeof(chat_default),"%s.chatlog",argv[3]);if(n<0 || (size_t)n>=sizeof(chat_default))return 2;chat_log=chat_default; }
@@ -495,6 +525,7 @@ int main(int argc,char **argv) {
         return listener_error(listener,"getsockname",bind_address,requested_port);
     service_port=(unsigned)ntohs(addr.sin_port);
     printf("LISTEN %s %u\n",bind_address,service_port); fflush(stdout);
+    if(ssh_server) { printf("SSH LISTEN %s %u\n",ssh_config.bind,ssh_config.port);fflush(stdout); }
     int result=0;
     while(!stopping) {
         uint64_t clock=now_ms();
@@ -564,16 +595,25 @@ int main(int argc,char **argv) {
             }
             if(completion.slot>=0 && completion.slot<SLOTS) {
                 Connection *c=&connections[completion.slot];
+                if(c->ssh && ln_ssh_auth_pending(c->ssh) && c->app.core.id==completion.session) {
+                    OPENSSL_cleanse(c->output,c->queued);c->queued=0;
+                }
                 if(c->app.core.id==completion.session && completion.auth>0 && completion.auth<=MEMBER_MAX && completion.user_epoch<account_epochs[completion.auth]) {
                     c->used=0; c->queued=0; OPENSSL_cleanse(c->input,sizeof(c->input));
                     terminal_clear(&c->terminal); session_revoke(&c->app);
                 } else session_result(&c->app,&completion,now_ms());
+                if(c->ssh && ln_ssh_auth_pending(c->ssh)) {
+                    int accepted=completion.auth>0 && c->app.core.user==(uint32_t)completion.auth && !c->app.core.closing;
+                    fprintf(stderr,"SSH auth %s slot=%d\n",accepted?"accepted":"rejected",completion.slot);
+                    if(!ln_ssh_auth_result(c->ssh,accepted))drop(c);
+                }
             }
         }
         doors_reap();
-        pollfd_t fds[SLOTS+2]; int map[SLOTS+2]; unsigned count=1;
+        pollfd_t fds[SLOTS+3]; int map[SLOTS+3]; unsigned count=1;
         memset(fds,0,sizeof(fds));
         fds[0].fd=listener; fds[0].events=POLLIN;
+        if(ssh_server) { fds[count].fd=ln_ssh_listener(ssh_server);fds[count].events=POLLIN;map[count++]=-2; }
         int notification=board_completion_fd();
         if(notification>=0) { fds[count].fd=notification;fds[count].events=POLLIN;map[count++]=-1; }
         uint64_t now=now_ms(); int timeout=50;
@@ -590,7 +630,28 @@ int main(int argc,char **argv) {
             }
             if(connection_idle_drained(&c->clock,now)) { drop(c);continue; }
             connection_busy_activity(&c->clock,&state,now);
-            advance(c,now);
+            if(c->ssh) {
+                if(!ln_ssh_pump(c->ssh,now)) { drop(c);continue; }
+                unsigned columns,rows;
+                if(ln_ssh_dimensions(c->ssh,&columns,&rows)) {
+                    session_dimensions(&c->app,columns,rows);
+                    if(c->door)(void)door_resize(c->door,c->app.connection.columns,c->app.connection.rows);
+                }
+                if(ln_ssh_ready(c->ssh)) {
+                    if(c->queued) {
+                        int n=ln_ssh_write(c->ssh,c->output,c->queued);
+                        if(n<0) { drop(c);continue; }
+                        c->tx_bytes+=(unsigned)n;c->queued-=(size_t)n;memmove(c->output,c->output+n,c->queued);
+                    }
+                    if(c->used<CAP && c->queued<=OUT_CAP/2) {
+                        size_t room=CAP-c->used;if(room>512)room=512;
+                        int n=ln_ssh_read(c->ssh,c->input+c->used,room);
+                        if(n<0) { drop(c);continue; }
+                        c->used+=(size_t)n;c->rx_bytes+=(unsigned)n;
+                    }
+                    advance(c,now);
+                }
+            } else advance(c,now);
             if(c->fd!=INVALID) {
                 state=connection_state(c);decision=connection_idle_check(&policy,&c->clock,&state,now);
                 if(decision==CONNECTION_CLOSE) {
@@ -611,7 +672,10 @@ int main(int argc,char **argv) {
             if(s->core.wake && s->core.wake>now && s->core.wake-now<(uint64_t)timeout) timeout=(int)(s->core.wake-now);
             fds[count].fd=c->fd;
             if(!s->core.closing && c->used<CAP && c->queued<=OUT_CAP/2) fds[count].events=POLLIN;
-            if(c->queued) fds[count].events|=POLLOUT;
+            if(c->ssh) {
+                fds[count].events=POLLIN;
+                if(ln_ssh_wants_write(c->ssh))fds[count].events|=POLLOUT;
+            } else if(c->queued) fds[count].events|=POLLOUT;
             map[count]=i; count++;
         }
         int ready=poll_sockets(fds,count,timeout);
@@ -620,6 +684,7 @@ int main(int argc,char **argv) {
             if(map[j]<0)continue;
             Connection *c=&connections[map[j]]; short ev=fds[j].revents;
             if(ev&(POLLERR|POLLNVAL)) { drop(c); continue; }
+            if(c->ssh) { if(ev&POLLHUP)drop(c);continue; }
             if(ev&POLLOUT) {
                 int n=(int)send(c->fd,(const char *)c->output,(int)c->queued,0);
                 if(n>0) { c->tx_bytes+=(uint64_t)n;memmove(c->output,c->output+n,c->queued-(size_t)n); c->queued-=(size_t)n; }
@@ -633,9 +698,10 @@ int main(int argc,char **argv) {
             }
             if(ev&POLLHUP) drop(c);
         }
-        if(fds[0].revents&POLLIN) {
+        for(int incoming=0;incoming<(ssh_server?2:1);incoming++) {
+        if(fds[incoming].revents&POLLIN) {
             struct sockaddr_in peer; socklen_t peer_size=sizeof(peer);
-            socket_t fd=accept(listener,(struct sockaddr *)&peer,&peer_size);
+            socket_t fd=accept(incoming?(socket_t)ln_ssh_listener(ssh_server):listener,(struct sockaddr *)&peer,&peer_size);
             if(fd!=INVALID) {
                 int slot=-1;
                 for(int i=0;i<SLOTS;i++) if(connections[i].fd==INVALID) { slot=i; break; }
@@ -646,11 +712,12 @@ int main(int argc,char **argv) {
                     int no_delay=1;
                     if(setsockopt(fd,IPPROTO_TCP,TCP_NODELAY,(const char *)&no_delay,sizeof(no_delay))) { close_socket(fd);continue; }
                     Connection *c=&connections[slot]; c->fd=fd;char address[48];if(inet_ntop(AF_INET,&peer.sin_addr,address,sizeof(address)))snprintf(c->peer,sizeof(c->peer),"%s:%u",address,(unsigned)ntohs(peer.sin_port));
-                    if(!terminal_init(&c->terminal,terminal_mode,queue_bytes,c)) { drop(c); continue; }
+                    if(incoming) { c->ssh=ln_ssh_accept(ssh_server,(int)fd,now_ms(),ssh_authenticate,c);if(!c->ssh) { drop(c);continue; } }
+                    if(!terminal_init(&c->terminal,incoming?TERMINAL_PLAIN:terminal_mode,queue_bytes,c)) { drop(c); continue; }
                     SessionIO io={c,app_write,online,app_drained};
                     session_init(&c->app,io,next_id++,slot,board_enabled,member_mode,menu_mode,default_language);
                     if(!c->app.core.active) { drop(c);continue; }
-                    if(!userlog_connect(slot,terminal_mode==TERMINAL_TELNET?"TELNET":"RAW",now_ms())) { fprintf(stderr,"userlog: connection write failed\n");drop(c);result=1;stopping=1;break; }
+                    if(!userlog_connect(slot,incoming?"RAW":terminal_mode==TERMINAL_TELNET?"TELNET":"RAW",now_ms())) { fprintf(stderr,"userlog: connection write failed\n");drop(c);result=1;stopping=1;break; }
                     c->userlog_registered=1;c->clock.started=c->clock.last_input=now_ms();
                     c->app.connection.zmodem_available=zhelper!=NULL;
                     if(shutdown_state.at) { uint64_t clock=now_ms();unsigned remaining=connection_shutdown_remaining(&shutdown_state,clock);session_notify(&c->app,MSG_SHUTDOWN_NOTICE,remaining,shutdown_state.reason); }
@@ -659,12 +726,13 @@ int main(int argc,char **argv) {
                 }
             }
         }
+        } /* both listeners */
     }
     for(int i=0;i<SLOTS;i++) drop(&connections[i]);
     #ifndef _WIN32
     for(int i=0;i<25 && (zhost_pending() || doors_pending());i++) { zhost_reap(now_ms());doors_reap();struct timespec pause={0,100000000};nanosleep(&pause,NULL); }
 #endif
-    close_socket(listener); userlog_close();board_stop(); vault_bridge_close();chat_log_close();
+    ln_ssh_server_free(ssh_server);close_socket(listener); userlog_close();board_stop(); vault_bridge_close();chat_log_close();
 #ifdef _WIN32
     WSACleanup();
 #endif

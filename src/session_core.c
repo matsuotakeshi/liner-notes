@@ -4,14 +4,14 @@
 SessionOperationStatus session_core_submit(SessionCore *s,OperationRequest *q,SessionOperationPort port) {
     if(!s->active || s->closing)return SESSION_OPERATION_INACTIVE;
     if(s->pending || (s->wake && s->now<s->wake))return SESSION_OPERATION_BUSY;
-    if((q->op=='a' || q->op=='g') && s->now<s->auth_after)return SESSION_OPERATION_THROTTLED;
+    if((q->op=='a' || q->op=='g' || q->op==BOARD_SSH_KEY) && s->now<s->auth_after)return SESSION_OPERATION_THROTTLED;
     q->structured=s->structured;q->session=s->id;q->slot=s->slot;q->user=s->user;q->user_epoch=s->user_epoch;
     memcpy(q->board_grants,s->board_grants,sizeof(q->board_grants));
     memcpy(q->vault_grants,s->vault_grants,sizeof(q->vault_grants));
     if(!s->user && q->op=='P')snprintf(q->username,sizeof(q->username),"%s",*s->guest_handle?s->guest_handle:"guest");
     if(q->op=='j' && s->now<s->auth_after)q->action='t';
     if(!port.enqueue || !port.enqueue(port.context,q))return SESSION_OPERATION_UNAVAILABLE;
-    s->pending=1;if(q->op=='a' || q->op=='g')s->auth_after=s->now+1000;return SESSION_OPERATION_ACCEPTED;
+    s->pending=1;if(q->op=='a' || q->op=='g' || q->op==BOARD_SSH_KEY)s->auth_after=s->now+1000;return SESSION_OPERATION_ACCEPTED;
 }
 void session_core_init(SessionCore *s,unsigned long id,int slot,int boards,int members) {
     memset(s,0,sizeof(*s));s->active=1;s->id=id;s->slot=slot;s->board_enabled=boards;s->member_mode=members;s->board=1;

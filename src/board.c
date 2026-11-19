@@ -956,7 +956,7 @@ void authentication_repository_unread(uint32_t user,uint32_t *articles,uint32_t 
 }
 static void authentication_execute(const BoardRequest *q,BoardResult *r) {
     AuthenticationDecodedForm decoded;
-    AuthenticationRequest request={.mode=q->op=='g'?AUTH_REGISTER:AUTH_LOGIN,.login=q->username,.password=q->password};
+    AuthenticationRequest request={.mode=q->op==BOARD_SSH_KEY?AUTH_SSH_KEY:q->op=='g'?AUTH_REGISTER:AUTH_LOGIN,.login=q->username,.password=q->password};
     if(request.mode==AUTH_REGISTER) { authentication_form_decode(q->body,&decoded);request.form=&decoded.form; }
     AuthenticationResult result;AuthenticationOutcome outcome=authentication_core(&request,&result);
     if(request.mode==AUTH_REGISTER)OPENSSL_cleanse(&decoded,sizeof(decoded));
@@ -997,7 +997,7 @@ static void execute(const BoardRequest *q,BoardResult *r) {
     if(extras_broken() || profile_store_broken()) { (r->feedback.failed=1,strcpy(r->text,"ERR extras storage\r\n")); return; }
     if(members_broken()) { (r->feedback.failed=1,strcpy(r->text,"ERR member storage unavailable\r\n")); return; }
     if(((q->op=='m' || q->op==BOARD_MAIL_TRANSFER || (q->op=='@' && q->action==1)) && !board_feature_enabled("mail")) || (q->op=='&' && !board_feature_enabled("chat")) || (strchr("@Y$^",q->op) && !(q->op=='@' && q->action==1) && !board_feature_enabled("vault"))) { (r->feedback.failed=1,strcpy(r->text,"ERR feature disabled\r\n"));return; }
-    if(q->op=='a' || q->op=='g') { authentication_execute(q,r);return; }
+    if(q->op=='a' || q->op=='g' || q->op==BOARD_SSH_KEY) { authentication_execute(q,r);return; }
     if(q->user && (moderation_suspended(q->user) || q->user_epoch!=moderation_epoch(q->user))) {
         r->revoked=1; (r->feedback.failed=1,strcpy(r->text,"ERR session revoked\r\n")); return;
     }

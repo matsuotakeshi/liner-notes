@@ -50,7 +50,7 @@ jobs:
             -v "$RUNNER_TEMP/rpm-artifacts:/out" \
             rockylinux/rockylinux:10 bash -euc '
               dnf install -y --setopt=install_weak_deps=False \
-                python3 clang make openssl-devel sqlite-devel \
+                python3 clang make openssl-devel sqlite-devel libssh-devel \
                 rpm-build systemd-rpm-macros tar gzip
               mkdir -p /build/liner-notes
               cp -a /source/. /build/liner-notes/

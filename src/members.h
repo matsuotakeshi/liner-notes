@@ -30,6 +30,9 @@ int members_set_mail_notify(uint32_t user,int deny);
 int members_broken(void);
 int members_reset_password(uint32_t user,uint32_t actor,const char *replacement);
 int members_password(uint32_t user,const char *current,const char *replacement);
+/* Configure before starting the worker. Keys use immutable numeric member IDs. */
+void members_keys_path(const char *);
+int members_key_auth(const char *,const char *);
 int members_auth(const char *name,const char *password,int create);
 const char *members_name(uint32_t id);
 int members_seen(uint32_t user,uint32_t article);

@@ -16,6 +16,7 @@ BuildRequires:  clang
 BuildRequires:  make
 BuildRequires:  openssl-devel
 BuildRequires:  sqlite-devel
+BuildRequires:  libssh-devel
 BuildRequires:  %{ln_python}
 BuildRequires:  systemd-rpm-macros
 Requires:       %{ln_python}
@@ -52,7 +53,7 @@ Peer keys and board permissions must be configured before starting the service.
 %setup -q
 
 %build
-%make_build CC=clang CFLAGS="%{optflags}" LDFLAGS="%{build_ldflags}" SQLITE_CFLAGS= SQLITE_LIBS=-lsqlite3
+%make_build SSH_CFLAGS=-DLINER_SSH SSH_LIBS=-lssh CC=clang CFLAGS="%{optflags}" LDFLAGS="%{build_ldflags}" SQLITE_CFLAGS= SQLITE_LIBS=-lsqlite3
 
 %install
 /usr/bin/%{ln_python} scripts/install-linux.py --destdir %{buildroot} --prefix %{_prefix} --python /usr/bin/%{ln_python} --unitdir %{_unitdir}
@@ -70,7 +71,7 @@ echo /usr/bin/liner-notes-link >> rpm-files.list
 install -d -m 0700 %{buildroot}/var/lib/liner-notes %{buildroot}/var/log/liner-notes
 
 %check
-%make_build CC=clang CFLAGS="%{optflags}" SQLITE_CFLAGS= SQLITE_LIBS=-lsqlite3 test-chat
+%make_build SSH_CFLAGS=-DLINER_SSH SSH_LIBS=-lssh CC=clang CFLAGS="%{optflags}" SQLITE_CFLAGS= SQLITE_LIBS=-lsqlite3 test-chat
 ./test-chat
 
 %pre

@@ -68,12 +68,12 @@ AuthenticationOutcome authentication_core(const AuthenticationRequest *request,A
     if(extras_broken() || profile_store_broken())return AUTH_EXTRAS_STORAGE;
     if(members_broken())return AUTH_MEMBER_STORAGE;
     if(moderation_broken())return AUTH_MODERATION_STORAGE;
-    if(!request || (request->mode!=AUTH_LOGIN && request->mode!=AUTH_REGISTER))return AUTH_REJECTED;
+    if(!request || (request->mode!=AUTH_LOGIN && request->mode!=AUTH_REGISTER && request->mode!=AUTH_SSH_KEY))return AUTH_REJECTED;
     int create=request->mode==AUTH_REGISTER;
     if(create && members_registration_mode()==2)return AUTH_REGISTRATION_CLOSED;
     if(create && !form_valid(request->form))return AUTH_APPLICATION_INVALID;
     if(!request->login || !request->password)return AUTH_REJECTED;
-    int id=members_auth(request->login,request->password,create);
+    int id=request->mode==AUTH_SSH_KEY?members_key_auth(request->login,request->password):members_auth(request->login,request->password,create);
     if(!id)return AUTH_REJECTED;
     if(!members_name((uint32_t)id))return AUTH_MEMBER_STORAGE;
     if(create && !form_save((uint32_t)id,request->form)) {

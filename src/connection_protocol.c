@@ -12,7 +12,7 @@ int connection_protocol_list(const ConnectionSummary *rows,size_t count,char *ou
         const ConnectionSummary *r=&rows[i];
         if((unsigned)r->mode>=sizeof(modes)/sizeof(*modes))goto full;
         n=snprintf(out+used,size-used,"CONNECTION %lu %s %s %s %s %llu %llu %llu %llu %zu %u %u\r\n",
-            r->id,r->login,modes[r->mode],r->telnet?"TELNET":"RAW",*r->peer?r->peer:"unknown",
+            r->id,r->login,modes[r->mode],r->telnet==2?"SSH":r->telnet?"TELNET":"RAW",*r->peer?r->peer:"unknown",
             (unsigned long long)r->elapsed,(unsigned long long)r->idle,(unsigned long long)r->rx,
             (unsigned long long)r->tx,r->queued,r->columns,r->rows);
         if(n<0 || (size_t)n>=size-used)goto full;

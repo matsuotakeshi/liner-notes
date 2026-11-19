@@ -10,7 +10,7 @@ export CPPFLAGS := $(filter-out -Wdate-time,$(CPPFLAGS))
 	dh $@
 
 override_dh_auto_build:
-	$(MAKE) -j2 CC=clang SQLITE_CFLAGS= SQLITE_LIBS=-lsqlite3
+	$(MAKE) -j2 SSH_CFLAGS=-DLINER_SSH SSH_LIBS=-lssh CC=clang SQLITE_CFLAGS= SQLITE_LIBS=-lsqlite3
 
 override_dh_auto_test:
 	$(MAKE) CC=clang SQLITE_CFLAGS= SQLITE_LIBS=-lsqlite3 test-chat

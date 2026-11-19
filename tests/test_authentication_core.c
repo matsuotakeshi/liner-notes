@@ -29,6 +29,7 @@ int members_broken(void) { return member_bad; }
 int moderation_broken(void) { return moderation_bad; }
 int members_registration_mode(void) { return registration; }
 int members_auto_ids(void) { return automatic; }
+int members_key_auth(const char *login,const char *proof) { assert(!strcmp(login,"alice") && !strcmp(proof,"test-password"));auth_calls++;return pending?0:auth_id; }
 int members_auth(const char *login,const char *password,int create) {
     assert(!strcmp(login,"alice") && !strcmp(password,"test-password"));auth_calls++;create_seen=create;return auth_id;
 }
@@ -72,6 +73,9 @@ static void rejection_and_policy(void) {
     reset();AuthenticationResult out;auth_id=0;
     assert(authentication_core(&request,&out)==AUTH_REJECTED && auth_calls==1);zero(&out,sizeof(out));
     auth_id=42;suspended=1;assert(authentication_core(&request,&out)==AUTH_REJECTED);zero(&out,sizeof(out));
+    reset();request.mode=AUTH_SSH_KEY;assert(authentication_core(&request,&out)==AUTHENTICATED);
+    pending=1;assert(authentication_core(&request,&out)==AUTH_REJECTED);zero(&out,sizeof(out));
+    pending=0;suspended=1;assert(authentication_core(&request,&out)==AUTH_REJECTED);zero(&out,sizeof(out));
     reset();request.mode=AUTH_REGISTER;registration=2;AuthenticationForm invalid={0};request.form=&invalid;
     assert(authentication_core(&request,&out)==AUTH_REGISTRATION_CLOSED && !auth_calls);
     registration=0;assert(authentication_core(&request,&out)==AUTH_APPLICATION_INVALID && !auth_calls);
