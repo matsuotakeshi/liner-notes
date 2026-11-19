@@ -16,6 +16,7 @@ from test_board import Server
 from test_runtime import Client as Raw
 from test_members import auth, PASSWORD
 from test_telnet import Client as Telnet
+from ssh_screen import Screen, MAIL_PROMPT
 
 
 def port():
@@ -30,31 +31,6 @@ def reject(fn):
     except (paramiko.SSHException, EOFError, OSError):
         return
     raise AssertionError('forbidden SSH request succeeded')
-
-
-class Screen:
-    def __init__(self, channel):
-        self.channel = channel
-        self.buf = b''
-        channel.settimeout(12)
-
-    def until(self, marker=b'] > '):
-        deadline = time.monotonic() + 12
-        while marker not in self.buf:
-            assert time.monotonic() < deadline, ('missing marker', marker, self.buf[-1500:])
-            try:
-                data = self.channel.recv(8192)
-            except TimeoutError as exc:
-                raise AssertionError(('missing marker', marker, self.buf[-1500:])) from exc
-            assert data, ('unexpected EOF', self.buf[-1500:])
-            self.buf += data
-        end = self.buf.index(marker) + len(marker)
-        out, self.buf = self.buf[:end], self.buf[end:]
-        return out
-
-    def cmd(self, text, marker=b'] > '):
-        self.channel.sendall(text.encode() + b'\r')
-        return self.until(marker)
 
 
 def run(binary):
@@ -139,7 +115,13 @@ for line in sys.stdin:
             # restoring the main UI or starting a Door on either connection.
             a.cmd('0', b'MAIL CLOSED\r\n')
             a.cmd('MENU')
-            assert b'private SSH mail' in b.cmd('MAIL READ 1')
+            # An unsolicited arrival notice redraws the MAIN prompt. It is
+            # not the reply to MAIL READ: wait for the distinct mail prompt.
+            mail = b.cmd('MAIL READ 1', MAIL_PROMPT)
+            assert b'Mail 1  From:alice To:bob ' in mail, mail[-1500:]
+            assert b'Subject: ssh-mail\r\n' in mail, mail[-1500:]
+            assert b'private SSH mail' in mail, mail[-1500:]
+            assert b'End mail\r\n' in mail, mail[-1500:]
             b.cmd('0')
             assert b'PONG' in a.cmd('PING')
             assert b'PONG' in b.cmd('PING')

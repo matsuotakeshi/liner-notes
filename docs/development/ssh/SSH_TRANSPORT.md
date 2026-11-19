@@ -154,6 +154,17 @@ and recent test-screen output. No runtime semantics or timeout limits change.
 The remaining encrypted integration cases require a successful corrected CI run;
 the initial run did not reach the Door/security checks after this point.
 
+The follow-up head `9e6bf1b7d68ab7e8bf19c0419fd293fdfdc50a85` passed
+that exit but failed the recipient's mail-body assertion on both distributions
+in [run 44468349733](https://github.com/matsuotakeshi/liner-notes/actions/runs/44468349733).
+An arrival notification redraws the main prompt, while a mail read ends with
+the distinct mail-menu prompt. The test now waits for that mail prompt and
+checks the sender/recipient, subject, body and end marker. The shared test reader
+has deterministic stream tests covering buffered notifications, byte-fragmented
+responses, preserved trailing output and a missing response. These run through
+the existing `test-ssh-sources` check. Runtime behavior is unchanged; encrypted
+acceptance still requires the corrected Hosted integration run.
+
 Do not treat source checks or Windows stub compilation as encrypted runtime
 acceptance. Record the actual PR head, CI run and OS result. Pending native SSH,
 SELinux and Solaris results must stay explicit. No release or deployment is
