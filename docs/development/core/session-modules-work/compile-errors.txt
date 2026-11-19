@@ -1,0 +1,238 @@
+src/session.c: In function 'session_impl_selection_reset':
+src/session.c:48:6: error: 'Session' has no member named 'session_impl_classic_input'
+   48 |     s->session_impl_classic_input=0;s->classic_id=0;s->classic_area=CM_MAIN;
+      |      ^~
+src/session.c: In function 'notification_audience':
+src/session.c:82:27: error: 'Session' has no member named 'session_impl_classic_input'
+   82 |         ((s->ui.input || s->session_impl_classic_input || s->mail_input || s->mail.delete_id)?NOTICE_INPUT:0)|
+      |                           ^~
+src/session.c: In function 'session_tick':
+src/session.c:109:104: error: 'Session' has no member named 'session_impl_editor_input'
+  109 |     if(s->editing && s->editor_upload && now>=s->editor_deadline && !s->pending) { s->editor_upload=0;s->session_impl_editor_input=0;session_impl_queue_text(s,s->ui.language==LANGUAGE_JA?"受信終了。編集を続けられます。\r\n":"Text received. Continue editing.\r\n");session_impl_prompt(s); }
+      |                                                                                                        ^~
+src/session.c: In function 'session_revoke':
+src/session.c:135:6: error: 'Session' has no member named 'session_impl_classic_input'
+  135 |     s->session_impl_classic_input=0;s->classic_id=0;s->classic_area=CM_MAIN;check_traversal_reset(&s->check);memset(s->vault_grants,0,sizeof(s->vault_grants));
+      |      ^~
+src/session_auth.c: In function 'session_impl_account_command':
+src/session_auth.c:140:10: error: 'Session' has no member named 'session_impl_classic_input'
+  140 |         s->session_impl_classic_input=0;s->classic_id=0;s->classic_area=CM_MAIN;check_traversal_reset(&s->check);memset(s->vault_grants,0,sizeof(s->vault_grants));
+      |          ^~
+src/session_chat.c: In function 'session_impl_chat_event':
+src/session_chat.c:140:163: error: 'Session' has no member named 'session_impl_classic_input'
+  140 |     if((e->kind=='I' || e->kind=='C') && !s->chatting && (s->password_mode || s->editing || s->binary || s->zmodem || s->pending || s->page[0] || s->ui.input || s->session_impl_classic_input || s->mail_input || s->mail.delete_id || s->wake))return 0;
+      |                                                                                                                                                                   ^~
+src/session_classic.c: In function 'classic_ask':
+src/session_classic.c:41:6: error: 'Session' has no member named 'session_impl_classic_input'
+   41 |     s->session_impl_classic_input=input;session_impl_queue_text(s,ui_text(&s->ui,message));
+      |      ^~
+src/session_classic.c: In function 'profile_fields':
+src/session_classic.c:59:6: error: 'Session' has no member named 'session_impl_classic_input'
+   59 |     s->session_impl_classic_input=search?CI_SEARCH_FIELD:CI_PROF_FIELD;session_impl_queue_text(s,s->ui.language==LANGUAGE_JA?"項目番号 (0:戻る) > ":"Field (0:back) > ");
+      |      ^~
+src/session_classic.c: In function 'session_impl_classic_input':
+src/session_classic.c:63:15: error: 'Session' has no member named 'session_impl_classic_input'
+   63 |     int mode=s->session_impl_classic_input;if(!mode)return 0;
+      |               ^~
+src/session_classic.c:64:36: error: 'Session' has no member named 'session_impl_classic_input'
+   64 |     char text[INPUT_LINE_MAX+128];s->session_impl_classic_input=0;
+      |                                    ^~
+src/session_classic.c:68:79: error: 'Session' has no member named 'session_impl_classic_input'
+   68 |         if(*line && (!session_impl_number_arg(line,&target,&end) || *end)) { s->session_impl_classic_input=CI_PROF_TARGET;session_impl_queue_text(s,"Member ID (Enter:self) > ");return 1; }
+      |                                                                               ^~
+src/session_classic.c:80:34: error: 'Session' has no member named 'session_impl_classic_input'
+   80 |         if(!strcmp(line,"E")) { s->session_impl_classic_input=CI_FILE_DESC;session_impl_queue_text(s,s->ui.language==LANGUAGE_JA?"説明 > ":"Description > ");return 1; }
+      |                                  ^~
+src/session_classic.c:81:34: error: 'Session' has no member named 'session_impl_classic_input'
+   81 |         if(!strcmp(line,"K")) { s->session_impl_classic_input=CI_FILE_DELETE;session_impl_queue_text(s,"DELETE? Y/N > ");return 1; }
+      |                                  ^~
+src/session_classic.c:84:111: error: 'Session' has no member named 'session_impl_classic_input'
+   84 |         else { const char *keys="SCXYGZM";const char *key=strchr(keys,*line);if(!*line || line[1] || !key) { s->session_impl_classic_input=CI_FILE_ACTION;session_impl_prompt(s);return 1; }
+      |                                                                                                               ^~
+src/session_classic.c:93:10: error: 'Session' has no member named 'session_impl_classic_input'
+   93 |         s->session_impl_classic_input=mode==CI_SEARCH_FIELD?CI_SEARCH_VALUE:CI_PROF_VALUE;
+      |          ^~
+src/session_classic.c:126:60: error: 'Session' has no member named 'session_impl_classic_input'
+  126 |         else if(!strcmp(line,"5") || !strcmp(line,"C")) { s->session_impl_classic_input=CI_BATCH_CLEAR;session_impl_queue_text(s,"CLEAR? Y/N > "); }
+      |                                                            ^~
+src/session_classic.c:128:39: error: 'Session' has no member named 'session_impl_classic_input'
+  128 |         else if(!strcmp(line,"M")) { s->session_impl_classic_input=CI_BATCH_COPY;session_impl_queue_text(s,"Destination board (Enter:current) > "); }
+      |                                       ^~
+src/session_classic.c: In function 'session_impl_classic_commands':
+src/session_classic.c:323:109: error: 'Session' has no member named 'session_impl_classic_input'
+  323 |         case 'W':action="BIOEDIT";break;case 'E':profile_form_target(&s->profile_form,0);if(s->ui.admin) { s->session_impl_classic_input=CI_PROF_TARGET;session_impl_queue_text(s,"Member ID (Enter:self) > "); }else profile_fields(s,0);return 1;
+      |                                                                                                             ^~
+src/session_connector.c:41:5: error: expected identifier or '(' before 'if'
+   41 |     if(completion->binary_enter) {
+      |     ^~
+src/session_connector.c:45:5: error: expected identifier or '(' before 'if'
+   45 |     if(s->binary) {
+      |     ^~
+src/session_connector.c:51:5: error: expected identifier or '(' before 'return'
+   51 |     return 0;
+      |     ^~~~~~
+src/session_connector.c:52:1: error: expected identifier or '(' before '}' token
+   52 | }
+      | ^
+src/session_connector.c: In function 'classic_input_state':
+src/session_connector.c:56:21: error: 'Session' has no member named 'session_impl_classic_input'
+   56 |         .selection=s->session_impl_classic_input==CI_FILE_ACTION || s->session_impl_classic_input==CI_BATCH,
+      |                     ^~
+src/session_connector.c:56:70: error: 'Session' has no member named 'session_impl_classic_input'
+   56 |         .selection=s->session_impl_classic_input==CI_FILE_ACTION || s->session_impl_classic_input==CI_BATCH,
+      |                                                                      ^~
+src/session_connector.c:57:52: error: 'Session' has no member named 'session_impl_classic_input'
+   57 |         .application=s->application.step,.classic=s->session_impl_classic_input,.secret=session_secret(s),
+      |                                                    ^~
+src/session_connector.c:60:38: error: 'ClassicInput' has no member named 'session_impl_editor_input'
+   60 |         .line_editor=s->editor_line,.session_impl_editor_input=s->session_impl_editor_input,.mail_mode=s->mail_mode};
+      |                                      ^~~~~~~~~~~~~~~~~~~~~~~~~
+src/session_connector.c:60:65: error: 'Session' has no member named 'session_impl_editor_input'
+   60 |         .line_editor=s->editor_line,.session_impl_editor_input=s->session_impl_editor_input,.mail_mode=s->mail_mode};
+      |                                                                 ^~
+src/session_connector.c: In function 'session_impl_connector_line':
+src/session_connector.c:146:61: error: 'Session' has no member named 'session_impl_classic_input'
+  146 |             .input=s->application.step?s->application.step:s->session_impl_classic_input?s->session_impl_classic_input:s->memo_input?s->memo_input:s->mail_input?s->mail_input:s->talk_select,
+      |                                                             ^~
+src/session_connector.c:146:91: error: 'Session' has no member named 'session_impl_classic_input'
+  146 |             .input=s->application.step?s->application.step:s->session_impl_classic_input?s->session_impl_classic_input:s->memo_input?s->memo_input:s->mail_input?s->mail_input:s->talk_select,
+      |                                                                                           ^~
+src/session_editor.c: In function 'session_impl_editor_preinput':
+src/session_editor.c:40:42: error: 'Session' has no member named 'session_impl_editor_input'
+   40 |     if(s->editing && s->editor_line && !s->session_impl_editor_input && !strcmp(line,"\\")) { s->memo_input=1;session_impl_queue_text(s,s->ui.language==LANGUAGE_JA?"接続者メモ > ":"Connection memo > ");return 1; }
+      |                                          ^~
+src/session_editor.c:41:42: error: 'Session' has no member named 'session_impl_editor_input'
+   41 |     if(s->editing && s->editor_line && !s->session_impl_editor_input && !s->editor_confirm && (!strcmp(line,"W") || !strcmp(line,"T") || !strncmp(line,"T ",2) || !strcmp(line,"#"))) { snprintf(scratch,(INPUT_LINE_MAX+2),"/%s",line);line=scratch; }
+      |                                          ^~
+src/session_editor.c: In function 'session_impl_editor_mode_command':
+src/session_editor.c:106:114: error: 'Session' has no member named 'session_impl_editor_input'
+  106 |     if(!strcmp(line,"EDITOR LINE") || !strcmp(line,"EDITOR BETA")) { s->editor_line=!strcmp(line,"EDITOR LINE");s->session_impl_editor_input=0;s->editor_at=1;session_impl_queue_text(s,ui_text(&s->ui,s->editor_line?MSG_EDITOR_LINE:MSG_EDITOR_BETA));return 1; }
+      |                                                                                                                  ^~
+src/session_editor.c: In function 'session_impl_buffer_result':
+src/session_editor.c:124:236: error: 'Session' has no member named 'session_impl_editor_input'
+  124 |     if(completion->service_action=='8') { memset(&s->draft,0,sizeof(s->draft));session_impl_undo_clear(s);s->draft.op=')';s->draft.action=completion->service_number==1?'B':'C';strcpy(s->draft.body,completion->draft_body);s->editing=1;s->session_impl_editor_input=0;s->editor_at=1; }
+      |                                                                                                                                                                                                                                            ^~
+src/session_editor.c: In function 'session_impl_board_editor_result':
+src/session_editor.c:136:115: error: 'Session' has no member named 'session_impl_editor_input'
+  136 |         strcpy(s->draft.body,completion->draft_body);strcpy(s->draft.title,completion->draft_title);s->editing=1;s->session_impl_editor_input=0;s->editor_at=1;
+      |                                                                                                                   ^~
+src/session_editor.c: In function 'classic_editor':
+src/session_editor.c:190:82: error: 'Session' has no member named 'session_impl_editor_input'
+  190 |         s->editor_upload_question=0;s->editor_at=session_impl_editor_count(s)+1;s->session_impl_editor_input=1;s->editor_upload=1;s->editor_deadline=s->now+3000;
+      |                                                                                  ^~
+src/session_editor.c:195:27: error: 'Session' has no member named 'session_impl_editor_input'
+  195 |         s->editor_line=1;s->session_impl_editor_input=0;s->editor_at=1;session_impl_queue_text(s,ui_text(&s->ui,MSG_EDITOR_LINE));return 1;
+      |                           ^~
+src/session_editor.c:197:58: error: 'Session' has no member named 'session_impl_editor_input'
+  197 |     if(!strcmp(line,"/EDITOR BETA")) { s->editor_line=0;s->session_impl_editor_input=0;session_impl_queue_text(s,ui_text(&s->ui,MSG_EDITOR_BETA));return 1; }
+      |                                                          ^~
+src/session_editor.c:198:51: error: 'Session' has no member named 'session_impl_editor_input'
+  198 |     if(!strcmp(line,"/?") || (s->editor_line && !s->session_impl_editor_input && !strcmp(line,"?"))) { session_impl_queue_text(s,help_text(s->ui.language,"EDITOR")?help_text(s->ui.language,"EDITOR"):ui_text(&s->ui,MSG_EDITOR_HELP));return 1; }
+      |                                                   ^~
+src/session_editor.c:199:51: error: 'Session' has no member named 'session_impl_editor_input'
+  199 |     if(!strcmp(line,"/M") || (s->editor_line && !s->session_impl_editor_input && !strcmp(line,"M"))) { s->editor_numbers=!s->editor_numbers;session_impl_queue_text(s,ui_text(&s->ui,MSG_EDITOR_NUMBERS));session_impl_queue_text(s,s->editor_numbers?"ON\r\n":"OFF\r\n");return 1; }
+      |                                                   ^~
+src/session_editor.c:205:9: error: 'Session' has no member named 'session_impl_editor_input'
+  205 |     if(s->session_impl_editor_input==4) { s->session_impl_editor_input=0;if(!*line)return 1;char search[INPUT_LINE_MAX+128];snprintf(search,sizeof(search),"S%u-%u %s",s->search_first,s->search_last,line);return classic_editor(s,search,translated,size); }
+      |         ^~
+src/session_editor.c:205:44: error: 'Session' has no member named 'session_impl_editor_input'
+  205 |     if(s->session_impl_editor_input==4) { s->session_impl_editor_input=0;if(!*line)return 1;char search[INPUT_LINE_MAX+128];snprintf(search,sizeof(search),"S%u-%u %s",s->search_first,s->search_last,line);return classic_editor(s,search,translated,size); }
+      |                                            ^~
+src/session_editor.c:206:9: error: 'Session' has no member named 'session_impl_editor_input'
+  206 |     if(s->session_impl_editor_input) {
+      |         ^~
+src/session_editor.c:208:35: error: 'Session' has no member named 'session_impl_editor_input'
+  208 |         if(!strcmp(line,"//")) { s->session_impl_editor_input=0;s->editor_upload=0;return 1; }
+      |                                   ^~
+src/session_editor.c:211:29: error: 'Session' has no member named 'session_impl_editor_input'
+  211 |         EditorOperation op=s->session_impl_editor_input==2 && s->editor_at<=count?EDITOR_REPLACE:EDITOR_INSERT;
+      |                             ^~
+src/session_editor.c:215:32: error: 'Session' has no member named 'session_impl_editor_input'
+  215 |             s->editor_at++;if(s->session_impl_editor_input==2)s->session_impl_editor_input=0;
+      |                                ^~
+src/session_editor.c:215:64: error: 'Session' has no member named 'session_impl_editor_input'
+  215 |             s->editor_at++;if(s->session_impl_editor_input==2)s->session_impl_editor_input=0;
+      |                                                                ^~
+src/session_editor.c:225:99: error: 'Session' has no member named 'session_impl_editor_input'
+  225 |     if(request.kind==LINE_NEW) { session_impl_edit_apply(s,EDITOR_CLEAR,0,0,NULL);s->editor_at=1;s->session_impl_editor_input=1;return 1; }
+      |                                                                                                   ^~
+src/session_editor.c:227:88: error: 'Session' has no member named 'session_impl_editor_input'
+  227 |     if(request.kind==LINE_APPEND || request.kind==LINE_UPLOAD) { s->editor_at=count+1;s->session_impl_editor_input=1;if(request.kind==LINE_UPLOAD) { s->editor_upload=1;s->editor_deadline=s->now+3000;session_impl_queue_text(s,s->ui.language==LANGUAGE_JA?"テキスト受信中。3秒間の無入力で編集へ戻ります。\r\n":"Receiving text; 3 seconds idle returns to editor.\r\n"); }return 1; }
+      |                                                                                        ^~
+src/session_editor.c:230:66: error: 'Session' has no member named 'session_impl_editor_input'
+  230 |         if(!*query) { s->search_first=first;s->search_last=last;s->session_impl_editor_input=4;session_impl_queue_text(s,ui_text(&s->ui,MSG_EDITOR_SEARCH));return 1; }
+      |                                                                  ^~
+src/session_editor.c:242:29: error: 'Session' has no member named 'session_impl_editor_input'
+  242 |         s->editor_at=first;s->session_impl_editor_input=request.kind==LINE_EDIT?2:3;
+      |                             ^~
+src/session_mail.c: In function 'session_impl_mail_result':
+src/session_mail.c:41:162: error: 'Session' has no member named 'session_impl_editor_input'
+   41 |             strcpy(s->draft.title,completion->draft_title);strcpy(s->draft.body,completion->draft_body);s->mail_revision=completion->mail_revision;s->editing=1;s->session_impl_editor_input=0;s->editor_at=1;session_impl_undo_clear(s);
+      |                                                                                                                                                                  ^~
+src/session_mail.c:46:34: error: 'Session' has no member named 'session_impl_editor_input'
+   46 |             else { s->editing=1;s->session_impl_editor_input=0;s->editor_at=1; }
+      |                                  ^~
+src/session_menu.c: In function 'session_impl_command':
+src/session_menu.c:79:26: error: 'Session' has no member named 'session_impl_classic_input'
+   79 |     if(!s->ui.input && !s->session_impl_classic_input && !s->mail_input && !s->mail.delete_id && (!strcmp(line,"LANG") || !strncmp(line,"LANG ",5))) {
+      |                          ^~
+src/session_menu.c:87:26: error: 'Session' has no member named 'session_impl_classic_input'
+   87 |     if(!s->ui.input && !s->session_impl_classic_input && !s->mail_input && !s->mail.delete_id && s->ui.enabled && !*s->connector_token &&
+      |                          ^~
+src/session_output.c: In function 'session_impl_prompt':
+src/session_output.c:74:98: error: 'Session' has no member named 'session_impl_editor_input'
+   74 |     if(s->reader.automatic || s->door || s->memo_input || s->application.step || (s->editing && s->session_impl_editor_input==4))return;
+      |                                                                                                  ^~
+src/session_output.c:78:84: error: 'Session' has no member named 'session_impl_classic_input'
+   78 |         if(s->vault_mode && !s->editing && !s->password_mode && !s->ui.input && (!s->session_impl_classic_input || s->session_impl_classic_input==CI_FILE_ACTION || s->session_impl_classic_input==CI_BATCH)) {
+      |                                                                                    ^~
+src/session_output.c:78:117: error: 'Session' has no member named 'session_impl_classic_input'
+   78 |         if(s->vault_mode && !s->editing && !s->password_mode && !s->ui.input && (!s->session_impl_classic_input || s->session_impl_classic_input==CI_FILE_ACTION || s->session_impl_classic_input==CI_BATCH)) {
+      |                                                                                                                     ^~
+src/session_output.c:78:166: error: 'Session' has no member named 'session_impl_classic_input'
+   78 |         if(s->vault_mode && !s->editing && !s->password_mode && !s->ui.input && (!s->session_impl_classic_input || s->session_impl_classic_input==CI_FILE_ACTION || s->session_impl_classic_input==CI_BATCH)) {
+      |                                                                                                                                                                      ^~
+src/session_output.c:79:36: error: 'Session' has no member named 'session_impl_classic_input'
+   79 |             if(s->batch_screen) { s->session_impl_classic_input=CI_BATCH;session_impl_queue_text(s,ui_text(&s->ui,MSG_TRANSFER_BATCH));return; }
+      |                                    ^~
+src/session_output.c:80:37: error: 'Session' has no member named 'session_impl_classic_input'
+   80 |             if(s->file_selected) { s->session_impl_classic_input=CI_FILE_ACTION;session_impl_queue_text(s,s->ui.language==LANGUAGE_JA?"T:表示 S/C/X/Y/G/Z/M:転送 B:選択 E:説明 K:削除 0:戻る > ":"T:view S/C/X/Y/G/Z/M:transfer B:select E:description K:delete 0:back > ");return; }
+      |                                     ^~
+src/session_output.c:82:13: error: 'Session' has no member named 'session_impl_classic_input'
+   82 |         if(s->session_impl_classic_input || (s->editing && (s->editor_confirm || s->editor_upload_question)))return;
+      |             ^~
+src/session_output.c:83:46: error: 'Session' has no member named 'session_impl_editor_input'
+   83 |         if(s->editing && s->editor_line && !s->session_impl_editor_input) { session_impl_queue_text(s,ui_text(&s->ui,MSG_EDITOR_PROMPT));return; }
+      |                                              ^~
+src/session_reading.c: In function 'session_impl_profile_walk_result':
+src/session_reading.c:149:26: error: 'Session' has no member named 'session_impl_classic_input'
+  149 |         if(page.next) { s->session_impl_classic_input=CI_PROF_NEXT;session_impl_queue_text(s,s->ui.language==LANGUAGE_JA?"次の会員:Enter / 0:終了 > ":"Next:Enter / 0:stop > "); }
+      |                          ^~
+src/session_reading.c: In function 'session_impl_article_result':
+src/session_reading.c:177:45: error: 'Session' has no member named 'session_impl_editor_input'
+  177 |     if(completion->editing) { s->editing=1;s->session_impl_editor_input=0;s->editor_at=1; }
+      |                                             ^~
+src/session_reading.c:178:108: error: 'Session' has no member named 'session_impl_classic_input'
+  178 |     if(s->file_selecting) { if(!strncmp(completion->text,"FILE ",5)) { s->file_selected=s->file_selecting;s->session_impl_classic_input=CI_FILE_ACTION; }s->file_selecting=0; }
+      |                                                                                                            ^~
+src/session_results.c: In function 'session_result':
+src/session_results.c:58:29: error: 'Session' has no member named 'session_impl_classic_input'
+   58 |     if(completion->auth) { s->session_impl_classic_input=0;s->classic_id=0;s->classic_area=CM_MAIN;check_traversal_reset(&s->check);memset(s->vault_grants,0,sizeof(s->vault_grants)); }
+      |                             ^~
+src/session_settings.c: In function 'session_impl_menu_settings_command':
+src/session_settings.c:61:18: error: 'out' undeclared (first use in this function)
+   61 |         snprintf(out,sizeof(out),"GUEST HANDLE %s\r\n",*s->guest_handle?s->guest_handle:"guest");session_impl_emit(s,out);return 1;
+      |                  ^~~
+src/session_settings.c:61:18: note: each undeclared identifier is reported only once for each function it appears in
+src/session_transfer.c: In function 'session_impl_transfer_result':
+src/session_transfer.c:165:1: error: expected declaration or statement at end of input
+  165 | }
+      | ^
+src/session_transfer.c:135:64: error: unused parameter 'completion' [-Werror=unused-parameter]
+  135 | int session_impl_transfer_result(Session *s,const BoardResult *completion,uint64_t now) {
+      |                                             ~~~~~~~~~~~~~~~~~~~^~~~~~~~~~
+cc1.exe: all warnings being treated as errors
+src/session_vault.c: In function 'session_impl_vault_edit_result':
+src/session_vault.c:121:384: error: 'Session' has no member named 'session_impl_editor_input'
+  121 |     if(!strncmp(completion->text,"FILEBOARD EDIT ",15)) { const char *body=strstr(completion->text,"\r\n");if(body) { memset(&s->draft,0,sizeof(s->draft));s->draft.op='Y';s->draft.action=VAULT_CMD_BOARDGUIDE;size_t n=(size_t)(body-(completion->text+15));if(n<=48) { memcpy(s->draft.title,completion->text+15,n);snprintf(s->draft.body,sizeof(s->draft.body),"%s",body+2);s->editing=1;s->session_impl_editor_input=0;s->editor_at=1;session_impl_undo_clear(s);session_impl_queue_text(s,s->ui.language==LANGUAGE_JA?"ファイルボード案内文を編集します。/SAVE で保存。\r\n":"Edit file-board guide. /SAVE to save.\r\n");session_impl_prompt(s);return 1; } } }
+      |                                                                                                                                                                                                                                                                                                                                                                                                ^~
