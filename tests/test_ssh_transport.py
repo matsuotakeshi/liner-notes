@@ -42,7 +42,10 @@ class Screen:
         deadline = time.monotonic() + 12
         while marker not in self.buf:
             assert time.monotonic() < deadline, ('missing marker', marker, self.buf[-1500:])
-            data = self.channel.recv(8192)
+            try:
+                data = self.channel.recv(8192)
+            except TimeoutError as exc:
+                raise AssertionError(('missing marker', marker, self.buf[-1500:])) from exc
             assert data, ('unexpected EOF', self.buf[-1500:])
             self.buf += data
         end = self.buf.index(marker) + len(marker)
@@ -132,8 +135,14 @@ for line in sys.stdin:
             a.cmd('MAIL SEND bob ssh-mail', b'MAIL EDIT ')
             a.channel.sendall(b'private SSH mail\r.\r')
             a.until(b'MAIL SENT ')
+            # Sending/reading mail retains the mail menu. Leave it before
+            # restoring the main UI or starting a Door on either connection.
+            a.cmd('0', b'MAIL CLOSED\r\n')
             a.cmd('MENU')
             assert b'private SSH mail' in b.cmd('MAIL READ 1')
+            b.cmd('0')
+            assert b'PONG' in a.cmd('PING')
+            assert b'PONG' in b.cmd('PING')
             print('PASS SSH password/key account binding, UTF-8 and Telnet coexistence')
 
             # Restrictions apply after valid auth, not merely to anonymous clients.

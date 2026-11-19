@@ -143,6 +143,17 @@ Telnet coexistence, Japanese display, articles/mail, denied requests, OpenSSH,
 Door return/crash/timeout/resize/disconnect, auth limits and restart of old stores.
 `ci/linux.sh` runs it within existing Hosted distro jobs; PRs never reach LAN.
 
+PR #132 initial head `2d780d98aafb0d3941d83ff35249a636cb23b0ee` failed
+the SSH test on both AlmaLinux 9 and Rocky Linux 9 in
+[Linux compatibility run 44467748034](https://github.com/matsuotakeshi/liner-notes/actions/runs/44467748034).
+The test waited for the main prompt after sending `MENU` while still in RAW
+mail mode. Mail operations retain that mode; `0` exits it. The test now exits
+mail on both sender and recipient connections and verifies `PING` before
+continuing to Door operations. Receive timeouts also report the missing marker
+and recent test-screen output. No runtime semantics or timeout limits change.
+The remaining encrypted integration cases require a successful corrected CI run;
+the initial run did not reach the Door/security checks after this point.
+
 Do not treat source checks or Windows stub compilation as encrypted runtime
 acceptance. Record the actual PR head, CI run and OS result. Pending native SSH,
 SELinux and Solaris results must stay explicit. No release or deployment is
