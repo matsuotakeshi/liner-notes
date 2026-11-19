@@ -441,5 +441,7 @@ bin/liner-notes-serial
 %%DATADIR%%/scripts/door_broker_core.py
 %%DATADIR%%/scripts/door_broker.py
 %%DATADIR%%/scripts/door_isolation.py
+%%DATADIR%%/door-services/freebsd/liner_notes_door_broker
+%%DATADIR%%/door-services/freebsd/liner_notes_door_isolation
 %%DATADIR%%/scripts/door_auth_client.py
 %%DATADIR%%/scripts/door_processes.py

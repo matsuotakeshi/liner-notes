@@ -1,0 +1,61 @@
+#!/bin/sh
+# Opt-in development candidate; installed outside rc.d.
+# PROVIDE: liner_notes_door_broker
+# REQUIRE: LOGIN
+# BEFORE: liner_notes_door_isolation
+# KEYWORD: shutdown
+. /etc/rc.subr
+name="liner_notes_door_broker"
+rcvar="liner_notes_door_broker_enable"
+load_rc_config "$name"
+: ${liner_notes_door_broker_enable:=NO}
+: ${liner_notes_door_broker_config:=%%PREFIX%%/etc/liner-notes/door-broker.json}
+: ${liner_notes_door_broker_pidfile:=/var/run/liner_notes_door_broker.pid}
+: ${liner_notes_door_broker_logfile:=/var/log/liner_notes_door_broker.log}
+: ${liner_notes_door_broker_run_user:=liner_notes_broker}
+config="${liner_notes_door_broker_config}"
+pidfile="${liner_notes_door_broker_pidfile}"
+logfile="${liner_notes_door_broker_logfile}"
+run_user="${liner_notes_door_broker_run_user}"
+command="%%PYTHON_CMD%%"
+procname="$command"
+script="%%DATADIR%%/scripts/door_broker.py"
+start_cmd="door_start"
+status_cmd="door_status"
+# Default rc.subr stop sends TERM and waits; never KILL cleanup workers.
+# daemon -p tracks the Python child, without restart or socket/marker removal.
+
+door_status()
+{
+    if [ -n "$(check_pidfile "$pidfile" "$procname")" ] &&
+        "$command" -E -s -B "$script" --config "$config" --check-ready; then
+        echo "$name is ready."
+        return 0
+    fi
+    echo "$name is not ready."
+    return 1
+}
+
+door_start()
+{
+    if [ -n "$(check_pidfile "$pidfile" "$procname")" ]; then
+        echo "$name is already running; refusing a duplicate start."
+        return 1
+    fi
+    "$command" -E -s -B "$script" --config "$config" --check-config || return 1
+    umask 077
+    /usr/sbin/daemon -f -p "$pidfile" -o "$logfile" -u "$run_user" \
+        "$command" -E -s -B "$script" --config "$config" || return 1
+    attempts=0
+    while [ "$attempts" -lt 10 ]; do
+        if door_status >/dev/null 2>&1; then
+            echo "Started $name."
+            return 0
+        fi
+        attempts=$((attempts + 1))
+        sleep 1
+    done
+    echo "$name failed readiness; inspect $logfile. No forced cleanup performed."
+    return 1
+}
+run_rc_command "$1"

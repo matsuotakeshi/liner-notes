@@ -32,7 +32,7 @@ GID_FILES=	${FILESDIR}/GIDs
 
 SUB_FILES=	liner-notes-admin liner-notes-doctor liner-notes-maintenance \
 		liner-notes-zmodem liner-notes-check-resume liner-notes-link liner-notes-serial \
-		liner_notes.conf doors.conf pkg-message
+		liner_notes.conf doors.conf pkg-message liner_notes_door_broker liner_notes_door_isolation
 SUB_LIST=	PYTHON_CMD=${PYTHON_CMD}
 
 OPTIONS_DEFINE=	DOCS WEBUI ZMODEM LINK SSH
@@ -69,6 +69,10 @@ do-install:
 	${INSTALL_PROGRAM} ${WRKSRC}/${binary} ${STAGEDIR}${PREFIX}/bin/liner-notes-${binary}
 .endfor
 	${INSTALL_DATA} ${WRKSRC}/scripts/*.py ${STAGEDIR}${DATADIR}/scripts/
+	${MKDIR} ${STAGEDIR}${DATADIR}/door-services/freebsd
+.for service in liner_notes_door_broker liner_notes_door_isolation
+	${INSTALL_DATA} ${WRKDIR}/${service} ${STAGEDIR}${DATADIR}/door-services/freebsd/${service}
+.endfor
 	${INSTALL_DATA} ${WRKSRC}/webui/bbs_transport.py ${STAGEDIR}${DATADIR}/scripts/bbs_transport.py
 	${INSTALL_DATA} ${WRKSRC}/ports/test-resume.py ${STAGEDIR}${DATADIR}/scripts/check-resume.py
 	${INSTALL_SCRIPT} ${WRKSRC}/scripts/liner-notes-ssh ${STAGEDIR}${PREFIX}/bin/liner-notes-ssh

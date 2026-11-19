@@ -644,3 +644,4 @@ test-door-broker:
 	$(PYTHON) tests/test_door_broker.py
 	$(PYTHON) tests/test_door_processes.py
 	$(PYTHON) tests/test_door_isolation_admission.py
+	$(PYTHON) tests/test_door_services.py

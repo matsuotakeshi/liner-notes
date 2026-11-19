@@ -19,6 +19,11 @@ def main():
         f"%%DATADIR%%/scripts/{p.name}"
         for p in (ROOT / "scripts").glob("*.py") if p.is_file()
     })
+    for role in ('broker','isolation'):
+        name='liner_notes_door_'+role
+        assert (ROOT/'ports/comms/liner-notes/files'/(name+'.in')).is_file()
+        expected.add('%%DATADIR%%/door-services/freebsd/'+name)
+        assert 'etc/rc.d/'+name not in content,'Candidate must not activate automatically'
     actual = set(content)
     missing = sorted(expected - actual)
     extra=sorted(x for x in actual-expected if x.startswith('%%PORTDOCS%%'))
@@ -27,7 +32,7 @@ def main():
         for entry in missing:
             print(f"UNLISTED FreeBSD stage file: {entry}", file=sys.stderr)
         raise SystemExit(1)
-    print(f"PASS: pkg-plist covers {len(expected)} staged Markdown/Python files")
+    print(f"PASS: pkg-plist covers {len(expected)} staged manual/script/service files")
 
 
 if __name__ == "__main__":

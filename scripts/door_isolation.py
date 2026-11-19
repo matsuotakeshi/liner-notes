@@ -7,7 +7,7 @@ is installed setuid. Solaris remains disabled pending contract-based process iso
 """
 import argparse,array,contextlib,errno,fcntl,json,os,pty,resource,secrets,select,signal,socket,stat,struct,sys,time
 from pathlib import Path
-from door_broker import peer_uid,secure_path,configuration as broker_configuration
+from door_broker import peer_uid,secure_path,check_ready,configuration as broker_configuration
 from door_broker_core import identity,positive,auth_generation
 from door_processes import Scope, processes, supported, no_new_privileges
 
@@ -192,10 +192,18 @@ def start_worker(config,connection,listener,watch,alive,children):
 
 
 def main():
-    parser=argparse.ArgumentParser(description=__doc__);parser.add_argument('--config',required=True);args=parser.parse_args()
+    parser=argparse.ArgumentParser(description=__doc__);parser.add_argument('--config',required=True)
+    checks=parser.add_mutually_exclusive_group()
+    checks.add_argument('--check-config',action='store_true',help='validate policy without starting or changing files')
+    checks.add_argument('--check-ready',action='store_true',help='probe local socket and verify supervisor UID')
+    args=parser.parse_args()
     if not supported() or os.getuid()!=0:parser.exit(1,'Isolation requires root and a supported Linux/FreeBSD process backend.\n')
     resource.setrlimit(resource.RLIMIT_CORE,(0,0))
-    config=config_read(args.config);endpoint=Path(config['socket'])
+    try:
+        config=config_read(args.config);endpoint=Path(config['socket'])
+        if args.check_ready:check_ready(endpoint,0);return
+        if args.check_config:return
+    except (ValueError,OSError,KeyError,TypeError):parser.exit(1,'Isolation policy or service rejected.\n')
     if endpoint.exists() or endpoint.is_symlink():parser.exit(1,'Socket exists; verify the old supervisor is stopped.\n')
     listener=socket.socket(socket.AF_UNIX,socket.SOCK_STREAM);old=os.umask(0o077)
     try:listener.bind(str(endpoint))
