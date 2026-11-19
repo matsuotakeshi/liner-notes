@@ -896,7 +896,9 @@
         "src/session_ui.h",
         "src/session_ui.c",
         "src/session_rtbbs.c",
-        "tests/test_session_ui.c"
+        "tests/test_session_ui.c",
+        "src/session_io.h",
+        "tests/test_session_ui_lifecycle.c"
       ]
     },
     {

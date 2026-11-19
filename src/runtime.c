@@ -129,9 +129,9 @@ static void drop(Connection *c) {
     OPENSSL_cleanse((char *)c+offsetof(Connection,used),sizeof(*c)-offsetof(Connection,used));c->fd=INVALID;
 }
 static ConnectionState connection_state(Connection *c) {
-    Session *s=&c->app;
-    return (ConnectionState){s->core.user,s->core.member_level,s->presentation.ui.admin,s->core.closing,s->connection.door,s->connection.zmodem,
-        s->connection.binary,s->core.pending,session_secret(s),s->presentation.ui.enabled,s->conversation.chatting,s->editor.editing};
+    Session *s=&c->app;SessionUiSnapshot ui=session_ui_snapshot(s);
+    return (ConnectionState){s->core.user,s->core.member_level,s->core.admin,s->core.closing,s->connection.door,s->connection.zmodem,
+        s->connection.binary,s->core.pending,ui.secret,ui.menu,ui.chatting,ui.editing};
 }
 static int app_drained(void *context) { return ((Connection *)context)->queued==0; }
 static int queue_bytes(void *context,const unsigned char *data,size_t size) {
@@ -145,8 +145,7 @@ static int app_write(void *context,const char *data,size_t size) {
     if(!terminal_write(&c->terminal,(const unsigned char *)data,size))return 0;
     /* Reprint a partially typed chat line after an asynchronous prompt. The
      * editor buffer is unchanged; never echo a password or binary payload. */
-    if(c->app.conversation.chat_notice && c->app.presentation.ui.enabled && c->terminal.size &&
-       c->terminal.mode!=TERMINAL_RAW && c->app.conversation.chat_prompting)
+    if(session_ui_snapshot(&c->app).redraw && c->terminal.size && c->terminal.mode!=TERMINAL_RAW)
         return terminal_write(&c->terminal,(unsigned char *)c->terminal.line,c->terminal.size);
     return 1;
 }
@@ -158,11 +157,7 @@ static unsigned online(void *context) {
 
 static void notify_all(MessageId id,uint32_t number,const char *body) {
     for(int i=0;i<SLOTS;i++)if(connections[i].fd!=INVALID) {
-        Session *s=&connections[i].app;char text[900];
-        if(id==MSG_SHUTDOWN_NOTICE)snprintf(text,sizeof(text),ui_text(&s->presentation.ui,id),number,body);
-        else if(id==MSG_ADMIN_NOTICE)snprintf(text,sizeof(text),ui_text(&s->presentation.ui,id),body);
-        else snprintf(text,sizeof(text),"%s",ui_text(&s->presentation.ui,id));
-        session_announce(s,text);
+        session_notify(&connections[i].app,id,number,body);
     }
 }
 static void service_result(BoardResult *r) {
@@ -171,10 +166,11 @@ static void service_result(BoardResult *r) {
         if(r->slot<0 || r->slot>=SLOTS) return;
         Connection *c=&connections[r->slot];Session *s=&c->app;
         if(c->fd==INVALID || s->core.id!=r->session || !s->core.user || s->core.closing || !s->connection.binary_allowed || c->door) { (r->feedback.failed=1,strcpy(r->text,"ERR game unavailable\r\n"));return; }
-        c->door=door_start(r->service_number,r->service_next,s->core.user,s->core.username,s->presentation.columns,s->presentation.rows,now_ms());
+        c->door=door_start(r->service_number,r->service_next,s->core.user,s->core.username,s->connection.columns,s->connection.rows,now_ms());
         if(!c->door) { r->feedback.failed=1;strcpy(r->text,errno==EBUSY?"ERR game busy\r\n":"ERR game unavailable\r\n");return; }
         s->connection.door=1;c->used=0;terminal_clear(&c->terminal);session_scan_pause(s);
-        snprintf(r->text,sizeof(r->text),s->presentation.ui.language==LANGUAGE_JA?"ゲーム開始。Ctrl-] でBBSへ戻ります。\r\n":"Game started. Ctrl-] returns to BBS.\r\n");return;
+        if(!session_notice(s,SESSION_NOTICE_DOOR,0,0,0,r->text,sizeof(r->text)))session_abort(s);
+        return;
     }
     if(r->all_accounts_changed)for(int i=0;i<SLOTS;i++)if(connections[i].fd!=INVALID && connections[i].app.core.id!=r->session)session_revoke(&connections[i].app);
     if(r->access_refresh)for(int i=0;i<SLOTS;i++)if(connections[i].fd!=INVALID) {
@@ -204,7 +200,7 @@ static void service_result(BoardResult *r) {
             row->elapsed=connection_elapsed(now_ms(),c->clock.started)/1000;
             row->idle=connection_elapsed(now_ms(),c->clock.last_input)/1000;
             row->rx=c->rx_bytes;row->tx=c->tx_bytes;row->queued=c->queued;
-            row->columns=c->app.presentation.columns;row->rows=c->app.presentation.rows;
+            row->columns=c->app.connection.columns;row->rows=c->app.connection.rows;
         }
         if(!connection_protocol_list(rows,count,r->text,sizeof(r->text)))(r->feedback.failed=1,strcpy(r->text,"ERR connection report\r\n"));
     } else if(r->service_action=='A') { notify_all(MSG_ADMIN_NOTICE,0,r->service_text);strcpy(r->text,"ANNOUNCE SENT\r\n"); }
@@ -246,7 +242,7 @@ static void zadvance(Connection *c,uint64_t now) {
         uint64_t bytes,total;
         if(zhost_progress(c->zhost,&bytes,&total)) {
             char text[192];unsigned percent=total?(unsigned)(bytes*100/total):100;
-            snprintf(text,sizeof(text),s->presentation.ui.language==LANGUAGE_JA?"\r\n受信データを登録中: %u%% (%llu / %llu bytes)\r\n":"\r\nRegistering received data: %u%% (%llu / %llu bytes)\r\n",percent,(unsigned long long)bytes,(unsigned long long)total);
+            if(!session_notice(s,SESSION_NOTICE_PROGRESS,percent,bytes,total,text,sizeof(text))) { drop(c);return; }
             if(!zbytes(c,(const unsigned char *)text,strlen(text))) { drop(c);return; }
         }
         if(done) {
@@ -292,7 +288,7 @@ static void door_advance(Connection *c,uint64_t now) {
        (old_width!=c->terminal.telnet.width || old_height!=c->terminal.telnet.height)) {
         session_dimensions(s,c->terminal.telnet.width,c->terminal.telnet.height);
         /* A vanished PTY must not kill the BBS session: door_pump handles exit. */
-        if(!done)(void)door_resize(c->door,s->presentation.columns,s->presentation.rows);
+        if(!done)(void)door_resize(c->door,s->connection.columns,s->connection.rows);
     }
     if(!done && c->queued<=OUT_CAP/2)done=door_pump(c->door,zbytes,c,now);
     if(done) {
@@ -534,7 +530,7 @@ int main(int argc,char **argv) {
             /* Committed moderation commands apply even after requester disconnect. */
             if(completion.chat_kick_user)for(int i=0;i<SLOTS;i++) {
                 Connection *c=&connections[i];Session *s=&c->app;
-                if(c->fd!=INVALID && s->core.active && !s->core.closing && s->core.user==completion.chat_kick_user && (s->conversation.chatting || s->conversation.chat_pending)) {
+                if(c->fd!=INVALID && s->core.active && !s->core.closing && s->core.user==completion.chat_kick_user && (session_ui_snapshot(s).chatting || session_ui_snapshot(s).chat_pending)) {
                     c->used=0;c->queued=0;OPENSSL_cleanse(c->input,sizeof(c->input));terminal_clear(&c->terminal);
                     session_chat_kick(s);completion.chat_kick_count++;
                 }
@@ -588,9 +584,8 @@ int main(int argc,char **argv) {
             ConnectionDecision decision=connection_time_check(&policy,&c->clock,&state,now);
             if(decision==CONNECTION_DROP) { drop(c);continue; }
             if(decision==CONNECTION_WARNING || decision==CONNECTION_GRACE) {
-                const char *message=decision==CONNECTION_GRACE?
-                    (c->app.presentation.ui.language==LANGUAGE_JA?"接続時間の上限です。猶予時間後に切断します。保存して終了してください。\r\n":"Session limit reached. Save your work before the grace period ends.\r\n"):
-                    (c->app.presentation.ui.language==LANGUAGE_JA?"接続時間の上限が近づいています。\r\n":"Your session time limit is approaching.\r\n");
+                char message[900];
+                if(!session_notice(&c->app,decision==CONNECTION_GRACE?SESSION_NOTICE_TIME_GRACE:SESSION_NOTICE_TIME_WARNING,0,0,0,message,sizeof(message))) { drop(c);continue; }
                 if(!app_write(c,message,strlen(message))) { drop(c);continue; }
             }
             if(connection_idle_drained(&c->clock,now)) { drop(c);continue; }
@@ -599,11 +594,11 @@ int main(int argc,char **argv) {
             if(c->fd!=INVALID) {
                 state=connection_state(c);decision=connection_idle_check(&policy,&c->clock,&state,now);
                 if(decision==CONNECTION_CLOSE) {
-                    const char *msg=c->app.presentation.ui.enabled?ui_text(&c->app.presentation.ui,MSG_IDLE_CLOSED):"BYE idle timeout\r\n";
+                    char msg[900];if(!session_notice(&c->app,SESSION_NOTICE_IDLE_CLOSED,0,0,0,msg,sizeof(msg))) { drop(c);continue; }
                     if(!app_write(c,msg,strlen(msg))) { drop(c);continue; }
                     c->app.core.closing=1;
                 } else if(decision==CONNECTION_WARNING) {
-                    const char *msg=ui_text(&c->app.presentation.ui,MSG_IDLE_WARNING);if(!app_write(c,msg,strlen(msg))) { drop(c);continue; }
+                    char msg[900];if(!session_notice(&c->app,SESSION_NOTICE_IDLE_WARNING,0,0,0,msg,sizeof(msg))) { drop(c);continue; }if(!app_write(c,msg,strlen(msg))) { drop(c);continue; }
                 }
             }
             if(c->fd!=INVALID && !userlog_update(i,c->app.core.user,now)) { result=1;stopping=1;break; }
@@ -654,10 +649,11 @@ int main(int argc,char **argv) {
                     if(!terminal_init(&c->terminal,terminal_mode,queue_bytes,c)) { drop(c); continue; }
                     SessionIO io={c,app_write,online,app_drained};
                     session_init(&c->app,io,next_id++,slot,board_enabled,member_mode,menu_mode,default_language);
+                    if(!c->app.core.active) { drop(c);continue; }
                     if(!userlog_connect(slot,terminal_mode==TERMINAL_TELNET?"TELNET":"RAW",now_ms())) { fprintf(stderr,"userlog: connection write failed\n");drop(c);result=1;stopping=1;break; }
                     c->userlog_registered=1;c->clock.started=c->clock.last_input=now_ms();
                     c->app.connection.zmodem_available=zhelper!=NULL;
-                    if(shutdown_state.at) { char text[900];uint64_t clock=now_ms();unsigned remaining=connection_shutdown_remaining(&shutdown_state,clock);snprintf(text,sizeof(text),ui_text(&c->app.presentation.ui,MSG_SHUTDOWN_NOTICE),remaining,shutdown_state.reason);session_announce(&c->app,text); }
+                    if(shutdown_state.at) { uint64_t clock=now_ms();unsigned remaining=connection_shutdown_remaining(&shutdown_state,clock);session_notify(&c->app,MSG_SHUTDOWN_NOTICE,remaining,shutdown_state.reason); }
 
                     vault_worker_session(slot,c->app.core.id,1);
                 }

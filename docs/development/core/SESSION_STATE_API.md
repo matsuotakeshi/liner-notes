@@ -10,19 +10,22 @@ state ownership and a UI-free operation submission contract.
 | --- | --- |
 | SessionCore | connection ID/slot, active/pending, clock/cooldown, authenticated actor/epoch, current board/article, board-password grants, login/guest identity |
 | SessionAuth | password/application dialogue and sensitive temporary credentials |
-| SessionPresentation | RTBBS Ui, paging, menu/classic bindings, screen geometry/preferences |
+| SessionPresentation | RTBBS Ui, paging, menu/classic bindings and preferences |
 | SessionEditor | draft, undo, line editor and confirmation state |
 | SessionReading | scan/check/report/profile continuation |
 | SessionFiles | file selection, batch, category navigation |
 | SessionMailState | mail input, navigation, attachment batch |
 | SessionConversation | chat/talk/Gather/SYSOP-mail and deferred notifications |
-| SessionConnection | output port, connector framing, Door/transfer state |
+| SessionConnection | output port, screen geometry, connector framing, Door/transfer state |
 
-The event loop still owns all state. These are named structures, not anonymous
+The event loop owns all state. The RTBBS groups now reside in a private per-profile
+allocation; Session exposes only Core, connection and UI binding. These are named
+structures, not anonymous
 unions or flat compatibility aliases. Session adapters borrow only the lifetime
-of the enclosing Session; no new threads or persistent pointers are introduced.
+of the enclosing Session; no new threads are introduced. Private state is owned by the binding and must not
+be retained after identity invalidation or disposal.
 Secret buffers remain in SessionAuth, draft bodies in SessionEditor. Disposal
-clears the complete aggregate and frees connector blocks before erasure. Existing
+clears/frees private profile allocations and connector blocks before erasing Session. Existing
 per-operation reset semantics remain intact; grouping does not reset unrelated
 preferences, transfer receipts or notification state.
 

@@ -31,20 +31,20 @@
 void session_rtbbs_result(Session *s,const OperationResult *completion,SessionResultView view,uint64_t now,int cancelled) {
     /* The shared receiver has already applied Core effects exactly once. */
     if(view.status==SESSION_RESULT_IGNORED || view.status==SESSION_RESULT_REVOKED)return;
-    if(cancelled) { session_impl_queue_text(s,ui_text(&s->presentation.ui,MSG_SCAN_STOP));session_impl_prompt(s);return; }
-    if(s->presentation.preferences.exit_action) {
-        PreferenceExit action=preference_exit_complete(&s->presentation.preferences,completion->feedback.preferences_saved);
-        if(action!=PREF_EXIT_NONE) { session_impl_command_core(s,action==PREF_EXIT_LOGOUT?"LOGOUT":"QUIT");session_impl_prompt(s);return; }
+    if(cancelled) { session_impl_queue_text(s,ui_text(&rtbbs(s)->presentation.ui,MSG_SCAN_STOP));session_impl_prompt(s);return; }
+    if(rtbbs(s)->presentation.preferences.exit_action) {
+        PreferenceExit action=preference_exit_complete(&rtbbs(s)->presentation.preferences,completion->feedback.preferences_saved);
+        if(action!=PREF_EXIT_NONE) { session_rtbbs_command(s,action==PREF_EXIT_LOGOUT?"LOGOUT":"QUIT");session_impl_prompt(s);return; }
         session_impl_emit(s,completion->text);session_impl_prompt(s);return;
     }
-    if(completion->sigop>=0)s->presentation.ui.sigop=completion->sigop;
-    if(completion->service_action=='E') { s->presentation.ui.input=completion->service_number==2?UI_REPLY:UI_POST;session_impl_prompt(s);return; }
+    if(completion->sigop>=0)rtbbs(s)->presentation.ui.sigop=completion->sigop;
+    if(completion->service_action=='E') { rtbbs(s)->presentation.ui.input=completion->service_number==2?UI_REPLY:UI_POST;session_impl_prompt(s);return; }
     if(completion->mail_notify_user)session_mail_notify(s,completion->mail_notify_user,completion->mail_notify_deny,completion->mail_notify_revision);
     if(completion->chat_user)chat_apply_preferences(completion->chat_user,&completion->chat_preferences);
-    if(vault_navigation_complete(&s->files.vault,completion->feedback.file_board_info)) {
-        s->files.file_selected=0;s->files.vault_mode=1;s->mail_state.mail_mode=0;
+    if(vault_navigation_complete(&rtbbs(s)->files.vault,completion->feedback.file_board_info)) {
+        rtbbs(s)->files.file_selected=0;rtbbs(s)->files.vault_mode=1;rtbbs(s)->mail_state.mail_mode=0;
     }
-    mail_navigation_observe(&s->mail_state.mail,session_impl_mail_event(completion->mail_action),completion->mail_id);
+    mail_navigation_observe(&rtbbs(s)->mail_state.mail,session_impl_mail_event(completion->mail_action),completion->mail_id);
     if(session_impl_traversal_result(s,completion,now))return;
     if(session_impl_mail_batch_result(s,completion,now))return;
     if(session_impl_vault_children_result(s,completion,now))return;
@@ -52,7 +52,7 @@ void session_rtbbs_result(Session *s,const OperationResult *completion,SessionRe
     if(session_impl_profile_walk_result(s,completion,now))return;
     if(session_impl_batch_copy_result(s,completion,now))return;
     if(session_impl_report_result(s,completion,now))return;
-    if(completion->auth) { s->presentation.classic_input=0;s->presentation.classic_id=0;s->presentation.classic_area=CM_MAIN;check_traversal_reset(&s->reading.check); }
+    if(completion->auth) { rtbbs(s)->presentation.classic_input=0;rtbbs(s)->presentation.classic_id=0;rtbbs(s)->presentation.classic_area=CM_MAIN;check_traversal_reset(&rtbbs(s)->reading.check); }
     if(session_impl_vault_edit_result(s,completion,now))return;
     if(session_impl_message_result(s,completion,now))return;
     if(session_impl_mail_result(s,completion,now))return;

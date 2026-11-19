@@ -52,8 +52,13 @@ class SessionBoundaries(unittest.TestCase):
             self.assertNotRegex(code(text),r'\b(?:Session|Ui|ui_format|session_line|board_submit)\b')
         text=(ROOT/'src/session.h').read_text(encoding='utf-8')
         self.assertIn('SessionCore core;',text)
-        self.assertIn('SessionAuth auth;',text)
-        self.assertIn('SessionEditor editor;',text)
+        self.assertNotIn('session_state.h',text)
+        self.assertNotIn('SessionAuth auth;',text)
+        self.assertNotIn('SessionEditor editor;',text)
+        self.assertIn('SessionUiBinding ui_binding;',text)
+        state=(ROOT/'src/session_state.h').read_text(encoding='utf-8')
+        self.assertIn('SessionAuth auth;',state)
+        self.assertIn('SessionEditor editor;',state)
         self.assertNotIn('union',code(text))
 
     def test_core_contract_does_not_expose_worker_lifecycle(self):
@@ -81,6 +86,17 @@ class SessionBoundaries(unittest.TestCase):
         make=(ROOT/'Makefile').read_text(encoding='utf-8')
         recipe=next(line for line in make.splitlines() if line.startswith('\t$(CC)') and ' -o test-adapters' in line)
         self.assertIn('tests/test_session_ui.c',recipe)
+
+    def test_runtime_and_dispatcher_cannot_access_rtbbs_state(self):
+        for name in ('runtime.c','session.c','session_ui.c'):
+            text=code((ROOT/'src'/name).read_text(encoding='utf-8'))
+            self.assertNotRegex(text,r'\brtbbs(?:_const)?\s*\(',name)
+            self.assertNotRegex(text,r'(?:->|\.)(?:presentation|conversation|editor|reading|mail_state|files)\b',name)
+            self.assertNotRegex(text,r'\bui_(?:text|format|prompt)\s*\(',name)
+        for name in ('session_auth.c','session_chat.c'):
+            text=(ROOT/'src'/name).read_text(encoding='utf-8')
+            self.assertNotIn(',session_impl_chat_event,s,',text)
+            self.assertIn(',session_chat_event,s,',text)
 
     def test_worker_audit_does_not_infer_events_from_display(self):
         text=(ROOT/'src/board.c').read_text(encoding='utf-8')

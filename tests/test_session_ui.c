@@ -1,5 +1,6 @@
 /* A second adapter exists only in this test. Production registers RTBBS alone. */
 #include "session.h"
+#include "session_internal.h"
 #include <assert.h>
 #include <stdlib.h>
 #include <string.h>
@@ -12,7 +13,7 @@ static int output(void *context,const char *text,size_t size) {
     (void)text;*(size_t *)context+=size;return 1;
 }
 static void enter(Session *s,int initial,int menu,Language language) {
-    (void)initial;s->presentation.ui.enabled=menu;s->presentation.ui.language=language;entered++;
+    (void)initial;rtbbs(s)->presentation.ui.enabled=menu;rtbbs(s)->presentation.ui.language=language;entered++;
 }
 static void leave(Session *s) { (void)s;left++; }
 static void line(Session *s,char *text,size_t size) {
@@ -74,30 +75,33 @@ void session_ui_adapter_test(void) {
     assert(session_ui_select(s,NULL)==SESSION_UI_INVALID);
     assert(session_ui_select(s,"MMM")==SESSION_UI_UNKNOWN);
     /* Each barrier leaves the old adapter and state intact. */
-#define BUSY(field,value) do { s->field=(value);assert(session_ui_select(s,"test-alt")==SESSION_UI_BUSY);assert(!strcmp(session_ui_name(s),"rtbbs"));s->field=0; } while(0)
-    BUSY(core.pending,1);BUSY(core.wake,123);BUSY(core.closing,1);
-    BUSY(auth.password_mode,'l');BUSY(auth.application.step,1);
-    BUSY(presentation.ui.input,UI_LOGIN);BUSY(presentation.ui.view,UI_ARTICLE);
-    BUSY(presentation.classic_input,1);BUSY(presentation.classic_area,1);BUSY(presentation.game_menu,1);
-    BUSY(presentation.page[0],'x');BUSY(presentation.preferences.exit_action,PREF_EXIT_QUIT);
-    BUSY(editor.editing,1);BUSY(editor.editor_upload,1);BUSY(editor.editor_confirm,1);BUSY(editor.editor_upload_question,1);
-    BUSY(reading.reader.active,1);BUSY(reading.reader.automatic,1);BUSY(reading.check.active,1);
-    BUSY(reading.profile_walk.pending,1);BUSY(reading.report.pending,1);
-    BUSY(files.vault_mode,1);BUSY(files.batch_screen,1);BUSY(files.batch_copying,1);BUSY(files.file_selecting,1);
-    BUSY(mail_state.mail_mode,1);BUSY(mail_state.mail_input,1);BUSY(mail_state.mail_pending,1);BUSY(mail_state.mail.delete_id,1);
-    BUSY(conversation.chatting,1);BUSY(conversation.gather.mode,1);BUSY(conversation.outside_talk,1);
-    BUSY(conversation.talk_select,1);BUSY(conversation.talk_once,1);BUSY(conversation.memo_input,1);
-    BUSY(conversation.status_pending,1);BUSY(conversation.chat_pending,1);
-    BUSY(connection.door,1);BUSY(connection.zmodem,1);BUSY(connection.zmodem_start,1);
-    BUSY(connection.binary,1);BUSY(connection.connector_literal,1);BUSY(connection.binary_reader.used,1);
+#define BUSY(field,value) do { (field)=(value);assert(session_ui_select(s,"test-alt")==SESSION_UI_BUSY);assert(!strcmp(session_ui_name(s),"rtbbs"));(field)=0; } while(0)
+    BUSY(s->core.pending,1);BUSY(s->core.wake,123);BUSY(s->core.closing,1);
+    BUSY(rtbbs(s)->auth.password_mode,'l');BUSY(rtbbs(s)->auth.application.step,1);
+    BUSY(rtbbs(s)->presentation.ui.input,UI_LOGIN);BUSY(rtbbs(s)->presentation.ui.view,UI_ARTICLE);
+    BUSY(rtbbs(s)->presentation.classic_input,1);BUSY(rtbbs(s)->presentation.classic_area,1);BUSY(rtbbs(s)->presentation.game_menu,1);
+    BUSY(rtbbs(s)->presentation.page[0],'x');BUSY(rtbbs(s)->presentation.preferences.exit_action,PREF_EXIT_QUIT);
+    BUSY(rtbbs(s)->editor.editing,1);BUSY(rtbbs(s)->editor.editor_upload,1);BUSY(rtbbs(s)->editor.editor_confirm,1);BUSY(rtbbs(s)->editor.editor_upload_question,1);
+    BUSY(rtbbs(s)->reading.reader.active,1);BUSY(rtbbs(s)->reading.reader.automatic,1);BUSY(rtbbs(s)->reading.check.active,1);
+    BUSY(rtbbs(s)->reading.profile_walk.pending,1);BUSY(rtbbs(s)->reading.report.pending,1);
+    BUSY(rtbbs(s)->files.vault_mode,1);BUSY(rtbbs(s)->files.batch_screen,1);BUSY(rtbbs(s)->files.batch_copying,1);BUSY(rtbbs(s)->files.file_selecting,1);
+    BUSY(rtbbs(s)->mail_state.mail_mode,1);BUSY(rtbbs(s)->mail_state.mail_input,1);BUSY(rtbbs(s)->mail_state.mail_pending,1);BUSY(rtbbs(s)->mail_state.mail.delete_id,1);
+    BUSY(rtbbs(s)->conversation.chatting,1);BUSY(rtbbs(s)->conversation.gather.mode,1);BUSY(rtbbs(s)->conversation.outside_talk,1);
+    BUSY(rtbbs(s)->conversation.talk_select,1);BUSY(rtbbs(s)->conversation.talk_once,1);BUSY(rtbbs(s)->conversation.memo_input,1);
+    BUSY(rtbbs(s)->conversation.status_pending,1);BUSY(rtbbs(s)->conversation.chat_pending,1);
+    BUSY(s->connection.door,1);BUSY(s->connection.zmodem,1);BUSY(s->connection.zmodem_start,1);
+    BUSY(s->connection.binary,1);BUSY(s->connection.connector_literal,1);BUSY(s->connection.binary_reader.used,1);
 #undef BUSY
     assert(connector_block_begin(&s->connection.connector_block,CONNECTOR_FILE_BLOCK,2,10)==1);
     assert(session_ui_select(s,"test-alt")==SESSION_UI_BUSY);connector_block_clear(&s->connection.connector_block);
-    strcpy(s->editor.draft.body,"retained buffer");s->presentation.rows=35;
+    strcpy(rtbbs(s)->editor.draft.body,"retained buffer");s->connection.rows=35;
     assert(session_ui_select(s,"test-alt")==SESSION_UI_SELECTED && !s->core.user);
-    assert(!strcmp(s->editor.draft.body,"retained buffer") && s->presentation.rows==35);
+    assert(!rtbbs(s)->editor.draft.body[0] && s->connection.rows==35); /* private state, common terminal size */
+    assert(session_ui_select(s,"rtbbs")==SESSION_UI_SELECTED);
+    assert(!strcmp(rtbbs(s)->editor.draft.body,"retained buffer"));
+    assert(session_ui_select(s,"test-alt")==SESSION_UI_SELECTED);
     assert(session_line(s,"mixed",5,100) && lines==1); /* No RTBBS uppercase/command mapping. */
-    assert(session_uppercase(s,"mixed",5));s->auth.password_mode='l';assert(!session_uppercase(s,"mixed",5));s->auth.password_mode=0;
+    assert(session_uppercase(s,"mixed",5));rtbbs(s)->auth.password_mode='l';assert(!session_uppercase(s,"mixed",5));rtbbs(s)->auth.password_mode=0;
     s->connection.door=1;session_door_finish(s);assert(doors==1);
     session_tick(s,101);assert(ticks==1);
     s->core.pending=1;r->session=499;r->slot=1;r->auth=7;r->user_epoch=11;
@@ -125,6 +129,22 @@ void session_ui_adapter_test(void) {
     assert(session_init_ui(s,io,502,1,0,0,1,LANGUAGE_EN,&c));
     assert(session_line(s,"HELP",4,200) && helps==1 && prompts);
     assert(session_line(s,"MENU",4,201) && menus==1);
-    session_dispose(s);free(r);free(s);
+    session_dispose(s);
+    for(int language=LANGUAGE_JA;language<LANGUAGE_COUNT;language++) {
+        session_init(s,io,503,1,0,0,1,(Language)language);
+        char message[900];
+        assert(session_notice(s,SESSION_NOTICE_DOOR,0,0,0,message,sizeof(message)));
+        assert(strstr(message,language==LANGUAGE_JA?"ゲーム開始":"Game started"));
+        assert(session_notice(s,SESSION_NOTICE_PROGRESS,50,10,20,message,sizeof(message)) && strstr(message,"50%") && strstr(message,"10 / 20"));
+        assert(!session_notice(s,SESSION_NOTICE_DOOR,0,0,0,message,2));
+        rtbbs(s)->conversation.chat_notice=1;rtbbs(s)->conversation.chat_prompting=1;
+        assert(session_ui_snapshot(s).redraw);
+        rtbbs(s)->auth.password_mode='a';assert(!session_ui_snapshot(s).redraw && session_secret(s));
+        rtbbs(s)->auth.password_mode=0;rtbbs(s)->presentation.ui.enabled=0;
+        assert(session_notice(s,SESSION_NOTICE_IDLE_CLOSED,0,0,0,message,sizeof(message)) && !strcmp(message,"BYE idle timeout\r\n"));
+        session_dispose(s);assert(!s->ui_binding.state);
+        for(unsigned index=0;index<SESSION_UI_MAX;index++)assert(!s->ui_binding.states[index]);
+    }
+    free(r);free(s);
     puts("PASS: RTBBS registry, policy snapshot, safe selection, selected UI routing and Core-before-UI effects");
 }

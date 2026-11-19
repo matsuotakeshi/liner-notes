@@ -42,15 +42,15 @@ static int utility_command(Session *s,char *line) {
         if(end==line+5 || *end || n<1 || n>5000) session_impl_emit(s,"ERR WAIT 1..5000\r\n");
         else { s->core.wake=s->core.now+(uint64_t)n; session_impl_emit(s,"WAITING\r\n"); }
     } else if(!strcmp(line,"QUIT")) {
-        if(preference_exit_begin(&s->presentation.preferences,s->core.user,PREF_EXIT_QUIT)) { session_impl_command_core(s,"PREFS SAVE");preference_exit_submitted(&s->presentation.preferences,s->core.pending);return 1; }
-        s->presentation.preferences.exit_action=PREF_EXIT_NONE;if(s->presentation.ui.enabled)session_impl_queue_text(s,site_text(1));session_impl_emit(s,"BYE\r\n");session_core_close(&s->core);
+        if(preference_exit_begin(&rtbbs(s)->presentation.preferences,s->core.user,PREF_EXIT_QUIT)) { session_rtbbs_command(s,"PREFS SAVE");preference_exit_submitted(&rtbbs(s)->presentation.preferences,s->core.pending);return 1; }
+        rtbbs(s)->presentation.preferences.exit_action=PREF_EXIT_NONE;if(rtbbs(s)->presentation.ui.enabled)session_impl_queue_text(s,site_text(1));session_impl_emit(s,"BYE\r\n");session_core_close(&s->core);
     }
     else session_impl_emit(s,"ERR command\r\n");
 
     return 1;
 }
 
-void session_impl_command_core(Session *s,char *line) {
+void session_rtbbs_command(Session *s,char *line) {
     if(session_impl_application_input(s,line))return;
     if(members_auto_ids() && !strcmp(line,"REGISTER"))line="REGISTER auto";
     char scratch[INPUT_LINE_MAX+2];

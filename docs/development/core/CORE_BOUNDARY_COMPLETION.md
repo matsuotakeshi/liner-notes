@@ -19,7 +19,8 @@ production changes or release are included.
 - Unverified login names live in SessionAuth.login. Confirmed identity, epoch,
   member level, admin/SIGOP observations, board/article position and password
   grants live in SessionCore. Password dialogue, editor and rendered page state
-  remain in their existing explicit Session subobjects.
+  are now private RTBBS state owned by the UI binding; shared Session/runtime
+  access typed callbacks and snapshots. See [RTBBS integration](RTBBS_UI_ADAPTER.md).
 - Core owns result-driven updates even when a UI handler returns early. Adapter
   code does not assign identity, epoch, selected board/article or grant entries.
   Runtime's account epoch notification uses the same guarded Core update.

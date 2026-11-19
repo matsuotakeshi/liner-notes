@@ -2,9 +2,16 @@
 #define SESSION_UI_H
 #include "session_core.h"
 #include "messages.h"
+#include "chat_types.h"
 #include <stddef.h>
 
 typedef struct Session Session;
+typedef struct {
+    Language language;
+    int menu,secret,editing,chatting,chat_pending,automatic,redraw;
+} SessionUiSnapshot;
+typedef enum { SESSION_NOTICE_DOOR,SESSION_NOTICE_PROGRESS,SESSION_NOTICE_TIME_WARNING,
+    SESSION_NOTICE_TIME_GRACE,SESSION_NOTICE_IDLE_WARNING,SESSION_NOTICE_IDLE_CLOSED } SessionNotice;
 /* Compiled, trusted adapters only: this is not a dynamically loaded plugin ABI.
  * Callbacks run on the Session event loop. Inputs/views are borrowed for the call.
  * Core receives worker effects BEFORE result; callbacks never authenticate users.
@@ -12,6 +19,28 @@ typedef struct Session Session;
  */
 typedef struct {
     const char *name;
+    size_t state_size; /* zero-initialized private bytes; cleared before free */
+    SessionUiSnapshot (*snapshot)(const Session *);
+    /* reason: 0 disconnect, 1 revoke, 2 discard inactive state; notify only on revoke. */
+    void (*cleanup)(Session *,int reason,int notify);
+    int (*connector_line)(Session *,char *,size_t);
+    int (*binary_byte)(Session *,unsigned char,uint64_t);
+    void (*prepare_request)(Session *,OperationRequest *);
+    int (*preferences)(const Session *,OperationRequest *);
+    uint64_t (*signature)(const Session *);
+    void (*scan_pause)(Session *);
+    void (*scan_stop)(Session *);
+    void (*board_refresh)(Session *);
+    void (*access_refresh)(Session *);
+    void (*chat_kick)(Session *);
+    int (*chat_event)(Session *,const ChatEvent *);
+    void (*announce)(Session *,const char *);
+    void (*notify)(Session *,MessageId,uint32_t,const char *);
+    void (*mail_arrived)(Session *,uint32_t);
+    void (*mail_notify)(Session *,uint32_t,int,uint32_t);
+    void (*transfer_receipt)(Session *,const char *);
+    void (*transfer_finish)(Session *,int,unsigned,uint64_t,int);
+    int (*notice)(const Session *,SessionNotice,unsigned,uint64_t,uint64_t,char *,size_t);
     void (*enter)(Session *,int initial,int menu,Language);
     void (*leave)(Session *);
     int (*can_leave)(const Session *);
@@ -38,6 +67,8 @@ typedef struct {
 typedef struct {
     SessionUiConfig config; /* per-connection policy snapshot */
     const SessionUiAdapter *active;
+    void *state;
+    void *states[SESSION_UI_MAX];
 } SessionUiBinding;
 typedef enum { SESSION_UI_SELECTED,SESSION_UI_UNCHANGED,SESSION_UI_UNKNOWN,
     SESSION_UI_DENIED,SESSION_UI_BUSY,SESSION_UI_INVALID } SessionUiSelection;
@@ -50,4 +81,9 @@ SessionUiConfig session_ui_default(void);
 int session_ui_config_valid(const SessionUiConfig *);
 SessionUiSelection session_ui_select(Session *,const char *name);
 const char *session_ui_name(const Session *);
+SessionUiSnapshot session_ui_snapshot(const Session *);
+/* Session lifecycle only; no UI command should call these ownership helpers. */
+int session_ui_allocate(Session *,unsigned index);
+void session_ui_discard_inactive(Session *);
+void session_ui_dispose(Session *);
 #endif

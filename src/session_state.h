@@ -37,8 +37,6 @@ typedef struct {
     int help_page;
     int menu_mode;
     int menu_shown;
-    unsigned columns;
-    unsigned rows;
     size_t page_offset;
     char page[CONTENT_DISPLAY];
     PreferenceLifecycle preferences;
@@ -106,4 +104,15 @@ typedef struct {
     unsigned long talk_target;
     unsigned long reply_target;
 } SessionConversation;
+/* Private RTBBS interaction state. Core and transports do not include this header. */
+typedef struct {
+    int initialized;
+    SessionAuth auth;
+    SessionPresentation presentation;
+    SessionEditor editor;
+    SessionReading reading;
+    SessionFiles files;
+    SessionMailState mail_state;
+    SessionConversation conversation;
+} SessionRtbbsState;
 #endif

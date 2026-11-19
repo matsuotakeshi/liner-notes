@@ -7,6 +7,11 @@
  * Borrowed input/result pointers may not be retained. submit copies requests.
  */
 #include "session.h"
+#include "session_io.h"
+#include "session_state.h"
+/* Only the selected RTBBS adapter (and focused white-box tests) uses this cast. */
+static inline SessionRtbbsState *rtbbs(Session *s) { return (SessionRtbbsState *)s->ui_binding.state; }
+static inline const SessionRtbbsState *rtbbs_const(const Session *s) { return (const SessionRtbbsState *)s->ui_binding.state; }
 #include "editor_core.h"
 #include "chat.h"
 
@@ -19,6 +24,22 @@ void session_rtbbs_menu(Session *,int);
 void session_rtbbs_help(Session *,const char *);
 int session_rtbbs_uppercase(const Session *,const char *,size_t);
 void session_rtbbs_door_finish(Session *);
+void session_rtbbs_chat_kick(Session *s);
+int session_rtbbs_binary_byte(Session *s,unsigned char byte,uint64_t now);
+void session_rtbbs_scan_pause(Session *s);
+void session_rtbbs_scan_stop(Session *s);
+void session_rtbbs_board_refresh(Session *s);
+void session_rtbbs_access_refresh(Session *s);
+void session_rtbbs_announce(Session *s,const char *text);
+void session_rtbbs_mail_arrived(Session *s,uint32_t recipient);
+void session_rtbbs_mail_notify(Session *s,uint32_t user,int deny,uint32_t revision);
+int session_rtbbs_disconnect_preferences(const Session *s,BoardRequest *out);
+uint64_t session_rtbbs_ui_signature(const Session *s);
+void session_rtbbs_transfer_receipt(Session *s,const char *text);
+void session_rtbbs_zmodem_finish(Session *s,int success,unsigned id,uint64_t size,int recovery);
+void session_rtbbs_cleanup(Session *,int,int);
+void session_rtbbs_prepare_request(Session *,OperationRequest *);
+
 enum { CI_NONE, CI_DATE, CI_AUTHOR, CI_HANDLE, CI_PROFILE, CI_PROFILE_SEARCH,
        CI_MEMO, CI_WITHDRAW, CI_HEADER, CI_TITLE, CI_OWNER, CI_EDITOR, CI_MENUMODE, CI_ROWS,
        CI_FILEINFO, CI_DOWNLOAD, CI_UPLOAD, CI_EXIT, CI_PROTOCOL, CI_FILENAME, CI_FILESIZE, CI_BATCH, CI_BATCH_ADD, CI_BATCH_REMOVE, CI_BATCH_MATCH,CI_PROF_FIELD,CI_PROF_VALUE,CI_SEARCH_FIELD,CI_SEARCH_VALUE,CI_BATCH_CLEAR,CI_SEND_PROTOCOL,CI_FILE_ACTION,CI_FILE_DESC,CI_FILE_DELETE,CI_PROF_TARGET,CI_PROF_NEXT,CI_BATCH_COPY };
@@ -76,7 +97,7 @@ int session_impl_batch_copy_result(Session *s,const BoardResult *completion,uint
 int session_impl_vault_edit_result(Session *s,const BoardResult *completion,uint64_t now);
 int session_impl_door_command(Session *s,char *line);
 void session_impl_command(Session *s,char *line);
-void session_impl_command_core(Session *s,char *line);
+void session_rtbbs_command(Session *s,char *line);
 int session_impl_message_result(Session *s,const BoardResult *completion,uint64_t now);
 int session_impl_service_command(Session *s,char *line);
 void session_impl_gather_input(Session *s,const char *line);

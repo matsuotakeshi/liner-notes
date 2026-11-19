@@ -1,20 +1,10 @@
 #ifndef SESSION_H
 #define SESSION_H
-#include "notification_core.h"
 #include "connector_core.h"
-#include "batch_core.h"
-#include "traversal_core.h"
-#include "preference_core.h"
-#include "mail_navigation_core.h"
-#include "list_navigation_core.h"
-#include "message_flow_core.h"
-#include "form_flow_core.h"
 #include <stddef.h>
 #include <stdint.h>
 #include "board.h"
-#include "ui.h"
 #include "session_core.h"
-#include "session_state.h"
 #include "session_ui.h"
 /* The adapter owns queuing/backpressure. write copies bytes synchronously and
  * returns 0 on failure. No OS handles, Telnet commands or HTTP frames here. */
@@ -27,6 +17,7 @@ typedef struct {
 } SessionIO;
 typedef struct {
     SessionIO io;
+    unsigned columns,rows;
     int door;
     char upload_description[241];
     char upload_filename[101];
@@ -50,19 +41,16 @@ typedef struct {
 struct Session {
     SessionUiBinding ui_binding;
     SessionCore core;
-    SessionAuth auth;
-    SessionPresentation presentation;
-    SessionEditor editor;
-    SessionReading reading;
-    SessionFiles files;
-    SessionMailState mail_state;
-    SessionConversation conversation;
     SessionConnection connection;
 };
 int session_init_ui(Session *,SessionIO,unsigned long id,int slot,int boards,int members,int menu,Language,const SessionUiConfig *);
 void session_init(Session *,SessionIO,unsigned long id,int slot,int boards,int members,int menu,Language);
 void session_dimensions(Session *,unsigned columns,unsigned rows);
 void session_abort(Session *);
+int session_logout(Session *);
+SessionOperationStatus session_submit(Session *,OperationRequest *);
+void session_notify(Session *,MessageId,uint32_t,const char *);
+int session_notice(const Session *,SessionNotice,unsigned,uint64_t,uint64_t,char *,size_t);
 void session_door_finish(Session *);
 void session_scan_stop(Session *);
 void session_scan_pause(Session *);
@@ -72,6 +60,7 @@ void session_board_refresh(Session *);
 void session_access_refresh(Session *);
 int session_auto_read(const Session *);
 void session_chat_kick(Session *);
+int session_chat_event(void *,const ChatEvent *);
 void session_revoke(Session *);
 uint64_t session_ui_signature(const Session *);
 /* NULL queries eligibility only. Otherwise zero/fill a caller-owned request.

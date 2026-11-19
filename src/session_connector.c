@@ -35,7 +35,7 @@ static void connector_link(Session *s,char *line);
 int session_impl_binary_result(Session *s,const BoardResult *completion,uint64_t now) {
     (void)now;
     if(completion->binary_enter) {
-        s->connection.binary_menu=s->presentation.ui.enabled;s->presentation.ui.enabled=0;session_impl_page_clear(s);s->connection.binary=1;connector_reader_enter(&s->connection.binary_reader,now);
+        s->connection.binary_menu=rtbbs(s)->presentation.ui.enabled;rtbbs(s)->presentation.ui.enabled=0;session_impl_page_clear(s);s->connection.binary=1;connector_reader_enter(&s->connection.binary_reader,now);
         session_impl_queue_text(s,"BINARY READY binary-v1\r\n");return 1;
     }
     if(s->connection.binary) {
@@ -48,12 +48,12 @@ int session_impl_binary_result(Session *s,const BoardResult *completion,uint64_t
 }
 
 static ClassicInput classic_input_state(const Session *s) {
-    return (ClassicInput){.memo=s->conversation.memo_input,
-        .selection=s->presentation.classic_input==CI_FILE_ACTION || s->presentation.classic_input==CI_BATCH,
-        .application=s->auth.application.step,.classic=s->presentation.classic_input,.secret=session_secret(s),
-        .input=s->presentation.ui.input,.mail_input=s->mail_state.mail_input,.paging=!!s->presentation.page[0],.binary=s->connection.binary,.transfer=s->connection.zmodem,
-        .editing=s->editor.editing,.chatting=s->conversation.chatting,.gather=s->conversation.gather.mode,.talk=s->conversation.outside_talk,
-        .line_editor=s->editor.editor_line,.editor_input=s->editor.editor_input,.mail_mode=s->mail_state.mail_mode};
+    return (ClassicInput){.memo=rtbbs_const(s)->conversation.memo_input,
+        .selection=rtbbs_const(s)->presentation.classic_input==CI_FILE_ACTION || rtbbs_const(s)->presentation.classic_input==CI_BATCH,
+        .application=rtbbs_const(s)->auth.application.step,.classic=rtbbs_const(s)->presentation.classic_input,.secret=session_secret(s),
+        .input=rtbbs_const(s)->presentation.ui.input,.mail_input=rtbbs_const(s)->mail_state.mail_input,.paging=!!rtbbs_const(s)->presentation.page[0],.binary=s->connection.binary,.transfer=s->connection.zmodem,
+        .editing=rtbbs_const(s)->editor.editing,.chatting=rtbbs_const(s)->conversation.chatting,.gather=rtbbs_const(s)->conversation.gather.mode,.talk=rtbbs_const(s)->conversation.outside_talk,
+        .line_editor=rtbbs_const(s)->editor.editor_line,.editor_input=rtbbs_const(s)->editor.editor_input,.mail_mode=rtbbs_const(s)->mail_state.mail_mode};
 }
 
 int session_rtbbs_uppercase(const Session *s,const char *line,size_t size) {
@@ -72,7 +72,7 @@ static void connector_transfer(Session *s,const char *line) {
 }
 
 static void connector_link(Session *s,char *line) {
-    if(!s->core.user || s->editor.editing || session_secret(s) || s->conversation.chatting || s->conversation.gather.mode || !board_link_enabled(s->core.board,s->core.user)) { session_impl_queue_text(s,"ERR link denied\r\n");return; }
+    if(!s->core.user || rtbbs(s)->editor.editing || session_secret(s) || rtbbs(s)->conversation.chatting || rtbbs(s)->conversation.gather.mode || !board_link_enabled(s->core.board,s->core.user)) { session_impl_queue_text(s,"ERR link denied\r\n");return; }
     BoardRequest q={0};LinkWireRequest request;
     _Static_assert(sizeof(q.link_origin)==sizeof(request.origin),"link origin capacity");
     _Static_assert(sizeof(q.link_article)==sizeof(request.article),"link article capacity");
@@ -92,21 +92,21 @@ int session_impl_connector_line(Session *s,char *line,size_t size) {
     if(*s->connection.connector_token && link_wire_command(line)) { connector_link(s,line);return 1; }
     if(envelope.kind==CONNECTOR_LINKBLOCK) {
         const char *end;uint32_t n;connector_block_clear(&s->connection.connector_block);
-        if(!s->core.user || s->editor.editing || session_secret(s) || s->conversation.chatting || s->conversation.gather.mode || !board_link_enabled(s->core.board,s->core.user) || !session_impl_number_arg(envelope.payload,&n,&end) || *end || !n || n>CONNECTOR_LINK_BLOCK_MAX) { session_impl_queue_text(s,"ERR link syntax\r\n");return 1; }
+        if(!s->core.user || rtbbs(s)->editor.editing || session_secret(s) || rtbbs(s)->conversation.chatting || rtbbs(s)->conversation.gather.mode || !board_link_enabled(s->core.board,s->core.user) || !session_impl_number_arg(envelope.payload,&n,&end) || *end || !n || n>CONNECTOR_LINK_BLOCK_MAX) { session_impl_queue_text(s,"ERR link syntax\r\n");return 1; }
         if(connector_block_begin(&s->connection.connector_block,CONNECTOR_LINK_BLOCK,n,s->core.now)<1)session_abort(s);
         return 1;
     }
     if(envelope.kind==CONNECTOR_TRANSFER) {
         const char *cmd=envelope.payload;
-        if(s->core.user && !s->auth.password_mode && !s->conversation.chatting && !s->conversation.gather.mode &&
-           (!s->editor.editing || s->editor.draft.op=='m') && !strncmp(cmd,"MFILE",5) && transfer_line_command(cmd+1))connector_transfer(s,cmd);
+        if(s->core.user && !rtbbs(s)->auth.password_mode && !rtbbs(s)->conversation.chatting && !rtbbs(s)->conversation.gather.mode &&
+           (!rtbbs(s)->editor.editing || rtbbs(s)->editor.draft.op=='m') && !strncmp(cmd,"MFILE",5) && transfer_line_command(cmd+1))connector_transfer(s,cmd);
         else session_impl_queue_text(s,"ERR vault syntax\r\n");
         return 1;
     }
     if(envelope.kind==CONNECTOR_BLOCK) {
         const char *end;uint32_t n;
         connector_block_clear(&s->connection.connector_block);
-        if(!s->core.user || (s->editor.editing && s->editor.draft.op!='m') || s->auth.password_mode || s->conversation.chatting || s->conversation.gather.mode ||
+        if(!s->core.user || (rtbbs(s)->editor.editing && rtbbs(s)->editor.draft.op!='m') || rtbbs(s)->auth.password_mode || rtbbs(s)->conversation.chatting || rtbbs(s)->conversation.gather.mode ||
            !session_impl_number_arg(envelope.payload,&n,&end) || *end || !n || n>CONNECTOR_FILE_BLOCK_MAX) { session_impl_queue_text(s,"ERR vault syntax\r\n");return 1; }
         if(connector_block_begin(&s->connection.connector_block,CONNECTOR_FILE_BLOCK,n,s->core.now)<1)session_abort(s);
         return 1;
@@ -118,15 +118,15 @@ int session_impl_connector_line(Session *s,char *line,size_t size) {
         if(received>0) {
             ConnectorBlockKind kind;char *session_impl_command=connector_block_take(&s->connection.connector_block,&kind);
             if(kind==CONNECTOR_LINK_BLOCK && !strncmp(session_impl_command,"LINKAPPLY ",10))connector_link(s,session_impl_command);
-            else if(kind==CONNECTOR_FILE_BLOCK && ((!s->editor.editing && !strncmp(session_impl_command,"FILEPUTBLOCK ",13)) || !strncmp(session_impl_command,"MFILEPUTBLOCK ",14)))connector_transfer(s,session_impl_command);
+            else if(kind==CONNECTOR_FILE_BLOCK && ((!rtbbs(s)->editor.editing && !strncmp(session_impl_command,"FILEPUTBLOCK ",13)) || !strncmp(session_impl_command,"MFILEPUTBLOCK ",14)))connector_transfer(s,session_impl_command);
             else session_impl_queue_text(s,"ERR vault syntax\r\n");
             free(session_impl_command);
         }return 1;
     }
-    if(envelope.kind==CONNECTOR_LITERAL && s->editor.editing && !s->auth.password_mode && !s->conversation.chatting) {
+    if(envelope.kind==CONNECTOR_LITERAL && rtbbs(s)->editor.editing && !rtbbs(s)->auth.password_mode && !rtbbs(s)->conversation.chatting) {
         s->connection.connector_literal=1;session_impl_queue_text(s,"CONNECTOR LITERAL READY\r\n");return 1;
     }
-    if(!s->presentation.ui.enabled && !s->editor.editing && !s->conversation.chatting && !s->auth.password_mode &&
+    if(!rtbbs(s)->presentation.ui.enabled && !rtbbs(s)->editor.editing && !rtbbs(s)->conversation.chatting && !rtbbs(s)->auth.password_mode &&
        envelope.kind==CONNECTOR_OPEN) {
         memcpy(s->connection.connector_token,envelope.payload,64);s->connection.connector_token[64]=0;
         session_impl_queue_text(s,"CONNECTOR READY 1\r\n");return 1;
@@ -135,12 +135,12 @@ int session_impl_connector_line(Session *s,char *line,size_t size) {
         char out[2048];
         ConnectorState state={
             .connection=s->core.id,.user=s->core.user,.username=s->core.user?s->core.username:"",
-            .board=s->core.board,.article=s->core.current,.admin=!!s->presentation.ui.admin,.sigop=!!s->presentation.ui.sigop,.level=s->core.member_level,
-            .editing=s->editor.editing,.editor_kind=(unsigned char)s->editor.draft.op,.secret=session_secret(s),.password_mode=s->auth.password_mode,
-            .mail=s->mail_state.mail_mode,.mail_current=s->mail_state.mail.current,.chat=s->conversation.chatting,.talk=s->conversation.outside_talk,
-            .pager=!!s->presentation.page[0],.gather=s->conversation.gather.mode,
-            .input=s->auth.application.step?s->auth.application.step:s->presentation.classic_input?s->presentation.classic_input:s->conversation.memo_input?s->conversation.memo_input:s->mail_state.mail_input?s->mail_state.mail_input:s->conversation.talk_select,
-            .confirmation=s->mail_state.mail.delete_id,.binary=s->connection.binary,.door=s->connection.door,.members=s->core.member_mode,
+            .board=s->core.board,.article=s->core.current,.admin=!!rtbbs(s)->presentation.ui.admin,.sigop=!!rtbbs(s)->presentation.ui.sigop,.level=s->core.member_level,
+            .editing=rtbbs(s)->editor.editing,.editor_kind=(unsigned char)rtbbs(s)->editor.draft.op,.secret=session_secret(s),.password_mode=rtbbs(s)->auth.password_mode,
+            .mail=rtbbs(s)->mail_state.mail_mode,.mail_current=rtbbs(s)->mail_state.mail.current,.chat=rtbbs(s)->conversation.chatting,.talk=rtbbs(s)->conversation.outside_talk,
+            .pager=!!rtbbs(s)->presentation.page[0],.gather=rtbbs(s)->conversation.gather.mode,
+            .input=rtbbs(s)->auth.application.step?rtbbs(s)->auth.application.step:rtbbs(s)->presentation.classic_input?rtbbs(s)->presentation.classic_input:rtbbs(s)->conversation.memo_input?rtbbs(s)->conversation.memo_input:rtbbs(s)->mail_state.mail_input?rtbbs(s)->mail_state.mail_input:rtbbs(s)->conversation.talk_select,
+            .confirmation=rtbbs(s)->mail_state.mail.delete_id,.binary=s->connection.binary,.door=s->connection.door,.members=s->core.member_mode,
             .feature_mail=board_feature_enabled("mail"),.feature_chat=board_feature_enabled("chat"),.feature_vault=board_feature_enabled("vault")
         };
         if(!connector_state_format(&state,envelope.payload,out,sizeof(out))) { session_abort(s);return 1; }
@@ -148,7 +148,7 @@ int session_impl_connector_line(Session *s,char *line,size_t size) {
     }
     if(s->connection.connector_literal) {
         s->connection.connector_literal=0;
-        if(!s->editor.editing || s->auth.password_mode || s->conversation.chatting)session_impl_queue_text(s,"ERR connector editor state\r\n");
+        if(!rtbbs(s)->editor.editing || rtbbs(s)->auth.password_mode || rtbbs(s)->conversation.chatting)session_impl_queue_text(s,"ERR connector editor state\r\n");
         else if(!session_impl_safe_text(line))session_impl_queue_text(s,"ERR control character\r\n");
         else {
             if(session_impl_edit_apply(s,EDITOR_APPEND_LINE,0,0,line)!=EDITOR_OK)session_impl_queue_text(s,"ERR body limit\r\n");
@@ -158,13 +158,13 @@ int session_impl_connector_line(Session *s,char *line,size_t size) {
     return 0;
 }
 
-int session_binary_byte(Session *s,unsigned char byte,uint64_t now) {
+int session_rtbbs_binary_byte(Session *s,unsigned char byte,uint64_t now) {
     if(!s->connection.binary || !session_ready(s))return 0;
     ConnectorFrame frame;int received=connector_reader_feed(&s->connection.binary_reader,byte,now,&frame);
     if(received<0) { session_abort(s);return -1; }if(!received)return 0;
     if(frame.kind=='Q') {
-        session_impl_binary_frame(s,'E',"",0);s->connection.binary=0;s->presentation.ui.enabled=s->connection.binary_menu;
-        session_impl_queue_text(s,"BINARY CLOSED\r\n");if(s->presentation.ui.enabled)session_impl_show_menu(s,1);session_impl_prompt(s);return 1;
+        session_impl_binary_frame(s,'E',"",0);s->connection.binary=0;rtbbs(s)->presentation.ui.enabled=s->connection.binary_menu;
+        session_impl_queue_text(s,"BINARY CLOSED\r\n");if(rtbbs(s)->presentation.ui.enabled)session_impl_show_menu(s,1);session_impl_prompt(s);return 1;
     }
     BoardRequest q={0};
     if(frame.kind=='L') {
