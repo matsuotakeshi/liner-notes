@@ -28,7 +28,16 @@ static int row_schema(sqlite3 *db) {
         "CREATE INDEX IF NOT EXISTS %s_identity ON %s(stream,record_id);"
         "CREATE INDEX IF NOT EXISTS %s_actor ON %s(stream,actor_id,created_at);",row_tables[i],row_tables[i],row_tables[i],row_tables[i],row_tables[i]);
         if(!sql(db,query))return 0;
-    }return 1;
+    }
+    if(storage_version>=4 && !sql(db,
+        "CREATE TABLE IF NOT EXISTS mail_attachments("
+        "stream INTEGER NOT NULL,offset INTEGER NOT NULL,"
+        "ordinal INTEGER NOT NULL CHECK(typeof(ordinal)='integer' AND ordinal BETWEEN 0 AND 15),"
+        "file_id INTEGER NOT NULL CHECK(typeof(file_id)='integer' AND file_id BETWEEN 1 AND 2147483647),"
+        "PRIMARY KEY(stream,offset,ordinal),UNIQUE(stream,offset,file_id),"
+        "FOREIGN KEY(stream,offset) REFERENCES mail_records(stream,offset) ON DELETE CASCADE) WITHOUT ROWID;"
+        "CREATE INDEX IF NOT EXISTS mail_attachments_file ON mail_attachments(file_id,stream,offset);"))return 0;
+    return 1;
 }
 static int row_kind(Store *s) {
     if(storage_version<2)return 0;
@@ -84,6 +93,31 @@ static int row_load(Store *s,sqlite3_int64 at) {
         ok=n>=128 && n<=ROW_MAX && offset<=at && at<offset+n && tl<=80 && bl<=262144 && nl<=32 && an>=0 && an<=256;
         unsigned char *r=s->row_cache;if(ok) {
             memset(r,0,(size_t)n);const unsigned char *a=sqlite3_column_blob(q,12);
+            unsigned char mail_attr[112];
+            if(storage_version>=4 && s->kind==2) {
+                if(an!=48)ok=0;
+                else {
+                    unsigned count=(a[0]=='u'||a[0]=='x')?a[2]:(a[0]=='t'||a[0]=='v');
+                    ok=count<=16 && n>=128+bl+(int)(4*count);
+                    if(ok) {
+                        memcpy(mail_attr,a,44);memcpy(mail_attr+44+4*count,a+44,4);
+                        sqlite3_stmt *attachments=NULL;unsigned seen=0;
+                        ok=sqlite3_prepare_v2(s->db,"SELECT ordinal,file_id FROM mail_attachments WHERE stream=? AND offset=? ORDER BY ordinal",-1,&attachments,NULL)==SQLITE_OK;
+                        if(ok) {
+                            sqlite3_bind_int64(attachments,1,s->id);sqlite3_bind_int64(attachments,2,offset);
+                            int rc;
+                            while((rc=sqlite3_step(attachments))==SQLITE_ROW) {
+                                sqlite3_int64 file=sqlite3_column_int64(attachments,1);
+                                if(seen>=count || sqlite3_column_int(attachments,0)!=(int)seen || file<1 || file>2147483647) { ok=0;break; }
+                                rput(mail_attr+44+4*seen,(uint32_t)file);seen++;
+                            }
+                            if(rc!=SQLITE_DONE || seen!=count)ok=0;
+                        }
+                        sqlite3_finalize(attachments);a=mail_attr;an=48+(int)(4*count);
+                    }
+                }
+                if(!ok) { sqlite3_finalize(q);return 0; }
+            }
             if(s->kind==1) {
                 ok=an==64 && n>=144+bl;
                 if(ok) { memcpy(r,a,16);size_t base=(size_t)n-44;memcpy(r+base-4,a+16,48);rput(r,((uint32_t)sqlite3_column_int64(q,2))|(rget(r)&0x80000000u));rput(r+4,(uint32_t)sqlite3_column_int64(q,3));rput(r+8,(unsigned)tl);rput(r+12,(unsigned)bl);if(tl)memcpy(r+16,sqlite3_column_blob(q,7),(size_t)tl);if(bl)memcpy(r+96,sqlite3_column_blob(q,8),(size_t)bl);uint64_t t=(uint64_t)sqlite3_column_int64(q,6);rput(r+base-4,(uint32_t)t);rput(r+base,(uint32_t)(t>>32));if(nl)memcpy(r+base+4,sqlite3_column_blob(q,9),(size_t)nl);rput(r+base+36,(uint32_t)sqlite3_column_int64(q,5)); }
@@ -140,6 +174,7 @@ static int row_insert(Store *s,sqlite3_int64 offset,const unsigned char *r,size_
         unsigned count=(r[0]=='u'||r[0]=='x')?r[2]:(r[0]=='t'||r[0]=='v');an=48+4*count;
         id=rget(r+8);parent=rget(r+24);sender=rget(r+16);actor=rget(r+12);to=rget(r+20);tl=rget(r+28);bl=rget(r+32);title=r+44;body=r+124;created=rget(r+36)|((uint64_t)rget(r+40)<<32);
         memcpy(attr,r,44);memcpy(attr+44,r+n-(an-44),an-44);memset(attr+8,0,36);
+        if(storage_version>=4) { memcpy(attr+44,r+n-4,4);an=48; }
     } else {
         id=rget(r+4);int draft=r[0]=='D'||r[0]=='d';
         if(draft) { tl=rget(r+20);bl=rget(r+24);title=r+32;body=r+112;memcpy(attr,r,32);memcpy(attr+32,r+n-4,4);an=36;memset(attr+20,0,8); }
@@ -154,5 +189,15 @@ static int row_insert(Store *s,sqlite3_int64 offset,const unsigned char *r,size_
     if(ok) {
         sqlite3_bind_int64(q,1,s->id);sqlite3_bind_int64(q,2,offset);sqlite3_bind_int64(q,3,(sqlite3_int64)n);sqlite3_bind_int64(q,4,id);sqlite3_bind_int64(q,5,parent);sqlite3_bind_int64(q,6,actor);sqlite3_bind_int64(q,7,to);sqlite3_bind_int64(q,8,(sqlite3_int64)created);
         sqlite3_bind_text(q,9,(const char *)title,(int)tl,SQLITE_STATIC);sqlite3_bind_text(q,10,(const char *)body,(int)bl,SQLITE_STATIC);sqlite3_bind_text(q,11,(const char *)login,(int)nl,SQLITE_STATIC);sqlite3_bind_blob(q,12,salt,auth?16:0,SQLITE_STATIC);sqlite3_bind_blob(q,13,hash,auth?32:0,SQLITE_STATIC);sqlite3_bind_blob(q,14,attr,(int)an,SQLITE_STATIC);sqlite3_bind_int(q,15,s->kind==1?0:r[0]);sqlite3_bind_int64(q,16,sender);ok=sqlite3_step(q)==SQLITE_DONE;
-    }sqlite3_finalize(q);return ok;
+    }sqlite3_finalize(q);
+    if(ok && storage_version>=4 && s->kind==2) {
+        unsigned count=(r[0]=='u'||r[0]=='x')?r[2]:(r[0]=='t'||r[0]=='v');
+        q=NULL;ok=count<=16 && sqlite3_prepare_v2(s->db,"INSERT INTO mail_attachments VALUES(?,?,?,?)",-1,&q,NULL)==SQLITE_OK;
+        for(unsigned i=0;ok && i<count;i++) {
+            sqlite3_bind_int64(q,1,s->id);sqlite3_bind_int64(q,2,offset);sqlite3_bind_int(q,3,(int)i);
+            sqlite3_bind_int64(q,4,rget(r+n-4-4*count+4*i));ok=sqlite3_step(q)==SQLITE_DONE;sqlite3_reset(q);sqlite3_clear_bindings(q);
+        }
+        sqlite3_finalize(q);
+    }
+    return ok;
 }

@@ -1,6 +1,6 @@
 {
   "LICENSE": "fb981668c18a279e285fc4d83fba1e836cc84dd4daa73c9697d3cfd2d8aca6e0",
-  "Makefile": "67bf97c6c1c94de9060b08daf6ed8637d5c9787fc2d001da8edcbdd102b82ee0",
+  "Makefile": "c66ea83125d099618e69030c0ba28279faa92132569fed085e39bec4eefb2cbc",
   "boards.example.conf": "4bd1a17ecf3966d3829510e8495a1362fb8b922cd754badccc739f5e5ab0bde8",
   "ci/build-freebsd-package.sh": "4e62899471d1f1a6c44e00a783c1aff771332140704ae778da95a95048474108",
   "debian/changelog": "8f3574a094f5a3677a9a7188e530ecdbdc006138b082b57243ca8441c644114d",
@@ -44,7 +44,7 @@
   "ports/comms/liner-notes/files/liner_notes.in": "1c65bdab078343340b874cf830fb4d9d7adba7d47b0f0a46aa9d59eff797f06c",
   "ports/comms/liner-notes/pkg-plist": "4c89b158ee355ae90b0dd2c34bd4bf327d132cb230f33c4a43db365b57544bab",
   "scripts/configure-zmodem.py": "2abc3c427aa5f93a8920cfce7a390bc8624b5958d72ddd3f8b4df4244c7dc838",
-  "scripts/doctor.py": "bb62faa6a98a9e77157accfc5ab46c79faf9485bde3dcff005d9295ea1649727",
+  "scripts/doctor.py": "5d0c0f921e9db7fc865f7b345bcc4693b7cd321c8c661d01fd7990c02bfd49b8",
   "scripts/door_clans.sh": "42d098ab56618024c6fa89a86c7f575a41a18082cf0ef1e71797b83675026fc5",
   "scripts/install-linux.py": "3f48877c54a1f62727136647278968884001277ec03595236c2237b24f3c1473",
   "scripts/liner-notes-ssh": "f73b5ebd8e24bff366c93fdf3f518a87feefb226e0b809df67eed04f190a8969",
@@ -63,7 +63,7 @@
   "src/runtime.c": "3e3bc151ab4b7ae2ee5735de70da352d702ce7f7e6aa0571962405696d657492",
   "src/runtime_limits.h": "82de34913914d0f81874789d473928e044225772c4db9d656bceac03920219a8",
   "src/session.c": "7cbcdfbcaa60867a7b19365f8e9b6d1e2b40f4c704027b525a23b889822764d8",
-  "src/storage_sqlite.c": "aa8971c445e2a23ae21548fc706e318e40238f8318c2f717490b867067ab3055",
+  "src/storage_sqlite.c": "b26e0395e808528a1ce0a68187359701146039bf4b1e1337f5ac68a91ab5c6e7",
   "src/telnet.c": "a490e550fb227858727b4edc656c7c1d60bf90f6fa13a2f74dd361234b8ff422",
   "src/transfer_line.c": "7da32dfcd4ffdbc67b05a7ffc463f0f03d67a8e1b6a17a47cf28297ea0c808a5",
   "src/ui.c": "b1e5d46c41619cd633c55df91bd801c709d1c0983e370300915d76e747ee4283",
@@ -329,5 +329,6 @@
   "tests/test_session_ui_lifecycle.c": "d41e9dfdd21032a6fda9a96d8f1a0cf7bb4bb84c68b82cb8e2375405dab3203c",
   "src/ssh_transport.c": "ea316c594fcd1ed2e737232bd1209f668badfc0304ebccb90cb924a53eea0be5",
   "src/ssh_transport.h": "58a6705421a4d5ddb68ed7adf0d5104698d24848785b5eb480732cfdb0469edf",
-  "src/member_keys.h": "7d91cb27e4d304cc9f33fdca9c679fc90fe85290dee9f210bd67403eb8393bbb"
+  "src/member_keys.h": "7d91cb27e4d304cc9f33fdca9c679fc90fe85290dee9f210bd67403eb8393bbb",
+  "src/storage_records.inc": "fef112d520198b7132e47272330b668685573fee94a91fd01c3883f3488a9908"
 }

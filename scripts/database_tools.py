@@ -34,7 +34,8 @@ def locked(database):
   fcntl.lockf(fd,fcntl.LOCK_EX|fcntl.LOCK_NB)
   with sqlite3.connect(database.as_uri()+'?mode=ro',uri=True) as db:
    maintenance.need(db.execute('pragma integrity_check').fetchall()==[('ok',)],'SQLite integrity check failed')
-   maintenance.need(db.execute('select version from storage_meta where id=1').fetchone() in ((1,),(2,),(3,)),'Unknown storage schema')
+   maintenance.need(db.execute('select version from storage_meta where id=1').fetchone() in ((1,),(2,),(3,),(4,)),'Unknown storage schema')
+   maintenance.need(not db.execute('pragma foreign_key_check').fetchone(),'SQLite relationship check failed')
    yield db
  finally:os.close(fd)
 
@@ -120,6 +121,7 @@ def import_copy(root,board,members,database='liner.sqlite',structured=False,tool
  else:
   fd=os.open(target,os.O_WRONLY|os.O_CREAT|os.O_EXCL,0o600);os.close(fd)
  with sqlite3.connect(target) as db:
+  db.execute('PRAGMA foreign_keys=ON')
   if not structured:db.executescript('PRAGMA synchronous=FULL;CREATE TABLE storage_meta(id INTEGER PRIMARY KEY CHECK(id=1),version INTEGER NOT NULL,uuid BLOB NOT NULL);INSERT INTO storage_meta VALUES(1,1,randomblob(16));CREATE TABLE streams(id INTEGER PRIMARY KEY,name TEXT UNIQUE NOT NULL,length INTEGER NOT NULL DEFAULT 0,revision INTEGER NOT NULL DEFAULT 0);CREATE TABLE blocks(stream INTEGER NOT NULL REFERENCES streams(id) ON DELETE CASCADE,number INTEGER NOT NULL,value BLOB NOT NULL CHECK(length(value)=4096),PRIMARY KEY(stream,number)) WITHOUT ROWID;')
   db.execute('CREATE TABLE storage_imports(name TEXT PRIMARY KEY)')
   for name in (() if structured else names):
@@ -137,6 +139,7 @@ def import_copy(root,board,members,database='liner.sqlite',structured=False,tool
      for row in source.execute(f'SELECT * FROM {table}'):db.execute(f'INSERT INTO {table} VALUES({",".join("?" for _ in row)})',row)
   db.execute("INSERT INTO storage_imports VALUES('features')");db.commit()
   maintenance.need(db.execute('pragma integrity_check').fetchone()==('ok',),'Migrated database is invalid')
+  maintenance.need(not db.execute('pragma foreign_key_check').fetchone(),'Migrated relationships are invalid')
   # Verify every byte against the source, not just row counts.
   for ident,name,length in db.execute('select id,name,length from streams'):
    h=hashlib.sha256();remaining=length
@@ -170,7 +173,7 @@ def restore(archive,destination,compact=False,reclaim=False,all_stores=False,too
   layout=Path(destination)/LAYOUT
   if structured is None:
    schema=json.loads(layout.read_text(encoding='utf8'))['schema'] if layout.exists() else 1
-   maintenance.need(schema in (1,2,3),'Unknown backup storage layout')
+   maintenance.need(schema in (1,2,3,4),'Unknown backup storage layout')
    structured=schema>=2
   result['database']=import_copy(Path(destination).resolve(),manifest['board'],manifest['members'],database,structured,tools_dir)
  except Exception:

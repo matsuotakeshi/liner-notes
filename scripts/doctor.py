@@ -666,7 +666,7 @@ class Doctor:
                         if not {'storage_meta','streams','blocks'} <= tables:
                             raise ValueError('schema')
                         versions = list(db.execute('SELECT version FROM storage_meta WHERE id=1'))
-                        if len(versions)!=1 or versions[0][0] not in (1,2,3):
+                        if len(versions)!=1 or versions[0][0] not in (1,2,3,4):
                             raise ValueError('version')
                     elif not {'events','cursors'} <= tables:
                         raise ValueError('link schema')

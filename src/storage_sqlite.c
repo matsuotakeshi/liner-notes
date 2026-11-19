@@ -73,8 +73,8 @@ int storage_init(const char *path) {
     int initial=open(database,O_RDWR|O_CREAT|O_NOFOLLOW,0600);
     if(initial<0 || fchmod(initial,0600)) { if(initial>=0)close(initial);close(owner);owner=-1;return 0; }close(initial);
     sqlite3 *db=NULL;int ok=connection(&db) && sql(db,"PRAGMA journal_mode=WAL;BEGIN IMMEDIATE;CREATE TABLE IF NOT EXISTS storage_meta(id INTEGER PRIMARY KEY CHECK(id=1),version INTEGER NOT NULL,uuid BLOB NOT NULL);INSERT OR IGNORE INTO storage_meta VALUES(1,1,randomblob(16));CREATE TABLE IF NOT EXISTS streams(id INTEGER PRIMARY KEY,name TEXT UNIQUE NOT NULL,length INTEGER NOT NULL DEFAULT 0,revision INTEGER NOT NULL DEFAULT 0);CREATE TABLE IF NOT EXISTS blocks(stream INTEGER NOT NULL REFERENCES streams(id) ON DELETE CASCADE,number INTEGER NOT NULL,value BLOB NOT NULL CHECK(length(value)=4096),PRIMARY KEY(stream,number)) WITHOUT ROWID;COMMIT;");
-    if(ok && structured_requested && is_new)ok=sql(db,"UPDATE storage_meta SET version=3 WHERE id=1");
-    sqlite3_stmt *q=NULL;if(ok) { ok=sqlite3_prepare_v2(db,"SELECT version FROM storage_meta WHERE id=1",-1,&q,NULL)==SQLITE_OK && sqlite3_step(q)==SQLITE_ROW;if(ok) { storage_version=sqlite3_column_int(q,0);ok=(storage_version>=1 && storage_version<=3) && (!structured_requested || storage_version>=2); } }sqlite3_finalize(q);
+    if(ok && structured_requested && is_new)ok=sql(db,"UPDATE storage_meta SET version=4 WHERE id=1");
+    sqlite3_stmt *q=NULL;if(ok) { ok=sqlite3_prepare_v2(db,"SELECT version FROM storage_meta WHERE id=1",-1,&q,NULL)==SQLITE_OK && sqlite3_step(q)==SQLITE_ROW;if(ok) { storage_version=sqlite3_column_int(q,0);ok=(storage_version>=1 && storage_version<=4) && (!structured_requested || storage_version>=2); } }sqlite3_finalize(q);
     if(ok && storage_version>=2)ok=row_schema(db);
     if(db)sqlite3_close(db);
     if(!ok || chmod(database,0600)) { close(owner);owner=-1;database[0]=0;return 0; }

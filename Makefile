@@ -634,3 +634,10 @@ test-ssh-sources:
 	$(PYTHON) tests/test_ssh_sources.py
 
 check: test-ssh-sources
+
+.PHONY: test-storage-relations
+check: test-storage-relations
+test-storage-relations: tests/test_storage_relations.c src/storage_records.inc
+	$(CC) $(CPPFLAGS) $(SQLITE_CFLAGS) $(CFLAGS) $(LDFLAGS) -std=c11 -Wall -Wextra -Werror -Isrc tests/test_storage_relations.c $(SQLITE_LIBS) -o test-storage-relations
+	./test-storage-relations
+	$(PYTHON) tests/test_structured_relations.py

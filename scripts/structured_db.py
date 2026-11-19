@@ -61,7 +61,18 @@ def export(db,stream,kind,magic,length,out):
             data=event_encode(kind,row);out.write(data);offset+=len(data)
         if offset!=length:raise ValueError('Truncated event stream')
         return
+    version=db.execute('SELECT version FROM storage_meta WHERE id=1').fetchone()[0]
     for row in db.execute('SELECT stream,offset,length,record_id,parent_id,actor_id,recipient_id,created_at,CAST(title AS BLOB),CAST(body AS BLOB),CAST(login AS BLOB),salt,password_hash,attributes,event_type,sender_id FROM '+TABLES[kind]+' WHERE stream=? ORDER BY offset',(stream,)):
         if row[1]!=offset:raise ValueError('Missing structured record')
+        if kind==2 and version>=4:
+            attr=row[13]
+            if len(attr)!=48:raise ValueError('Invalid normalized mail header')
+            count=attr[2] if chr(attr[0]) in 'ux' else int(chr(attr[0]) in 'tv')
+            if count>16:raise ValueError('Invalid attachment count')
+            attachments=list(db.execute('SELECT ordinal,file_id FROM mail_attachments WHERE stream=? AND offset=? ORDER BY ordinal',(stream,row[1])))
+            if len(attachments)!=count or any(i!=ordinal or not 1<=file<=2147483647 for i,(ordinal,file) in enumerate(attachments)):
+                raise ValueError('Invalid attachment relationship')
+            attr=attr[:44]+b''.join(struct.pack('<I',file) for _,file in attachments)+attr[44:]
+            row=(*row[:13],attr,*row[14:])
         encoded=encode(kind,row);out.write(encoded);offset+=len(encoded)
     if offset!=length:raise ValueError('Truncated structured stream')
