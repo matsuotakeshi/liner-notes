@@ -602,6 +602,7 @@ test-session-policy-core: tests/test_session_policy_core.c src/session_policy_co
 	./test-session-policy-core
 test-session-boundaries:
 	$(PYTHON) tests/test_session_boundaries.py
+	$(PYTHON) tests/test_session_operations_harness.py
 check: test-session-policy-core test-session-boundaries
 
 runtime test-adapters: src/session_core.h src/session_state.h

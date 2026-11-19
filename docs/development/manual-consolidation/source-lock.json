@@ -1,6 +1,6 @@
 {
   "LICENSE": "fb981668c18a279e285fc4d83fba1e836cc84dd4daa73c9697d3cfd2d8aca6e0",
-  "Makefile": "5f14544dfa9eaada157ca8c419b639245d898e6090904d904fc447a635d98864",
+  "Makefile": "e98214d52e004c40335b7612268cc4eab1e72981c8f3b2dbcb79e45efcda222e",
   "boards.example.conf": "4bd1a17ecf3966d3829510e8495a1362fb8b922cd754badccc739f5e5ab0bde8",
   "ci/build-freebsd-package.sh": "4e62899471d1f1a6c44e00a783c1aff771332140704ae778da95a95048474108",
   "debian/changelog": "8f3574a094f5a3677a9a7188e530ecdbdc006138b082b57243ca8441c644114d",
@@ -228,7 +228,7 @@
   "src/connection_protocol.h": "a497663d9dbf2652c795c8394fea1b38bb66f304ba629780d2bac33484aae667",
   "tests/test_connection_core.c": "2efb380fdfc520e697bef8edb70e476d60f23cf838a992075cbb83e10124d5e0",
   "tests/test_stage57.py": "c1ea9a6a665387c5ebc4f42e75688f4c31fb8ffd702cc9a4a99b7f478d558f8f",
-  "tests/test_adapters.c": "f52148fd7c636d5092b8d74c11fe41a9bfeb10417f1fbafe520aa725c5c94c80",
+  "tests/test_adapters.c": "d4d93ce8dececac870d1d5d569cd112ca2eab153fd1269d5020f7eb3526e1486",
   "src/notification_core.c": "05f93d1b102bd276649c68cc385799f8e43fab559003200c84b5bceeca8d726d",
   "src/notification_core.h": "637cde7c1ffd893ff380c83f41ffef0f3732872b2a4c014273d0d0cc90c90de9",
   "tests/test_notification_core.c": "c9b5d4cfdb30ed385abc928a1b05ebf1d148915e2a5ab76b0b2ee1a8288cf4fe",
@@ -316,6 +316,7 @@
   "src/session_core.h": "b7616aa8a9e4e4122fc36bb2ac5102b527da8ea1215f86ee20e92caa97c7342a",
   "src/session_state.h": "6f19ea390f7a6c89d924302df9e4efd2305f190d0c35f3c3c6a9256598b7ae2e",
   "tests/test_session_core.c": "541a7aefaf85a0e465839ed370f12edd0c8afa19ef2e6bccaaa62b5a083695a2",
-  "tests/test_session_operations.c": "fad0c62a627a9513150997f074936e93000f27886d3eda0af211a1c5f7c55183",
-  "tests/test_session_operations.py": "e9d93452dc01b86b80d9c962319e5ee98ca01f267058d6592ef9232a5eb451ec"
+  "tests/test_session_operations.c": "66a66f81b64429194c9c89951748a815e0590c7db71a1a3d251c00c49bd7802e",
+  "tests/test_session_operations.py": "240ade5c9aecbbd22ff7b5f89c5d8970dfc1b4ef9adb9602916b52cba9a7c79a",
+  "tests/test_session_operations_harness.py": "5ab850cdf1846889e6218c5eed5ec8d26f32633426059e3b148d6e9a4436f006"
 }

@@ -121,3 +121,26 @@ The production implementation correctly refused it. Correct the positive fixture
 retain an explicit rejection assertion for the malformed body, and make the guest
 ACL-denial fixture syntactically valid as well. No production validation, timeout
 or test assertions are weakened. Full corrected runtime validation is pending CI.
+
+At 0b19a4136a7c71669efdf17658e5204e436813cf, Linux run 44441148867
+passed the existing adapter tests but the new test timed out in exchange(). That
+log did not identify the operation. Source review found that its same-process
+board_stop()/board_start() sequence retained the worker's static ending flag;
+the service lifecycle starts a new process instead. Do not infer a production
+restart failure from that unsupported test lifecycle.
+
+The harness now runs a seed process to register, post, send mail and test ACLs,
+waits for its successful shutdown, then starts a separate verifier on the same
+store. The seed reports its actual article/mail IDs; the verifier authenticates
+again and checks both original IDs, titles and bodies. No globals or memory
+indexes carry across restart. A failed seed or invalid ID manifest prevents the
+verifier from starting. Either child's failure or timeout fails the test.
+
+Each worker operation and start/stop boundary has a flushed diagnostic containing
+phase, operation name and numeric result IDs. A request timeout additionally
+identifies operation/action, session/slot and pending state. Credentials and
+message bodies are never included. The existing 30-second operation deadline and
+120-second child watchdog are retained. Harness unit tests cover failure and
+timeout propagation; Linux compatibility runs the actual two-process store test.
+Production code, data formats, validation and permissions are unchanged by this
+test correction. The corrected runtime result must be tied to its own CI SHA.
