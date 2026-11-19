@@ -48,8 +48,7 @@ void session_impl_page_next(Session *s) {
     else session_impl_page_clear(s);
 }
 
-void session_impl_emit(Session *s,const char *text) {
-    if(s->connection.binary) { session_impl_binary_frame(s,'T',text,strlen(text));return; }
+void session_rtbbs_emit(Session *s,const char *text) {
     char formatted[CONTENT_DISPLAY];
     if(s->presentation.ui.enabled) {
         if(!ui_format(&s->presentation.ui,text,formatted,sizeof(formatted))) { session_abort(s); return; }
@@ -59,7 +58,7 @@ void session_impl_emit(Session *s,const char *text) {
     } else session_impl_queue_text(s,text);
 }
 
-void session_impl_show_menu(Session *s,int explicit_request) {
+void session_rtbbs_menu(Session *s,int explicit_request) {
     if(s->presentation.classic_area) {
         unsigned part=s->presentation.classic_area==CM_BOARD?(s->presentation.ui.view==UI_ARTICLE?1:0):s->presentation.classic_area==CM_SETTINGS?2:s->presentation.classic_area==CM_PROFILE?3:s->presentation.ui.admin?4:5;
         static const MessageId fallback[]={MSG_CLASSIC_BOARD_MENU,MSG_CLASSIC_READER_MENU,MSG_CLASSIC_SETTINGS_MENU,MSG_CLASSIC_PROFILE_MENU,MSG_CLASSIC_ADMIN_MENU,MSG_CLASSIC_SIGOP_MENU};
@@ -70,7 +69,7 @@ void session_impl_show_menu(Session *s,int explicit_request) {
     s->presentation.menu_shown=1;
 }
 
-void session_impl_prompt(Session *s) {
+void session_rtbbs_prompt(Session *s) {
     if(s->reading.reader.automatic || s->connection.door || s->conversation.memo_input || s->auth.application.step || (s->editor.editing && s->editor.editor_input==4))return;
     if(!s->connection.zmodem && !s->conversation.chatting && !s->connection.binary && s->presentation.ui.enabled && s->core.active && !s->core.pending && !s->core.closing && !s->core.wake && !s->presentation.page[0]) {
         if(s->presentation.game_menu && !s->editor.editing && !s->auth.password_mode) { session_impl_queue_text(s,s->presentation.ui.language==LANGUAGE_JA?"ゲーム [番号:起動 Enter/L:一覧 0:主画面] > ":"Games [number:play Enter/L:list 0:main] > ");return; }
@@ -97,7 +96,7 @@ void session_impl_prompt(Session *s) {
     }
 }
 
-void session_impl_show_help(Session *s,const char *topic) {
+void session_rtbbs_help(Session *s,const char *topic) {
     static const char *names[]={"", "READ", "UNREAD", "POST", "DRAFT", "SETTINGS", "ACCOUNT", "ADMIN", "CONTENT", "PROFILE", "FILES", "CHAT", "TALK", "MAIL", "GATHER", "SIGOP", "EDITOR", "ADMINMEMBERS", "ADMINBOARDS", "ADMINFILES", "ADMINCONNECTIONS", "ADMINSTORAGE"};
     static const MessageId ids[]={MSG_HELP_INDEX,MSG_HELP_READ,MSG_HELP_UNREAD,MSG_HELP_POST,
                                   MSG_HELP_DRAFT,MSG_HELP_SETTINGS,MSG_HELP_ACCOUNT,MSG_HELP_ADMIN,MSG_HELP_CONTENT,MSG_HELP_PROFILE,MSG_HELP_FILES,MSG_HELP_CHAT,MSG_HELP_CHAT,MSG_HELP_MAIL,MSG_HELP_GATHER,MSG_HELP_SIGOP,MSG_EDITOR_HELP,MSG_HELP_ADMINMEMBERS,MSG_HELP_ADMINBOARDS,MSG_HELP_ADMINFILES,MSG_HELP_ADMINCONNECTIONS,MSG_HELP_ADMINSTORAGE};

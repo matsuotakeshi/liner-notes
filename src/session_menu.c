@@ -224,8 +224,8 @@ void session_impl_command(Session *s,char *line) {
     session_impl_prompt(s);
 }
 
-void session_door_finish(Session *s) {
-    s->connection.door=0;session_impl_queue_text(s,s->presentation.ui.language==LANGUAGE_JA?"\r\nゲーム終了。BBSへ戻ります。\r\n":"\r\nGame ended. Back to BBS.\r\n");
+void session_rtbbs_door_finish(Session *s) {
+    session_impl_queue_text(s,s->presentation.ui.language==LANGUAGE_JA?"\r\nゲーム終了。BBSへ戻ります。\r\n":"\r\nGame ended. Back to BBS.\r\n");
     if(s->presentation.game_menu && s->core.user && !s->core.closing) { session_impl_command_core(s,"GAMES");session_impl_prompt(s);return; }
     if(s->presentation.ui.enabled)session_impl_show_menu(s,0);
     session_impl_prompt(s);

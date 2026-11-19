@@ -153,3 +153,10 @@ PR #128 correction verification: commit 2bf4af75109bfbaa2d03cbf1e044624cdf78bbec
 passed Linux compatibility run 44443314770 on Rocky 9 and AlmaLinux 9 and all
 nine applicable Hosted workflows. Merged as a082f9484d0949bdd7953e1cd64631b06c40999d.
 This evidence does not substitute for CI on subsequent boundary changes.
+
+## RTBBS adapter follow-up
+
+The registered UI receiver now calls `session_core_receive` before delivering a
+typed view and the trusted compatibility result to RTBBS. See
+[RTBBS UI adapter](RTBBS_UI_ADAPTER.md) for callback lifetime, selection policy,
+safety barriers and remaining multi-UI integration work.

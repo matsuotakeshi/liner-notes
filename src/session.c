@@ -28,8 +28,6 @@
 #include <limits.h>
 #include <openssl/crypto.h>
 
-static NotificationAudience notification_audience(const Session *s);
-
 void session_abort(Session *s) { session_core_abort(&s->core); }
 
 void session_dimensions(Session *s,unsigned columns,unsigned rows) {
@@ -59,12 +57,20 @@ void session_impl_submit(Session *s,BoardRequest *q) {
     else if(result!=SESSION_OPERATION_ACCEPTED)session_impl_emit(s,"ERR board busy\r\n");
 }
 
+int session_init_ui(Session *s,SessionIO io,unsigned long id,int slot,int boards,int members,int menu,Language language,const SessionUiConfig *config) {
+    SessionUiConfig defaults=session_ui_default();
+    if(!config)config=&defaults;
+    memset(s,0,sizeof(*s));
+    if(!session_ui_config_valid(config) || !io.write)return 0;
+    s->ui_binding.config=*config;s->ui_binding.active=config->adapters[config->default_index];
+    s->connection.io=io;session_core_init(&s->core,id,slot,boards,members);
+    s->connection.binary_allowed=1;session_dimensions(s,80,24);
+    s->ui_binding.active->enter(s,1,menu,language);
+    return s->core.active;
+}
+
 void session_init(Session *s,SessionIO io,unsigned long id,int slot,int boards,int members,int menu,Language language) {
-    memset(s,0,sizeof(*s)); s->connection.io=io;s->presentation.menu_mode=1;s->reading.check.automatic=menu; session_core_init(&s->core,id,slot,boards,members);
-    s->connection.binary_allowed=1; s->presentation.ui.language=language;
-    char greeting[128]; snprintf(greeting,sizeof(greeting),"RTBBS-PROBE %lu\r\n",id); session_impl_queue_text(s,greeting);
-    session_dimensions(s,80,24);
-    if(menu) { s->presentation.ui.enabled=1; session_impl_queue_text(s,banner_text());session_impl_queue_text(s,login_text(0));session_impl_queue_text(s,login_text(1));session_impl_show_menu(s,1); session_impl_prompt(s); }
+    (void)session_init_ui(s,io,id,slot,boards,members,menu,language,NULL);
 }
 
 void session_dispose(Session *s) { connector_block_clear(&s->connection.connector_block);session_core_abort(&s->core);chat_disconnect(s->core.id);OPENSSL_cleanse(s,sizeof(*s)); }
@@ -73,59 +79,13 @@ int session_ready(const Session *s) { return s->core.active && !s->core.wake && 
 
 int session_secret(const Session *s) { return s->auth.password_mode!=0; }
 
-static NotificationAudience notification_audience(const Session *s) {
-    unsigned blocked=(s->connection.door?NOTICE_DOOR:0)|(s->connection.binary?NOTICE_BINARY:0)|(s->connection.zmodem?NOTICE_TRANSFER:0)|
-        (s->auth.password_mode?NOTICE_SECRET:0)|(s->core.pending?NOTICE_PENDING:0)|(s->presentation.page[0]?NOTICE_PAGE:0)|
-        (s->editor.editing?NOTICE_EDITOR:0)|(s->core.wake?NOTICE_TIMER:0)|
-        ((s->presentation.ui.input || s->presentation.classic_input || s->mail_state.mail_input || s->mail_state.mail.delete_id)?NOTICE_INPUT:0)|
-        (s->conversation.chatting?NOTICE_CHAT:0)|(s->reading.reader.active?NOTICE_SCAN:0);
-    return (NotificationAudience){s->core.user,blocked,s->core.active,s->core.closing,s->presentation.ui.enabled,s->connection.binary_menu};
-}
-
-void session_mail_notify(Session *s,uint32_t user,int deny,uint32_t revision) {
-    notification_mail_preference(&s->conversation.notifications,s->core.user,user,deny,revision);
-}
-
-void session_mail_arrived(Session *s,uint32_t recipient) {
-    NotificationAudience audience=notification_audience(s);
-    notification_mail_arrived(&s->conversation.notifications,&audience,recipient);
-}
-
-void session_announce(Session *s,const char *text) {
-    NotificationAudience audience=notification_audience(s);
-    notification_announce(&s->conversation.notifications,&audience,text);
-}
-
-void session_tick(Session *s,uint64_t now) {
-    if(!s->core.connected_at)s->core.connected_at=now;
-    if(check_traversal_auto_ready(&s->reading.check,s->presentation.page[0]!=0,s->core.pending,s->core.closing,1) && (!s->connection.io.drained || s->connection.io.drained(s->connection.io.context))) { session_impl_extended_command(s,"CHECK DONE");return; }
-    if(s->reading.reader.automatic && s->core.active && !s->core.pending) {
-        if(s->reading.reader.active && s->reading.scan.cursor)session_impl_submit(s,&s->reading.scan);
-        else { s->reading.reader.automatic=0;session_impl_prompt(s); }
-    }
-    s->core.now=now;
-    if(s->editor.editing && s->editor.editor_upload && now>=s->editor.editor_deadline && !s->core.pending) { s->editor.editor_upload=0;s->editor.editor_input=0;session_impl_queue_text(s,s->presentation.ui.language==LANGUAGE_JA?"受信終了。編集を続けられます。\r\n":"Text received. Continue editing.\r\n");session_impl_prompt(s); }
-    NotificationAudience audience=notification_audience(s);
-    const char *announcement=notification_announcement_peek(&s->conversation.notifications,&audience);
-    if(announcement) { session_impl_queue_text(s,announcement);notification_announcement_clear(&s->conversation.notifications); }
-    /* A failed announcement write may abort the session before mail delivery. */
-    audience=notification_audience(s);
-    uint32_t arrivals=notification_mail_take(&s->conversation.notifications,&audience);
-    if(arrivals) {
-        char text[256];snprintf(text,sizeof(text),ui_text(&s->presentation.ui,MSG_MAIL_ARRIVED),arrivals);
-        s->conversation.chat_notice=1;session_impl_queue_text(s,text);s->conversation.chat_prompting=1;session_impl_prompt(s);s->conversation.chat_prompting=0;s->conversation.chat_notice=0;
-    }
-    if(connector_block_expired(&s->connection.connector_block,now)) { connector_block_clear(&s->connection.connector_block);session_abort(s);return; }
-    if(s->connection.binary && connector_reader_expired(&s->connection.binary_reader,now)) { session_abort(s);return; }
-    if(s->core.active && s->core.wake && now>=s->core.wake) { s->core.wake=0; session_impl_emit(s,"AWAKE\r\n"); session_impl_prompt(s); }
-}
 
 int session_line(Session *s,const char *text,size_t size,uint64_t now) {
     if(!session_ready(s)) return 0;
     if(size>ln_limit("INPUT",INPUT_LINE_MAX) || memchr(text,0,size)) { session_abort(s); return 0; }
     char line[INPUT_LINE_MAX+1]; memcpy(line,text,size); line[size]=0; s->core.now=now;
     if(session_impl_connector_line(s,line,size)) { OPENSSL_cleanse(line,sizeof(line));return 1; }
-    session_impl_normalize_command(s,line,size);session_impl_command(s,line); OPENSSL_cleanse(line,sizeof(line)); return 1;
+    s->ui_binding.active->line(s,line,size); OPENSSL_cleanse(line,sizeof(line)); return 1;
 }
 
 void session_revoke(Session *s) {

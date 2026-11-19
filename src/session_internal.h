@@ -9,6 +9,16 @@
 #include "session.h"
 #include "editor_core.h"
 #include "chat.h"
+
+/* RTBBS implementation callbacks; shared entry points dispatch through session_ui. */
+void session_rtbbs_result(Session *,const OperationResult *,SessionResultView,uint64_t,int);
+void session_rtbbs_tick(Session *,uint64_t);
+void session_rtbbs_emit(Session *,const char *);
+void session_rtbbs_prompt(Session *);
+void session_rtbbs_menu(Session *,int);
+void session_rtbbs_help(Session *,const char *);
+int session_rtbbs_uppercase(const Session *,const char *,size_t);
+void session_rtbbs_door_finish(Session *);
 enum { CI_NONE, CI_DATE, CI_AUTHOR, CI_HANDLE, CI_PROFILE, CI_PROFILE_SEARCH,
        CI_MEMO, CI_WITHDRAW, CI_HEADER, CI_TITLE, CI_OWNER, CI_EDITOR, CI_MENUMODE, CI_ROWS,
        CI_FILEINFO, CI_DOWNLOAD, CI_UPLOAD, CI_EXIT, CI_PROTOCOL, CI_FILENAME, CI_FILESIZE, CI_BATCH, CI_BATCH_ADD, CI_BATCH_REMOVE, CI_BATCH_MATCH,CI_PROF_FIELD,CI_PROF_VALUE,CI_SEARCH_FIELD,CI_SEARCH_VALUE,CI_BATCH_CLEAR,CI_SEND_PROTOCOL,CI_FILE_ACTION,CI_FILE_DESC,CI_FILE_DELETE,CI_PROF_TARGET,CI_PROF_NEXT,CI_BATCH_COPY };

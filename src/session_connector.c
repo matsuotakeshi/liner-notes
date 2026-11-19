@@ -56,7 +56,7 @@ static ClassicInput classic_input_state(const Session *s) {
         .line_editor=s->editor.editor_line,.editor_input=s->editor.editor_input,.mail_mode=s->mail_state.mail_mode};
 }
 
-int session_uppercase(const Session *s,const char *line,size_t size) {
+int session_rtbbs_uppercase(const Session *s,const char *line,size_t size) {
     ClassicInput state=classic_input_state(s);return classic_input_uppercase(&state,line,size);
 }
 

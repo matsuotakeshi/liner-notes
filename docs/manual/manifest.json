@@ -892,7 +892,11 @@
         "tests/test_session_core.c",
         "tests/test_session_operations.c",
         "src/operation.h",
-        "src/operation_pages.h"
+        "src/operation_pages.h",
+        "src/session_ui.h",
+        "src/session_ui.c",
+        "src/session_rtbbs.c",
+        "tests/test_session_ui.c"
       ]
     },
     {
