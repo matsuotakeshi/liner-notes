@@ -13,8 +13,8 @@ RuntimeDirectory=liner-notes-door-isolation
 RuntimeDirectoryMode=0755
 StateDirectory=liner-notes-door-isolation
 StateDirectoryMode=0711
-ExecStartPre=@PYTHON@ -E -s -B @PREFIX@/share/liner-notes/scripts/door_isolation.py --config /etc/liner-notes/door-isolation.json --check-config
-ExecStart=@PYTHON@ -E -s -B @PREFIX@/share/liner-notes/scripts/door_isolation.py --config /etc/liner-notes/door-isolation.json
+ExecStartPre=@PREFIX@/libexec/liner-notes/door-isolation --config /etc/liner-notes/door-isolation.json --check-config
+ExecStart=@PREFIX@/libexec/liner-notes/door-isolation --config /etc/liner-notes/door-isolation.json
 Restart=no
 # Workers revoke their leases and reap descendants when the parent pipe closes.
 # Do not kill them part-way through cleanup or delete the persistent slot files.

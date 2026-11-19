@@ -31,7 +31,7 @@ def run(*args, check=True):
 
 def fixture_denials(text):
     """Export only AVC records for the dedicated fixture, never other audit data."""
-    domain = re.compile(r'\bscontext=[^\s:]+:[^\s:]+:liner_notes(?:_(?:web|link|admin|door|transfer))?_t:')
+    domain = re.compile(r'\bscontext=[^\s:]+:[^\s:]+:liner_notes(?:_(?:web|link|admin|door|transfer|broker|isolation|consumer))?_t:')
     for line in text.splitlines():
         if re.search(r'\btype=(?:AVC|1400)\s', line) and re.search(r'\bavc:\s+denied\s', line) and domain.search(line):
             yield line[:4096]
@@ -64,7 +64,8 @@ class Fixture:
         # ROOT.parent is the helper's root-only work directory, never ci-test data.
         temporary = self.record.with_suffix('.new')
         with temporary.open('x', encoding='utf8') as stream:
-            json.dump({'fixture': str(self.path), 'units': self.units, 'ports': self.ports}, stream)
+            json.dump({'fixture': str(self.path), 'units': self.units, 'ports': self.ports,
+                       'door_slot_uids': getattr(self, 'door_slot_uids', [])}, stream)
             stream.flush()
             os.fsync(stream.fileno())
         temporary.chmod(0o600)
@@ -655,6 +656,8 @@ def main():
         asyncio.run(bbs_probe(port, False))
         fixture.stop(unit)
         fixture.results.append({'bbs': 'Telnet/articles/mail/SQLite restart', 'door': 'PTY/normal/abnormal/disconnect/MAC denial'})
+        from ci.selinux_door_services import acceptance
+        acceptance(fixture, run)
         assert run('getenforce').stdout.strip() == 'Enforcing'
     finally:
         fixture.close()

@@ -47,7 +47,10 @@ def config_read(path):
         if uid in used or uid in (bbs,broker) or (slot['door'],slot['node']) in pairs:raise Rejected('slot isolation')
         used.add(uid);pairs.add((slot['door'],slot['node']))
         secure_path(slot['exe'],0)
-        if not os.access(slot['exe'],os.X_OK) or not Path(slot['cwd']).is_absolute() or not Path(slot['cwd']).is_dir():raise Rejected('slot path')
+        # A writable game directory is intentional; writable ancestors or a
+        # symlink controlled by another identity are not an isolation boundary.
+        secure_path(slot['cwd'],uid,True)
+        if not os.access(slot['exe'],os.X_OK):raise Rejected('slot path')
     if used!=set(policy['door_uids']):raise Rejected('Broker slot identities differ')
     if used&set(policy['consumers']):raise Rejected('consumer/slot identity collision')
     return config

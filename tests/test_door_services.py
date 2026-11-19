@@ -1,5 +1,6 @@
 """Service preflight is read-only; readiness verifies a live local peer."""
 import os
+import json
 from pathlib import Path
 import stat
 import subprocess
@@ -60,6 +61,38 @@ class Readiness(unittest.TestCase):
         for role in ('broker','isolation'):
             subprocess.run(['sh','-n',str(ROOT/'ports/comms/liner-notes/files'/('liner_notes_door_'+role+'.in'))],check=True)
 
+
+@unittest.skipUnless(os.name=='posix','Unix policy admission')
+class WorkingDirectory(unittest.TestCase):
+    def test_policy_checks_owner_and_ancestors_before_start(self):
+        slot=dict(door=1,node=1,uid=50,gid=50,exe='/fixed/game',cwd='/slots/50',
+                  level=0,seconds=30,drop=True,auth=True)
+        config=dict(bbs_uid=20,socket='/run/isolation/socket',socket_gid=20,
+                    broker_config='/fixed/broker',state_dir='/state',slots=[slot])
+        policy=dict(bbs_uid=20,broker_uid=30,socket='/run/broker/socket',door_uids=[50],consumers={40:[1]})
+        source=Mock();source.read_text.return_value=json.dumps(config)
+        calls=[]
+        def secure(path,owner,directory=False):
+            calls.append((str(path),owner,directory))
+            if str(path)==slot['cwd']:raise ValueError('unsafe ownership or permissions')
+            return source
+        with patch.object(isolation,'secure_path',side_effect=secure),patch.object(isolation,'broker_configuration',return_value=policy),patch.object(isolation.os,'access',return_value=True):
+            with self.assertRaisesRegex(ValueError,'unsafe ownership'):isolation.config_read('/fixed/config')
+        self.assertIn(('/slots/50',50,True),calls)
+
+    def test_directory_symlink_writable_parent_and_foreign_owner_are_rejected(self):
+        # Virtual stat tree gives deterministic ownership tests without chown.
+        for bad in ('symlink','parent-write','owner'):
+            def stat_path(path):
+                target=str(path)
+                mode=stat.S_IFDIR|0o755;uid=0
+                if target=='/slots/50':
+                    uid=60 if bad=='owner' else 50
+                    if bad=='symlink':mode=stat.S_IFLNK|0o777
+                if target=='/slots' and bad=='parent-write':mode|=0o020
+                return Mock(st_mode=mode,st_uid=uid)
+            with patch.object(Path,'lstat',autospec=True,side_effect=stat_path):
+                with self.assertRaisesRegex(ValueError,'unsafe ownership'):broker.secure_path('/slots/50',50,True)
 
 class RcLifecycle(unittest.TestCase):
     def process(self,base):

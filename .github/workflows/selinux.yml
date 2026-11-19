@@ -6,6 +6,11 @@ on:
       - 'tests/test_release_manifest.py'
       - 'linux/selinux/**'
       - 'ci/selinux*'
+      - 'linux/door-*.in'
+      - 'linux/liner-notes-door-*.service'
+      - 'scripts/door*.py'
+      - 'tests/test_door*.py'
+      - 'scripts/install-linux.py'
       - 'tests/test_selinux*'
       - '.github/workflows/selinux.yml'
   push:
@@ -15,6 +20,11 @@ on:
       - 'tests/test_release_manifest.py'
       - 'linux/selinux/**'
       - 'ci/selinux*'
+      - 'linux/door-*.in'
+      - 'linux/liner-notes-door-*.service'
+      - 'scripts/door*.py'
+      - 'tests/test_door*.py'
+      - 'scripts/install-linux.py'
       - 'tests/test_selinux*'
       - '.github/workflows/selinux.yml'
   workflow_dispatch:
@@ -42,7 +52,8 @@ jobs:
         run: |
           python3 tests/test_selinux_policy.py
           python3 tests/test_selinux_root.py
-          python3 -m py_compile ci/selinux_native.py ci/selinux_root.py
+          python3 tests/test_selinux_door_services.py
+          python3 -m py_compile ci/selinux_native.py ci/selinux_root.py ci/selinux_door_services.py
           mkdir -p build/selinux
           docker run --rm -e SOURCE_SHA="$GITHUB_SHA" -v "$GITHUB_WORKSPACE:/source:ro" -v "$GITHUB_WORKSPACE/build/selinux:/out" \
             rockylinux/rockylinux:10 bash -euc '

@@ -1,7 +1,9 @@
 # Door Broker implementation review, 2026-11-19
 
-This is the implementer's review, not an independent security sign-off. PR #135
-remains Draft. No production activation or private-host PR execution occurred.
+This is the implementer's review, not an independent security sign-off. The
+initial findings below describe the PR #135 candidate at the time of review;
+later sections record subsequent changes, not retrospective proof for that SHA.
+No production activation or private-host PR execution occurred.
 
 | Finding | Change | Evidence to require |
 | --- | --- | --- |
@@ -55,3 +57,25 @@ admitted CI jail hostname and jail flag. The normal non-root native tests only
 signal their own isolated reaper subtree. A platform skip is not a success for
 that platform. Exact Actions results belong to the PR/check SHA, not an earlier
 candidate. No existing successful result is reassigned to this revision.
+
+## Linux service and MAC candidate
+
+Current grouped work adds labelled fixed entrypoints, separate Broker/supervisor/
+consumer domains, compiled-policy deny checks, opt-in installation contracts and
+an adapter running the existing full Door scenario through systemd on trusted
+main. See [operation and recovery](DOOR_LINUX_OPERATIONS.md). Working-directory
+admission now rejects unsafe ancestors, symlinks and foreign ownership. No
+runtime reset or fallback was introduced.
+
+The 128-member/eight-generation and concurrent-handler tests exercise bounded
+state growth, capacity refusal, lease preservation and final cleanup. They do not
+simulate host-wide exhaustion. Existing fault injection remains. Security checks
+cover no Broker/BBS impersonation, one-use tickets, per-mutation expiry, UID/FD
+separation, and MAC refusal; root compromise is outside this boundary.
+
+Validation still required for this revision: Hosted policy compilation and RPM
+lifecycle, same-SHA native systemd/Enforcing lifecycle, and independent security
+review. The updated native helper's protected-domain list requires an explicitly
+authorized installed-helper refresh, never bypassing its workflow hash check.
+The native mock consumer is not AREA-PC88: real-game evidence must name both
+source SHAs and cannot be inferred from a synthetic game or an earlier run.

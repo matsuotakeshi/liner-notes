@@ -25,10 +25,31 @@ for permission, expected in [('getopt', True), ('setopt', False), ('connectto', 
 for domain, target in [('liner_notes_web_t', 'liner_notes_data_t'),
                        ('liner_notes_web_t', 'liner_notes_link_secret_t'),
                        ('liner_notes_door_t', 'liner_notes_data_t'),
-                       ('liner_notes_transfer_t', 'liner_notes_data_t')]:
+                       ('liner_notes_transfer_t', 'liner_notes_data_t'),
+                       ('liner_notes_broker_t', 'liner_notes_data_t'),
+                       ('liner_notes_isolation_t', 'liner_notes_data_t'),
+                       ('liner_notes_consumer_t', 'liner_notes_data_t'),
+                       ('liner_notes_door_t', 'liner_notes_isolation_state_t')]:
     rules = subprocess.check_output(['sesearch', '--allow', '-s', domain,
                                      '-t', target, '-c', 'file', '-p', 'read'], text=True)
     assert not rules.strip(), (domain, target, rules)
+for source, target, expected in [
+    ('liner_notes_isolation_t','liner_notes_broker_t',True),
+    ('liner_notes_consumer_t','liner_notes_broker_t',True),
+    ('liner_notes_t','liner_notes_isolation_t',True),
+    ('liner_notes_door_t','liner_notes_consumer_t',True),
+    ('liner_notes_t','liner_notes_broker_t',False),
+    ('liner_notes_door_t','liner_notes_broker_t',False),
+    ('liner_notes_door_t','liner_notes_isolation_t',False),
+    ('liner_notes_consumer_t','liner_notes_isolation_t',False),
+]:
+    rules=subprocess.check_output(['sesearch','--allow','-s',source,'-t',target,
+                                  '-c','unix_stream_socket','-p','connectto'],text=True)
+    assert bool(rules.strip()) == expected, (source,target,rules)
+for domain in ('liner_notes_broker_t','liner_notes_consumer_t'):
+    rules=subprocess.check_output(['sesearch','--allow','-s',domain,'-c','capability'],text=True)
+    assert not rules.strip(), (domain,rules)
+
 PY
 semanage fcontext -a -t var_lib_t '/var/lib/liner-notes-local-policy-fixture(/.*)?'
 semanage fcontext -l -C > /tmp/labels-before

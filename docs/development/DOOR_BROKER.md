@@ -92,7 +92,7 @@ be a member of that group to create the socket with that GID.
 ```json
 {
   "bbs": "my-bbs", "bbs_uid": 65001, "broker_uid": 65002,
-  "socket": "/run/liner-broker/broker.sock", "socket_gid": 65003,
+  "socket": "/run/liner-notes-door-broker/broker.sock", "socket_gid": 65003,
   "door_uids": [65004, 65005], "consumers": {"65003": [1]}
 }
 ```
@@ -102,15 +102,15 @@ Isolation JSON, root-owned. The second slot follows the same pattern with node
 
 ```json
 {
-  "bbs_uid": 65001, "socket": "/run/liner-isolation/control.sock",
-  "socket_gid": 65001, "broker_config": "/etc/liner-notes/broker.json",
-  "state_dir": "/run/liner-isolation/state",
+  "bbs_uid": 65001, "socket": "/run/liner-notes-door-isolation/control.sock",
+  "socket_gid": 65001, "broker_config": "/etc/liner-notes/door-broker.json",
+  "state_dir": "/var/lib/liner-notes-door-isolation",
   "slots": [
     {"door": 1, "node": 1, "uid": 65004, "gid": 65004,
-     "exe": "/usr/local/libexec/my-lobby-wrapper", "cwd": "/var/lib/my-lobby/slot1",
+     "exe": "/usr/local/libexec/my-lobby-wrapper", "cwd": "/var/lib/liner-notes-door-slots/slot1",
      "level": 0, "seconds": 3600, "drop": true, "auth": true},
     {"door": 1, "node": 2, "uid": 65005, "gid": 65005,
-     "exe": "/usr/local/libexec/my-lobby-wrapper", "cwd": "/var/lib/my-lobby/slot2",
+     "exe": "/usr/local/libexec/my-lobby-wrapper", "cwd": "/var/lib/liner-notes-door-slots/slot2",
      "level": 0, "seconds": 3600, "drop": true, "auth": true}
   ]
 }
@@ -139,8 +139,10 @@ Broker socket group as the consumer group's actual GID. Do not reuse slot groups
 for BBS, Broker or game-server data.
 
 Before any future service activation, verify accounts, fixed wrapper paths,
-private data permissions, local policy and SELinux labels. SELinux domain policy,
-Solaris SMF definitions and actual systemd/SMF lifecycle tests remain pending.
+private data permissions, local policy and SELinux labels. The Linux service and
+SELinux candidate is described in [Linux operation and recovery](DOOR_LINUX_OPERATIONS.md);
+its new native tests are not success evidence until the exact main SHA passes.
+Solaris isolation and SMF lifecycle remain unimplemented.
 FreeBSD rc samples and a jail lifecycle test are added below; their native
 acceptance is pending for this candidate. This is **not a production runbook**.
 

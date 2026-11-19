@@ -176,7 +176,7 @@ def main():
         finally:
             # Do not unload a policy while any test child remains in its domain.
             domains = command('/usr/bin/ps', '-eZ').stdout
-            if re.search(r':liner_notes(?:_(?:web|link|admin|door|transfer))?_t:', domains):
+            if re.search(r':liner_notes(?:_(?:web|link|admin|door|transfer|broker|isolation|consumer))?_t:', domains):
                 raise RuntimeError('Confined process remains: keep policy and evidence for recovery')
             if installed:
                 command('/usr/sbin/semodule', '-X', '200', '-r', 'liner_notes')
