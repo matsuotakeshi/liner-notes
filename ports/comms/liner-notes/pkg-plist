@@ -442,3 +442,4 @@ bin/liner-notes-serial
 %%DATADIR%%/scripts/door_broker.py
 %%DATADIR%%/scripts/door_isolation.py
 %%DATADIR%%/scripts/door_auth_client.py
+%%DATADIR%%/scripts/door_processes.py

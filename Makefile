@@ -642,3 +642,4 @@ runtime: src/door_isolation.inc
 check: test-door-broker
 test-door-broker:
 	$(PYTHON) tests/test_door_broker.py
+	$(PYTHON) tests/test_door_processes.py

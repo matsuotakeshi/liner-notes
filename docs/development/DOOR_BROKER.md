@@ -73,8 +73,15 @@ terminal I/O and NAWS resize use the same PTY API.
 
 Reference APIs: [Linux subreaper](https://man7.org/linux/man-pages/man2/PR_SET_CHILD_SUBREAPER.2const.html),
 [FreeBSD reaper](https://man.freebsd.org/cgi/man.cgi?query=procctl).
-The FreeBSD API needs a separate implementation and native rejection/cleanup
-verification; it is not substituted with a Linux assumption.
+The FreeBSD candidate now uses its own reaper/no-new-privileges implementation,
+with native own-descendant tests in `make check` and the privileged integration
+in the existing trusted-main disposable package-upgrade jail. Neither is a
+FreeBSD success claim until that exact SHA passes. PID enumeration is used only
+for refusing already-occupied UIDs; signalling uses the kernel reaper subtree.
+Solaris peer identity uses `getpeerucred`/`ucred_geteuid`, with native socket checks
+in `make check`. Its launcher still rejects activation: process contracts and
+privilege-limit handling are not implemented. Do not substitute killpg or a
+same-UID launcher. See [Oracle peer credentials](https://docs.oracle.com/cd/E88353_01/html/E37843/getpeerucred-3c.html).
 
 ## Example policies (development only)
 
@@ -118,8 +125,42 @@ is for an existing unauthenticated game, but it still runs under an isolated UID
 DORINFO1.DEF, LINER_USER_ID/USER/DOOR_ID/DOOR_NODE, PTY and game-menu return remain.
 
 The candidate scripts are invoked explicitly with `--config`; package copying
-does not provision accounts or start daemons. Linux systemd/SELinux units and
-FreeBSD/Solaris supervisors are pending; this is **not a production runbook**.
+does not provision accounts or start daemons. Linux installs two reviewable
+systemd examples under `share/liner-notes/door-services/`, outside the systemd
+unit search path. They are syntax-checked in hosted CI, not boot-tested by it.
+The Broker uses `liner_notes_broker` with supplementary `liner_notes_games`;
+the launcher runs as root with a bounded capability set, no-new-privileges and
+write access to `/var/lib/liner-notes-door-slots`. Numeric JSON identities must
+match provisioned users/groups; examples do not create these or per-slot folders.
+The launcher state must be `/var/lib/liner-notes-door-isolation` (0711), with
+its socket in `/run/liner-notes-door-isolation`. Broker socket belongs in
+`/run/liner-notes-door-broker`. Configure BBS socket group as `liner_notes` and
+Broker socket group as the consumer group's actual GID. Do not reuse slot groups
+for BBS, Broker or game-server data.
+
+Before any future service activation, verify accounts, fixed wrapper paths,
+private data permissions, local policy and SELinux labels. SELinux domain policy,
+FreeBSD rc/SMF service definitions and actual service lifecycle tests remain
+pending. This is **not a production runbook**.
+
+### Stop and crash reservations
+
+Each worker watches a parent-owned pipe. Parent termination, including SIGKILL,
+closes that pipe; workers revoke the issuer connection and clean up their Door
+descendants. The normal parent stop waits for workers. No forced worker kill is
+used as a successful cleanup shortcut. The systemd example uses `KillMode=process`,
+`SendSIGKILL=no`, an infinite stop timeout and no automatic restart for this reason.
+
+A root-owned slot lock also contains a persistent BUSY marker, written/fsynced
+before launch and cleared only after proven cleanup. Abnormal worker death or a
+cleanup API failure leaves the marker; a restart refuses that slot even if flock
+is no longer held. Never delete/recreate lock files while workers can exist.
+An administrator must establish all services/worker descendants are stopped and
+the dedicated UID has no processes before clearing a retained reservation through
+the same locked inode. Automated recovery/reset is intentionally absent. Prefer
+a persistent state directory; do not let service cleanup erase it while children
+may survive. After a complete host reboot no old processes survive, but markers
+still require an explicit review rather than silent reset.
 
 ## Validation and incomplete scope
 
@@ -130,7 +171,15 @@ real Broker/supervisor/BBS processes and Telnet games, checks independent player
 identity, private dropfiles, leases, detached children and no legacy fallback.
 It never runs on private CI hosts and does not provision production accounts.
 
-Still required: native FreeBSD isolation backend, Solaris strategy, SELinux policy
-for new services, production service packaging, actual AREA-PC88 integration,
-persistent-game-server restart fixture, broader timeout/kill/resize stress and
-security review. Do not mark LN-38 complete or deploy this candidate yet.
+Added integration assertions: NAWS reaches the isolated PTY, every mutation
+rechecks member/lease authority, replay and other-member operations are rejected,
+game-server restart preserves committed SQLite data, parent service stop removes
+detached children, and stale BUSY markers prevent reuse. These are a synthetic
+game fixture, **not AREA-PC88 acceptance**. See [AREA-PC88 handoff](DOOR_AREA_PC88_HANDOFF.md).
+
+Still required: exact-SHA native FreeBSD isolated-launch results, Solaris process
+contracts/privilege backend, SELinux policy, complete OS service lifecycle tests,
+AREA-PC88-side integration and independent security review. Additional crash,
+resource-exhaustion and timeout stress are not complete. User manual acceptance
+is not used to substitute for these development tests. Do not mark LN-38 complete
+or deploy this candidate yet.

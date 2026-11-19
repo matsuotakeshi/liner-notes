@@ -1,5 +1,5 @@
 /* Optional local isolation service. All launches use it when configured. */
-#ifdef __linux__
+#if defined(__linux__) || defined(__FreeBSD__)
 #include <sys/socket.h>
 #include <sys/un.h>
 #include <sys/time.h>
@@ -16,8 +16,13 @@ static Door *isolated_start(const DoorSpec *g,unsigned level,uint32_t user,const
     struct sockaddr_un address={0};address.sun_family=AF_UNIX;strcpy(address.sun_path,isolation_socket);
     struct timeval limit={3,0};setsockopt(fd,SOL_SOCKET,SO_RCVTIMEO,&limit,sizeof(limit));setsockopt(fd,SOL_SOCKET,SO_SNDTIMEO,&limit,sizeof(limit));
     if(connect(fd,(struct sockaddr *)&address,sizeof(address))) { close(fd);return NULL; }
+#ifdef __FreeBSD__
+    uid_t uid;gid_t gid;
+    if(getpeereid(fd,&uid,&gid) || uid!=0) { close(fd);return NULL; }
+#else
     struct { pid_t pid;uid_t uid;gid_t gid; } peer; socklen_t length=sizeof(peer);
     if(getsockopt(fd,SOL_SOCKET,SO_PEERCRED,&peer,&length) || length!=sizeof(peer) || peer.uid!=0) { close(fd);return NULL; }
+#endif
     unsigned char random[16];if(RAND_bytes(random,sizeof(random))!=1) { close(fd);return NULL; }
     char session[64],hexname[65];
     for(unsigned i=0;i<16;i++)snprintf(session+2*i,3,"%02x",random[i]);
@@ -49,7 +54,7 @@ static int isolation_enabled(void) { return 0; }
 static Door *isolated_start(const DoorSpec *g,unsigned l,uint32_t u,const char *n,unsigned c,unsigned r,uint64_t t,unsigned long s,uint32_t epoch) { (void)s;(void)epoch;(void)g;(void)l;(void)u;(void)n;(void)c;(void)r;(void)t;return NULL; }
 #endif
 static int isolated_done(Door *d) {
-#ifdef __linux__
+#if defined(__linux__) || defined(__FreeBSD__)
     char state[32];ssize_t n=recv(d->remote,state,sizeof(state),MSG_DONTWAIT);
     return n>=0 || (errno!=EAGAIN && errno!=EINTR);
 #else

@@ -155,7 +155,7 @@ int door_pump(Door *d,int (*write_bytes)(void *,const unsigned char *,size_t),vo
 void door_stop(Door *d) {
     if(!d)return;
     if(d->remote>=0) {
-#ifdef __linux__
+#if defined(__linux__) || defined(__FreeBSD__)
         shutdown(d->remote,SHUT_WR);
 #endif
         close(d->fd);d->fd=-1;d->next=reaping;reaping=d;doors_reap();return;

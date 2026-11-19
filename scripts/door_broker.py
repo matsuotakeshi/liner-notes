@@ -19,6 +19,18 @@ def peer_uid(sock):
         call=libc.getpeereid;call.argtypes=[ctypes.c_int,ctypes.POINTER(ctypes.c_uint),ctypes.POINTER(ctypes.c_uint)];call.restype=ctypes.c_int
         if call(sock.fileno(),ctypes.byref(uid),ctypes.byref(gid))!=0:raise OSError('peer credentials unavailable')
         return uid.value
+    if sys.platform.startswith('sunos'):
+        libc=ctypes.CDLL(None,use_errno=True);credential=ctypes.c_void_p()
+        get=libc.getpeerucred;get.argtypes=[ctypes.c_int,ctypes.POINTER(ctypes.c_void_p)];get.restype=ctypes.c_int
+        uid=libc.ucred_geteuid;uid.argtypes=[ctypes.c_void_p];uid.restype=ctypes.c_uint
+        free=libc.ucred_free;free.argtypes=[ctypes.c_void_p];free.restype=None
+        if get(sock.fileno(),ctypes.byref(credential))!=0:raise OSError('peer credentials unavailable')
+        if not credential.value:raise OSError('missing peer credentials')
+        try:
+            value=uid(credential)
+            if value==ctypes.c_uint(-1).value:raise OSError('invalid peer credentials')
+            return value
+        finally:free(credential)
     raise OSError('peer credentials unsupported on this OS')
 
 def secure_path(path,owner,directory=False):

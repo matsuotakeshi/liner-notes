@@ -1,14 +1,15 @@
 #!/usr/bin/env python3
-"""Opt-in Linux Door isolation supervisor; privileged local socket only.
+"""Opt-in Linux/FreeBSD Door isolation supervisor; privileged local socket only.
 
 Fixed root-owned policy selects binaries and dedicated slot UIDs. The BBS never
 supplies an executable or working directory. No privilege-changing executable
-is installed setuid. FreeBSD/Solaris backends are deliberately unavailable here.
+is installed setuid. Solaris remains disabled pending contract-based process isolation.
 """
-import argparse,array,contextlib,ctypes,fcntl,json,os,pty,resource,secrets,select,signal,socket,stat,struct,sys,time
+import argparse,array,contextlib,fcntl,json,os,pty,resource,secrets,select,signal,socket,stat,struct,sys,time
 from pathlib import Path
 from door_broker import peer_uid,secure_path,configuration as broker_configuration
 from door_broker_core import identity,positive,auth_generation
+from door_processes import Scope, processes, supported, no_new_privileges
 
 class Rejected(ValueError):pass
 
@@ -22,26 +23,6 @@ def read_line(sock):
     raise Rejected('request too long')
 
 def send(sock,value):sock.sendall(json.dumps(value,separators=(',',':')).encode()+b'\n')
-
-def processes(uid,terminate=False,sig=signal.SIGKILL):
-    """Pin each Linux task before checking UID/signalling: no recycled-PID kill."""
-    active=False
-    for entry in Path('/proc').iterdir():
-        if not entry.name.isdecimal():continue
-        handle=None
-        try:
-            handle=os.pidfd_open(int(entry.name))
-            status=(entry/'status').read_text()
-            values=next(line for line in status.splitlines() if line.startswith('Uid:')).split()[1:]
-            if uid not in map(int,values):continue
-            # Zombies cannot run/fork/read credentials and must not reserve a slot forever.
-            if next(line for line in status.splitlines() if line.startswith('State:')).split()[1]=='Z':continue
-            active=True
-            if terminate:signal.pidfd_send_signal(handle,sig)
-        except (ProcessLookupError,FileNotFoundError):pass
-        finally:
-            if handle is not None:os.close(handle)
-    return active
 
 def config_read(path):
     config=json.loads(secure_path(path,0).read_text(encoding='utf8'))
@@ -97,18 +78,23 @@ def slot_acquire(config,door,level):
         if not stat.S_ISREG(st.st_mode) or st.st_uid!=0 or st.st_nlink!=1 or st.st_mode&0o077:os.close(fd);raise Rejected('slot lock')
         try:fcntl.flock(fd,fcntl.LOCK_EX|fcntl.LOCK_NB)
         except BlockingIOError:os.close(fd);continue
-        if processes(slot['uid']):os.close(fd);continue
-        return slot,fd
+        try:
+            # Read reservation only after taking the lock; an earlier fstat can
+            # predate another worker's crash and otherwise reuse a dirty slot.
+            if os.fstat(fd).st_size or processes(slot['uid']):os.close(fd);continue
+            os.write(fd,b'BUSY\n');os.fsync(fd)
+            return slot,fd
+        except BaseException:os.close(fd);raise
     raise Rejected('no isolated slot')
 
-def supervise(config,connection):
-    slot=None;lock=None;issuer=None;master=None;slave=None;ticket_read=None;pid=None;run=None;phase="request"
+def supervise(config,connection,parent_watch=None):
+    slot=None;lock=None;issuer=None;master=None;slave=None;ticket_read=None;pid=None;run=None;scope=None;phase="request"
     try:
         connection.settimeout(3);request=read_line(connection);name=request_check(request)
         phase='slot'
         slot,lock=slot_acquire(config,request['door'],request['level'])
         # This supervisor is trusted, single-threaded, and owns one unique slot UID.
-        if ctypes.CDLL(None,use_errno=True).prctl(36,1,0,0,0)!=0:raise Rejected('subreaper unavailable')
+        scope=Scope(slot['uid'])
         token=None
         phase='broker'
         if slot['auth']:issuer,token=broker_open(config,request)
@@ -130,7 +116,7 @@ def supervise(config,connection):
         pid=os.fork()
         if pid==0:
             try:
-                os.setsid();import termios
+                os.setsid();signal.signal(signal.SIGTERM,signal.SIG_DFL);signal.signal(signal.SIGINT,signal.SIG_DFL);import termios
                 fcntl.ioctl(slave,termios.TIOCSCTTY,0)
                 for fd in (0,1,2):os.dup2(slave,fd)
                 if ticket_read is not None:os.dup2(ticket_read,3);os.set_inheritable(3,True)
@@ -138,7 +124,7 @@ def supervise(config,connection):
                 os.setgroups([]);os.setgid(slot['gid']);os.setuid(slot['uid'])
                 if os.getuid()!=slot['uid'] or os.geteuid()!=slot['uid']:os._exit(126)
                 # Prevent a Door from acquiring a different UID through setuid exec.
-                if ctypes.CDLL(None,use_errno=True).prctl(38,1,0,0,0)!=0:os._exit(126)
+                no_new_privileges()
                 resource.setrlimit(resource.RLIMIT_CORE,(0,0));resource.setrlimit(resource.RLIMIT_NOFILE,(64,64));resource.setrlimit(resource.RLIMIT_CPU,(slot['seconds'],slot['seconds']+1))
                 os.chdir(slot['cwd']);os.execve(slot['exe'],[slot['exe']],env)
             except BaseException:os._exit(126)
@@ -147,7 +133,7 @@ def supervise(config,connection):
         connection.sendmsg([b'OK\n'],[(socket.SOL_SOCKET,socket.SCM_RIGHTS,array.array('i',[master]))]);os.close(master);master=None
         connection.settimeout(None);until=time.monotonic()+slot['seconds']
         while time.monotonic()<until:
-            sockets=[connection]+([issuer] if issuer else [])
+            sockets=[connection]+([issuer] if issuer else [])+([parent_watch] if parent_watch is not None else [])
             readable,_,_=select.select(sockets,[],[],0.1)
             if readable:break # EOF, STOP, unexpected data or Broker death all revoke
             done,status=os.waitpid(pid,os.WNOHANG)
@@ -161,19 +147,11 @@ def supervise(config,connection):
         if issuer:issuer.close() # invalidate even consumed leases before cleanup
         for fd in (master,slave,ticket_read):
             if fd is not None:os.close(fd)
-        if slot:
-            if processes(slot['uid'],terminate=True,sig=signal.SIGHUP):time.sleep(0.25)
-            # Kill all tasks under the dedicated UID, including setsid/double forks.
-            # Keep the lease if cleanup is incomplete; never recycle it to a user.
-            while processes(slot['uid'],terminate=True):time.sleep(0.05)
-            while True:
-                try:
-                    child,_=os.waitpid(-1,os.WNOHANG)
-                    if child==0:time.sleep(0.02);continue
-                except ChildProcessError:break
+        if scope:scope.stop()
+        elif slot:raise Rejected('Cleanup scope unavailable; slot stays reserved')
         if run:
             with contextlib.suppress(OSError):(run/'DORINFO1.DEF').unlink();run.rmdir()
-        if lock is not None:os.close(lock)
+        if lock is not None:os.ftruncate(lock,0);os.fsync(lock);os.close(lock)
         with contextlib.suppress(OSError):connection.sendall(b'DONE\n')
         connection.close()
 
@@ -183,25 +161,46 @@ def termios_TIOCSWINSZ():
 
 def main():
     parser=argparse.ArgumentParser(description=__doc__);parser.add_argument('--config',required=True);args=parser.parse_args()
-    if not sys.platform.startswith('linux') or os.getuid()!=0 or not hasattr(os,'pidfd_open') or not hasattr(signal,'pidfd_send_signal'):parser.exit(1,'Isolation supervisor currently requires Linux, root and pidfd support.\n')
+    if not supported() or os.getuid()!=0:parser.exit(1,'Isolation requires root and a supported Linux/FreeBSD process backend.\n')
     resource.setrlimit(resource.RLIMIT_CORE,(0,0))
     config=config_read(args.config);endpoint=Path(config['socket'])
     if endpoint.exists() or endpoint.is_symlink():parser.exit(1,'Socket exists; verify the old supervisor is stopped.\n')
     listener=socket.socket(socket.AF_UNIX,socket.SOCK_STREAM);old=os.umask(0o077)
     try:listener.bind(str(endpoint))
     finally:os.umask(old)
-    os.chown(endpoint,0,config['socket_gid']);os.chmod(endpoint,0o660);listener.listen(32)
-    signal.signal(signal.SIGCHLD,signal.SIG_IGN)
+    inode=endpoint.lstat().st_ino
+    os.chown(endpoint,0,config['socket_gid']);os.chmod(endpoint,0o660);listener.listen(32);listener.settimeout(.25)
+    watch,alive=os.pipe();children=set();stopping=False
+    def stop(signum,frame):
+        nonlocal stopping
+        stopping=True
+    for sig in (signal.SIGTERM,signal.SIGINT):signal.signal(sig,stop)
+    def reap():
+        for child in list(children):
+            done,_=os.waitpid(child,os.WNOHANG)
+            if done:children.remove(child)
     try:
-        while True:
-            connection,_=listener.accept()
-            if peer_uid(connection)!=config['bbs_uid']:connection.close();continue
-            pid=os.fork()
-            if pid==0:
-                listener.close();signal.signal(signal.SIGCHLD,signal.SIG_DFL)
-                try:supervise(config,connection)
-                finally:os._exit(0)
-            connection.close()
-    finally:listener.close();endpoint.unlink(missing_ok=True)
+        while not stopping:
+            reap()
+            try:connection,_=listener.accept()
+            except socket.timeout:continue
+            try:
+                if peer_uid(connection)!=config['bbs_uid'] or len(children)>=len(config['slots'])+8:continue
+                pid=os.fork()
+                if pid==0:
+                    listener.close();os.close(alive)
+                    # Termination is driven by the parent pipe. A service stop must
+                    # not bypass finally/UID cleanup in these trusted workers.
+                    signal.signal(signal.SIGTERM,signal.SIG_IGN);signal.signal(signal.SIGINT,signal.SIG_IGN)
+                    try:supervise(config,connection,watch)
+                    finally:os._exit(0)
+                children.add(pid)
+            finally:connection.close()
+    finally:
+        listener.close();os.close(alive);os.close(watch)
+        if endpoint.exists() and endpoint.lstat().st_ino==inode:endpoint.unlink()
+        # Parent death also closes alive, revoking every worker. Do not forcibly
+        # kill a worker and silently make its slot reusable after partial cleanup.
+        while children:reap();time.sleep(.05)
 
 if __name__=='__main__':main()
