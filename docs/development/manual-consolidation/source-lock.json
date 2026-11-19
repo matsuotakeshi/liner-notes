@@ -334,9 +334,9 @@
   "scripts/door_broker_core.py": "94f2f5fa0747236f5d8592b10d63d5bae34767a0401a615de58c6398b712424c",
   "scripts/door_auth_client.py": "60d53e12159b6ca3ba8d5c8f359627340707dbcf6d497aedeb26717e9e52a588",
   "scripts/door_isolation.py": "0bd59aada047c1a02bba3f9a979afc20c48858137aafb03b98e7018f2233190d",
-  "scripts/door_processes.py": "9aa186c26b852159f91223b20bafdb2d05d4a9d99dbe4ad6e088ef315cde1f2a",
+  "scripts/door_processes.py": "b32cb7cff9b6bd5c40154c7a9f258fed826a634954f25f592018569ea26864f1",
   "src/door_isolation.inc": "8a9630b140e70713de21d2820a0fc639c9392f21d5a390900d32a824f743173e",
-  "tests/test_door_broker.py": "9a50ef3070bbf48883f24c385ade62c9c34e7ed33d646cfad6e8faae833b8b04",
-  "tests/test_door_broker_linux.py": "477db49a8b0407d8c602fa0bd470089d443e80106607c0a9d04d31e786ac4527",
-  "tests/test_door_processes.py": "8ae1bffe1a7e487bcf825caab88d16201a138897abc0e785823b3e1699b8507a"
+  "tests/test_door_broker.py": "26c3f339427cfba8edcf370059b997c83da237a4f75e2fa34d722c75a6e0dc9e",
+  "tests/test_door_broker_linux.py": "17e3335650bdbbf31d1140c38e3e991a89f8d5b5e3b9533f07a04c84e3c19a7e",
+  "tests/test_door_processes.py": "29da7e5a6c1d4b3b20042dddbea44ed45b14a51466890ec97074bb7c3c01b7bf"
 }

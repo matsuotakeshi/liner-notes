@@ -1,6 +1,6 @@
 """Root-only test in a hosted Linux container or an admitted disposable FreeBSD jail."""
 from pathlib import Path
-import contextlib,json,multiprocessing,os,re,shutil,signal,socket,sqlite3,subprocess,sys,tempfile,time
+import contextlib,fcntl,json,multiprocessing,os,re,shutil,signal,socket,sqlite3,stat,subprocess,sys,tempfile,time
 from test_board import Server
 from test_telnet import Client
 
@@ -17,6 +17,22 @@ def ready(path,process):
         if process.poll() is not None:raise AssertionError(('service exited during startup',process.stderr.read(2048)))
         time.sleep(.05)
     raise AssertionError('service startup timeout')
+
+def wait_for(predicate,message,seconds=8):
+    until=time.monotonic()+seconds
+    while time.monotonic()<until:
+        if predicate():return
+        time.sleep(.03)
+    raise AssertionError(message)
+
+def slot_released(state,uid,processes):
+    if processes(uid):return False
+    try:
+        with (state/('slot-'+str(uid))).open('rb') as lock:
+            try:fcntl.flock(lock,fcntl.LOCK_EX|fcntl.LOCK_NB)
+            except BlockingIOError:return False
+            return os.fstat(lock.fileno()).st_size==0
+    except FileNotFoundError:return True
 
 def game_server(path,broker,scripts):
     identity(GAME)();os.umask(0o077);sys.path.insert(0,str(scripts))
@@ -64,7 +80,11 @@ def run(binary):
     # Dedicated IDs must be unused; refuse collisions rather than kill other tests.
     sys.path.insert(0,str(ROOT/'scripts'))
     from door_isolation import processes
+    from door_processes import Scope
     for uid in (BBS,BROKER,GAME,SLOT1,SLOT2):assert not processes(uid),'fixture UID already active'
+    # Reap only this test's descendants if a deliberately killed worker leaves
+    # orphans. FreeBSD signalling stays within the kernel-owned reaper subtree.
+    fixture_scope=Scope(SLOT1)
     with tempfile.TemporaryDirectory(prefix='ln-broker-',dir='/var/run' if sys.platform.startswith('freebsd') else '/run') as tmp:
         p=Path(tmp);p.chmod(0o755);scripts=p/'scripts';scripts.mkdir()
         for name in ('door_broker.py','door_broker_core.py','door_isolation.py','door_auth_client.py','door_processes.py'):shutil.copy2(ROOT/'scripts'/name,scripts/name)
@@ -90,7 +110,7 @@ try:Path(PRIVATE_PATH).read_bytes()
 except PermissionError:pass
 else:raise AssertionError('Door read private BBS data')
 assert set(os.getgroups()) <= {os.getegid()}, 'supplementary groups inherited'
-print('AUTH '+str(claims['member'])+' UID '+str(os.getuid())+'\r\nKEY> ',end='',flush=True)
+print('AUTH '+str(claims['member'])+' UID '+str(os.getuid())+' WORKER '+str(os.getppid())+'\r\nKEY> ',end='',flush=True)
 while True:
     key=os.read(0,1)
     if key==b'q':break
@@ -116,7 +136,18 @@ while True:
         launch_conf.write_text(json.dumps(dict(bbs_uid=BBS,socket=str(isolation),socket_gid=BBS,broker_config=str(broker_conf),state_dir=str(state),slots=slots)))
         doors=p/'doors.conf';doors.write_text(f'1|0|30|{wrapper}|{p}|Authenticated fixture|dorinfo1:2\n')
         commands=[([sys.executable,str(scripts/'door_broker.py'),'--config',str(broker_conf)],identity(BROKER,[GAME])),([sys.executable,str(scripts/'door_isolation.py'),'--config',str(launch_conf)],None)]
-        services=[];clients=[];bbs=None;game=None
+        services=[];clients=[];bbs=None;game=None;crash_marker=None
+        def released():return all(slot_released(state,uid,processes) for uid in (SLOT1,SLOT2))
+        def start_launcher():
+            process=subprocess.Popen(commands[1][0],stdout=subprocess.DEVNULL,stderr=subprocess.PIPE)
+            services.append(process);ready(isolation,process)
+            return process
+        def lobby():
+            wait_for(released,'previous Door cleanup not complete')
+            out=clients[1].cmd('1',b'KEY> ')
+            assert b'AUTH 2 UID 64504' in out,'wrong member or reused occupied slot'
+            match=re.search(rb'WORKER (\d+)',out);assert match,'missing fixture worker identity'
+            return int(match[1])
         try:
             for args,pre in commands:
                 services.append(subprocess.Popen(args,preexec_fn=pre,stdout=subprocess.DEVNULL,stderr=subprocess.PIPE))
@@ -157,6 +188,7 @@ while True:
                 if query(game_socket,{})['active']==0:break
                 time.sleep(.03)
             assert query(game_socket,{})['active']==0
+            wait_for(released,'normal Door exit did not release reservations')
             # Game server restart preserves data, but cannot keep cached authority.
             game.terminate();game.join(5);assert not game.is_alive();game_socket.unlink()
             game=multiprocessing.Process(target=game_server,args=(game_socket,endpoint,scripts));game.start()
@@ -183,21 +215,87 @@ while True:
             assert dirty.read_bytes()==b'BUSY\n'
             # No fallback to a same-UID Door when the isolation service is down.
             out=clients[1].cmd('1',b'0:main] > ');assert b'AUTH ' not in out
+            # The hand-written dirty reservation above has never owned a process.
+            # Restore only that synthetic value before exercising real crashes.
+            with dirty.open('r+b') as lock:
+                fcntl.flock(lock,fcntl.LOCK_EX|fcntl.LOCK_NB);lock.truncate(0)
+
+            # A short policy deadline must revoke a live lease and stop detached
+            # descendants even when the BBS listing advertises a longer duration.
+            for slot in slots:slot['seconds']=3
+            policy=json.loads(launch_conf.read_text());policy['slots']=slots
+            launch_conf.write_text(json.dumps(policy))
+            launcher=start_launcher();lobby()
+            clients[1].send(b'f');clients[1].until(b'KEY> ')
+            clients[1].until(b'0:main] > ')
+            wait_for(released,'policy timeout left reserved/live Door')
+            assert query(game_socket,{})['active']==0
+            launcher.terminate();launcher.wait(timeout=10)
+            for slot in slots:slot['seconds']=30
+            policy['slots']=slots;launch_conf.write_text(json.dumps(policy))
+
+            # SIGKILL bypasses the parent's finally. Its inherited watch pipe
+            # must still revoke worker authority and reclaim detached games.
+            for cycle in range(2):
+                launcher=start_launcher();inode=isolation.lstat().st_ino;lobby()
+                clients[1].send(b'f');clients[1].until(b'KEY> ')
+                launcher.kill();launcher.wait(timeout=5)
+                clients[1].until(b'0:main] > ')
+                wait_for(released,'killed supervisor left live/reserved Door')
+                assert query(game_socket,{})['active']==0
+                assert query(game_socket,{})['players']==[[1,1],[2,2]]
+                # Explicit recovery of this fixture's orphan socket only, after
+                # parent death and proven cleanup. Do not reset reservation files.
+                st=isolation.lstat();assert stat.S_ISSOCK(st.st_mode) and st.st_ino==inode
+                isolation.unlink()
+
+            # Losing the cleanup worker is different: revoke its lease, retain
+            # BUSY, and refuse reuse while a detached game may still exist.
+            launcher=start_launcher();worker=lobby()
+            clients[1].send(b'f');clients[1].until(b'KEY> ')
+            parent=subprocess.check_output(['ps','-p',str(worker),'-o','ppid='],text=True).strip()
+            assert parent==str(launcher.pid),'fixture worker parent changed'
+            os.kill(worker,signal.SIGKILL)
+            clients[1].until(b'0:main] > ')
+            wait_for(lambda:query(game_socket,{})['active']==0,'dead worker lease survived')
+            crash_marker=state/('slot-'+str(SLOT1))
+            assert crash_marker.read_bytes()==b'BUSY\n','worker crash silently released reservation'
+            assert processes(SLOT1),'detached fixture did not survive worker loss'
+            with crash_marker.open('rb') as lock:
+                fcntl.flock(lock,fcntl.LOCK_EX|fcntl.LOCK_NB)
+            try:slot_acquire({'slots':[slots[0]],'state_dir':str(state)},1,0)
+            except Rejected:pass
+            else:raise AssertionError('real crashed worker slot reused')
+            assert crash_marker.read_bytes()==b'BUSY\n'
         finally:
+            cleanup_errors=[]
             for c in clients:
                 with contextlib.suppress(OSError):c.close()
-            if bbs:bbs.close()
-            if game:game.terminate();game.join(5)
+            if bbs:
+                try:bbs.close()
+                except Exception as error:cleanup_errors.append(('bbs',type(error).__name__))
+            if game:
+                game.terminate();game.join(5)
+                if game.is_alive():
+                    game.kill();game.join(5);cleanup_errors.append(('game','stop timeout'))
             for process in services:
                 if process.poll() is None:process.terminate()
-                process.wait(timeout=5)
-                errors=process.stderr.read(2048)
-                if errors:print('Service diagnostics:',errors.decode('utf8','replace'),flush=True)
+                try:process.wait(timeout=5)
+                except subprocess.TimeoutExpired:
+                    process.kill();process.wait(timeout=5);cleanup_errors.append(('service','stop timeout'))
+            # Reclaim adopted fixture orphans before reading stderr pipes to EOF.
+            fixture_scope.stop()
             for uid in (SLOT1,SLOT2):
                 for _ in range(50):
                     if not processes(uid,terminate=sys.platform.startswith('linux')):break
                     time.sleep(.03)
                 assert not processes(uid),'fixture process cleanup failed'
-    print('PASS isolated Door: two authenticated members, UID separation, dropfile, one-use API, disconnect/descendant cleanup, lease revocation, no legacy fallback, NAWS, per-mutation ACL, replay rejection, persistent game restart, supervisor stop')
+            if crash_marker:
+                assert crash_marker.read_bytes()==b'BUSY\n','orphan cleanup erased crash evidence'
+            for process in services:
+                errors=process.stderr.read(2048)
+                if errors:print('Service diagnostics:',errors.decode('utf8','replace'),flush=True)
+            assert not cleanup_errors,cleanup_errors
+    print('PASS isolated Door: identity/ACL, PTY, persistence, graceful stop, policy deadline, repeated supervisor SIGKILL, worker SIGKILL revocation and durable refusal')
 
 if __name__=='__main__':run(str(Path(sys.argv[1]).resolve()))

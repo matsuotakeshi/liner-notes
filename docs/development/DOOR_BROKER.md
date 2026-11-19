@@ -183,3 +183,61 @@ AREA-PC88-side integration and independent security review. Additional crash,
 resource-exhaustion and timeout stress are not complete. User manual acceptance
 is not used to substitute for these development tests. Do not mark LN-38 complete
 or deploy this candidate yet.
+
+### Crash lifecycle regression expansion
+
+The existing privileged fixture now additionally asserts:
+
+- A short supervisor policy deadline revokes authority and stops detached games,
+  even when the BBS listing has a longer time limit.
+- Two successive parent SIGKILL/restart cycles close the inherited watch pipe,
+  revoke leases, reclaim descendants and preserve committed synthetic game data.
+- SIGKILL of a cleanup worker revokes its issuer connection but retains BUSY.
+  A deliberately detached child remains possible: the slot must be rejected,
+  not silently marked clean. The test's outer reaper then removes only fixture
+  descendants, and the BUSY evidence must still remain.
+- Readiness means both no slot processes and an unlocked, empty reservation.
+  Process exit alone is earlier than the reaper grace period and is insufficient.
+
+An orphan supervisor socket is removed only in the disposable fixture, after
+parent death, verified child cleanup, socket-type and inode checks. This is not
+an automatic production recovery implementation. The manually inserted dirty
+marker from the older test is cleared under its existing lock before the real
+crash scenario; a real crashed worker's marker is never cleared.
+
+Portable protocol tests cover oversized/truncated/non-object requests, capacity
+recovery on issuer disconnect and consumed-lease revocation on task cancellation.
+The issuer test waits for the actual blocked reader rather than counting event
+loop ticks. Local Windows execution covers these portable tests only; Unix peer
+and FreeBSD reaper checks are explicitly platform-specific.
+
+No new CI environment is introduced: `ci/linux.sh` runs the expanded fixture in
+Hosted Linux containers, and `ci/freebsd_upgrade_jail.py` runs it in the existing
+trusted-main disposable jail. Added assertions are not OS success evidence until
+the corresponding exact-SHA CI passes. Broader resource-exhaustion, service,
+Solaris isolation and independent security review remain outstanding. These
+synthetic tests do not publish or replace private game-specific evidence.
+
+Manual review: `docs/manual/external-games.md` and `docs/manual/security.md`
+retain the distinction between stable legacy Doors and opt-in development
+isolation. This test-only change does not alter commands, ACL, activation,
+configuration or recovery policy; public instructions require no behavior edit.
+
+### FreeBSD UID inventory correction
+
+Main `f91a5ef` failed run `44495450243` before the first isolated Door launch,
+inside `processes(uid)`. The jail receipt says `link` because the Broker test
+shares that phase; it was not a failure of BBS link synchronization. The private
+failure log identifies `Cannot establish slot UID availability`.
+
+FreeBSD's [ps format parser](https://github.com/freebsd/freebsd-src/blob/releng/15.0/bin/ps/keyword.c#L395-L405)
+treats the rest of an argument after `=` as the column header. Consequently
+`-o uid=,ruid=,svuid=` does not request three headerless UID columns. Use repeated
+`-o uid= -o ruid= -o svuid=`. Keep strict three-column numeric parsing and refusal
+on missing/malformed output; do not skip unknown rows or assume an empty slot.
+
+The regression tests retain rejection of the old single-column/header output
+and add a native, unprivileged self-UID inventory check to `make check`. The
+existing privileged jail fixture still has to pass after trusted-main integration.
+This correction does not change permissions, process signalling or activation
+policy. Stable user instructions remain unchanged; no production host was used.
