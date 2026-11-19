@@ -18,6 +18,7 @@
 #include "session.h"
 #include "ssh_transport.h"
 #include "doors.h"
+#include "door_diagnostics.h"
 #include "door_lock.h"
 #include "store_limits.h"
 #include "chat.h"
@@ -175,7 +176,7 @@ static void service_result(BoardResult *r) {
         if(!r->service_number) { doors_list(r->service_next,r->text,sizeof(r->text));return; }
         if(r->slot<0 || r->slot>=SLOTS) return;
         Connection *c=&connections[r->slot];Session *s=&c->app;
-        if(c->fd==INVALID || s->core.id!=r->session || !s->core.user || s->core.closing || !s->connection.binary_allowed || c->door) { (r->feedback.failed=1,strcpy(r->text,"ERR game unavailable\r\n"));return; }
+        if(c->fd==INVALID || s->core.id!=r->session || !s->core.user || s->core.closing || !s->connection.binary_allowed || c->door) { door_launch_diagnostic("session-admission",0);(r->feedback.failed=1,strcpy(r->text,"ERR game unavailable\r\n"));return; }
         c->door=door_start(r->service_number,r->service_next,s->core.user,s->core.username,s->connection.columns,s->connection.rows,now_ms(),s->core.id,s->core.user_epoch);
         if(!c->door) { r->feedback.failed=1;strcpy(r->text,errno==EBUSY?"ERR game busy\r\n":"ERR game unavailable\r\n");return; }
         s->connection.door=1;c->used=0;terminal_clear(&c->terminal);session_scan_pause(s);

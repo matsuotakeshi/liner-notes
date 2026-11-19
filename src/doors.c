@@ -11,6 +11,7 @@
 #include "door_core.h"
 #include "door_config.h"
 #include "door_protocol.h"
+#include "door_diagnostics.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -98,9 +99,9 @@ void doors_list(unsigned level,char *out,size_t size) {
     door_protocol_list(&listing,out,size);
 }
 Door *door_start(unsigned id,unsigned level,uint32_t user,const char *name,unsigned columns,unsigned rows,uint64_t now,unsigned long session,uint32_t epoch) {
-    errno=0;if(!user || geteuid()==0)return NULL;doors_reap();errno=0;
+    errno=0;if(!user || geteuid()==0) { door_launch_diagnostic("identity",0);return NULL; }doors_reap();errno=0;
     const DoorSpec *g=door_core_launch(&catalog,id,level,user,geteuid()==0);
-    if(!g)return NULL;
+    if(!g) { door_launch_diagnostic("catalog-permission",0);return NULL; }
     if(isolation_enabled())return isolated_start(g,level,user,name,columns,rows,now,session,epoch);
     Door *d=calloc(1,sizeof(*d));if(!d)return NULL;d->lock=-1;d->fd=-1;d->remote=-1;
     unsigned node=0;

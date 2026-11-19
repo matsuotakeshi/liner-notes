@@ -11,41 +11,47 @@ int doors_isolation_config(const char *path) {
 }
 static int isolation_enabled(void) { return *isolation_socket!=0; }
 static Door *isolated_start(const DoorSpec *g,unsigned level,uint32_t user,const char *name,unsigned columns,unsigned rows,uint64_t now,unsigned long bbs_session,uint32_t epoch) {
-    if(!bbs_session || strlen(name)>32)return NULL;
-    int fd=socket(AF_UNIX,SOCK_STREAM|SOCK_CLOEXEC,0);if(fd<0)return NULL;
+    if(!bbs_session || strlen(name)>32) { door_launch_diagnostic("isolation-request",0);return NULL; }
+    int fd=socket(AF_UNIX,SOCK_STREAM|SOCK_CLOEXEC,0);if(fd<0) { door_launch_diagnostic("isolation-socket",errno);return NULL; }
     struct sockaddr_un address={0};address.sun_family=AF_UNIX;strcpy(address.sun_path,isolation_socket);
     struct timeval limit={3,0};setsockopt(fd,SOL_SOCKET,SO_RCVTIMEO,&limit,sizeof(limit));setsockopt(fd,SOL_SOCKET,SO_SNDTIMEO,&limit,sizeof(limit));
-    if(connect(fd,(struct sockaddr *)&address,sizeof(address))) { close(fd);return NULL; }
+    if(connect(fd,(struct sockaddr *)&address,sizeof(address))) { door_launch_diagnostic("isolation-connect",errno);close(fd);return NULL; }
 #ifdef __FreeBSD__
     uid_t uid;gid_t gid;
-    if(getpeereid(fd,&uid,&gid) || uid!=0) { close(fd);return NULL; }
+    if(getpeereid(fd,&uid,&gid)) { door_launch_diagnostic("isolation-peer-query",errno);close(fd);return NULL; }
+    if(uid!=0) { door_launch_diagnostic("isolation-peer",0);close(fd);return NULL; }
 #else
     struct { pid_t pid;uid_t uid;gid_t gid; } peer; socklen_t length=sizeof(peer);
-    if(getsockopt(fd,SOL_SOCKET,SO_PEERCRED,&peer,&length) || length!=sizeof(peer) || peer.uid!=0) { close(fd);return NULL; }
+    if(getsockopt(fd,SOL_SOCKET,SO_PEERCRED,&peer,&length)) { door_launch_diagnostic("isolation-peer-query",errno);close(fd);return NULL; }
+    if(length!=sizeof(peer) || peer.uid!=0) { door_launch_diagnostic("isolation-peer",0);close(fd);return NULL; }
 #endif
-    unsigned char random[16];if(RAND_bytes(random,sizeof(random))!=1) { close(fd);return NULL; }
+    unsigned char random[16];if(RAND_bytes(random,sizeof(random))!=1) { door_launch_diagnostic("isolation-random",0);close(fd);return NULL; }
     char session[64],hexname[65];
     for(unsigned i=0;i<16;i++)snprintf(session+2*i,3,"%02x",random[i]);
     snprintf(session+32,sizeof(session)-32,".%lu",bbs_session);
     for(size_t i=0;i<strlen(name);i++) { snprintf(hexname+2*i,3,"%02x",(unsigned char)name[i]); }hexname[2*strlen(name)]=0;
     char request[512];int n=snprintf(request,sizeof(request),"{\"door\":%u,\"user\":%u,\"level\":%u,\"columns\":%u,\"rows\":%u,\"namehex\":\"%s\",\"session\":\"%s\",\"generation\":%u}\n",g->id,user,level,columns,rows,hexname,session,epoch);
-    if(n<0 || n>=(int)sizeof(request)) { close(fd);return NULL; }
+    if(n<0 || n>=(int)sizeof(request)) { door_launch_diagnostic("isolation-encode",0);close(fd);return NULL; }
     size_t sent=0;
-    while(sent<(size_t)n) { ssize_t count=send(fd,request+sent,(size_t)n-sent,MSG_NOSIGNAL);if(count<0 && errno==EINTR)continue;if(count<=0) { close(fd);return NULL; }sent+=(size_t)count; }
+    while(sent<(size_t)n) { ssize_t count=send(fd,request+sent,(size_t)n-sent,MSG_NOSIGNAL);if(count<0 && errno==EINTR)continue;if(count<=0) { door_launch_diagnostic("isolation-send",errno);close(fd);return NULL; }sent+=(size_t)count; }
     char reply[3];struct iovec data={reply,sizeof(reply)};
     union { struct cmsghdr align;char bytes[CMSG_SPACE(sizeof(int)*4)]; } control;
     memset(&control,0,sizeof(control));struct msghdr message={0};message.msg_iov=&data;message.msg_iovlen=1;message.msg_control=control.bytes;message.msg_controllen=sizeof(control.bytes);
-    ssize_t received=recvmsg(fd,&message,MSG_CMSG_CLOEXEC|MSG_WAITALL);int master=-1,count=0;
+    ssize_t received=recvmsg(fd,&message,MSG_CMSG_CLOEXEC|MSG_WAITALL);int receive_error=received<0?errno:0;int master=-1,count=0;
     for(struct cmsghdr *c=CMSG_FIRSTHDR(&message);c;c=CMSG_NXTHDR(&message,c)) {
         if(c->cmsg_level==SOL_SOCKET && c->cmsg_type==SCM_RIGHTS && c->cmsg_len>=CMSG_LEN(0)) {
             size_t size=c->cmsg_len-CMSG_LEN(0);int *fds=(int *)CMSG_DATA(c);
             for(size_t i=0;i<size/sizeof(int);i++) { if(count++==0)master=fds[i];else close(fds[i]); }
         }
     }
-    if(received!=3 || memcmp(reply,"OK\n",3) || count!=1 || !isatty(master) || (message.msg_flags&(MSG_CTRUNC|MSG_TRUNC))) { if(master>=0)close(master);close(fd);return NULL; }
-    Door *d=calloc(1,sizeof(*d));if(!d) { close(master);close(fd);return NULL; }
+    if(received!=3 || memcmp(reply,"OK\n",3) || count!=1 || !isatty(master) || (message.msg_flags&(MSG_CTRUNC|MSG_TRUNC))) {
+        const char *phase=received!=3?"isolation-receive":memcmp(reply,"OK\n",3)?"isolation-rejected":count!=1?"isolation-fd-count":(message.msg_flags&(MSG_CTRUNC|MSG_TRUNC))?"isolation-truncated":"isolation-pty";
+        door_launch_diagnostic(phase,received<0?receive_error:0);
+        if(master>=0) { close(master); }close(fd);return NULL;
+    }
+    Door *d=calloc(1,sizeof(*d));if(!d) { door_launch_diagnostic("isolation-allocation",errno);close(master);close(fd);return NULL; }
     d->fd=master;d->remote=fd;d->lock=-1;d->until=now+(uint64_t)g->seconds*1000;
-    if(fcntl(master,F_SETFL,O_NONBLOCK) || fcntl(fd,F_SETFL,O_NONBLOCK)) { close(master);close(fd);free(d);return NULL; }
+    if(fcntl(master,F_SETFL,O_NONBLOCK) || fcntl(fd,F_SETFL,O_NONBLOCK)) { door_launch_diagnostic("isolation-nonblocking",errno);close(master);close(fd);free(d);return NULL; }
     return d;
 }
 #else

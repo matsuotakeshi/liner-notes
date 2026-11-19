@@ -90,6 +90,15 @@ class Units(unittest.TestCase):
                     for line in ('KillMode=process','SendSIGKILL=no','TimeoutStopSec=infinity'):
                         self.assertIn(line,text)
 
+    def test_launch_diagnostics_are_enabled_only_in_fixture_bbs_unit(self):
+        backend = services.Backend.__new__(services.Backend)
+        backend.base = Path('/fixture'); backend.ids = {'bbs':20, 'consumer':40}
+        with patch.object(services, 'Process') as process:
+            for role, domain in [('bbs','liner_notes_t'), ('consumer','liner_notes_consumer_t')]:
+                backend.unit(role, ['/fixed/entry'], domain)
+                text = process.call_args.args[2]
+                self.assertEqual('Environment=LINER_DOOR_DIAGNOSTICS=1' in text, role == 'bbs')
+
 
 class SocketReadiness(unittest.TestCase):
     def setUp(self):
