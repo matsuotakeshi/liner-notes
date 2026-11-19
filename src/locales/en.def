@@ -490,3 +490,4 @@ MESSAGE(ERR_LINK_DENIED, "Shared-board linking is not allowed for this account o
 MESSAGE(ERR_LINK_SYNTAX, "Invalid shared-board link input.")
 MESSAGE(ERR_LINK_PREDECESSOR, "Article or preceding revision unavailable. Check link state.")
 MESSAGE(ERR_LINK_STORAGE, "Link storage uncertain. Administrator inspection is required.")
+MESSAGE(ERR_UI_SELECTION, "Invalid UI name. Use UI to list available interfaces.")

@@ -366,6 +366,8 @@ int main(int argc,char **argv) {
     const char *chat_log=NULL;char chat_default[4096];
     int structured_database=0;const char *limits_path=NULL,*database_path=NULL;
     const char *timezone="UTC",*site_info="sysinfo.txt",*site_bye="goodbye.txt";
+    const char *ui_policy="FIXED",*ui_default="rtbbs",*ui_allowed="rtbbs";
+    SessionUiConfig ui_config=session_ui_default();
     const char *login_directory=".";
     const char *id_prefix="u",*id_first="";unsigned id_digits=6;
     const char *banner_path="banner.txt",*menu_directory="menus",*bind_address="127.0.0.1",*vault_directory=NULL; int menu_required=0;
@@ -445,17 +447,24 @@ int main(int argc,char **argv) {
         else if(!strcmp(argv[1],"--banner") && argc>2) { banner_path=argv[2];argc-=2;argv+=2; }
         else if(!strcmp(argv[1],"--help-dir") && argc>2) { help_directory=argv[2];help_required=1;argc-=2;argv+=2; }
         else if(!strcmp(argv[1],"--menu-dir") && argc>2) { menu_directory=argv[2]; menu_required=1; argc-=2; argv+=2; }
+        else if((!strcmp(argv[1],"--ui-policy") || !strcmp(argv[1],"--ui-default") || !strcmp(argv[1],"--ui-allow")) && argc>2) {
+            if(!strcmp(argv[1],"--ui-policy"))ui_policy=argv[2];
+            else if(!strcmp(argv[1],"--ui-default"))ui_default=argv[2];
+            else ui_allowed=argv[2];
+            argc-=2;argv+=2;
+        }
         else if(!strcmp(argv[1],"--menu")) { menu_mode=1; argc--; argv++; }
         else if(!strcmp(argv[1],"--telnet")) { terminal_mode=TERMINAL_TELNET; argc--; argv++; }
         else if(!strcmp(argv[1],"--lang") && argc>2 && language_parse(argv[2],&default_language)) { argc-=2; argv+=2; }
         else { fprintf(stderr,"invalid option; use --zmodem-helper FILE, --vault-dir DIR, --bind IPv4, --menu-dir DIR, --menu, --telnet, --lang ja|en and/or --admins FILE\n"); return 2; }
     }
+    if(!session_ui_configure(&ui_config,ui_policy,ui_default,ui_allowed)) { fprintf(stderr,"invalid UI policy/default/allowlist\n");return 2; }
     char *end=NULL;
     if(doors_path && !door_lock_init(program)) { fprintf(stderr,"Door lock helper missing or unsafe\n");return 2; }
     if(!doors_config(doors_path)) { fprintf(stderr,"invalid doors configuration\n");return 2; }
     long port=(argc>=2 && argc<=5) ? strtol(argv[1],&end,10) : -1;
     if(port<0 || port>65535 || !end || end==argv[1] || *end) {
-        fprintf(stderr,"usage: runtime [--ssh-port PORT --ssh-host-key FILE] [--ssh-bind IPv4] [--ssh-member-keys FILE] [--ssh-attempts N] [--ssh-timeout SECONDS] [--database FILE | --database-structured FILE] [--level-seconds LEVEL:SECONDS] [--time-warning N] [--time-grace N] [--userlog-public] [--userlog-keep N] [--idle-seconds N] [--user-log FILE|-] [--gather-count N] [--chat-log FILE|-] [--max-articles N] [--max-mail N] [--max-user-posts N] [--banner FILE] [--disable chat|mail|vault] [--registration open|approval|closed] [--id-mode free|auto] [--id-prefix PREFIX] [--id-digits 1..8] [--id-first NAME] [--rtbbs-member-policy] [--login-text-dir DIR] [--registration-form simple|detailed] [--door-isolation-socket FILE] [--doors FILE] [--link-accounts FILE] [--zmodem-helper FILE] [--vault-dir DIR] [--bind IPv4] [--menu] [--menu-dir DIR] [--help-dir DIR] [--telnet] [--lang ja|en] [--admins FILE] PORT [BOARD_FILE [MEMBERS_FILE [CATALOG_FILE]]] (default bind: 127.0.0.1)\n"); return 2;
+        fprintf(stderr,"usage: runtime [--ui-policy FIXED|MEMBERS|ALL] [--ui-default NAME] [--ui-allow NAME,...] [--ssh-port PORT --ssh-host-key FILE] [--ssh-bind IPv4] [--ssh-member-keys FILE] [--ssh-attempts N] [--ssh-timeout SECONDS] [--database FILE | --database-structured FILE] [--level-seconds LEVEL:SECONDS] [--time-warning N] [--time-grace N] [--userlog-public] [--userlog-keep N] [--idle-seconds N] [--user-log FILE|-] [--gather-count N] [--chat-log FILE|-] [--max-articles N] [--max-mail N] [--max-user-posts N] [--banner FILE] [--disable chat|mail|vault] [--registration open|approval|closed] [--id-mode free|auto] [--id-prefix PREFIX] [--id-digits 1..8] [--id-first NAME] [--rtbbs-member-policy] [--login-text-dir DIR] [--registration-form simple|detailed] [--door-isolation-socket FILE] [--doors FILE] [--link-accounts FILE] [--zmodem-helper FILE] [--vault-dir DIR] [--bind IPv4] [--menu] [--menu-dir DIR] [--help-dir DIR] [--telnet] [--lang ja|en] [--admins FILE] PORT [BOARD_FILE [MEMBERS_FILE [CATALOG_FILE]]] (default bind: 127.0.0.1)\n"); return 2;
     }
 #ifdef _WIN32
     WSADATA data; if(WSAStartup(MAKEWORD(2,2),&data)) return 1;
@@ -716,7 +725,7 @@ int main(int argc,char **argv) {
                     if(incoming) { c->ssh=ln_ssh_accept(ssh_server,(int)fd,now_ms(),ssh_authenticate,c);if(!c->ssh) { drop(c);continue; } }
                     if(!terminal_init(&c->terminal,incoming?TERMINAL_PLAIN:terminal_mode,queue_bytes,c)) { drop(c); continue; }
                     SessionIO io={c,app_write,online,app_drained};
-                    session_init(&c->app,io,next_id++,slot,board_enabled,member_mode,menu_mode,default_language);
+                    (void)session_init_ui(&c->app,io,next_id++,slot,board_enabled,member_mode,menu_mode,default_language,&ui_config);
                     if(!c->app.core.active) { drop(c);continue; }
                     if(!userlog_connect(slot,incoming?"RAW":terminal_mode==TERMINAL_TELNET?"TELNET":"RAW",now_ms())) { fprintf(stderr,"userlog: connection write failed\n");drop(c);result=1;stopping=1;break; }
                     c->userlog_registered=1;c->clock.started=c->clock.last_input=now_ms();

@@ -1,4 +1,5 @@
 #include "member_core.h"
+#include "ui_profile.h"
 #include "member_settings_repository.h"
 #include "members.h"
 #include "moderation.h"
@@ -547,6 +548,18 @@ static MemberOutcome settings_authorize(const MemberActor *actor) {
     MemberOutcome result=authorize(actor,0);if(result!=MEMBER_CORE_OK)return result;
     if(!actor || !actor->user)return MEMBER_CORE_LOGIN_REQUIRED;
     return member_settings_repository_ready()?MEMBER_CORE_OK:MEMBER_CORE_SETTINGS_STORAGE;
+}
+MemberOutcome member_core_ui_get(const MemberActor *actor,char out[32]) {
+    if(!out)return MEMBER_CORE_INVALID;
+    *out=0;MemberOutcome result=settings_authorize(actor);if(result!=MEMBER_CORE_OK)return result;
+    if(!member_settings_repository_ui_get(actor->user,out))return MEMBER_CORE_SETTINGS_STORAGE;
+    if(*out && !ui_profile_valid(out)) { *out=0;return MEMBER_CORE_SETTINGS_STORAGE; }
+    return MEMBER_CORE_OK;
+}
+MemberOutcome member_core_ui_save(const MemberActor *actor,const char *name) {
+    MemberOutcome result=settings_authorize(actor);if(result!=MEMBER_CORE_OK)return result;
+    if(!name || (*name && !ui_profile_valid(name)))return MEMBER_CORE_INVALID;
+    return member_settings_repository_ui_save(actor->user,name)?MEMBER_CORE_OK:MEMBER_CORE_SETTINGS_STORAGE;
 }
 MemberOutcome member_core_menu_get(const MemberActor *actor,MemberMenuMode *out) {
     if(!out)return MEMBER_CORE_INVALID;

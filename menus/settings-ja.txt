@@ -3,3 +3,4 @@ INSTALL 個人設定
  1 エディタ / 2 ESC互換差分 / 3 案内量 / 4 停止行数
  LANG JA|EN / PAGER ON|OFF / PAGER SIZE 列 行
  PREFS SAVE|LOAD / HELP SETTINGS
+ UI / UI 名前 / UI RESET  操作UIの選択

@@ -963,7 +963,10 @@ static void authentication_execute(const BoardRequest *q,BoardResult *r) {
     r->auth=-1;
     switch(outcome) {
     case AUTHENTICATED: {
-        const AuthenticationSession *a=&result.session;r->auth=(int)a->user;r->user_epoch=a->epoch;
+        const AuthenticationSession *a=&result.session;MemberActor actor={a->user,a->epoch};
+        MemberOutcome preference=member_core_ui_get(&actor,r->ui_profile);
+        if(preference!=MEMBER_CORE_OK) { member_result(preference,r);return; }
+        r->auth=(int)a->user;r->user_epoch=a->epoch;
         r->mail_notice=a->mail_unread;r->mail_draft_notice=a->mail_draft;
         r->mail_notify_user=a->user;r->mail_notify_deny=a->mail_deny;r->mail_notify_revision=a->mail_revision;
         r->chat_admin=a->admin;r->chat_user=a->user;r->chat_preferences=a->chat;
@@ -993,7 +996,7 @@ static void execute(const BoardRequest *q,BoardResult *r) {
     policy_context(q->board_grants);
     if(features_broken || policy_broken() || move_journal.broken || access_journal.broken) { r->session=q->session;r->slot=q->slot;(r->feedback.failed=1,strcpy(r->text,"ERR board policy storage\r\n"));return; }
     r->deferred=0;r->binary_enter=0;r->binary_size=0;
-    r->session=q->session; r->slot=q->slot;r->zcontrol=q->zcontrol; r->selected=0; r->auth=0; r->board=0; r->editing=0; r->user_epoch=0; r->account_user=0; r->account_epoch=0; r->revoked=0; r->password_changed=0; r->preferences=0; r->language=0; r->pager=0; r->draft_loaded=0; r->draft_revision=0; r->draft_parent=0;
+    r->ui_profile[0]=0;r->session=q->session; r->slot=q->slot;r->zcontrol=q->zcontrol; r->selected=0; r->auth=0; r->board=0; r->editing=0; r->user_epoch=0; r->account_user=0; r->account_epoch=0; r->revoked=0; r->password_changed=0; r->preferences=0; r->language=0; r->pager=0; r->draft_loaded=0; r->draft_revision=0; r->draft_parent=0;
     if(extras_broken() || profile_store_broken()) { (r->feedback.failed=1,strcpy(r->text,"ERR extras storage\r\n")); return; }
     if(members_broken()) { (r->feedback.failed=1,strcpy(r->text,"ERR member storage unavailable\r\n")); return; }
     if(((q->op=='m' || q->op==BOARD_MAIL_TRANSFER || (q->op=='@' && q->action==1)) && !board_feature_enabled("mail")) || (q->op=='&' && !board_feature_enabled("chat")) || (strchr("@Y$^",q->op) && !(q->op=='@' && q->action==1) && !board_feature_enabled("vault"))) { (r->feedback.failed=1,strcpy(r->text,"ERR feature disabled\r\n"));return; }
@@ -1176,6 +1179,13 @@ static void execute(const BoardRequest *q,BoardResult *r) {
             strcpy(r->draft_title,draft.title);strcpy(r->text,"DRAFT RESUMED\r\n");
         }
         return;
+    }
+    if(q->op=='V' && (q->number==3 || q->number==4)) {
+        MemberActor actor={q->user,q->user_epoch};MemberOutcome outcome;
+        outcome=q->number==4?member_core_ui_save(&actor,q->title):member_core_ui_get(&actor,r->ui_profile);
+        if(outcome!=MEMBER_CORE_OK) { member_result(outcome,r);return; }
+        if(q->number==4) { strcpy(r->ui_profile,q->title);r->feedback.ui_profile_saved=1; }
+        snprintf(r->text,sizeof(r->text),"UI PREF %s %s\r\n",q->number==4?"SAVED":"STORED",*r->ui_profile?r->ui_profile:"DEFAULT");return;
     }
     if(q->op=='V') {
         if(!q->user) { (r->feedback.failed=1,strcpy(r->text,"ERR login required\r\n")); return; }

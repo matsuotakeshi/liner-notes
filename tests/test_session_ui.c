@@ -99,7 +99,8 @@ void session_ui_adapter_test(void) {
     assert(!rtbbs(s)->editor.draft.body[0] && s->connection.rows==35); /* private state, common terminal size */
     assert(session_ui_select(s,"rtbbs")==SESSION_UI_SELECTED);
     assert(!strcmp(rtbbs(s)->editor.draft.body,"retained buffer"));
-    assert(session_ui_select(s,"test-alt")==SESSION_UI_SELECTED);
+    /* Simulate an explicit user selection, retained across login restoration. */
+    assert(session_ui_choose(s,"test-alt")==SESSION_UI_SELECTED);
     assert(session_line(s,"mixed",5,100) && lines==1); /* No RTBBS uppercase/command mapping. */
     assert(session_uppercase(s,"mixed",5));rtbbs(s)->auth.password_mode='l';assert(!session_uppercase(s,"mixed",5));rtbbs(s)->auth.password_mode=0;
     s->connection.door=1;session_door_finish(s);assert(doors==1);
