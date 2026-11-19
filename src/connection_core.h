@@ -29,7 +29,7 @@ typedef enum { CONNECTION_BBS,CONNECTION_EDITOR,CONNECTION_CHAT,CONNECTION_AUTH,
 ConnectionMode connection_mode(const ConnectionState *);
 /* Trusted administrative snapshot: contains no secrets or borrowed pointers. */
 typedef struct {
-    unsigned long id;ConnectionMode mode;int telnet;
+    unsigned long id;ConnectionMode mode;int telnet; /* 0 RAW, 1 TELNET, 2 SSH */
     char login[33],peer[64];uint64_t elapsed,idle,rx,tx;
     size_t queued;unsigned columns,rows;
 } ConnectionSummary;

@@ -7,7 +7,7 @@
 /* Synchronous, serialized by the account/board worker. Credentials are borrowed
  * for this call, never retained or returned. Callers own input cleansing and
  * connection rate limits. This API grants no OS shell or transport access. */
-typedef enum { AUTH_LOGIN,AUTH_REGISTER } AuthenticationMode;
+typedef enum { AUTH_LOGIN,AUTH_REGISTER,AUTH_SSH_KEY } AuthenticationMode;
 enum { AUTH_FROM_BBS=PROFILE_FIELDS,AUTH_SYSOP_NOTE,AUTH_FORM_FIELDS=2048,AUTH_FORM_BYTES=8192 };
 typedef struct { unsigned field;const char *value; } AuthenticationField;
 /* Ordered entries preserve duplicate fields and partial-save failure behavior.

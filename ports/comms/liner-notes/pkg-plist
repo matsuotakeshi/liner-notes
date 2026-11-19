@@ -437,3 +437,4 @@ bin/liner-notes-serial
 %%DATADIR%%/scripts/deploy_policy.py
 %%DATADIR%%/scripts/deploy_restore.py
 %%DATADIR%%/scripts/deploy_transaction.py
+%%DATADIR%%/scripts/ssh-key-fingerprint.py

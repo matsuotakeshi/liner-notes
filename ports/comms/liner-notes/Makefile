@@ -35,13 +35,17 @@ SUB_FILES=	liner-notes-admin liner-notes-doctor liner-notes-maintenance \
 		liner_notes.conf doors.conf pkg-message
 SUB_LIST=	PYTHON_CMD=${PYTHON_CMD}
 
-OPTIONS_DEFINE=	DOCS WEBUI ZMODEM LINK
+OPTIONS_DEFINE=	DOCS WEBUI ZMODEM LINK SSH
 OPTIONS_DEFAULT=	DOCS WEBUI
 OPTIONS_SUB=	yes
 WEBUI_DESC=	Install the separate HTTP/WebSocket connector
 WEBUI_RUN_DEPENDS=	${PYTHON_PKGNAMEPREFIX}aiohttp>=3.11:www/py-aiohttp@${PY_FLAVOR}
 LINK_DESC=	Install the optional public-key shared-board connector
 LINK_RUN_DEPENDS=	${PYTHON_PKGNAMEPREFIX}cryptography>=43:security/py-cryptography@${PY_FLAVOR}
+
+SSH_DESC=	Build the optional BBS SSH listener (disabled at runtime)
+SSH_LIB_DEPENDS=	libssh.so:security/libssh
+SSH_MAKE_ARGS=	SSH_CFLAGS="-DLINER_SSH -I${LOCALBASE}/include" SSH_LIBS="-L${LOCALBASE}/lib -lssh"
 
 ZMODEM_DESC=	Depend on lrzsz 0.13.1 or newer for external file transfers
 ZMODEM_RUN_DEPENDS=	lrzsz>=0.13.1:comms/lrzsz

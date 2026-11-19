@@ -1,0 +1,215 @@
+"""Real SSH v2 + simultaneous Telnet, against the ordinary shared BBS worker.
+
+Run in existing Hosted Linux CI with libssh enabled. No LAN or production access.
+"""
+from pathlib import Path
+import hashlib
+import os
+import re
+import socket
+import subprocess
+import sys
+import tempfile
+import time
+import paramiko
+from test_board import Server
+from test_runtime import Client as Raw
+from test_members import auth, PASSWORD
+from test_telnet import Client as Telnet
+from ssh_screen import Screen, MAIL_PROMPT
+from ssh_openssh import pty_ping
+
+
+def port():
+    with socket.socket() as s:
+        s.bind(('127.0.0.1', 0))
+        return s.getsockname()[1]
+
+
+def reject(fn):
+    try:
+        fn()
+    except (paramiko.SSHException, EOFError, OSError):
+        return
+    raise AssertionError('forbidden SSH request succeeded')
+
+
+def run(binary):
+    binary = str(Path(binary).resolve())
+    with tempfile.TemporaryDirectory(prefix='ln-ssh-') as tmp:
+        root = Path(tmp)
+        host = root/'host'
+        subprocess.run(['ssh-keygen', '-q', '-t', 'ed25519', '-N', '', '-f', str(host)], check=True)
+        key = paramiko.RSAKey.generate(2048)
+        wrong_key = paramiko.RSAKey.generate(2048)
+        private = root/'client-key'
+        key.write_private_key_file(str(private)); private.chmod(0o600)
+        keys = root/'member-keys'
+        fingerprint = hashlib.sha256(key.asbytes()).hexdigest()
+        keys.write_text(f'1 {fingerprint}\n'); keys.chmod(0o600)
+        admins = root/'admins'; admins.write_text('1\n')
+        game = root/'game'
+        game.write_text('#!'+sys.executable+'''\nimport os,sys
+print('SSH_DOOR_USER='+os.environ['LINER_USER'],flush=True)
+print('SSH_DOOR_PID='+str(os.getpid()),flush=True)
+print('DOOR> ',end='',flush=True)
+for line in sys.stdin:
+    if line.strip()=='quit':break
+    if line.strip()=='crash':os._exit(17)
+    w,h=os.get_terminal_size(0)
+    print('PTY %d %d'%(w,h),flush=True)
+    print('DOOR> ',end='',flush=True)
+'''); game.chmod(0o700)
+        doors = root/'doors'
+        doors.write_text(f'1|0|30|{game}|{root}|SSH PTY test\n2|0|1|{game}|{root}|Timeout test\n')
+        seed = Server(binary, root/'notes', members=root/'members')
+        for name in ('alice', 'bob'):
+            c = Raw(seed.port); auth(c, name, True); c.close()
+        seed.close()
+        ssh_port = port()
+        options = ['--ssh-port', str(ssh_port), '--ssh-host-key', str(host),
+                   '--ssh-member-keys', str(keys), '--ssh-timeout', '3',
+                   '--ssh-attempts', '4', '--doors', str(doors)]
+        server = Server(binary, root/'notes', members=root/'members', admins=admins,
+                        telnet=True, menu=True, language='en', options=options)
+        transports = []
+
+        def connect(name='alice', password=PASSWORD, public=None):
+            t = paramiko.Transport(('127.0.0.1', ssh_port)); transports.append(t)
+            t.start_client(timeout=10)
+            # Verify the dedicated host key, never trust arbitrary remote hosts.
+            expected = (host.with_suffix('.pub')).read_text().split()[1]
+            assert t.get_remote_server_key().get_base64() == expected
+            if public is not None:
+                t.auth_publickey(name, public)
+            else:
+                t.auth_password(name, password)
+            assert t.is_authenticated()
+            return t
+
+        def screen(t):
+            ch = t.open_session(timeout=10); ch.get_pty(term='xterm', width=80, height=24); ch.invoke_shell()
+            s = Screen(ch); s.until(); return s
+
+        telnet = Telnet(server.port)
+        try:
+            telnet.until()
+            reject(lambda: connect(password='wrong-password'))
+            reject(lambda: connect(name='missing'))
+            reject(lambda: connect(public=wrong_key))
+            reject(lambda: connect(name='bob', public=key))
+            a = screen(connect()); b = screen(connect('bob')); k = screen(connect(public=key))
+            assert b'PONG' in a.cmd('PING')
+            assert b'PONG' in b.cmd('PING')
+            assert b'PONG' in telnet.cmd('PING')
+            assert '日本語'.encode() in a.cmd('ECHO 日本語')
+            assert b'alice' in k.cmd('ACCOUNT')
+            a.cmd('POST SSH article', b'Body > ')
+            a.cmd('SSH article body', b'Body > ')
+            assert b'Saved article #1' in a.cmd('.')
+            assert b'SSH article body' in a.cmd('READ 1')
+            a.cmd('RAW', b'RAW\r\n')
+            a.cmd('MAIL SEND bob ssh-mail', b'MAIL EDIT ')
+            a.channel.sendall(b'private SSH mail\r.\r')
+            a.until(b'MAIL SENT ')
+            # Sending/reading mail retains the mail menu. Leave it before
+            # restoring the main UI or starting a Door on either connection.
+            a.cmd('0', b'MAIL CLOSED\r\n')
+            a.cmd('MENU')
+            # An unsolicited arrival notice redraws the MAIN prompt. It is
+            # not the reply to MAIL READ: wait for the distinct mail prompt.
+            mail = b.cmd('MAIL READ 1', MAIL_PROMPT)
+            assert b'Mail 1  From:alice To:bob ' in mail, mail[-1500:]
+            assert b'Subject: ssh-mail\r\n' in mail, mail[-1500:]
+            assert b'private SSH mail' in mail, mail[-1500:]
+            assert b'End mail\r\n' in mail, mail[-1500:]
+            b.cmd('0')
+            assert b'PONG' in a.cmd('PING')
+            assert b'PONG' in b.cmd('PING')
+            print('PASS SSH password/key account binding, UTF-8 and Telnet coexistence')
+
+            # Restrictions apply after valid auth, not merely to anonymous clients.
+            for request in ('exec', 'sftp', 'no-pty-shell'):
+                t = connect(); ch = t.open_session(timeout=10)
+                if request == 'exec': reject(lambda: ch.exec_command('id'))
+                elif request == 'sftp': reject(lambda: ch.invoke_subsystem('sftp'))
+                else: reject(ch.invoke_shell)
+                t.close()
+            t = connect()
+            reject(lambda: t.open_channel('direct-tcpip', ('127.0.0.1', server.port), ('127.0.0.1', 1234)))
+            reject(lambda: t.request_port_forward('127.0.0.1', 0))
+            s = screen(t)
+            reject(lambda: t.open_session(timeout=5))
+            assert t.global_request('tcpip-forward', ('127.0.0.1', 0), wait=True) is None
+            print('PASS exec, subsystem, forwarding, extra channel and shell-without-PTY denied')
+
+            # Actual OpenSSH client interoperability and no command execution.
+            common = ['ssh', '-F', '/dev/null', '-p', str(ssh_port), '-i', str(private),
+                      '-o', 'IdentitiesOnly=yes', '-o', 'BatchMode=yes',
+                      '-o', 'StrictHostKeyChecking=yes', '-o', f'UserKnownHostsFile={root/"known_hosts"}']
+            (root/'known_hosts').write_text(f'[127.0.0.1]:{ssh_port} '+host.with_suffix('.pub').read_text())
+            result = subprocess.run(common+['alice@127.0.0.1', 'id'], capture_output=True, timeout=12)
+            exec_diagnostics = {'returncode': result.returncode, 'stderr': result.stderr[-4096:],
+                                'stdout': result.stdout[-1500:]}
+            print('OpenSSH exec-denial diagnostics:', exec_diagnostics, flush=True)
+            assert result.returncode != 0 and b'uid=' not in result.stdout, exec_diagnostics
+            pty_ping(common+['-tt', 'alice@127.0.0.1'])
+            print('PASS OpenSSH via 80x24 PTY: BBS prompt and PING')
+
+            # PTY is supplied by existing Door machinery, including live resizing.
+            output = a.cmd('DOOR 1', b'DOOR> ')
+            assert b'SSH_DOOR_USER=alice' in output
+            a.channel.resize_pty(width=100, height=30)
+            assert b'PTY 100 30' in a.cmd('size', b'DOOR> ')
+            assert b'Back to BBS' in a.cmd('quit')
+            a.cmd('DOOR 1', b'DOOR> ')
+            assert b'Back to BBS' in a.cmd('crash')
+            a.cmd('DOOR 2', b'DOOR> '); assert b'Back to BBS' in a.until()
+            output = b.cmd('DOOR 1', b'DOOR> ')
+            pid = int(re.search(rb'SSH_DOOR_PID=(\d+)', output)[1]); b.channel.get_transport().close()
+            for _ in range(50):
+                try: os.kill(pid, 0)
+                except ProcessLookupError: break
+                time.sleep(.1)
+            else: raise AssertionError('Door survived SSH disconnect')
+            print('PASS Door return, crash, timeout, resize and disconnect cleanup')
+
+            a.cmd('SUSPEND 2')
+            reject(lambda: connect('bob'))
+            a.cmd('RESUME 2')
+            assert b'PONG' in screen(connect('bob')).cmd('PING')
+            keys.write_text('')
+            reject(lambda: connect(public=key))
+            keys.write_text(f'1 {fingerprint}\n'); keys.chmod(0o666)
+            reject(lambda: connect(public=key))
+            keys.chmod(0o600)
+            assert b'PONG' in screen(connect()).cmd('PING')
+            # Partial handshake has a finite deadline and cannot starve Telnet.
+            with socket.create_connection(('127.0.0.1', ssh_port), timeout=8) as stalled:
+                time.sleep(3.3)
+                while stalled.recv(8192): pass
+            assert b'PONG' in telnet.cmd('PING')
+            limited = paramiko.Transport(('127.0.0.1', ssh_port)); transports.append(limited)
+            limited.start_client(timeout=10)
+            for _ in range(5):
+                reject(lambda: limited.auth_password('alice', 'wrong-password'))
+            deadline = time.monotonic()+3
+            while limited.is_active() and time.monotonic()<deadline: time.sleep(.05)
+            assert not limited.is_active(), 'authentication attempts were not bounded'
+            print('PASS key removal/unsafe permissions, handshake deadline and attempt limit')
+        finally:
+            telnet.close()
+            for t in transports: t.close()
+            server.proc.terminate()
+            _, errors = server.proc.communicate(timeout=10)
+            assert server.proc.returncode == 0, errors
+            assert PASSWORD not in errors and fingerprint not in errors, 'credential leaked'
+            assert all(line.startswith('SSH auth ') for line in errors.splitlines()), errors
+        # New connection records keep the existing durable USERLOG format readable.
+        again = Server(binary, root/'notes', members=root/'members')
+        c = Raw(again.port); auth(c, 'alice'); c.send(b'PING\n'); c.expect(b'PONG'); c.close(); again.close()
+    print('SSH integration passed')
+
+
+if __name__ == '__main__':
+    run(sys.argv[1])

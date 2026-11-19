@@ -129,6 +129,12 @@ class DoctorTests(unittest.TestCase):
             self.assertEqual(report['exit_code'],2,text)
             self.assertNotIn('SECRET',json.dumps(report))
 
+    def test_ssh_options(self):
+        opts=doctor.options('--ssh-port 2223 --ssh-host-key /private/key --ssh-attempts 6 2222')
+        self.assertEqual(opts['ssh-port'],'2223')
+        for text in ('--ssh-port 2223 2222','--ssh-port 65536 2222','--ssh-timeout 0 2222','--ssh-attempts 21 2222','--ssh-bind hostname 2222'):
+            with self.assertRaises(ValueError):doctor.options(text)
+
     def test_database_flag_order_and_explicit_override(self):
         parsed=doctor.options('--database-structured /old.sqlite --database /actual.sqlite 2222')
         self.assertEqual(parsed['database'],'/actual.sqlite')

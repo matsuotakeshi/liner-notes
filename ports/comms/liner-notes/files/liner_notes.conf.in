@@ -52,3 +52,12 @@ liner_notes_login_text_dir="%%DATADIR%%"
 # Optional for a NEW instance only. Existing schema-1 databases are not converted.
 # liner_notes_database="/var/db/liner-notes/liner.sqlite"
 # liner_notes_database_mode="structured"
+
+# Optional built-in SSH (Ports SSH option required). Passwords are BBS passwords.
+# Disabled by default; does not use or change the OS sshd.
+liner_notes_ssh_port="0"
+liner_notes_ssh_bind="127.0.0.1"
+liner_notes_ssh_host_key=""
+liner_notes_ssh_member_keys=""
+liner_notes_ssh_attempts="6"
+liner_notes_ssh_timeout="60"

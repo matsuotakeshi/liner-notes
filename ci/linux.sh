@@ -1,7 +1,7 @@
 #!/bin/bash
 set -euo pipefail
 cat /etc/os-release
-dnf install -y clang gcc make openssl-devel sqlite-devel python3.11 python3.11-pip tar gzip procps-ng shadow-utils systemd telnet
+dnf install -y clang gcc make openssl-devel sqlite-devel libssh-devel openssh-clients python3.11 python3.11-pip tar gzip procps-ng shadow-utils systemd telnet
 useradd --create-home bbstest
 mkdir /home/bbstest/source
 tar -C /source --exclude=.git --exclude=build -cf - . | tar -C /home/bbstest/source -xf -
@@ -10,6 +10,7 @@ runuser -u bbstest -- bash -c '
   set -euo pipefail
   cd /home/bbstest/source
   export CC=clang
+  export SSH_CFLAGS=-DLINER_SSH SSH_LIBS=-lssh
   export LINER_TEST_START_TIMEOUT=180
   make -j2 CC=clang PYTHON=python3.11 SQLITE_CFLAGS= SQLITE_LIBS=-lsqlite3
   python3.11 tests/test_linux_install.py
@@ -26,9 +27,12 @@ runuser -u bbstest -- bash -c '
   set -euo pipefail
   cd /home/bbstest/source
   export CC=clang
+  export SSH_CFLAGS=-DLINER_SSH SSH_LIBS=-lssh
   export LINER_TEST_START_TIMEOUT=180
   python3.11 -m venv .web-venv
-  .web-venv/bin/pip install -r webui/requirements.txt -r link-requirements.txt
+  .web-venv/bin/pip install -r webui/requirements.txt -r link-requirements.txt -r tests/ssh-requirements.txt
+  .web-venv/bin/python tests/test_ssh_sources.py
+  .web-venv/bin/python tests/test_ssh_transport.py ./runtime
   make PYTHON="$PWD/.web-venv/bin/python" test-doctor
   make CC=clang PYTHON="$PWD/.web-venv/bin/python" SQLITE_CFLAGS= SQLITE_LIBS=-lsqlite3 test-stage73 test-stage74
   if ! python3.11 scripts/build-lrzsz.py /home/bbstest/lrzsz-check; then
