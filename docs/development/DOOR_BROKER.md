@@ -140,8 +140,67 @@ for BBS, Broker or game-server data.
 
 Before any future service activation, verify accounts, fixed wrapper paths,
 private data permissions, local policy and SELinux labels. SELinux domain policy,
-FreeBSD rc/SMF service definitions and actual service lifecycle tests remain
-pending. This is **not a production runbook**.
+Solaris SMF definitions and actual systemd/SMF lifecycle tests remain pending.
+FreeBSD rc samples and a jail lifecycle test are added below; their native
+acceptance is pending for this candidate. This is **not a production runbook**.
+
+### FreeBSD service candidate and preflight
+
+The port installs `liner_notes_door_broker` and `liner_notes_door_isolation`
+under `share/liner-notes/door-services/freebsd/`, not `etc/rc.d/`. No automatic
+activation, policy creation, account provisioning or directory repair is done.
+For an independently provisioned development instance only, root can invoke
+these samples through `/bin/sh SAMPLE onestart|onestatus|onestop`.
+The default `_enable` setting is `NO`; normal `start` stays disabled.
+
+Each script reads the following rc.conf settings with its own name prefix
+(`liner_notes_door_broker` or `liner_notes_door_isolation`):
+
+| Suffix | Default | Requirement |
+| --- | --- | --- |
+| `_enable` | `NO` | Explicit activation only after acceptance/review |
+| `_config` | `PREFIX/etc/liner-notes/door-broker.json` or `door-isolation.json` | Existing root-owned policy with safe ancestors |
+| `_pidfile` | `/var/run/NAME.pid` | Root-controlled path; daemon owns the child PID file |
+| `_logfile` | `/var/log/NAME.log` | Root-controlled path; created under umask 077 |
+| `_run_user` | `liner_notes_broker` or `root` | Broker account matches policy, with consumer socket group membership; supervisor requires root |
+
+Provision persistent supervisor state (0711, root-owned), private slot work
+directories and dedicated accounts according to the policy above. On FreeBSD,
+use `/var/run/` for sockets and `/var/db/` for persistent state instead of Linux
+`/run/` and `/var/lib/`. Keep wrapper executables outside writable game data.
+Start Broker first, then isolation, then the opted-in BBS; stop in reverse order.
+The REQUIRE/BEFORE markers describe boot ordering only, not automatic dependency
+startup for a manually invoked script. Do not run legacy BBS-UID Doors alongside.
+
+`door_broker.py --config FILE --check-config` and the isolation counterpart
+parse/validate policy without binding sockets or creating state. Isolation
+checks require root and a supported backend. `--check-ready` additionally opens
+the configured local socket and verifies its file type, owner and kernel peer
+UID, without sending authentication data. It is an intentional local probe,
+not a fully offline diagnostic. It does not attest every possible game launch.
+The Linux systemd samples use configuration checks as ExecStartPre too; Linux
+boot/service validation remains a separate gate.
+
+The service-template regression permits exactly the read-only `--check-config`
+preflight and normal start command. Other Exec hooks (including reservation
+reset/cleanup) remain rejected. The preflight tests separately verify that the
+check does not start a server, bind a socket or fork a worker.
+
+Start refuses a duplicate process and reports readiness only after both child
+PID and socket identity checks succeed. Stop uses rc.subr TERM-and-wait behavior.
+The samples do not use automatic restart, SIGKILL, socket unlink, or reservation
+reset. A failed start/stop requires inspection; never clear BUSY as a workaround.
+An orphan socket is not ready and is not automatically replaced.
+Reference: [FreeBSD daemon](https://man.freebsd.org/cgi/man.cgi?query=daemon&sektion=8)
+and [rc.subr](https://man.freebsd.org/cgi/man.cgi?query=rc.subr&sektion=8).
+
+The trusted-main disposable jail creates only its own fixture accounts and
+executes the installed samples. The existing two-game/PTY/crash fixture now
+uses rc-managed services on FreeBSD, including explicit stop with descendants,
+status after stop, duplicate refusal and restart. Linux retains its existing
+container process fixture. Windows local tests cover portable preflight/readiness
+contracts; shell/native service checks require the corresponding CI. Passing
+the earlier raw-process fixture is not evidence that these new service tests passed.
 
 ### Stop and crash reservations
 

@@ -66,6 +66,15 @@ def configuration(path):
     config['consumers']=consumers
     return config
 
+def check_ready(endpoint,uid):
+    # A pathname alone is not readiness: it may be an orphan after a crash.
+    st=Path(endpoint).lstat()
+    if not stat.S_ISSOCK(st.st_mode) or st.st_uid!=uid:raise ValueError('socket identity')
+    with socket.socket(socket.AF_UNIX,socket.SOCK_STREAM) as connection:
+        connection.settimeout(3);connection.connect(str(endpoint))
+        if peer_uid(connection)!=uid:raise ValueError('socket peer identity')
+
+
 class Server:
     def __init__(self,broker,*,peer=peer_uid):
         self.broker=broker;self.peer=peer;self.clients=set()
@@ -129,11 +138,17 @@ async def serve(config):
 
 def main():
     parser=argparse.ArgumentParser(description=__doc__);parser.add_argument('--config',required=True)
+    checks=parser.add_mutually_exclusive_group()
+    checks.add_argument('--check-config',action='store_true',help='validate policy without starting or changing files')
+    checks.add_argument('--check-ready',action='store_true',help='probe local socket and verify service UID')
     args=parser.parse_args()
     import resource
     resource.setrlimit(resource.RLIMIT_CORE,(0,0))
-    try:asyncio.run(serve(configuration(args.config)))
+    try:
+        config=configuration(args.config)
+        if args.check_ready:check_ready(config['socket'],config['broker_uid'])
+        elif not args.check_config:asyncio.run(serve(config))
     except KeyboardInterrupt:pass
-    except (ValueError,OSError):parser.exit(1,'Broker startup rejected; check configuration, identity and permissions.\n')
+    except (ValueError,OSError,KeyError,TypeError):parser.exit(1,'Broker startup rejected; check configuration, identity and permissions.\n')
 
 if __name__=='__main__':main()

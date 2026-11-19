@@ -83,10 +83,16 @@ class Backend(unittest.TestCase):
     def test_service_templates_keep_cleanup_and_opt_in(self):
         isolation=(ROOT/'linux/liner-notes-door-isolation.service').read_text()
         broker=(ROOT/'linux/liner-notes-door-broker.service').read_text()
-        for unit in (isolation,broker):
+        for role,unit in (('isolation',isolation),('broker',broker)):
             self.assertIn('NoNewPrivileges=yes',unit)
             self.assertIn('Restart=no',unit)
-            self.assertNotIn('ExecStartPre=',unit)
+            # Only the read-only preflight may run before startup. Keep rejecting
+            # reset/cleanup commands that could discard a live Door reservation.
+            command=('@PYTHON@ -E -s -B @PREFIX@/share/liner-notes/scripts/'
+                     f'door_{role}.py --config /etc/liner-notes/door-{role}.json')
+            self.assertEqual([line for line in unit.splitlines() if line.startswith('Exec')],
+                             ['ExecStartPre='+command+' --check-config',
+                              'ExecStart='+command])
         for line in ('KillMode=process','SendSIGKILL=no','TimeoutStopSec=infinity',
                      'StateDirectory=liner-notes-door-isolation','User=root'):
             self.assertIn(line,isolation)
