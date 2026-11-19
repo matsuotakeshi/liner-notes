@@ -2,6 +2,7 @@ policy_module(liner_notes, 0.2.0)
 
 # No permissive domains, blanket unconfined attribute or audit2allow output.
 attribute liner_notes_domain;
+attribute liner_notes_isolated_service;
 
 type liner_notes_t;
 type liner_notes_exec_t;
@@ -119,7 +120,20 @@ dev_rw_null(liner_notes_domain)
 kernel_read_system_state(liner_notes_domain)
 logging_send_syslog_msg(liner_notes_domain)
 corecmd_exec_shell(liner_notes_domain)
-corecmd_exec_bin(liner_notes_domain)
+# Preserve the existing domains' interfaces. Do not apply this interface to
+# isolated services: it assigns sys_resource_type as well as file execution.
+corecmd_exec_bin(liner_notes_t)
+corecmd_exec_bin(liner_notes_web_t)
+corecmd_exec_bin(liner_notes_link_t)
+corecmd_exec_bin(liner_notes_admin_t)
+corecmd_exec_bin(liner_notes_door_t)
+corecmd_exec_bin(liner_notes_transfer_t)
+# Fixed Python interpreters need bin_t execution, not CAP_SYS_RESOURCE or the
+# broad execution of every base read-only file. Keep this attribute-free.
+gen_require(`type bin_t;')
+read_lnk_files_pattern(liner_notes_isolated_service, bin_t, bin_t)
+list_dirs_pattern(liner_notes_isolated_service, bin_t, bin_t)
+can_exec(liner_notes_isolated_service, bin_t)
 list_dirs_pattern(liner_notes_domain, liner_notes_ro_t, liner_notes_ro_t)
 read_files_pattern(liner_notes_domain, liner_notes_ro_t, liner_notes_ro_t)
 allow liner_notes_domain liner_notes_etc_t:dir search_dir_perms;
@@ -280,6 +294,7 @@ type liner_notes_broker_exec_t;
 init_domain(liner_notes_broker_t, liner_notes_broker_exec_t)
 init_nnp_daemon_domain(liner_notes_broker_t)
 typeattribute liner_notes_broker_t liner_notes_domain;
+typeattribute liner_notes_broker_t liner_notes_isolated_service;
 allow liner_notes_broker_t liner_notes_broker_exec_t:file execute_no_trans;
 type liner_notes_broker_etc_t;
 files_config_file(liner_notes_broker_etc_t)
@@ -294,6 +309,7 @@ type liner_notes_isolation_exec_t;
 init_domain(liner_notes_isolation_t, liner_notes_isolation_exec_t)
 init_nnp_daemon_domain(liner_notes_isolation_t)
 typeattribute liner_notes_isolation_t liner_notes_domain;
+typeattribute liner_notes_isolation_t liner_notes_isolated_service;
 allow liner_notes_isolation_t liner_notes_isolation_exec_t:file execute_no_trans;
 type liner_notes_isolation_etc_t;
 files_config_file(liner_notes_isolation_etc_t)
@@ -308,6 +324,7 @@ type liner_notes_consumer_exec_t;
 init_domain(liner_notes_consumer_t, liner_notes_consumer_exec_t)
 init_nnp_daemon_domain(liner_notes_consumer_t)
 typeattribute liner_notes_consumer_t liner_notes_domain;
+typeattribute liner_notes_consumer_t liner_notes_isolated_service;
 allow liner_notes_consumer_t liner_notes_consumer_exec_t:file execute_no_trans;
 type liner_notes_consumer_etc_t;
 files_config_file(liner_notes_consumer_etc_t)

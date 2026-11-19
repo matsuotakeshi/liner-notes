@@ -20,10 +20,18 @@ assert not any('liner_notes' in row for row in unconfined.splitlines()), unconfi
 # Reject attribute inheritance even when its conditional allow is disabled on
 # this host. Keep systemd entrypoint and NoNewPrivileges transitions working.
 daemons = subprocess.check_output(['seinfo', '-a', 'daemon', '-x'], text=True)
+resource_types = subprocess.check_output(['seinfo', '-a', 'sys_resource_type', '-x'], text=True)
 for role in ('broker', 'isolation', 'consumer'):
     domain = 'liner_notes_' + role + '_t'
     entry = 'liner_notes_' + role + '_exec_t'
     assert not re.search(r'\b' + domain + r'\b', daemons), (domain, daemons)
+    assert not re.search(r'\b' + domain + r'\b', resource_types), (domain, resource_types)
+    resources = subprocess.check_output(['sesearch', '--allow', '-s', domain,
+                                        '-c', 'capability', '-p', 'sys_resource'], text=True)
+    assert not resources.strip(), (domain, resources)
+    interpreter = subprocess.check_output(['sesearch', '--allow', '-s', domain,
+                                          '-t', 'bin_t', '-c', 'file', '-p', 'execute_no_trans'], text=True)
+    assert interpreter.strip(), (domain, interpreter)
     transitions = subprocess.check_output(['sesearch', '--type_trans', '-s', 'init_t',
                                            '-t', entry, '-c', 'process'], text=True)
     assert re.search(r'\b' + domain + r'\s*;', transitions), (domain, transitions)

@@ -104,3 +104,24 @@ Local checks cannot compile the Rocky policy on Windows. Hosted policy CI must
 validate the resulting graph and RPM lifecycle; exact-main Enforcing acceptance
 still follows merge and the authorized protected-helper update. No VM or
 production changes are needed for this correction.
+
+### Separate interpreter execution from resource capabilities
+
+At `4fb17f2961fac5b0e43f4f71bb22527da474c816`, run `44551466350`, job
+`135656031689`, the daemon membership, init transitions, data isolation and
+socket allow/deny checks passed. The later capability check found Broker's
+inherited `sys_resource` permission conditional on `corecmd_bin_sys_resource`.
+`corecmd_exec_bin(liner_notes_domain)` assigns `sys_resource_type` to its input,
+so the three new services acquired an unintended privilege through the shared
+attribute. The test remains strict about conditional rules.
+
+Preserve `corecmd_exec_bin` on the six pre-existing domains. For the three new
+services, use only bin_t directory/symlink traversal and `can_exec`, without the
+sys_resource_type membership or broad base-readonly-file execution grant. The
+compiled-policy check requires absence from that attribute, no sys_resource
+allow (including the root supervisor), and retained interpreter execution.
+The separate zero-capability check for Broker/consumer remains unchanged.
+Reference: [corecommands interfaces](https://github.com/fedora-selinux/selinux-policy/blob/rawhide/policy/modules/kernel/corecommands.if).
+This modifies policy, not BBS authentication or test acceptance thresholds.
+The new compiled graph/RPM lifecycle and native Enforcing execution remain CI
+gates; local Windows checks do not substitute for them.

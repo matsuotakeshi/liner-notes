@@ -62,7 +62,9 @@ domains remain `liner_notes_t` / `liner_notes_door_t`.
 
 Only the supervisor receives bounded setuid/setgid/kill/chown/DAC-override/fowner
 capabilities. There is no SYS_ADMIN/SYS_PTRACE, unconfined attribute or permissive
-domain. Broker and consumer have no capabilities or general TCP rule. A remote
+domain. Broker and consumer have no capabilities or general TCP rule. The new services
+use interpreter execution rules without `sys_resource_type` membership; the
+root supervisor also receives no `sys_resource` permission. A remote
 consumer is unsupported. Game server network/extra dependencies need a reviewed
 local extension; the fixture consumer does not prove arbitrary games run under
 this policy. The existing Door network boolean remains explicit and off by
