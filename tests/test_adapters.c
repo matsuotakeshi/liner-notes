@@ -494,5 +494,18 @@ int main(int argc,char **argv) {
     strcpy(result.text,"body includes END NEXT 999\r\n");session_result(&s,&result,6003);assert(!s.reading.report.next);
     session_dispose(&s);
     puts("PASS: typed effects resist misleading display markers and preserve independent cursor/grants");
+    reset(&m);session_init(&s,io,190,5,1,1,0,LANGUAGE_EN);
+    assert(session_line(&s,"LOGIN pendingname",17,7000));assert(!s.core.username[0] && !strcmp(s.auth.login,"pendingname"));
+    memset(&result,0,sizeof(result));result.session=190;result.slot=5;result.auth=2;result.user_epoch=9;result.member_level=4;strcpy(result.chat_login,"confirmed");
+    session_result(&s,&result,7001);assert(s.core.user==2 && s.core.user_epoch==9 && !strcmp(s.core.username,"confirmed"));
+    s.auth.password_mode=0;s.core.auth_after=0;s.reading.profile_walk.pending=1;
+    memset(&result,0,sizeof(result));result.session=190;result.slot=5;result.password_changed=1;result.account_user=2;result.account_epoch=10;
+    result.feedback.file_unlocked=1;result.feedback.grant_board=4;result.feedback.grant_revision=8;
+    session_result(&s,&result,8000);assert(s.core.user_epoch==10 && s.core.vault_grants[4]==8); /* even an early UI handler cannot drop core effects */
+    memset(&result,0,sizeof(result));result.session=190;result.slot=5;result.auth=-1;
+    session_result(&s,&result,9000);assert(!s.core.user && !s.core.username[0] && !s.core.member_level && !s.core.vault_grants[4]);
+    session_dispose(&s);
+    puts("PASS: UI routing cannot own identity/epoch/grants; unverified login remains separate");
+
     return 0;
 }

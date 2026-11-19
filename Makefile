@@ -612,3 +612,6 @@ test-session-core: tests/test_session_core.c src/session_core.c src/session_core
 	$(CC) $(CPPFLAGS) $(CFLAGS) $(LDFLAGS) -std=c11 -Wall -Wextra -Werror -Isrc tests/test_session_core.c src/session_core.c -o test-session-core
 	./test-session-core
 check: test-session-core
+
+# Shared data contracts are independent of the worker lifecycle.
+runtime test-adapters test-session-core: src/operation.h src/operation_pages.h

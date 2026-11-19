@@ -555,7 +555,7 @@ int main(int argc,char **argv) {
                 uint32_t user=completion.account_user;
                 if(completion.password_changed && completion.slot>=0 && completion.slot<SLOTS) {
                     Session *owner=&connections[completion.slot].app;
-                    if(owner->core.id==completion.session && owner->core.user==user && !owner->core.closing) owner->core.user_epoch=completion.account_epoch;
+                    (void)session_core_password_epoch(&owner->core,completion.session,user,completion.account_epoch);
                 }
                 if(account_epochs[user]<completion.account_epoch) account_epochs[user]=completion.account_epoch;
                 for(int i=0;i<SLOTS;i++) {

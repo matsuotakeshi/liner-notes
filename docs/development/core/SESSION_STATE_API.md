@@ -32,7 +32,8 @@ configuration stay unchanged. This is not a new external network API.
 
 ## UI-independent operations
 
-Include session_core.h; neither Ui, Session nor a terminal is required.
+Include session_core.h; neither Ui, Session, a worker lifecycle header nor a terminal is required.
+See CORE_BOUNDARY_COMPLETION.md for the current receive/lifecycle contract.
 The trusted owner initializes SessionCore.id/slot/active and advances its clock.
 BoardRequest expresses the existing domain operation and its arguments; the
 operation codes are the internal board worker contract, not terminal commands.
@@ -53,12 +54,13 @@ acceptance. Accepted authentication attempts start the same one-second cooldown
 for non-UI consumers as for legacy UI. UI modal/editor guards stay in the adapter;
 a headless client has no editor dialogue to bypass. Each client owns its own core.
 
-session_core_complete rejects stale session/slot and inactive/closing completion
-before updating pending/clock. Only matching trusted worker results may then be
-applied with session_core_identity. Auth success/failure resets actor/grants at
+session_core_receive rejects stale session/slot and inactive/closing completions
+before updating state or returning any payload. Matching trusted worker results
+apply identity, epoch, grants and position atomically; session_core_complete is
+the compatibility entry point without a returned view. Auth success/failure resets actor/grants at
 the same point as the legacy UI. Consumers must handle revoked results by ending
 their session, and clear caller-owned credentials/bodies when no longer needed.
-A client never manufactures BoardResult values or treats API pointers as network
+A client never manufactures OperationResult values or treats API pointers as network
 credentials. The port is an in-process trusted dependency, not an authentication
 service. BBS ACL still resides in domain Core/repositories.
 
@@ -89,9 +91,11 @@ uses the existing draft buffers; this is distinct from draft_loaded.
 Display strings remain for existing RTBBS/RAW clients. Payload text can include
 END NEXT or FILEBOARD UNLOCKED without creating a control effect. Numeric effects
 and authorized structured content may be used without translating display text.
-This is not a complete JSON/HTTP projection of every report row: the existing
-WebUI still uses its RAW connector and presentation formatter. Adopting these
-in-process APIs in a new Web/SSH transport is a separate integration step.
+The operation contract now also carries bounded typed pages from domain Core
+(see CORE_BOUNDARY_COMPLETION.md). Existing WebUI still uses its RAW connector
+and presentation formatter. A network JSON/HTTP schema and new transports are
+separate integrations; the internal C structures must never be deserialized from
+an untrusted network request or treated as credentials.
 
 ## Validation
 
@@ -144,3 +148,8 @@ message bodies are never included. The existing 30-second operation deadline and
 timeout propagation; Linux compatibility runs the actual two-process store test.
 Production code, data formats, validation and permissions are unchanged by this
 test correction. The corrected runtime result must be tied to its own CI SHA.
+
+PR #128 correction verification: commit 2bf4af75109bfbaa2d03cbf1e044624cdf78bbec
+passed Linux compatibility run 44443314770 on Rocky 9 and AlmaLinux 9 and all
+nine applicable Hosted workflows. Merged as a082f9484d0949bdd7953e1cd64631b06c40999d.
+This evidence does not substitute for CI on subsequent boundary changes.

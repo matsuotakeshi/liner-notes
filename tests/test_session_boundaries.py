@@ -56,4 +56,21 @@ class SessionBoundaries(unittest.TestCase):
         self.assertIn('SessionEditor editor;',text)
         self.assertNotIn('union',code(text))
 
+    def test_core_contract_does_not_expose_worker_lifecycle(self):
+        header=(ROOT/'src/session_core.h').read_text(encoding='utf-8')
+        self.assertNotIn('#include "board.h"',header)
+        self.assertIn('#include "operation.h"',header)
+        contract=(ROOT/'src/operation.h').read_text(encoding='utf-8')
+        self.assertNotRegex(code(contract),r'\bboard_(?:start|stop|submit|poll)\b')
+        for p in (ROOT/'src').glob('session*.c'):
+            if p.name=='session_core.c':continue
+            text=code(p.read_text(encoding='utf-8'))
+            self.assertNotRegex(text,r'->core\.(?:user|user_epoch|board|current|member_level)\s*=(?!=)',p.name)
+            self.assertNotRegex(text,r'->core\.(?:board_grants|vault_grants)\[[^]]+\]\s*=',p.name)
+
+    def test_worker_audit_does_not_infer_events_from_display(self):
+        text=(ROOT/'src/board.c').read_text(encoding='utf-8')
+        self.assertNotRegex(text,r'(?:strn?cmp|strstr|sscanf)\(rs->text')
+        self.assertIn('rs->feedback.article_access',text)
+
 if __name__=='__main__':unittest.main()
