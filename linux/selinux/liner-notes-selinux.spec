@@ -1,6 +1,6 @@
 %{!?policy_release:%global policy_release 1}
 Name:           liner-notes-selinux
-Version:        0.1.0
+Version:        0.2.0
 Release:        %{policy_release}%{?dist}
 Summary:        Confined SELinux domains for Liner Notes
 License:        GPL-3.0-only
@@ -41,12 +41,13 @@ install -D -m 0755 %{SOURCE2} %{buildroot}%{_sbindir}/liner-notes-selinux
 # Only package entrypoints. Existing state/config/keys are NOT relabelled here.
 for p in /usr/sbin/liner-notes /usr/sbin/liner-notes-web /usr/bin/liner-notes-link \
          /usr/bin/liner-notes-admin /usr/bin/liner-notes-memberctl \
-         /usr/bin/liner-notes-vaultctl /usr/bin/liner-notes-dbconvert /usr/bin/liner-notes-zmodem; do
+         /usr/bin/liner-notes-vaultctl /usr/bin/liner-notes-dbconvert /usr/bin/liner-notes-zmodem \
+         /usr/libexec/liner-notes/door-broker /usr/libexec/liner-notes/door-isolation; do
     if [ -f "$p" ] && [ ! -L "$p" ]; then /usr/sbin/restorecon "$p" || exit 1; fi
 done
 
 %preun
-if [ "$1" -eq 0 ] && ps -eZ | grep -Eq ':liner_notes(_(web|link|admin|door|transfer))?_t:'; then
+if [ "$1" -eq 0 ] && ps -eZ | grep -Eq ':liner_notes(_(web|link|admin|door|transfer|broker|isolation|consumer))?_t:'; then
     echo 'Stop Liner Notes confined processes before removing its SELinux policy.' >&2
     exit 1
 fi
@@ -57,7 +58,8 @@ if [ "$1" -eq 0 ]; then
     # Do not remove local semanage entries or relabel existing state directories.
     for p in /usr/sbin/liner-notes /usr/sbin/liner-notes-web /usr/bin/liner-notes-link \
              /usr/bin/liner-notes-admin /usr/bin/liner-notes-memberctl \
-             /usr/bin/liner-notes-vaultctl /usr/bin/liner-notes-dbconvert /usr/bin/liner-notes-zmodem; do
+             /usr/bin/liner-notes-vaultctl /usr/bin/liner-notes-dbconvert /usr/bin/liner-notes-zmodem \
+         /usr/libexec/liner-notes/door-broker /usr/libexec/liner-notes/door-isolation; do
         if [ -f "$p" ] && [ ! -L "$p" ]; then /usr/sbin/restorecon "$p" || exit 1; fi
     done
 fi

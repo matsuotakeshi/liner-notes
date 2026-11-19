@@ -88,8 +88,8 @@ class Backend(unittest.TestCase):
             self.assertIn('Restart=no',unit)
             # Only the read-only preflight may run before startup. Keep rejecting
             # reset/cleanup commands that could discard a live Door reservation.
-            command=('@PYTHON@ -E -s -B @PREFIX@/share/liner-notes/scripts/'
-                     f'door_{role}.py --config /etc/liner-notes/door-{role}.json')
+            command=(f'@PREFIX@/libexec/liner-notes/door-{role}'
+                     f' --config /etc/liner-notes/door-{role}.json')
             self.assertEqual([line for line in unit.splitlines() if line.startswith('Exec')],
                              ['ExecStartPre='+command+' --check-config',
                               'ExecStart='+command])

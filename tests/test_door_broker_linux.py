@@ -55,8 +55,10 @@ def slot_released(state,uid,processes):
             return os.fstat(lock.fileno()).st_size==0
     except FileNotFoundError:return True
 
-def game_server(path,broker,scripts):
-    identity(GAME)();os.umask(0o077);sys.path.insert(0,str(scripts))
+def game_server(path,broker,scripts,drop_identity=True):
+    if drop_identity:identity(GAME)()
+    assert os.geteuid()==GAME
+    os.umask(0o077);sys.path.insert(0,str(scripts))
     from door_auth_client import DoorAuthorization,AuthorizationError
     from door_broker import peer_uid
     db=sqlite3.connect(path.parent/'players.sqlite')
@@ -92,7 +94,7 @@ def query(path,value):
     with socket.socket(socket.AF_UNIX,socket.SOCK_STREAM) as c:
         c.settimeout(3);c.connect(str(path));c.sendall(json.dumps(value).encode()+b'\n');return json.loads(c.makefile('rb').readline(4096))
 
-def run(binary):
+def run(binary,backend=None):
     assert os.geteuid()==0,'isolated root fixture required'
     if sys.platform.startswith('freebsd'):
         assert subprocess.check_output(['/sbin/sysctl','-n','security.jail.jailed']).strip()==b'1','disposable jail required'
@@ -107,7 +109,7 @@ def run(binary):
     # Reap only this test's descendants if a deliberately killed worker leaves
     # orphans. FreeBSD signalling stays within the kernel-owned reaper subtree.
     fixture_scope=Scope(SLOT1)
-    with tempfile.TemporaryDirectory(prefix='ln-broker-',dir='/var/run' if sys.platform.startswith('freebsd') else '/run') as tmp:
+    with tempfile.TemporaryDirectory(prefix='ln-broker-',dir=backend.path if backend else ('/var/run' if sys.platform.startswith('freebsd') else '/run')) as tmp:
         p=Path(tmp);p.chmod(0o755);scripts=p/'scripts';scripts.mkdir();scripts.chmod(0o755)
         # The jail helper deliberately retains umask 077. Publish only fixture
         # code and non-secret policy explicitly; do not relax the process umask
@@ -159,15 +161,20 @@ while True:
         for node,uid in enumerate((SLOT1,SLOT2),1):
             cwd=p/('slot'+str(node));cwd.mkdir();os.chown(cwd,uid,uid)
             slots.append(dict(door=1,node=node,uid=uid,gid=uid,exe=str(wrapper),cwd=str(cwd),level=0,seconds=30,drop=True,auth=True))
-        isolation=p/'isolation.sock';launch_conf=p/'isolation.json'
+        isolation_dir=p/'isolation';isolation_dir.mkdir(mode=0o755);isolation_dir.chmod(0o755)
+        isolation=isolation_dir/'isolation.sock';launch_conf=p/'isolation.json'
         launch_conf.write_text(json.dumps(dict(bbs_uid=BBS,socket=str(isolation),socket_gid=BBS,broker_config=str(broker_conf),state_dir=str(state),slots=slots)))
         doors=p/'doors.conf';doors.write_text(f'1|0|30|{wrapper}|{p}|Authenticated fixture|dorinfo1:2\n')
         doors.chmod(0o644)
         commands=[([sys.executable,str(scripts/'door_broker.py'),'--config',str(broker_conf)],identity(BROKER,[GAME])),([sys.executable,str(scripts/'door_isolation.py'),'--config',str(launch_conf)],None)]
+        launch_conf.chmod(0o600)
+        if backend:backend.prepare(p,broker_conf,launch_conf,slots)
         services=[];clients=[];bbs=None;game=None;crash_marker=None
         def released():return all(slot_released(state,uid,processes) for uid in (SLOT1,SLOT2))
         def start_service(index):
-            if sys.platform.startswith('freebsd'):
+            if backend:
+                process=backend.start_service(('broker','isolation')[index]);services.append(process)
+            elif sys.platform.startswith('freebsd'):
                 process=RcProcess(('broker','isolation')[index],(broker_conf,launch_conf)[index],p)
                 services.append(process);process.start()
             else:
@@ -187,12 +194,13 @@ while True:
         try:
             for index in range(2):start_service(index)
             ready(endpoint,services[0]);ready(isolation,services[1])
-            game=multiprocessing.Process(target=game_server,args=(game_socket,endpoint,scripts));game.start()
+            game=backend.start_game(game_socket,endpoint,scripts) if backend else multiprocessing.Process(target=game_server,args=(game_socket,endpoint,scripts))
+            if not backend:game.start()
             for _ in range(100):
                 if game_socket.exists():break
                 time.sleep(.03)
             assert game_socket.exists()
-            bbs=Server(str(runtime),data/'notes',preexec_fn=identity(BBS),members=data/'members',menu=True,telnet=True,language='en',options=['--doors',str(doors),'--door-isolation-socket',str(isolation)])
+            bbs=(backend.server if backend else Server)(str(runtime),data/'notes',preexec_fn=identity(BBS),members=data/'members',menu=True,telnet=True,language='en',options=['--doors',str(doors),'--door-isolation-socket',str(isolation)])
             for name,member,uid in [('alice',1,SLOT1),('bob',2,SLOT2)]:
                 c=Client(bbs.port);clients.append(c);c.until();c.send(('REGISTER '+name+'\r\nfixture-password\r\n').encode());assert b'Logged in' in c.until()
                 c.cmd('GAME',b'0:main] > ')
@@ -244,7 +252,8 @@ with socket.socket(socket.AF_UNIX,socket.SOCK_STREAM) as s:
             wait_for(released,'normal Door exit did not release reservations')
             # Game server restart preserves data, but cannot keep cached authority.
             game.terminate();game.join(5);assert not game.is_alive();game_socket.unlink()
-            game=multiprocessing.Process(target=game_server,args=(game_socket,endpoint,scripts));game.start()
+            game=backend.start_game(game_socket,endpoint,scripts) if backend else multiprocessing.Process(target=game_server,args=(game_socket,endpoint,scripts))
+            if not backend:game.start()
             for _ in range(100):
                 if game_socket.exists():break
                 time.sleep(.03)

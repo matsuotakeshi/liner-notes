@@ -92,6 +92,9 @@ def install(destdir,prefix,python,unitdir='/usr/local/lib/systemd/system'):
     for name in ('liner-notes-door-broker.service','liner-notes-door-isolation.service'):
         content=(ROOT/'linux'/name).read_text().replace('@PREFIX@',prefix).replace('@PYTHON@',python).encode()
         put(share+'/door-services/'+name,content)
+    for role in ('broker','isolation'):
+        content=(ROOT/'linux'/('door-'+role+'.in')).read_text().replace('@PREFIX@',prefix).replace('@PYTHON@',python).encode()
+        put(prefix+'/libexec/liner-notes/door-'+role,content,0o755)
     print('Installed programs and samples. Existing settings preserved; accounts, data and services unchanged.')
 
 

@@ -26,3 +26,13 @@
 /var/log/liner-notes-link(/.*)? gen_context(system_u:object_r:liner_notes_link_log_t,s0)
 /var/lib/liner-notes/lrz-resume\.json -- gen_context(system_u:object_r:liner_notes_transfer_receipt_t,s0)
 /var/backups/liner-notes(/.*)? gen_context(system_u:object_r:liner_notes_backup_t,s0)
+
+/usr/libexec/liner-notes/door-broker -- gen_context(system_u:object_r:liner_notes_broker_exec_t,s0)
+/usr/libexec/liner-notes/door-isolation -- gen_context(system_u:object_r:liner_notes_isolation_exec_t,s0)
+/etc/liner-notes/door-broker\.json -- gen_context(system_u:object_r:liner_notes_broker_etc_t,s0)
+/etc/liner-notes/door-isolation\.json -- gen_context(system_u:object_r:liner_notes_isolation_etc_t,s0)
+/run/liner-notes-door-broker(/.*)? gen_context(system_u:object_r:liner_notes_broker_run_t,s0)
+/run/liner-notes-door-isolation(/.*)? gen_context(system_u:object_r:liner_notes_isolation_run_t,s0)
+/var/lib/liner-notes-door-isolation(/.*)? gen_context(system_u:object_r:liner_notes_isolation_state_t,s0)
+/var/lib/liner-notes-door-isolation/run-[0-9a-f]+(/.*)? gen_context(system_u:object_r:liner_notes_door_drop_t,s0)
+/var/lib/liner-notes-door-slots(/.*)? gen_context(system_u:object_r:liner_notes_door_data_t,s0)

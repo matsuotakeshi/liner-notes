@@ -64,6 +64,32 @@ class Core(unittest.TestCase):
         with self.assertRaises(Denied):self.opened(session='bad\nname')
         with self.assertRaises(Denied):self.opened(door=3)
 
+class Load(unittest.TestCase):
+    def test_128_live_members_and_repeated_generations_stay_bounded(self):
+        now=[0]
+        b=Broker('load',{40:[1]},clock=lambda:now[0],capacity=128,session_ttl=60)
+        previous=[]
+        for generation in range(8):
+            live=[]
+            for i in range(128):
+                session=b.open(i+1,1,'s'+str(i),generation)
+                ticket=b.issue(session)
+                result=b.consume(40,1,'load',ticket)
+                live.append((session,result['lease']))
+                with self.assertRaises(Denied):b.consume(40,1,'load',ticket)
+            self.assertEqual((len(b.sessions),len(b.leases),len(b.generations)),(128,128,128))
+            self.assertFalse(b.tickets)
+            with self.assertRaises(Denied):b.open(999,1,'overflow',0)
+            for old,lease in previous:
+                b.close(old)
+                with self.assertRaises(Denied):b.check(40,1,'load',lease)
+            for i,(_,lease) in enumerate(live):
+                self.assertEqual(b.check(40,1,'load',lease)['member'],i+1)
+            previous=live
+        now[0]=61;b.sweep()
+        self.assertFalse(b.sessions or b.leases or b.tickets or b.generations)
+        b.open(1,1,'fresh-after-expiry',0)
+
 class Consumer(unittest.TestCase):
     def test_rpc_deadline_covers_trickled_response(self):
         connection=Mock();connection.__enter__=Mock(return_value=connection);connection.__exit__=Mock(return_value=False)
@@ -139,6 +165,22 @@ class Protocol(unittest.IsolatedAsyncioTestCase):
         reader.feed_eof();await task
         check=await self.request(40,dict(op='check',door=1,bbs='bbs',token=result['lease']))
         self.assertIn(b'"ok":false',check)
+    async def test_128_parallel_issuers_revoke_without_disturbing_survivors(self):
+        live=await asyncio.gather(*(self.live_issuer('parallel'+str(i)) for i in range(128)))
+        try:
+            leases=[self.b.consume(40,1,'bbs',json.loads(writer.data)['result']['ticket'])['lease']
+                    for reader,writer,task in live]
+            self.assertEqual(len(self.server.clients),128)
+            for reader,writer,task in live[:64]:reader.feed_eof()
+            await asyncio.wait_for(asyncio.gather(*(task for _,_,task in live[:64])),5)
+            for i,lease in enumerate(leases):
+                if i<64:
+                    with self.assertRaises(Denied):self.b.check(40,1,'bbs',lease)
+                else:self.assertEqual(self.b.check(40,1,'bbs',lease)['session'],'parallel'+str(i))
+        finally:
+            for reader,writer,task in live:reader.feed_eof()
+            await asyncio.wait_for(asyncio.gather(*(task for _,_,task in live)),5)
+        self.assertFalse(self.server.clients or self.b.sessions or self.b.tickets or self.b.leases)
     async def test_malformed_request_has_no_secret_echo(self):
         result=await self.request(0,{'op':'wrong','secret':'do-not-echo'})
         self.assertIn(b'"ok":false',result);self.assertNotIn(b'do-not-echo',result)

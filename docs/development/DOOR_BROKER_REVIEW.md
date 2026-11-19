@@ -1,7 +1,9 @@
 # Door Broker implementation review, 2026-11-19
 
-This is the implementer's review, not an independent security sign-off. PR #135
-remains Draft. No production activation or private-host PR execution occurred.
+This is the implementer's review, not an independent security sign-off. The
+initial findings below describe the PR #135 candidate at the time of review;
+later sections record subsequent changes, not retrospective proof for that SHA.
+No production activation or private-host PR execution occurred.
 
 | Finding | Change | Evidence to require |
 | --- | --- | --- |
@@ -55,3 +57,71 @@ admitted CI jail hostname and jail flag. The normal non-root native tests only
 signal their own isolated reaper subtree. A platform skip is not a success for
 that platform. Exact Actions results belong to the PR/check SHA, not an earlier
 candidate. No existing successful result is reassigned to this revision.
+
+## Linux service and MAC candidate
+
+Current grouped work adds labelled fixed entrypoints, separate Broker/supervisor/
+consumer domains, compiled-policy deny checks, opt-in installation contracts and
+an adapter running the existing full Door scenario through systemd on trusted
+main. See [operation and recovery](DOOR_LINUX_OPERATIONS.md). Working-directory
+admission now rejects unsafe ancestors, symlinks and foreign ownership. No
+runtime reset or fallback was introduced.
+
+The 128-member/eight-generation and concurrent-handler tests exercise bounded
+state growth, capacity refusal, lease preservation and final cleanup. They do not
+simulate host-wide exhaustion. Existing fault injection remains. Security checks
+cover no Broker/BBS impersonation, one-use tickets, per-mutation expiry, UID/FD
+separation, and MAC refusal; root compromise is outside this boundary.
+
+Validation still required for this revision: Hosted policy compilation and RPM
+lifecycle, same-SHA native systemd/Enforcing lifecycle, and independent security
+review. The updated native helper's protected-domain list requires an explicitly
+authorized installed-helper refresh, never bypassing its workflow hash check.
+The native mock consumer is not AREA-PC88: real-game evidence must name both
+source SHAs and cannot be inferred from a synthetic game or an earlier run.
+
+### Avoid inherited daemon-cluster socket permissions
+
+PR #141 at `07fb9448370329bd4c1e6d73ba88de42c9205bca` failed the compiled
+policy graph check in Actions job `135644083285`, run `44548102338`. Policy
+compilation and both RPM builds completed; the failure was a forbidden
+`liner_notes_t` to `liner_notes_broker_t` Unix socket `connectto` rule inherited
+from `allow daemon daemon:unix_stream_socket connectto`, conditional on
+`daemons_enable_cluster_mode`. The check must not ignore conditional rules or
+turn the host boolean off to mask the grant. This is a candidate MAC-policy
+boundary defect; the separate kernel-UID Broker admission remains unchanged.
+
+Use `init_domain` for only the three new roles, retaining the explicit
+NoNewPrivileges transition. Unlike `init_daemon_domain`, this interface does not
+join the generic daemon attribute. Reference definitions:
+[SELinux policy init interfaces](https://github.com/fedora-selinux/selinux-policy/blob/rawhide/policy/modules/system/init.if).
+The compiled graph now additionally requires absence from `daemon`, presence of
+the init-to-entrypoint type transition and `nnp_transition`, and rejects Web/link
+connections to Broker. Existing allow/deny checks remain unchanged. The stable
+BBS/Web/link domains and all runtime authentication code are unchanged.
+
+Local checks cannot compile the Rocky policy on Windows. Hosted policy CI must
+validate the resulting graph and RPM lifecycle; exact-main Enforcing acceptance
+still follows merge and the authorized protected-helper update. No VM or
+production changes are needed for this correction.
+
+### Separate interpreter execution from resource capabilities
+
+At `4fb17f2961fac5b0e43f4f71bb22527da474c816`, run `44551466350`, job
+`135656031689`, the daemon membership, init transitions, data isolation and
+socket allow/deny checks passed. The later capability check found Broker's
+inherited `sys_resource` permission conditional on `corecmd_bin_sys_resource`.
+`corecmd_exec_bin(liner_notes_domain)` assigns `sys_resource_type` to its input,
+so the three new services acquired an unintended privilege through the shared
+attribute. The test remains strict about conditional rules.
+
+Preserve `corecmd_exec_bin` on the six pre-existing domains. For the three new
+services, use only bin_t directory/symlink traversal and `can_exec`, without the
+sys_resource_type membership or broad base-readonly-file execution grant. The
+compiled-policy check requires absence from that attribute, no sys_resource
+allow (including the root supervisor), and retained interpreter execution.
+The separate zero-capability check for Broker/consumer remains unchanged.
+Reference: [corecommands interfaces](https://github.com/fedora-selinux/selinux-policy/blob/rawhide/policy/modules/kernel/corecommands.if).
+This modifies policy, not BBS authentication or test acceptance thresholds.
+The new compiled graph/RPM lifecycle and native Enforcing execution remain CI
+gates; local Windows checks do not substitute for them.

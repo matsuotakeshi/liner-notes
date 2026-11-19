@@ -13,6 +13,9 @@ PATHS = ('/usr/sbin/liner-notes', '/usr/sbin/liner-notes-web',
          '/etc/liner-notes', '/var/lib/liner-notes', '/var/lib/liner-notes-web',
          '/var/lib/liner-notes-link', '/var/lib/liner-notes-doors',
          '/var/backups/liner-notes',
+         '/usr/libexec/liner-notes/door-broker', '/usr/libexec/liner-notes/door-isolation',
+         '/run/liner-notes-door-broker', '/run/liner-notes-door-isolation',
+         '/var/lib/liner-notes-door-isolation', '/var/lib/liner-notes-door-slots',
          '/var/log/liner-notes', '/var/log/liner-notes-web', '/var/log/liner-notes-link',
          '/run/liner-notes', '/run/liner-notes-web', '/run/liner-notes-link')
 
