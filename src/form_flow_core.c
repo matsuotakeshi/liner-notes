@@ -1,5 +1,4 @@
 #include "form_flow_core.h"
-#include <stdio.h>
 #include <string.h>
 static const char *application_fields[]={"REALNAME","KANA","ADDRESS","PHONE","BIRTHDAY","MACHINE","HANDLE","LOCATION","OCCUPATION","INTERESTS","WEBSITE","CONTACT","FROMBBS","SYSOPNOTE"};
 static const char *profile_fields[]={"HANDLE","BIO","LOCATION","OCCUPATION","INTERESTS","WEBSITE","CONTACT","MACHINE","BIRTHDAY","REALNAME","KANA","ADDRESS","PHONE","GROUP"};
@@ -23,9 +22,13 @@ ApplicationEffect application_form_input(ApplicationForm *f,ApplicationInput inp
     const char *field=application_form_field(f);
     if(!field || !valid || strlen(value)>320)return APPLICATION_INVALID;
     for(const unsigned char *p=(const unsigned char *)value;*p;p++)if(*p<32 || *p==127)return APPLICATION_INVALID;
-    size_t used=strlen(f->body),required=strlen(field)+strlen(value)+2;
+    size_t used=strlen(f->body),key_size=strlen(field),value_size=strlen(value);
+    size_t required=key_size+value_size+2;
     if(used>=sizeof(f->body) || required>=sizeof(f->body)-used)return APPLICATION_INVALID;
-    snprintf(f->body+used,sizeof(f->body)-used,"%s|%s\n",field,value);
+    /* The complete record and its terminator fit; do not format/truncate it. */
+    char *out=f->body+used;
+    memcpy(out,field,key_size);out+=key_size;*out++='|';
+    memcpy(out,value,value_size);out+=value_size;*out++='\n';*out=0;
     return ++f->step>(int)APPLICATION_FORM_FIELDS?APPLICATION_REVIEW:APPLICATION_PROMPT;
 }
 unsigned profile_form_count(int search) { return search?14u:13u; }

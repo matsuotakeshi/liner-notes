@@ -71,7 +71,7 @@ FIX = {
  'default': ('統合マニュアルの該当設定・所有者・依存関係を確認し、修正後に再診断してください。', 'Review the corresponding manual settings, ownership and dependencies, then rerun the check.'),
 }
 FLAGS = {'--menu', '--telnet', '--rtbbs-member-policy', '--userlog-public'}
-VALUES = set('ui-policy ui-default ui-allow ssh-port ssh-bind ssh-host-key ssh-member-keys ssh-attempts ssh-timeout database database-structured limits timezone sysinfo goodbye doors link-accounts zmodem-helper vault-dir menu-dir help-dir admins lang bind banner disable registration id-mode id-prefix id-digits id-first login-text-dir registration-form max-articles max-mail max-user-posts gather-count user-log chat-log userlog-keep idle-seconds level-seconds time-warning time-grace'.split())
+VALUES = set('ui-policy ui-default ui-allow ssh-port ssh-bind ssh-host-key ssh-member-keys ssh-attempts ssh-timeout database database-structured limits timezone sysinfo goodbye doors door-isolation-socket link-accounts zmodem-helper vault-dir menu-dir help-dir admins lang bind banner disable registration id-mode id-prefix id-digits id-first login-text-dir registration-form max-articles max-mail max-user-posts gather-count user-log chat-log userlog-keep idle-seconds level-seconds time-warning time-grace'.split())
 
 
 class InspectionChanged(ValueError):

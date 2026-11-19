@@ -1,0 +1,28 @@
+[Unit]
+Description=Liner Notes Door authorization Broker (opt-in candidate)
+Before=liner-notes-door-isolation.service
+
+[Service]
+Type=simple
+User=liner_notes_broker
+Group=liner_notes_broker
+SupplementaryGroups=liner_notes_games
+WorkingDirectory=/
+RuntimeDirectory=liner-notes-door-broker
+RuntimeDirectoryMode=0755
+ExecStartPre=@PYTHON@ -E -s -B @PREFIX@/share/liner-notes/scripts/door_broker.py --config /etc/liner-notes/door-broker.json --check-config
+ExecStart=@PYTHON@ -E -s -B @PREFIX@/share/liner-notes/scripts/door_broker.py --config /etc/liner-notes/door-broker.json
+Restart=no
+UMask=0077
+LimitCORE=0
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectSystem=strict
+ProtectHome=yes
+RestrictAddressFamilies=AF_UNIX
+CapabilityBoundingSet=
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

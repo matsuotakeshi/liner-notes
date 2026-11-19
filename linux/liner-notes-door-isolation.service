@@ -1,0 +1,37 @@
+[Unit]
+Description=Liner Notes isolated Door launcher (opt-in candidate)
+Requires=liner-notes-door-broker.service
+After=liner-notes-door-broker.service
+Before=liner-notes.service
+
+[Service]
+Type=simple
+User=root
+Group=root
+WorkingDirectory=/
+RuntimeDirectory=liner-notes-door-isolation
+RuntimeDirectoryMode=0755
+StateDirectory=liner-notes-door-isolation
+StateDirectoryMode=0711
+ExecStartPre=@PYTHON@ -E -s -B @PREFIX@/share/liner-notes/scripts/door_isolation.py --config /etc/liner-notes/door-isolation.json --check-config
+ExecStart=@PYTHON@ -E -s -B @PREFIX@/share/liner-notes/scripts/door_isolation.py --config /etc/liner-notes/door-isolation.json
+Restart=no
+# Workers revoke their leases and reap descendants when the parent pipe closes.
+# Do not kill them part-way through cleanup or delete the persistent slot files.
+KillMode=process
+SendSIGKILL=no
+TimeoutStopSec=infinity
+UMask=0077
+LimitCORE=0
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectSystem=strict
+ProtectHome=yes
+ReadWritePaths=/var/lib/liner-notes-door-slots
+CapabilityBoundingSet=CAP_SETUID CAP_SETGID CAP_KILL CAP_CHOWN CAP_DAC_OVERRIDE CAP_FOWNER
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

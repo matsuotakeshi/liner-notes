@@ -190,6 +190,8 @@ def main():
         link_check.write_text("import sys,asyncio,tempfile\nfrom pathlib import Path\nsys.path[:0]=['/ci/source/tests','/ci/source']\nimport test_link_service as t\nt.ROOT=Path('/usr/local/share/liner-notes')\nwith tempfile.TemporaryDirectory(prefix='jail-link-') as d: asyncio.run(t.exercise('/usr/local/sbin/liner-notes',Path(d)))\n")
         link_check.chmod(0o644)
         command([sys.executable, '-I', link_check], user=account, timeout=300)
+        # Trusted main only, within this existing disposable VNET jail.
+        command([sys.executable, ROOT/'tests/test_door_broker_linux.py', binary], timeout=180)
         # Planned recovery, not automatic rollback: restore the stopped DB copy
         # together with the old package, never run an old binary on an unknown
         # new DB schema. No pkg-delete/pkg-add pair is used.
