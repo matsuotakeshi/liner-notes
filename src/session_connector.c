@@ -34,10 +34,6 @@ static void connector_link(Session *s,char *line);
 
 int session_impl_binary_result(Session *s,const BoardResult *completion,uint64_t now) {
     (void)now;
-    if(completion->binary_enter) { s->zmodem=1;session_impl_page_clear(s);s->reader.active=0;if(s->zmodem_protocol)session_impl_queue_text(s,s->ui.language==LANGUAGE_JA?"選択した方式で端末の転送を開始してください。\r\n":"Start terminal transfer using the selected protocol.\r\n");else session_impl_queue_text(s,ui_text(&s->ui,(s->zmodem_receive==6 || s->zmodem_receive==9 || s->zmodem_receive==11 || s->zmodem_receive==12)?MSG_ZMODEM_BATCH_UPLOAD_READY:(s->zmodem_receive==2 || s->zmodem_receive==10)?MSG_ZMODEM_BATCH_READY:MSG_ZMODEM_READY)); }
-        else { session_impl_emit(s,completion->text);session_impl_prompt(s); }
-        return 1;
-    }
     if(completion->binary_enter) {
         s->binary_menu=s->ui.enabled;s->ui.enabled=0;session_impl_page_clear(s);s->binary=1;connector_reader_enter(&s->binary_reader,now);
         session_impl_queue_text(s,"BINARY READY binary-v1\r\n");return 1;
@@ -53,11 +49,11 @@ int session_impl_binary_result(Session *s,const BoardResult *completion,uint64_t
 
 static ClassicInput classic_input_state(const Session *s) {
     return (ClassicInput){.memo=s->memo_input,
-        .selection=s->session_impl_classic_input==CI_FILE_ACTION || s->session_impl_classic_input==CI_BATCH,
-        .application=s->application.step,.classic=s->session_impl_classic_input,.secret=session_secret(s),
+        .selection=s->classic_input==CI_FILE_ACTION || s->classic_input==CI_BATCH,
+        .application=s->application.step,.classic=s->classic_input,.secret=session_secret(s),
         .input=s->ui.input,.mail_input=s->mail_input,.paging=!!s->page[0],.binary=s->binary,.transfer=s->zmodem,
         .editing=s->editing,.chatting=s->chatting,.gather=s->gather.mode,.talk=s->outside_talk,
-        .line_editor=s->editor_line,.session_impl_editor_input=s->session_impl_editor_input,.mail_mode=s->mail_mode};
+        .line_editor=s->editor_line,.editor_input=s->editor_input,.mail_mode=s->mail_mode};
 }
 
 int session_uppercase(const Session *s,const char *line,size_t size) {
@@ -143,7 +139,7 @@ int session_impl_connector_line(Session *s,char *line,size_t size) {
             .editing=s->editing,.editor_kind=(unsigned char)s->draft.op,.secret=session_secret(s),.password_mode=s->password_mode,
             .mail=s->mail_mode,.mail_current=s->mail.current,.chat=s->chatting,.talk=s->outside_talk,
             .pager=!!s->page[0],.gather=s->gather.mode,
-            .input=s->application.step?s->application.step:s->session_impl_classic_input?s->session_impl_classic_input:s->memo_input?s->memo_input:s->mail_input?s->mail_input:s->talk_select,
+            .input=s->application.step?s->application.step:s->classic_input?s->classic_input:s->memo_input?s->memo_input:s->mail_input?s->mail_input:s->talk_select,
             .confirmation=s->mail.delete_id,.binary=s->binary,.door=s->door,.members=s->member_mode,
             .feature_mail=board_feature_enabled("mail"),.feature_chat=board_feature_enabled("chat"),.feature_vault=board_feature_enabled("vault")
         };

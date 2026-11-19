@@ -38,12 +38,12 @@ int session_impl_mail_result(Session *s,const BoardResult *completion,uint64_t n
         if(effect==MAIL_DRAFT_ATTACH)s->draft.mail_attachments=completion->mail_attachments;
         if(effect==MAIL_DRAFT_OPEN) {
             memset(&s->draft,0,sizeof(s->draft));s->draft.op='m';s->draft.action='S';s->draft.number=completion->mail_to;s->draft.cursor=completion->mail_parent;s->draft.mail_attachments=completion->mail_attachments;
-            strcpy(s->draft.title,completion->draft_title);strcpy(s->draft.body,completion->draft_body);s->mail_revision=completion->mail_revision;s->editing=1;s->session_impl_editor_input=0;s->editor_at=1;session_impl_undo_clear(s);
+            strcpy(s->draft.title,completion->draft_title);strcpy(s->draft.body,completion->draft_body);s->mail_revision=completion->mail_revision;s->editing=1;s->editor_input=0;s->editor_at=1;session_impl_undo_clear(s);
         }
         if(effect==MAIL_DRAFT_SAVED) { OPENSSL_cleanse(&s->draft,sizeof(s->draft));s->editing=0;s->editor_upload=s->editor_confirm=s->editor_upload_question=0;s->mail_revision=0;session_impl_undo_clear(s); }
         if(effect==MAIL_DRAFT_SENT || effect==MAIL_DRAFT_RETRY) {
             if(effect==MAIL_DRAFT_SENT) { OPENSSL_cleanse(&s->draft,sizeof(s->draft));s->editing=0;s->editor_upload=s->editor_confirm=s->editor_upload_question=0; }
-            else { s->editing=1;s->session_impl_editor_input=0;s->editor_at=1; }
+            else { s->editing=1;s->editor_input=0;s->editor_at=1; }
         }
 
         mail_navigation_page(&s->mail,session_impl_mail_event(completion->mail_action),completion->mail_next);

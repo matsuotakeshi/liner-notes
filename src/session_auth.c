@@ -13,6 +13,7 @@
 #include "activity.h"
 #include "vault.h"
 #include "session_internal.h"
+#include "session_policy_core.h"
 #include "members.h"
 #include "catalog.h"
 #include "store_limits.h"
@@ -54,30 +55,31 @@ int session_impl_application_input(Session *s,char *line) {
 }
 
 int session_impl_password_input(Session *s,char *line) {
+    PasswordAction action=password_flow_action(s->password_mode,s->ui.enabled,!strcmp(line,"/CANCEL"),strlen(line),!strcmp(line,s->old_password),!strcmp(line,s->new_password));
     if(s->password_mode=='f' || s->password_mode=='v' || s->password_mode=='w') {
         int mode=s->password_mode;s->password_mode=0;s->auth_after=s->now+1000;
-        if(!strcmp(line,"/CANCEL"))session_impl_emit(s,"CANCELLED\r\n");
-        else if(strlen(line)<8 || strlen(line)>128)session_impl_emit(s,"ERR password 8..128 bytes\r\n");
-        else if(mode=='v') { strcpy(s->new_password,line);s->password_mode='w';session_impl_emit(s,"CONFIRM PASSWORD\r\n"); }
-        else if(mode=='w' && strcmp(line,s->new_password))session_impl_emit(s,"ERR password mismatch\r\n");
+        if(action==PASSWORD_CANCEL)session_impl_emit(s,"CANCELLED\r\n");
+        else if(action==PASSWORD_LENGTH)session_impl_emit(s,"ERR password 8..128 bytes\r\n");
+        else if(action==PASSWORD_FILE_CONFIRM) { strcpy(s->new_password,line);s->password_mode='w';session_impl_emit(s,"CONFIRM PASSWORD\r\n"); }
+        else if(action==PASSWORD_MISMATCH)session_impl_emit(s,"ERR password mismatch\r\n");
         else { BoardRequest q={0};q.op='Y';q.action=mode=='f'?VAULT_CMD_UNLOCK:VAULT_CMD_PASSWORD;snprintf(q.body,sizeof(q.body),"%s|%s",s->filepass_path,line);session_impl_submit(s,&q);OPENSSL_cleanse(&q,sizeof(q)); }
         if(mode!='v')OPENSSL_cleanse(s->new_password,sizeof(s->new_password));
         OPENSSL_cleanse(line,strlen(line));return 1;
     }
     if(s->password_mode=='b') {
         s->password_mode=0;s->auth_after=s->now+1000;
-        if(!strcmp(line,"/CANCEL"))session_impl_emit(s,"CANCELLED\r\n");
-        else if(strlen(line)<8 || strlen(line)>128)session_impl_emit(s,"ERR password 8..128 bytes\r\n");
+        if(action==PASSWORD_CANCEL)session_impl_emit(s,"CANCELLED\r\n");
+        else if(action==PASSWORD_LENGTH)session_impl_emit(s,"ERR password 8..128 bytes\r\n");
         else { BoardRequest q={0};q.op='(';q.action='U';q.number=s->board_enter;q.cursor=s->board_lock;strcpy(q.password,line);session_impl_submit(s,&q);OPENSSL_cleanse(&q,sizeof(q)); }
         OPENSSL_cleanse(line,strlen(line));return 1;
     }
     if(s->password_mode=='o' || s->password_mode=='p' || s->password_mode=='c') {
         int mode=s->password_mode;
-        if(!strcmp(line,"/CANCEL")) { session_impl_emit(s,"CANCELLED\r\n"); }
-        else if(strlen(line)<8 || strlen(line)>128) { session_impl_emit(s,"ERR password 8..128 bytes\r\n"); }
-        else if(mode=='o') { strcpy(s->old_password,line); s->password_mode='p'; session_impl_emit(s,"NEW PASSWORD\r\n"); return 1; }
-        else if(mode=='p' && strcmp(line,s->old_password)) { strcpy(s->new_password,line); s->password_mode='c'; session_impl_emit(s,"CONFIRM PASSWORD\r\n"); return 1; }
-        else if(mode=='c' && !strcmp(line,s->new_password)) {
+        if(action==PASSWORD_CANCEL) { session_impl_emit(s,"CANCELLED\r\n"); }
+        else if(action==PASSWORD_LENGTH) { session_impl_emit(s,"ERR password 8..128 bytes\r\n"); }
+        else if(action==PASSWORD_STORE_OLD) { strcpy(s->old_password,line); s->password_mode='p'; session_impl_emit(s,"NEW PASSWORD\r\n"); return 1; }
+        else if(action==PASSWORD_STORE_NEW) { strcpy(s->new_password,line); s->password_mode='c'; session_impl_emit(s,"CONFIRM PASSWORD\r\n"); return 1; }
+        else if(action==PASSWORD_CHANGE) {
             BoardRequest q={0}; q.op=s->boardpass_target?'(':s->reset_target?'~':'k';q.number=s->boardpass_target?s->boardpass_target:s->reset_target;q.action=s->boardpass_target?'S':1; strcpy(q.password,s->old_password); strcpy(q.new_password,s->new_password);
             session_impl_submit(s,&q); OPENSSL_cleanse(&q,sizeof(q));
         } else session_impl_emit(s,mode=='c'?"ERR password mismatch\r\n":"ERR password unchanged\r\n");
@@ -86,10 +88,10 @@ int session_impl_password_input(Session *s,char *line) {
         return 1;
     }
     if(s->password_mode) {
-        if(s->ui.enabled && !strcmp(line,"/CANCEL")) { s->password_mode=0; session_impl_emit(s,"CANCELLED\r\n"); return 1; }
+        if(s->ui.enabled && action==PASSWORD_CANCEL) { s->password_mode=0; session_impl_emit(s,"CANCELLED\r\n"); return 1; }
         BoardRequest q={0}; q.op=(char)s->password_mode; strcpy(q.username,s->username);if(q.op=='g') { strcpy(q.body,s->application.body);application_form_clear(&s->application); }
         s->password_mode=0; s->auth_after=s->now+1000;
-        if(strlen(line)<8 || strlen(line)>128) session_impl_emit(s,"ERR password 8..128 bytes\r\n");
+        if(action==PASSWORD_LENGTH) session_impl_emit(s,"ERR password 8..128 bytes\r\n");
         else { strcpy(q.password,line); session_impl_submit(s,&q); }
         OPENSSL_cleanse(q.password,sizeof(q.password)); OPENSSL_cleanse(line,strlen(line)); return 1;
     }
@@ -137,7 +139,7 @@ int session_impl_account_command(Session *s,char *line) {
     } else if(!strcmp(line,"LOGOUT")) {
         if(preference_exit_begin(&s->preferences,s->user,PREF_EXIT_LOGOUT)) { session_impl_command_core(s,"PREFS SAVE");preference_exit_submitted(&s->preferences,s->pending);return 1; }
         s->preferences.exit_action=PREF_EXIT_NONE;session_impl_selection_reset(s);
-        s->session_impl_classic_input=0;s->classic_id=0;s->classic_area=CM_MAIN;check_traversal_reset(&s->check);memset(s->vault_grants,0,sizeof(s->vault_grants));
+        s->classic_input=0;s->classic_id=0;s->classic_area=CM_MAIN;check_traversal_reset(&s->check);memset(s->vault_grants,0,sizeof(s->vault_grants));
         chat_disconnect(s->id);s->mail_mode=0;mail_navigation_clear_filter(&s->mail);
         memset(s->board_grants,0,sizeof(s->board_grants));batch_reset(&s->batch);s->game_menu=0;s->vault_mode=0;notification_mail_discard(&s->notifications);s->user=0;s->ui.admin=0;s->ui.sigop=0;s->reset_target=0; s->user_epoch=0; s->current=0; s->board=1; memset(&s->draft,0,sizeof(s->draft)); s->draft_revision=0; session_impl_undo_clear(s); session_impl_emit(s,"LOGGED OUT\r\n");
     }

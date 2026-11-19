@@ -34,7 +34,10 @@ def catalogs():
             assert '%' not in fmt.sub('',text),(lang,key,'unsupported format')
     # Every existing user-visible error emitted by the runtime/worker must have a mapping.
     ui=(ROOT/'src/ui.c').read_text(encoding='utf-8')
-    for name in ['runtime.c','session.c','board.c']:
+    # Preserve the former session.c coverage after decomposition. The classic
+    # adapter was previously the separately included classic_commands.inc.
+    session_sources = ['session.c'] + sorted(p.name for p in (ROOT/'src').glob('session_*.c') if not p.name.endswith('_core.c') and p.name != 'session_classic.c')
+    for name in ['runtime.c','board.c'] + session_sources:
         source=(ROOT/'src'/name).read_text(encoding='utf-8')
         errors=set(re.findall(r'"(ERR [^"\\]+)',source))
         assert all('"'+error+'"' in ui for error in errors),(name,errors)

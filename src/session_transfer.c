@@ -13,6 +13,7 @@
 #include "activity.h"
 #include "vault.h"
 #include "session_internal.h"
+#include "session_policy_core.h"
 #include "members.h"
 #include "catalog.h"
 #include "store_limits.h"
@@ -136,7 +137,10 @@ int session_impl_transfer_result(Session *s,const BoardResult *completion,uint64
     (void)now;
     if(s->zmodem_start) {
         s->zmodem_start=0;
-    
+        if(completion->binary_enter) { s->zmodem=1;session_impl_page_clear(s);s->reader.active=0;if(s->zmodem_protocol)session_impl_queue_text(s,s->ui.language==LANGUAGE_JA?"選択した方式で端末の転送を開始してください。\r\n":"Start terminal transfer using the selected protocol.\r\n");else session_impl_queue_text(s,ui_text(&s->ui,(s->zmodem_receive==6 || s->zmodem_receive==9 || s->zmodem_receive==11 || s->zmodem_receive==12)?MSG_ZMODEM_BATCH_UPLOAD_READY:(s->zmodem_receive==2 || s->zmodem_receive==10)?MSG_ZMODEM_BATCH_READY:MSG_ZMODEM_READY)); }
+        else { session_impl_emit(s,completion->text);session_impl_prompt(s); }
+        return 1;
+    }
     return 0;
 }
 
@@ -148,18 +152,19 @@ void session_transfer_receipt(Session *s,const char *text) {
 void session_zmodem_finish(Session *s,int success,unsigned id,uint64_t size,int recovery) {
     s->zmodem=0;s->zmodem_start=0;
     char text[256];
-    if(!success && recovery>=2 && recovery<=5) {
+    TransferNotice notice=transfer_notice(success,s->zmodem_receive,s->zmodem_protocol,recovery);
+    if(notice==TRANSFER_DETAIL) {
         static const char *ja[]={"再開できる中断データがありません。登録先ボードを確認してください。", "再開時の説明文または単一／一括の指定が一致しません。説明文を省略すると保存済みの説明を使います。", "受信プログラムの再開検証記録がないか一致しません。管理者は liner-notes-check-resume を実行してください。", "転送がタイムアウトしました。受信中はデータの増加がない場合に停止します。"};
         static const char *en[]={"No interrupted transfer in this board. Check the original destination.", "Resume description or single/batch mode differs. Omit the description to reuse the saved value.", "Resume receiver verification is missing or stale. Ask the administrator to run liner-notes-check-resume.", "Transfer timed out. Reception stops when file data makes no progress."};
         snprintf(text,sizeof(text),"%s\r\n",(s->ui.language==LANGUAGE_JA?ja:en)[recovery-2]);
     }
-    else if(s->zmodem_protocol && !recovery) {
+    else if(notice==TRANSFER_PROTOCOL_OK || notice==TRANSFER_PROTOCOL_FAILED) {
         const char *names[]={"ZMODEM","XMODEM","YMODEM","YMODEM-G","M-LINK","TEXT","XMODEM-SUM","XMODEM-1K"};
         if(success)snprintf(text,sizeof(text),s->ui.language==LANGUAGE_JA?"%s 転送完了: %u (%llu バイト)\r\n":"%s transfer completed: %u (%llu bytes)\r\n",names[s->zmodem_protocol],id,(unsigned long long)size);
         else snprintf(text,sizeof(text),s->ui.language==LANGUAGE_JA?"%s 転送は失敗または中断しました。\r\n":"%s transfer failed or cancelled.\r\n",names[s->zmodem_protocol]);
     }
-    else if(success && (s->zmodem_receive==11 || s->zmodem_receive==12))snprintf(text,sizeof(text),s->ui.language==LANGUAGE_JA?"メール添付用に %u ファイル（%llu バイト）を受信しました。MAILFILES で番号を確認できます。\r\n":"Private mail batch ready: %u files (%llu bytes). Use MAILFILES for IDs.\r\n",id,(unsigned long long)size);
-    else if(success)snprintf(text,sizeof(text),ui_text(&s->ui,(s->zmodem_receive==6 || s->zmodem_receive==9)?MSG_ZMODEM_BATCH_UPLOADED:(s->zmodem_receive==4 || s->zmodem_receive==8)?MSG_MAIL_UPLOAD_DONE:(s->zmodem_receive==2 || s->zmodem_receive==10)?MSG_ZMODEM_BATCH_SENT:(s->zmodem_receive && s->zmodem_receive!=5)?MSG_ZMODEM_RECEIVED:MSG_ZMODEM_SENT),id,(unsigned long long)size);
-    else snprintf(text,sizeof(text),"%s",ui_text(&s->ui,recovery?MSG_ZMODEM_RECOVERY:MSG_ZMODEM_FAILED));
+    else if(notice==TRANSFER_MAIL_BATCH)snprintf(text,sizeof(text),s->ui.language==LANGUAGE_JA?"メール添付用に %u ファイル（%llu バイト）を受信しました。MAILFILES で番号を確認できます。\r\n":"Private mail batch ready: %u files (%llu bytes). Use MAILFILES for IDs.\r\n",id,(unsigned long long)size);
+    else if(success)snprintf(text,sizeof(text),ui_text(&s->ui,notice==TRANSFER_VAULT_BATCH?MSG_ZMODEM_BATCH_UPLOADED:notice==TRANSFER_MAIL_UPLOAD?MSG_MAIL_UPLOAD_DONE:notice==TRANSFER_BATCH_SENT?MSG_ZMODEM_BATCH_SENT:notice==TRANSFER_RECEIVED?MSG_ZMODEM_RECEIVED:MSG_ZMODEM_SENT),id,(unsigned long long)size);
+    else snprintf(text,sizeof(text),"%s",ui_text(&s->ui,notice==TRANSFER_RECOVERY?MSG_ZMODEM_RECOVERY:MSG_ZMODEM_FAILED));
     session_impl_queue_text(s,text);session_impl_prompt(s);
 }

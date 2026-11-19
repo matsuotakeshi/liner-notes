@@ -76,7 +76,7 @@ void session_impl_command(Session *s,char *line) {
         }
     }
     if(s->password_mode || s->editing || s->application.step) { session_impl_command_core(s,line); session_impl_prompt(s); return; }
-    if(!s->ui.input && !s->session_impl_classic_input && !s->mail_input && !s->mail.delete_id && (!strcmp(line,"LANG") || !strncmp(line,"LANG ",5))) {
+    if(!s->ui.input && !s->classic_input && !s->mail_input && !s->mail.delete_id && (!strcmp(line,"LANG") || !strncmp(line,"LANG ",5))) {
         if(line[4] && !language_parse(line+5,&s->ui.language)) session_impl_queue_text(s,ui_text(&s->ui,MSG_ERR_LANGUAGE));
         else {
             snprintf(mapped,sizeof(mapped),ui_text(&s->ui,MSG_LANGUAGE),language_code(s->ui.language));
@@ -84,7 +84,7 @@ void session_impl_command(Session *s,char *line) {
         }
         session_impl_prompt(s); return;
     }
-    if(!s->ui.input && !s->session_impl_classic_input && !s->mail_input && !s->mail.delete_id && s->ui.enabled && !*s->connector_token &&
+    if(!s->ui.input && !s->classic_input && !s->mail_input && !s->mail.delete_id && s->ui.enabled && !*s->connector_token &&
        (!strcmp(line,"GAME") || !strcmp(line,"GAMES"))) {
         if(!s->user) { session_impl_emit(s,"ERR login required\r\n");session_impl_prompt(s);return; }
         s->game_menu=1;s->vault_mode=s->mail_mode=s->gather.mode=0;s->classic_area=CM_MAIN;

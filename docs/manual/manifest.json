@@ -133,9 +133,20 @@
         "src/form_flow_core.h",
         "tests/test_form_flow_core.c",
         "src/session.h",
-        "src/classic_commands.inc",
+        "src/session_classic.c",
         "tests/test_adapters.c",
-        "tests/test_stage69_ui.py"
+        "tests/test_stage69_ui.py",
+        "src/session_auth.c",
+        "src/session_members.c",
+        "src/session_settings.c",
+        "src/session_commands.c",
+        "src/session_results.c",
+        "src/session_output.c",
+        "src/session_internal.h",
+        "src/session_policy_core.c",
+        "src/session_policy_core.h",
+        "tests/test_session_policy_core.c",
+        "tests/test_session_boundaries.py"
       ]
     },
     {
@@ -160,7 +171,21 @@
         "help/ja/adminboards.txt",
         "STAGE67.md",
         "STAGE71.md",
-        "src/session.c"
+        "src/session.c",
+        "src/session_board.c",
+        "src/session_reading.c",
+        "src/session_menu.c",
+        "src/session_classic.c",
+        "src/session_extended.c",
+        "src/session_commands.c",
+        "src/session_results.c",
+        "src/session_output.c",
+        "src/session_internal.h",
+        "src/session_policy_core.c",
+        "src/session_policy_core.h",
+        "tests/test_session_policy_core.c",
+        "tests/test_session_boundaries.py",
+        "tests/test_adapters.c"
       ]
     },
     {
@@ -181,8 +206,19 @@
         "src/traversal_protocol.c",
         "src/traversal_protocol.h",
         "tests/test_traversal_core.c",
-        "src/classic_commands.inc",
-        "tests/test_adapters.c"
+        "src/session_classic.c",
+        "tests/test_adapters.c",
+        "src/session_reading.c",
+        "src/session_extended.c",
+        "src/session_parse.c",
+        "src/session_commands.c",
+        "src/session_results.c",
+        "src/session_output.c",
+        "src/session_internal.h",
+        "src/session_policy_core.c",
+        "src/session_policy_core.h",
+        "tests/test_session_policy_core.c",
+        "tests/test_session_boundaries.py"
       ]
     },
     {
@@ -206,7 +242,19 @@
         "src/editor_view.h",
         "tests/test_editor_interface.c",
         "tests/test_editor_core.c",
-        "tests/test_adapters.c"
+        "tests/test_adapters.c",
+        "src/session_editor.c",
+        "src/session_classic.c",
+        "src/session_chat.c",
+        "src/session_auth.c",
+        "src/session_commands.c",
+        "src/session_results.c",
+        "src/session_output.c",
+        "src/session_internal.h",
+        "src/session_policy_core.c",
+        "src/session_policy_core.h",
+        "tests/test_session_policy_core.c",
+        "tests/test_session_boundaries.py"
       ]
     },
     {
@@ -232,7 +280,19 @@
         "tests/test_message_flow_core.c",
         "src/session.h",
         "tests/test_activity_core.py",
-        "tests/test_stage57.py"
+        "tests/test_stage57.py",
+        "src/session_mail.c",
+        "src/session_services.c",
+        "src/session_transfer.c",
+        "src/session_editor.c",
+        "src/session_commands.c",
+        "src/session_results.c",
+        "src/session_output.c",
+        "src/session_internal.h",
+        "src/session_policy_core.c",
+        "src/session_policy_core.h",
+        "tests/test_session_policy_core.c",
+        "tests/test_session_boundaries.py"
       ]
     },
     {
@@ -266,7 +326,17 @@
         "src/session.h",
         "tests/test_adapters.c",
         "tests/test_activity_core.py",
-        "tests/test_stage57.py"
+        "tests/test_stage57.py",
+        "src/session_chat.c",
+        "src/session_services.c",
+        "src/session_commands.c",
+        "src/session_results.c",
+        "src/session_output.c",
+        "src/session_internal.h",
+        "src/session_policy_core.c",
+        "src/session_policy_core.h",
+        "tests/test_session_policy_core.c",
+        "tests/test_session_boundaries.py"
       ]
     },
     {
@@ -298,7 +368,20 @@
         "src/list_navigation_protocol.c",
         "src/list_navigation_protocol.h",
         "tests/test_list_navigation_core.c",
-        "tests/test_stage69_ui.py"
+        "tests/test_stage69_ui.py",
+        "src/session_vault.c",
+        "src/session_transfer.c",
+        "src/session_classic.c",
+        "src/session_menu.c",
+        "src/session_extended.c",
+        "src/session_commands.c",
+        "src/session_results.c",
+        "src/session_output.c",
+        "src/session_internal.h",
+        "src/session_policy_core.c",
+        "src/session_policy_core.h",
+        "tests/test_session_policy_core.c",
+        "tests/test_session_boundaries.py"
       ]
     },
     {
@@ -331,7 +414,18 @@
         "tests/test_form_flow_core.c",
         "src/session.c",
         "src/session.h",
-        "src/classic_commands.inc"
+        "src/session_classic.c",
+        "src/session_settings.c",
+        "src/session_auth.c",
+        "src/session_extended.c",
+        "src/session_commands.c",
+        "src/session_results.c",
+        "src/session_output.c",
+        "src/session_internal.h",
+        "src/session_policy_core.c",
+        "src/session_policy_core.h",
+        "tests/test_session_policy_core.c",
+        "tests/test_session_boundaries.py"
       ]
     },
     {
@@ -357,7 +451,19 @@
         "src/session.c",
         "src/article_core.c",
         "src/article_core.h",
-        "src/article_repository.h"
+        "src/article_repository.h",
+        "src/session_auth.c",
+        "src/session_members.c",
+        "src/session_board.c",
+        "src/session_commands.c",
+        "src/session_results.c",
+        "src/session_output.c",
+        "src/session_internal.h",
+        "src/session_policy_core.c",
+        "src/session_policy_core.h",
+        "tests/test_session_policy_core.c",
+        "tests/test_session_boundaries.py",
+        "tests/test_adapters.c"
       ]
     },
     {
@@ -722,7 +828,19 @@
         "tests/test_binary_transfer.py",
         "src/connector_protocol.c",
         "src/connector_protocol.h",
-        "tests/test_connector_protocol.c"
+        "tests/test_connector_protocol.c",
+        "src/session_connector.c",
+        "src/session_transfer.c",
+        "src/session_menu.c",
+        "src/session_auth.c",
+        "src/session_commands.c",
+        "src/session_results.c",
+        "src/session_output.c",
+        "src/session_internal.h",
+        "src/session_policy_core.c",
+        "src/session_policy_core.h",
+        "tests/test_session_policy_core.c",
+        "tests/test_session_boundaries.py"
       ]
     },
     {

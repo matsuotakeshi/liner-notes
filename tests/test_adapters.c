@@ -437,5 +437,42 @@ int main(void) {
         session_dispose(&s);
     }
     puts("PASS: Japanese/English application review/restart/validation, secret-input handoff, personal-data erase and profile target revocation");
+    /* Exercise public entry points across the new independently linked modules. */
+    for(int lang=LANGUAGE_JA;lang<LANGUAGE_COUNT;lang++)for(int menu=0;menu<=1;menu++) {
+        const char *modes="agfvw bopc";
+        for(const char *mode=modes;*mode;mode++) {
+            if(*mode==' ')continue;
+            reset(&m);m.fail=0;session_init(&s,io,170,4,1,1,menu,(Language)lang);s.pager_enabled=0;
+            s.password_mode=*mode;strcpy(s.old_password,"old-SeCrEt");strcpy(s.new_password,"new-SeCrEt");
+            reset(&m);assert(session_line(&s,"/CANCEL",7,1000));
+            assert(!s.password_mode && !s.pending && !s.closing);
+            assert(!strstr((char *)m.data,"old-SeCrEt") && !strstr((char *)m.data,"new-SeCrEt"));
+            assert(s.auth_after==((menu && (*mode=='a' || *mode=='g'))?0u:2000u));
+            if(*mode=='o' || *mode=='p' || *mode=='c')assert(!s.old_password[0] && !s.new_password[0]);
+            session_dispose(&s);
+        }
+        reset(&m);session_init(&s,io,171,4,1,1,menu,(Language)lang);s.pager_enabled=0;
+        s.password_mode='o';assert(session_line(&s,"old-SeCrEt",10,2000));
+        assert(s.password_mode=='p' && !strcmp(s.old_password,"old-SeCrEt") && !s.auth_after);
+        assert(session_line(&s,"new-SeCrEt",10,2001));assert(s.password_mode=='c' && !strcmp(s.new_password,"new-SeCrEt"));
+        assert(session_line(&s,"wrong-pass",10,2002));assert(!s.password_mode && !s.old_password[0] && !s.new_password[0] && s.auth_after==3002);
+        s.password_mode='v';assert(session_line(&s,"file-SeCrEt",11,3003));assert(s.password_mode=='w');
+        assert(session_line(&s,"wrong-pass",10,3004));assert(!s.password_mode && !s.new_password[0]);
+        reset(&m);assert(session_line(&s,"PING",4,4005));assert(strstr((char *)m.data,"PONG"));
+        s.editing=1;s.draft.op='P';reset(&m);assert(session_line(&s,"PING",4,4006));
+        assert(strstr(s.draft.body,"PING") && !strstr((char *)m.data,"PONG"));
+        assert(session_line(&s,"/CANCEL",7,4007));assert(!s.editing);
+        /* A secret input or editor must not consume another connection's result. */
+        memset(&result,0,sizeof(result));result.session=170;result.slot=4;result.binary_enter=1;
+        s.zmodem_start=1;s.pending=1;reset(&m);session_result(&s,&result,5000);
+        assert(s.zmodem_start && s.pending && !s.zmodem && !s.binary && !m.size);
+        result.session=171;result.slot=3;session_result(&s,&result,5001);assert(s.zmodem_start && s.pending && !m.size);
+        result.slot=4;session_result(&s,&result,5002);
+        assert(!s.zmodem_start && !s.pending && s.zmodem && !s.binary);
+        session_zmodem_finish(&s,0,0,0,5);assert(!s.zmodem && !s.zmodem_start);
+        session_result(&s,&result,5003);assert(s.binary && !s.ui.enabled && !s.zmodem);
+        session_dispose(&s);
+    }
+    puts("PASS: RAW/menu Japanese/English secret-dialog routing, editor precedence, stale completions and transfer/binary precedence");
     return 0;
 }

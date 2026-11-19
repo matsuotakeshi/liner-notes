@@ -137,7 +137,7 @@ static void chat_prompt(Session *s) {
 int session_impl_chat_event(void *context,const ChatEvent *e) {
     Session *s=context;if(!s->active || s->closing || !s->user || s->zmodem || s->door)return 0;
     if(e->kind=='X' && e->connection!=s->talk_target)return 1;
-    if((e->kind=='I' || e->kind=='C') && !s->chatting && (s->password_mode || s->editing || s->binary || s->zmodem || s->pending || s->page[0] || s->ui.input || s->session_impl_classic_input || s->mail_input || s->mail.delete_id || s->wake))return 0;
+    if((e->kind=='I' || e->kind=='C') && !s->chatting && (s->password_mode || s->editing || s->binary || s->zmodem || s->pending || s->page[0] || s->ui.input || s->classic_input || s->mail_input || s->mail.delete_id || s->wake))return 0;
     if((e->kind=='J' || e->kind=='S') && (!s->chatting || s->outside_talk))return 1;
     if((e->kind=='L' || e->kind=='X') && (!s->chatting || s->outside_talk) && e->connection!=s->talk_target)return 1;
     char text[1400];

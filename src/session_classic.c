@@ -38,7 +38,7 @@ static void classic_run(Session *s,const char *text) {
 }
 
 static void classic_ask(Session *s,int input,MessageId message) {
-    s->session_impl_classic_input=input;session_impl_queue_text(s,ui_text(&s->ui,message));
+    s->classic_input=input;session_impl_queue_text(s,ui_text(&s->ui,message));
 }
 
 static void classic_read(Session *s,int descending,uint32_t distance,int repeat) {
@@ -56,16 +56,16 @@ static void classic_read(Session *s,int descending,uint32_t distance,int repeat)
 
 static void profile_fields(Session *s,int search) {
     char text[96];for(unsigned i=0;i<profile_form_count(search);i++) { snprintf(text,sizeof(text),"%u: %s\r\n",i+1,profile_form_field(i));session_impl_queue_text(s,text); }
-    s->session_impl_classic_input=search?CI_SEARCH_FIELD:CI_PROF_FIELD;session_impl_queue_text(s,s->ui.language==LANGUAGE_JA?"項目番号 (0:戻る) > ":"Field (0:back) > ");
+    s->classic_input=search?CI_SEARCH_FIELD:CI_PROF_FIELD;session_impl_queue_text(s,s->ui.language==LANGUAGE_JA?"項目番号 (0:戻る) > ":"Field (0:back) > ");
 }
 
 int session_impl_classic_input(Session *s,const char *line) {
-    int mode=s->session_impl_classic_input;if(!mode)return 0;
-    char text[INPUT_LINE_MAX+128];s->session_impl_classic_input=0;
+    int mode=s->classic_input;if(!mode)return 0;
+    char text[INPUT_LINE_MAX+128];s->classic_input=0;
     if(!strcmp(line,"/CANCEL")) { s->batch_screen=0;s->file_selected=0;s->profile_walk.active=0;session_impl_emit(s,"CANCELLED\r\n");session_impl_prompt(s);return 1; }
     if(mode==CI_PROF_TARGET) {
         const char *end;uint32_t target=0;
-        if(*line && (!session_impl_number_arg(line,&target,&end) || *end)) { s->session_impl_classic_input=CI_PROF_TARGET;session_impl_queue_text(s,"Member ID (Enter:self) > ");return 1; }
+        if(*line && (!session_impl_number_arg(line,&target,&end) || *end)) { s->classic_input=CI_PROF_TARGET;session_impl_queue_text(s,"Member ID (Enter:self) > ");return 1; }
         profile_form_target(&s->profile_form,target);profile_fields(s,0);return 1;
     }
     if(mode==CI_PROF_NEXT) {
@@ -77,11 +77,11 @@ int session_impl_classic_input(Session *s,const char *line) {
     }
     if(mode==CI_FILE_ACTION) {
         if(!strcmp(line,"0")) { s->file_selected=0;session_impl_prompt(s);return 1; }
-        if(!strcmp(line,"E")) { s->session_impl_classic_input=CI_FILE_DESC;session_impl_queue_text(s,s->ui.language==LANGUAGE_JA?"説明 > ":"Description > ");return 1; }
-        if(!strcmp(line,"K")) { s->session_impl_classic_input=CI_FILE_DELETE;session_impl_queue_text(s,"DELETE? Y/N > ");return 1; }
+        if(!strcmp(line,"E")) { s->classic_input=CI_FILE_DESC;session_impl_queue_text(s,s->ui.language==LANGUAGE_JA?"説明 > ":"Description > ");return 1; }
+        if(!strcmp(line,"K")) { s->classic_input=CI_FILE_DELETE;session_impl_queue_text(s,"DELETE? Y/N > ");return 1; }
         if(!strcmp(line,"B"))snprintf(text,sizeof(text),"BATCH ADD %u",s->file_selected);
         else if(!strcmp(line,"T"))snprintf(text,sizeof(text),"FILETYPE %u",s->file_selected);
-        else { const char *keys="SCXYGZM";const char *key=strchr(keys,*line);if(!*line || line[1] || !key) { s->session_impl_classic_input=CI_FILE_ACTION;session_impl_prompt(s);return 1; }
+        else { const char *keys="SCXYGZM";const char *key=strchr(keys,*line);if(!*line || line[1] || !key) { s->classic_input=CI_FILE_ACTION;session_impl_prompt(s);return 1; }
             const unsigned modes[]={6,1,7,2,3,0,4};s->transfer_protocol=modes[key-keys];snprintf(text,sizeof(text),"DOWNLOAD %u",s->file_selected); }
         classic_run(s,text);return 1;
     }
@@ -90,7 +90,7 @@ int session_impl_classic_input(Session *s,const char *line) {
     if(mode==CI_PROF_FIELD || mode==CI_SEARCH_FIELD) {
         if(!strcmp(line,"0")) { session_impl_prompt(s);return 1; }uint32_t field;const char *end;
         if(!session_impl_number_arg(line,&field,&end) || *end || !profile_form_select(&s->profile_form,mode==CI_SEARCH_FIELD,field)) { profile_fields(s,mode==CI_SEARCH_FIELD);return 1; }
-        s->session_impl_classic_input=mode==CI_SEARCH_FIELD?CI_SEARCH_VALUE:CI_PROF_VALUE;
+        s->classic_input=mode==CI_SEARCH_FIELD?CI_SEARCH_VALUE:CI_PROF_VALUE;
         session_impl_queue_text(s,s->ui.language==LANGUAGE_JA?"内容 > ":"Value > ");return 1;
     }
     if(mode==CI_PROF_VALUE || mode==CI_SEARCH_VALUE) {
@@ -123,9 +123,9 @@ int session_impl_classic_input(Session *s,const char *line) {
         else if(!strcmp(line,"2"))classic_ask(s,CI_BATCH_REMOVE,MSG_TRANSFER_ID);
         else if(!strcmp(line,"3"))classic_ask(s,CI_BATCH_MATCH,MSG_TRANSFER_MATCH);
         else if(!strcmp(line,"4") || !strcmp(line,"L"))classic_run(s,"BATCH LIST");
-        else if(!strcmp(line,"5") || !strcmp(line,"C")) { s->session_impl_classic_input=CI_BATCH_CLEAR;session_impl_queue_text(s,"CLEAR? Y/N > "); }
+        else if(!strcmp(line,"5") || !strcmp(line,"C")) { s->classic_input=CI_BATCH_CLEAR;session_impl_queue_text(s,"CLEAR? Y/N > "); }
         else if(!strcmp(line,"6") || !strcmp(line,"D")) { s->upload_batch=1;classic_ask(s,CI_SEND_PROTOCOL,MSG_TRANSFER_PROTOCOL); }
-        else if(!strcmp(line,"M")) { s->session_impl_classic_input=CI_BATCH_COPY;session_impl_queue_text(s,"Destination board (Enter:current) > "); }
+        else if(!strcmp(line,"M")) { s->classic_input=CI_BATCH_COPY;session_impl_queue_text(s,"Destination board (Enter:current) > "); }
         else if(!strcmp(line,"0")) { s->batch_screen=0;session_impl_prompt(s); }
         else classic_ask(s,CI_BATCH,MSG_TRANSFER_BATCH);
         return 1;
@@ -320,7 +320,7 @@ int session_impl_classic_commands(Session *s,const char *line) {
         switch(key) {
         case 'L':action="PROFILES";break;case 'P':classic_ask(s,CI_PROFILE,MSG_CLASSIC_PROFILE);return 1;
         case 'S':profile_fields(s,1);return 1;
-        case 'W':action="BIOEDIT";break;case 'E':profile_form_target(&s->profile_form,0);if(s->ui.admin) { s->session_impl_classic_input=CI_PROF_TARGET;session_impl_queue_text(s,"Member ID (Enter:self) > "); }else profile_fields(s,0);return 1;
+        case 'W':action="BIOEDIT";break;case 'E':profile_form_target(&s->profile_form,0);if(s->ui.admin) { s->classic_input=CI_PROF_TARGET;session_impl_queue_text(s,"Member ID (Enter:self) > "); }else profile_fields(s,0);return 1;
         }
     }
     if(action)classic_run(s,action);

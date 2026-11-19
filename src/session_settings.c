@@ -51,6 +51,7 @@ int session_impl_preference_command(Session *s,char *line) {
 }
 
 int session_impl_menu_settings_command(Session *s,char *line) {
+    char out[128];
     if(!strncmp(line,"MENUMODE ",9)) {
         const char *mode=line+9;int n=!strcmp(mode,"BEGINNER")?0:!strcmp(mode,"STANDARD")?1:!strcmp(mode,"EXPERT")?2:-1;
         if(n<0) { session_impl_emit(s,"ERR command\r\n");return 1; }s->menu_mode=n;s->menu_shown=0;

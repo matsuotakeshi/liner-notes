@@ -47,7 +47,7 @@ static int utility_command(Session *s,char *line) {
     }
     else session_impl_emit(s,"ERR command\r\n");
 
-    return 0;
+    return 1;
 }
 
 void session_impl_command_core(Session *s,char *line) {

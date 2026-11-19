@@ -146,7 +146,7 @@ int session_impl_profile_walk_result(Session *s,const BoardResult *completion,ui
         ListContinuation page=list_continuation_parse(completion->text,0);
         profile_walk_complete(&s->profile_walk,page.next);
         session_impl_queue_text(s,completion->text);
-        if(page.next) { s->session_impl_classic_input=CI_PROF_NEXT;session_impl_queue_text(s,s->ui.language==LANGUAGE_JA?"次の会員:Enter / 0:終了 > ":"Next:Enter / 0:stop > "); }
+        if(page.next) { s->classic_input=CI_PROF_NEXT;session_impl_queue_text(s,s->ui.language==LANGUAGE_JA?"次の会員:Enter / 0:終了 > ":"Next:Enter / 0:stop > "); }
         else session_impl_prompt(s);
         return 1;
     }
@@ -174,8 +174,8 @@ int session_impl_article_result(Session *s,const BoardResult *completion,uint64_
         s->classic_area=CM_MAIN;s->ui.next=0; s->ui.view=UI_HOME; s->ui.board_title[0]=0;
     }
     if(completion->draft_revision) s->draft_revision=completion->draft_revision;
-    if(completion->editing) { s->editing=1;s->session_impl_editor_input=0;s->editor_at=1; }
-    if(s->file_selecting) { if(!strncmp(completion->text,"FILE ",5)) { s->file_selected=s->file_selecting;s->session_impl_classic_input=CI_FILE_ACTION; }s->file_selecting=0; }
+    if(completion->editing) { s->editing=1;s->editor_input=0;s->editor_at=1; }
+    if(s->file_selecting) { if(!strncmp(completion->text,"FILE ",5)) { s->file_selected=s->file_selecting;s->classic_input=CI_FILE_ACTION; }s->file_selecting=0; }
     if(completion->selected) { s->current=completion->selected;if(!s->mail_mode && !s->vault_mode)s->classic_area=CM_BOARD; }
     reader_complete(&s->reader,completion->sequence,completion->selected || completion->mail_id,!strncmp(completion->text,"ERR ",4));
     if(completion->sequence)s->scan.cursor=completion->sequence_next;

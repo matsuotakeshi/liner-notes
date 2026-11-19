@@ -55,7 +55,7 @@ void session_result(Session *s,const BoardResult *completion,uint64_t now) {
     if(session_impl_batch_copy_result(s,completion,now))return;
     if(session_impl_report_result(s,completion,now))return;
     if(!strncmp(completion->text,"FILEBOARD UNLOCKED ",19)) { unsigned id,revision;if(sscanf(completion->text,"FILEBOARD UNLOCKED %u %u",&id,&revision)==2 && id<=1024)s->vault_grants[id]=revision; }
-    if(completion->auth) { s->session_impl_classic_input=0;s->classic_id=0;s->classic_area=CM_MAIN;check_traversal_reset(&s->check);memset(s->vault_grants,0,sizeof(s->vault_grants)); }
+    if(completion->auth) { s->classic_input=0;s->classic_id=0;s->classic_area=CM_MAIN;check_traversal_reset(&s->check);memset(s->vault_grants,0,sizeof(s->vault_grants)); }
     if(session_impl_vault_edit_result(s,completion,now))return;
     if(session_impl_message_result(s,completion,now))return;
     if(session_impl_mail_result(s,completion,now))return;

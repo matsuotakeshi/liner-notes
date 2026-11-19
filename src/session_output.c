@@ -71,16 +71,16 @@ void session_impl_show_menu(Session *s,int explicit_request) {
 }
 
 void session_impl_prompt(Session *s) {
-    if(s->reader.automatic || s->door || s->memo_input || s->application.step || (s->editing && s->session_impl_editor_input==4))return;
+    if(s->reader.automatic || s->door || s->memo_input || s->application.step || (s->editing && s->editor_input==4))return;
     if(!s->zmodem && !s->chatting && !s->binary && s->ui.enabled && s->active && !s->pending && !s->closing && !s->wake && !s->page[0]) {
         if(s->game_menu && !s->editing && !s->password_mode) { session_impl_queue_text(s,s->ui.language==LANGUAGE_JA?"ゲーム [番号:起動 Enter/L:一覧 0:主画面] > ":"Games [number:play Enter/L:list 0:main] > ");return; }
         if(s->gather.mode) { session_impl_queue_text(s,ui_text(&s->ui,s->gather.cursor?MSG_GATHER_MORE:MSG_GATHER_PROMPT));return; }
-        if(s->vault_mode && !s->editing && !s->password_mode && !s->ui.input && (!s->session_impl_classic_input || s->session_impl_classic_input==CI_FILE_ACTION || s->session_impl_classic_input==CI_BATCH)) {
-            if(s->batch_screen) { s->session_impl_classic_input=CI_BATCH;session_impl_queue_text(s,ui_text(&s->ui,MSG_TRANSFER_BATCH));return; }
-            if(s->file_selected) { s->session_impl_classic_input=CI_FILE_ACTION;session_impl_queue_text(s,s->ui.language==LANGUAGE_JA?"T:表示 S/C/X/Y/G/Z/M:転送 B:選択 E:説明 K:削除 0:戻る > ":"T:view S/C/X/Y/G/Z/M:transfer B:select E:description K:delete 0:back > ");return; }
+        if(s->vault_mode && !s->editing && !s->password_mode && !s->ui.input && (!s->classic_input || s->classic_input==CI_FILE_ACTION || s->classic_input==CI_BATCH)) {
+            if(s->batch_screen) { s->classic_input=CI_BATCH;session_impl_queue_text(s,ui_text(&s->ui,MSG_TRANSFER_BATCH));return; }
+            if(s->file_selected) { s->classic_input=CI_FILE_ACTION;session_impl_queue_text(s,s->ui.language==LANGUAGE_JA?"T:表示 S/C/X/Y/G/Z/M:転送 B:選択 E:説明 K:削除 0:戻る > ":"T:view S/C/X/Y/G/Z/M:transfer B:select E:description K:delete 0:back > ");return; }
         }
-        if(s->session_impl_classic_input || (s->editing && (s->editor_confirm || s->editor_upload_question)))return;
-        if(s->editing && s->editor_line && !s->session_impl_editor_input) { session_impl_queue_text(s,ui_text(&s->ui,MSG_EDITOR_PROMPT));return; }
+        if(s->classic_input || (s->editing && (s->editor_confirm || s->editor_upload_question)))return;
+        if(s->editing && s->editor_line && !s->editor_input) { session_impl_queue_text(s,ui_text(&s->ui,MSG_EDITOR_PROMPT));return; }
         if(s->editing && s->editor_numbers) { char number[40];snprintf(number,sizeof(number),"%u ",s->editor_line?s->editor_at:session_impl_editor_count(s)+1);session_impl_queue_text(s,number); }
         if(s->vault_mode && !s->editing && !s->password_mode && !s->ui.input) { session_impl_queue_text(s,ui_text(&s->ui,MSG_VAULT_PROMPT));return; }
         if(s->mail_input) { session_impl_queue_text(s,ui_text(&s->ui,s->mail_input==1?MSG_MAIL_TO_PROMPT:MSG_MAIL_TITLE_PROMPT));return; }
