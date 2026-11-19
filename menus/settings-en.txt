@@ -3,3 +3,4 @@ INSTALL Settings
  1 Editor / 2 ESC differences / 3 Menu detail / 4 Page lines
  LANG JA|EN / PAGER ON|OFF / PAGER SIZE columns rows
  PREFS SAVE|LOAD / HELP SETTINGS
+ UI / UI name / UI RESET  Interface selection

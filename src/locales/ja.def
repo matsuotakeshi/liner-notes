@@ -490,3 +490,4 @@ MESSAGE(ERR_LINK_DENIED, "この会員またはボードではBBS間リンクを
 MESSAGE(ERR_LINK_SYNTAX, "BBS間リンクの入力形式が正しくありません。")
 MESSAGE(ERR_LINK_PREDECESSOR, "対象記事または前の版を利用できません。リンクの状態を確認してください。")
 MESSAGE(ERR_LINK_STORAGE, "リンクの保存を確認できません。管理者による保存領域の確認が必要です。")
+MESSAGE(ERR_UI_SELECTION, "UI名が正しくありません。UIで選択可能な一覧を確認してください。")

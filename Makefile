@@ -635,6 +635,10 @@ test-ssh-sources:
 
 check: test-ssh-sources
 
+.PHONY: test-ui-selection
+test-ui-selection: runtime
+	$(PYTHON) tests/test_ui_selection.py ./runtime
+check: test-ui-selection
 # All Door launch paths rebuild when the opt-in isolation adapter changes.
 runtime: src/door_isolation.inc
 
