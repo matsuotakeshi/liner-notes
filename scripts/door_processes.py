@@ -25,7 +25,9 @@ def processes(uid, terminate=False, sig=None):
         if terminate:
             raise OSError('FreeBSD signalling requires an owned reaper scope')
         # Read only. Saved/real/effective IDs all reserve a dedicated slot.
-        result = subprocess.run(['/bin/ps', '-axo', 'uid=,ruid=,svuid='],
+        # FreeBSD consumes everything after '=' as that column's header.
+        # Repeat -o so empty headers do not swallow the remaining UID columns.
+        result = subprocess.run(['/bin/ps', '-ax', '-o', 'uid=', '-o', 'ruid=', '-o', 'svuid='],
                                 env={'PATH': '/bin:/usr/bin', 'LC_ALL': 'C'},
                                 capture_output=True, text=True, timeout=5, check=True)
         rows = [line.split() for line in result.stdout.splitlines() if line.strip()]

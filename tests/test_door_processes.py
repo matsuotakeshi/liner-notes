@@ -97,10 +97,18 @@ class Backend(unittest.TestCase):
         with patch.object(dp.sys,'platform','freebsd15'),patch.object(dp.subprocess,'run') as run:
             run.return_value.stdout='  0 0 0\n 22 22 65004\n'
             self.assertTrue(dp.processes(65004));self.assertFalse(dp.processes(65005))
-            self.assertEqual(run.call_args.args[0],['/bin/ps','-axo','uid=,ruid=,svuid='])
-            for invalid in ('','?? 0 0\n','0 0\n'):
+            self.assertEqual(run.call_args.args[0],['/bin/ps','-ax','-o','uid=','-o','ruid=','-o','svuid='])
+            # The old combined format yields a header plus only one UID column.
+            for invalid in ('','?? 0 0\n','0 0\n',',ruid=,svuid=\n 0\n 65004\n'):
                 run.return_value.stdout=invalid
                 with self.assertRaises(OSError):dp.processes(65004)
+
+    @unittest.skipUnless(sys.platform.startswith('freebsd'),'native FreeBSD ps syntax')
+    def test_native_freebsd_uid_inventory_contains_self(self):
+        # Exercise the real ps parser without privileges, not a mocked Linux
+        # rendering. Even restricted visibility must include the calling UID.
+        self.assertTrue(dp.processes(os.getuid()))
+        self.assertTrue(dp.processes(os.geteuid()))
 
     @unittest.skipUnless(os.name=='posix','native Unix socket credentials')
     def test_native_peer_identity(self):

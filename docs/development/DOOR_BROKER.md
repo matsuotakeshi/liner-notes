@@ -222,3 +222,22 @@ Manual review: `docs/manual/external-games.md` and `docs/manual/security.md`
 retain the distinction between stable legacy Doors and opt-in development
 isolation. This test-only change does not alter commands, ACL, activation,
 configuration or recovery policy; public instructions require no behavior edit.
+
+### FreeBSD UID inventory correction
+
+Main `f91a5ef` failed run `44495450243` before the first isolated Door launch,
+inside `processes(uid)`. The jail receipt says `link` because the Broker test
+shares that phase; it was not a failure of BBS link synchronization. The private
+failure log identifies `Cannot establish slot UID availability`.
+
+FreeBSD's [ps format parser](https://github.com/freebsd/freebsd-src/blob/releng/15.0/bin/ps/keyword.c#L395-L405)
+treats the rest of an argument after `=` as the column header. Consequently
+`-o uid=,ruid=,svuid=` does not request three headerless UID columns. Use repeated
+`-o uid= -o ruid= -o svuid=`. Keep strict three-column numeric parsing and refusal
+on missing/malformed output; do not skip unknown rows or assume an empty slot.
+
+The regression tests retain rejection of the old single-column/header output
+and add a native, unprivileged self-UID inventory check to `make check`. The
+existing privileged jail fixture still has to pass after trusted-main integration.
+This correction does not change permissions, process signalling or activation
+policy. Stable user instructions remain unchanged; no production host was used.
