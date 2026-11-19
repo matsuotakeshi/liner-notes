@@ -167,7 +167,7 @@ int session_impl_report_result(Session *s,const BoardResult *completion,uint64_t
 
 int session_impl_article_result(Session *s,const BoardResult *completion,uint64_t now) {
     (void)now;
-    if(completion->board) { s->core.board=completion->board; s->core.current=0; if(completion->direct) s->presentation.ui.board_title[0]=0; }
+    if(completion->board) { if(completion->direct) s->presentation.ui.board_title[0]=0; }
     if(completion->draft_loaded) {
         memset(&s->editor.draft,0,sizeof(s->editor.draft)); session_impl_undo_clear(s);
         s->editor.draft.number=completion->draft_parent; strcpy(s->editor.draft.title,completion->draft_title); strcpy(s->editor.draft.body,completion->draft_body);
@@ -176,7 +176,7 @@ int session_impl_article_result(Session *s,const BoardResult *completion,uint64_
     if(completion->draft_revision) s->editor.draft_revision=completion->draft_revision;
     if(completion->editing) { s->editor.editing=1;s->editor.editor_input=0;s->editor.editor_at=1; }
     if(s->files.file_selecting) { if(completion->feedback.file_detail) { s->files.file_selected=s->files.file_selecting;s->presentation.classic_input=CI_FILE_ACTION; }s->files.file_selecting=0; }
-    if(completion->selected) { s->core.current=completion->selected;if(!s->mail_state.mail_mode && !s->files.vault_mode)s->presentation.classic_area=CM_BOARD; }
+    if(completion->selected) { if(!s->mail_state.mail_mode && !s->files.vault_mode)s->presentation.classic_area=CM_BOARD; }
     reader_complete(&s->reading.reader,completion->sequence,completion->selected || completion->mail_id,completion->feedback.failed);
     if(completion->sequence)s->reading.scan.cursor=completion->sequence_next;
     session_impl_emit(s,completion->text);

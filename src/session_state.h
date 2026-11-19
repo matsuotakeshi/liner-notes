@@ -15,6 +15,7 @@
 #include "ui.h"
 typedef struct {
     int password_mode;
+    char login[33]; /* unverified name belongs to the authentication dialogue */
     uint32_t reset_target;
     uint32_t boardpass_target;
     uint32_t board_enter;

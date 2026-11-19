@@ -54,6 +54,7 @@ void vault_bridge_execute(IdentityProvider identity,uint32_t user,uint32_t epoch
     if(op==VAULT_CMD_CHILDREN) {
         VaultQueryChildren page;r=vault_query_children(store,&p,!strcmp(argument,"-")?"":argument,id,&page);
         if(r==VAULT_OK) {
+            OPERATION_PAGE(response,FILE_CHILDREN,file_children,page);
             f->file_children=1;f->child_count=(unsigned)page.count;f->child_next=page.next;for(size_t i=0;i<page.count;i++)snprintf(f->children[i],sizeof(f->children[i]),"%s",page.rows[i].name);
             size_t used=(size_t)snprintf(out,size,"FILECHILDREN %s\r\n",argument);
             for(size_t i=0;i<page.count;i++)used+=(size_t)snprintf(out+used,size-used,"CHILD %u %s|%s\r\n",(unsigned)i+1,page.rows[i].name,page.rows[i].display);
@@ -127,6 +128,7 @@ void vault_bridge_execute(IdentityProvider identity,uint32_t user,uint32_t epoch
         }
         r=vault_query_files(store,&p,&request,&page);
         if(r==VAULT_OK) {
+            OPERATION_PAGE(response,FILES,files,page);
             size_t pos=(size_t)(op==VAULT_CMD_LIST?snprintf(out,size,"FILES\r\n"):snprintf(out,size,"%s %s\r\n",op==VAULT_CMD_NEWS?"FILENEWS":op==VAULT_CMD_SEARCH?"FILESEARCH":"FILESIN",op==VAULT_CMD_NEWS && query[0]=='@'?"CHECK":argument));
             for(size_t i=0;i<page.count;i++) { pos+=(size_t)snprintf(out+pos,size-pos,"FILEITEM %u %u %s\r\n",page.rows[i].id,page.rows[i].size,page.rows[i].name);
                 pos+=(size_t)snprintf(out+pos,size-pos,"FILEDETAIL %u %s %llu %s\r\n",page.rows[i].id,page.rows[i].ascii?"ASCII":"BINARY",(unsigned long long)downloads_count(page.rows[i].id),page.rows[i].description); }
@@ -134,11 +136,13 @@ void vault_bridge_execute(IdentityProvider identity,uint32_t user,uint32_t epoch
         }
     } else if(op==VAULT_CMD_INFO) {
         VaultQueryDetail detail;r=vault_query_detail(store,&p,id,&detail);
-        if(r==VAULT_OK) { f->file_detail=1;char hash[65];e=detail.entry;vault_hex(e.sha256,hash);snprintf(out,size,"FILE %u %u %s\r\nNAME %s\r\nDESCRIPTION %s\r\nPUBLISHER %s\r\nCATEGORY %s\r\nASCII %s\r\nPROTOCOL %s\r\nEND FILE\r\n",e.id,e.size,hash,e.name,e.description,e.publisher,*e.category?e.category:"-",e.ascii?"ON":"OFF",detail.protocol);return; }
+        if(r==VAULT_OK) {
+            OPERATION_PAGE(response,FILE_DETAIL,file_detail,detail); f->file_detail=1;char hash[65];e=detail.entry;vault_hex(e.sha256,hash);snprintf(out,size,"FILE %u %u %s\r\nNAME %s\r\nDESCRIPTION %s\r\nPUBLISHER %s\r\nCATEGORY %s\r\nASCII %s\r\nPROTOCOL %s\r\nEND FILE\r\n",e.id,e.size,hash,e.name,e.description,e.publisher,*e.category?e.category:"-",e.ascii?"ON":"OFF",detail.protocol);return; }
     }
     if(op==VAULT_CMD_BOARDS) {
         VaultQueryBoards page;r=vault_query_boards(store,&p,id,&page);
         if(r==VAULT_OK) {
+            OPERATION_PAGE(response,FILE_BOARDS,file_boards,page);
             size_t pos=(size_t)snprintf(out,size,"FILEBOARDS\r\n");
             for(size_t i=0;i<page.count;i++)pos+=(size_t)snprintf(out+pos,size-pos,"VBOARD %d %s%s%s\r\n",page.rows[i].can_upload,*page.rows[i].name?page.rows[i].name:"-",*page.rows[i].display?" | ":"",page.rows[i].display);
             f->page_found=1;f->page_next=page.next;snprintf(out+pos,size-pos,"END NEXT %u\r\n",page.next);return;
@@ -146,6 +150,7 @@ void vault_bridge_execute(IdentityProvider identity,uint32_t user,uint32_t epoch
     } else if(op==VAULT_CMD_CATEGORIES) {
         VaultQueryCategories page;r=vault_query_categories(store,&p,id,&page);
         if(r==VAULT_OK) {
+            OPERATION_PAGE(response,FILE_CATEGORIES,file_categories,page);
             size_t pos=(size_t)snprintf(out,size,"FILECATEGORIES\r\n");
             for(size_t i=0;i<page.count;i++)pos+=(size_t)snprintf(out+pos,size-pos,"VCATEGORY %u %s\r\n",page.rows[i].count,*page.rows[i].name?page.rows[i].name:"-");
             f->page_found=1;f->page_next=page.next;snprintf(out+pos,size-pos,"END NEXT %u\r\n",page.next);return;
@@ -153,6 +158,7 @@ void vault_bridge_execute(IdentityProvider identity,uint32_t user,uint32_t epoch
     } else if(op==VAULT_CMD_AUDIT) {
         VaultQueryAudit page;r=vault_query_audit(store,&p,id,&page);
         if(r==VAULT_OK) {
+            OPERATION_PAGE(response,FILE_AUDIT,file_audit,page);
             size_t pos=(size_t)snprintf(out,size,"FILEAUDIT\r\n");
             for(size_t i=0;i<page.count;i++) {
                 char stamp[40]="unknown";time_t at=(time_t)page.rows[i].at;struct tm value;struct tm *utc=page.rows[i].at?utc_time(&at,&value):NULL;

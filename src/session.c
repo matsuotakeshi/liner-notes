@@ -30,7 +30,7 @@
 
 static NotificationAudience notification_audience(const Session *s);
 
-void session_abort(Session *s) { s->core.active=0; }
+void session_abort(Session *s) { session_core_abort(&s->core); }
 
 void session_dimensions(Session *s,unsigned columns,unsigned rows) {
     TerminalDimensions size=terminal_dimensions(columns,rows);s->presentation.columns=size.columns;s->presentation.rows=size.rows;
@@ -41,7 +41,7 @@ void session_impl_selection_reset(Session *s) {
     batch_reset(&s->files.batch);
     vault_navigation_reset(&s->files.vault);
     s->presentation.game_menu=0;s->files.vault_mode=0;
-    memset(s->core.vault_grants,0,sizeof(s->core.vault_grants));
+    session_core_clear_vault_grants(&s->core);
     profile_form_target(&s->reading.profile_form,0);profile_walk_reset(&s->reading.profile_walk);
     s->conversation.talk_once=s->conversation.talk_return_editor=s->conversation.status_pending=s->conversation.memo_input=0;
     s->conversation.talk_target=s->conversation.reply_target=0;s->conversation.talk_select=s->conversation.talk_lost=s->conversation.outside_talk=0;
@@ -60,14 +60,14 @@ void session_impl_submit(Session *s,BoardRequest *q) {
 }
 
 void session_init(Session *s,SessionIO io,unsigned long id,int slot,int boards,int members,int menu,Language language) {
-    memset(s,0,sizeof(*s)); s->connection.io=io;s->presentation.menu_mode=1;s->reading.check.automatic=menu; s->core.active=1; s->core.id=id; s->core.slot=slot;
-    s->connection.binary_allowed=1; s->core.board_enabled=boards; s->core.member_mode=members; s->core.board=1; s->presentation.ui.language=language;
+    memset(s,0,sizeof(*s)); s->connection.io=io;s->presentation.menu_mode=1;s->reading.check.automatic=menu; session_core_init(&s->core,id,slot,boards,members);
+    s->connection.binary_allowed=1; s->presentation.ui.language=language;
     char greeting[128]; snprintf(greeting,sizeof(greeting),"RTBBS-PROBE %lu\r\n",id); session_impl_queue_text(s,greeting);
     session_dimensions(s,80,24);
     if(menu) { s->presentation.ui.enabled=1; session_impl_queue_text(s,banner_text());session_impl_queue_text(s,login_text(0));session_impl_queue_text(s,login_text(1));session_impl_show_menu(s,1); session_impl_prompt(s); }
 }
 
-void session_dispose(Session *s) { connector_block_clear(&s->connection.connector_block);s->core.active=0;chat_disconnect(s->core.id);OPENSSL_cleanse(s,sizeof(*s)); }
+void session_dispose(Session *s) { connector_block_clear(&s->connection.connector_block);session_core_abort(&s->core);chat_disconnect(s->core.id);OPENSSL_cleanse(s,sizeof(*s)); }
 
 int session_ready(const Session *s) { return s->core.active && !s->core.wake && !s->core.pending && !s->core.closing && !s->connection.zmodem; }
 
@@ -130,17 +130,18 @@ int session_line(Session *s,const char *text,size_t size,uint64_t now) {
 
 void session_revoke(Session *s) {
     session_impl_selection_reset(s);
-    s->presentation.classic_input=0;s->presentation.classic_id=0;s->presentation.classic_area=CM_MAIN;check_traversal_reset(&s->reading.check);memset(s->core.vault_grants,0,sizeof(s->core.vault_grants));
+    s->presentation.classic_input=0;s->presentation.classic_id=0;s->presentation.classic_area=CM_MAIN;check_traversal_reset(&s->reading.check);session_core_clear_vault_grants(&s->core);
     chat_disconnect(s->core.id);s->mail_state.mail_mode=s->mail_state.mail_input=0;mail_navigation_confirmed(&s->mail_state.mail,0);
     if(s->conversation.chatting) { s->conversation.chatting=0;chat_leave(s->core.id); }
-    if(s->connection.door || s->connection.binary || s->connection.zmodem) { session_abort(s);return; }
+    if(s->connection.door || s->connection.binary || s->connection.zmodem) { session_core_revoke(&s->core);session_abort(s);return; }
     if(!s->core.active || s->core.closing) return;
-    s->presentation.game_menu=0;s->files.vault_mode=0;notification_mail_discard(&s->conversation.notifications);s->core.user=0;s->presentation.ui.admin=0;s->presentation.ui.sigop=0;s->auth.reset_target=0; s->core.user_epoch=0; s->core.current=0; s->core.board=1; s->auth.password_mode=0;
+    session_core_revoke(&s->core);
+    s->presentation.game_menu=0;s->files.vault_mode=0;notification_mail_discard(&s->conversation.notifications);s->presentation.ui.admin=0;s->presentation.ui.sigop=0;s->auth.reset_target=0;  s->auth.password_mode=0;
     session_impl_page_clear(s);
     s->reading.reader.active=0; OPENSSL_cleanse(&s->reading.scan,sizeof(s->reading.scan));
-    s->editor.editing=0;s->editor.editor_upload=s->editor.editor_confirm=s->editor.editor_upload_question=0; s->core.pending=0; s->core.wake=0; s->presentation.ui.input=0;
+    s->editor.editing=0;s->editor.editor_upload=s->editor.editor_confirm=s->editor.editor_upload_question=0; s->presentation.ui.input=0;
     OPENSSL_cleanse(s->auth.old_password,sizeof(s->auth.old_password)); OPENSSL_cleanse(s->auth.new_password,sizeof(s->auth.new_password));
     session_impl_undo_clear(s); s->editor.draft_revision=0;
     OPENSSL_cleanse(&s->editor.draft,sizeof(s->editor.draft));
-    session_impl_emit(s,"ERR session revoked\r\n"); s->core.closing=1;
+    session_impl_emit(s,"ERR session revoked\r\n"); session_core_close(&s->core);
 }

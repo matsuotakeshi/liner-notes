@@ -88,8 +88,6 @@ int session_impl_board_unlock_result(Session *s,const BoardResult *completion,ui
     (void)now;
     if(completion->service_action=='1') { s->auth.board_enter=completion->service_number;s->auth.board_lock=completion->board_grant;s->auth.password_mode='b'; }
     if(completion->service_action=='2') {
-        s->core.auth_after=now; /* A verified ancestor may immediately lead to the next password prompt. */
-        if(completion->board_grant>0 && completion->board_grant<=CATALOG_MAX)s->core.board_grants[completion->board_grant]=completion->board_revision;
         BoardRequest q={0};q.op='j';q.number=completion->service_number;session_impl_submit(s,&q);return 1;
     }
 

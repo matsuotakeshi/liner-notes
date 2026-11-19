@@ -260,5 +260,5 @@ void session_chat_kick(Session *s) {
     if(!s->core.active || s->core.closing)return;
     if(s->conversation.chatting) { s->conversation.chatting=0;chat_leave(s->core.id); }
     s->conversation.chat_pending=0;s->core.pending=0;s->conversation.talk_target=s->conversation.reply_target=0;
-    session_impl_queue_text(s,s->presentation.ui.enabled?ui_text(&s->presentation.ui,MSG_CHAT_KICKED):"CHAT KICKED\r\n");s->core.closing=1;
+    session_impl_queue_text(s,s->presentation.ui.enabled?ui_text(&s->presentation.ui,MSG_CHAT_KICKED):"CHAT KICKED\r\n");session_core_close(&s->core);
 }

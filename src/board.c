@@ -252,6 +252,7 @@ static void display_article_page(const BoardRequest *q,BoardResult *r,int search
         }
         return;
     }
+    OPERATION_PAGE(r,ARTICLES,articles,page);
     size_t pos=search?(size_t)snprintf(r->text,sizeof(r->text),"SEARCH %s\r\n",q->title):
                       (size_t)snprintf(r->text,sizeof(r->text),"LIST %u\r\n",page.total);
     for(unsigned i=0;i<page.count;i++) {
@@ -277,6 +278,7 @@ static void display_article_tree(const BoardRequest *q,BoardResult *r) {
         }
         return;
     }
+    OPERATION_PAGE(r,TREE,tree,page);
     size_t pos=(size_t)snprintf(r->text,sizeof(r->text),"TREE %u\r\n",page.root);
     for(unsigned i=0;i<page.count;i++) {
         const ArticleTreeRow *row=&page.rows[i];unsigned indent=row->depth>12?24:row->depth*2;
@@ -302,6 +304,7 @@ static void display_article_notes(const BoardRequest *q,BoardResult *r) {
         }
         return;
     }
+    OPERATION_PAGE(r,NOTES,notes,page);
     size_t pos=(size_t)snprintf(r->text,sizeof(r->text),q->notes_unread?"NOTES UNREAD %u\r\n":"NOTES %u\r\n",page.total);
     for(unsigned i=0;i<page.count;i++) {
         const ArticleNoteRow *row=&page.rows[i];char date[32]="unknown",unread_text[16];
@@ -333,6 +336,7 @@ static void display_article(const BoardRequest *q,uint32_t id,BoardResult *r,int
         }
     } else {
         r->selected=view.id;
+        if(view.state==ARTICLE_VISIBLE) { r->feedback.article_access='R';r->feedback.article_access_id=view.id; }
         if(q->structured) { r->content.kind=1;r->content.state=view.state;r->content.id=view.id;r->content.parent=view.parent;r->content.board=view.board;
             r->content.size=view.body_size;snprintf(r->content.author,sizeof(r->content.author),"%s",view.author);snprintf(r->content.title,sizeof(r->content.title),"%s",view.title); }
         if(view.state==ARTICLE_WITHDRAWN)
@@ -371,6 +375,7 @@ static void article_read_state(const BoardRequest *q,BoardResult *r) {
     else if(q->op=='n') {
         if(page.first)display_article(q,page.first,r,0);else strcpy(r->text,"NO UNREAD\r\n");
     } else {
+        OPERATION_PAGE(r,UNREAD,unread,page);
         size_t pos=(size_t)snprintf(r->text,sizeof(r->text),"UNREAD %u\r\n",page.total);
         for(unsigned i=0;i<page.count;i++) {
             const ArticleUnreadRow *row=&page.rows[i];
@@ -544,6 +549,7 @@ static void extra_execute(const BoardRequest *q,BoardResult *r) {
             }
             return;
         }
+        OPERATION_PAGE(r,ARTICLES,articles,page);
         size_t pos=(size_t)snprintf(r->text,sizeof(r->text),"NEWS %s %s\r\n",q->scope==2?"SUBTREE":q->scope?"ALL":"HERE",q->title);
         for(unsigned i=0;i<page.count;i++) {
             const ArticleSummary *row=&page.rows[i];
@@ -578,6 +584,7 @@ static void extra_execute(const BoardRequest *q,BoardResult *r) {
             }
             strcpy(r->text,"SCAN END\r\n"); return;
         }
+        OPERATION_PAGE(r,ARTICLES,articles,page);
         size_t pos=(size_t)snprintf(r->text,sizeof(r->text),"FIND %s %s %s\r\n",q->scope==2?"SUBTREE":q->scope?"ALL":"HERE",q->username,q->title);
         for(unsigned i=0;i<page.count;i++) {
             const ArticleSummary *row=&page.rows[i];
@@ -608,6 +615,7 @@ static void extra_execute(const BoardRequest *q,BoardResult *r) {
         MemberActor actor={q->user,q->user_epoch};MemberProfile profile;
         MemberOutcome result=member_core_profile_get(&actor,target,login,&profile);
         if(result!=MEMBER_CORE_OK) { member_result(result,r);return; }
+        OPERATION_PAGE(r,PROFILE,profile,profile);
         size_t used=(size_t)snprintf(r->text,sizeof(r->text),"PROFILE %u %s\r\n",profile.user,profile.name);
         for(unsigned field=0;field<PROFILE_FIELDS;field++) {
             const char *value=member_profile_value(&profile,field);if(field>=7 && !*value)continue;
@@ -638,10 +646,12 @@ static void extra_execute(const BoardRequest *q,BoardResult *r) {
                                   q->scope?q->scope-1:0,q->number,q->cursor,q->notes_unread?1u:8u,q->title};
         MemberOutcome result=member_core_profile_search(&actor,&query,&page);
         if(result!=MEMBER_CORE_OK) { member_result(result,r);return; }
+        OPERATION_PAGE(r,PROFILES,profiles,page);
         size_t pos=(size_t)snprintf(r->text,sizeof(r->text),"PROFILES %s\r\n",q->title);
         if(q->notes_unread && page.count) {
             MemberProfile profile;result=member_core_profile_get(&actor,page.rows[0].user,NULL,&profile);
             if(result!=MEMBER_CORE_OK) { member_result(result,r);return; }
+            OPERATION_PAGE(r,PROFILE,profile,profile);
             pos=(size_t)snprintf(r->text,sizeof(r->text),"PROFILE %u %s\r\n",profile.user,profile.name);
             for(unsigned field=0;field<PROFILE_FIELDS;field++) {
                 const char *value=member_profile_value(&profile,field);
@@ -720,6 +730,7 @@ static void mail_execute(const BoardRequest *q,BoardResult *r) {
     if(q->action=='I') {
         MailFilePage page;MailOutcome result=mail_core_files(&actor,q->cursor,&page);
         if(result!=MAIL_CORE_OK) { mail_result(q,result,r);return; }
+        OPERATION_PAGE(r,MAIL_FILES,mail_files,page);
         size_t n=(size_t)snprintf(r->text,sizeof(r->text),"%s",mail_text(q,MSG_MAIL_FILES,"MAIL FILES\r\n"));
         for(unsigned i=0;i<page.count;i++) {
             const MailFileInfo *file=&page.rows[i];
@@ -772,6 +783,7 @@ static void mail_execute(const BoardRequest *q,BoardResult *r) {
         MailQuery query={(MailListMode)q->number,q->cursor,q->title,since,q->until};MailPage page;
         MailOutcome result=mail_core_list(&actor,&query,&page);
         if(result!=MAIL_CORE_OK) { mail_result(q,result,r);return; }
+        OPERATION_PAGE(r,MAIL,mail,page);
         size_t pos=(size_t)snprintf(r->text,sizeof(r->text),mail_text(q,MSG_MAIL_LIST,"MAIL LIST UNREAD %u\r\n"),page.unread);
         if(q->number==4)pos=(size_t)snprintf(r->text,sizeof(r->text),mail_text(q,MSG_MAIL_SEARCH,"MAIL SEARCH %s UNREAD %u\r\n"),q->title,page.unread);
         for(unsigned i=0;i<page.count;i++) {
@@ -977,6 +989,7 @@ static void authentication_execute(const BoardRequest *q,BoardResult *r) {
 
 static void execute(const BoardRequest *q,BoardResult *r) {
     memset(r,0,sizeof(*r));
+    r->structured=q->structured;
     policy_context(q->board_grants);
     if(features_broken || policy_broken() || move_journal.broken || access_journal.broken) { r->session=q->session;r->slot=q->slot;(r->feedback.failed=1,strcpy(r->text,"ERR board policy storage\r\n"));return; }
     r->deferred=0;r->binary_enter=0;r->binary_size=0;
@@ -1024,6 +1037,7 @@ static void execute(const BoardRequest *q,BoardResult *r) {
             MemberActor actor={q->user,q->user_epoch};MemberPage page;
             MemberOutcome outcome=member_core_applications(&actor,q->cursor,&page);
             if(outcome!=MEMBER_CORE_OK) { member_result(outcome,r);return; }
+            OPERATION_PAGE(r,MEMBERS,members,page);
             size_t used=(size_t)snprintf(r->text,sizeof(r->text),"APPLICATIONS\r\n");
             for(unsigned i=0;i<page.count;i++)
                 used+=(size_t)snprintf(r->text+used,sizeof(r->text)-used,"APPLICATION %u %s\r\n",page.rows[i].id,page.rows[i].name);
@@ -1214,6 +1228,7 @@ static void execute(const BoardRequest *q,BoardResult *r) {
             else post_result(result,r);
             return;
         }
+        OPERATION_PAGE(r,ARTICLE_AUDIT,article_audit,page);
         size_t pos=(size_t)(page.article || page.actor?
             snprintf(r->text,sizeof(r->text),"AUDIT %u ARTICLE %u ACTORID %u\r\n",page.start,page.article,page.actor):
             snprintf(r->text,sizeof(r->text),"AUDIT %u\r\n",page.start));
@@ -1237,6 +1252,7 @@ static void execute(const BoardRequest *q,BoardResult *r) {
         }
         MemberPage page;result=member_core_list(&actor,q->number,&page);
         if(result!=MEMBER_CORE_OK) { member_result(result,r);return; }
+        OPERATION_PAGE(r,MEMBERS,members,page);
         size_t pos=(size_t)snprintf(r->text,sizeof(r->text),"MEMBERS\r\n");
         for(unsigned i=0;i<page.count;i++) {
             const MemberSummary *member=&page.rows[i];
@@ -1275,6 +1291,7 @@ static void execute(const BoardRequest *q,BoardResult *r) {
             r->board=next.id;
             snprintf(r->text,sizeof(r->text),"BOARD %u %.80s\r\n",next.id,next.title);return;
         }
+        OPERATION_PAGE(r,BOARDS,boards,page);
         size_t pos=(size_t)snprintf(r->text,sizeof(r->text),"BOARDS\r\n");
         for(unsigned i=0;i<page.count;i++) {
             const ArticleBoardRow *row=&page.rows[i];
@@ -1303,7 +1320,7 @@ static void execute(const BoardRequest *q,BoardResult *r) {
         ArticleOutcome result=q->op=='e'?article_prepare_post(&actor,q->board,q->number):
             article_post(&actor,q->board,q->number,q->username,q->title,q->body,&r->selected);
         if(result!=ARTICLE_OK) { post_result(result,r);return; }
-        if(q->op=='P')snprintf(r->text,sizeof(r->text),"SAVED %u\r\n",r->selected);
+        if(q->op=='P') { r->feedback.article_access='P';r->feedback.article_access_id=r->selected;snprintf(r->text,sizeof(r->text),"SAVED %u\r\n",r->selected); }
         else if(q->action=='?') { r->service_action='E';r->service_number=q->number?2:1; }
         else { r->editing=1;strcpy(r->text,"EDIT end with . or /CANCEL\r\n"); }
         return;
@@ -1392,8 +1409,16 @@ static void *work(void *unused)
         body_read_failed=0;execute(&jobs[job].request,&jobs[job].result);
         if(body_read_failed) { BoardResult *r=&jobs[job].result;unsigned long session=r->session;int slot=r->slot;memset(r,0,sizeof(*r));r->session=session;r->slot=slot;r->board=jobs[job].request.board;(r->feedback.failed=1,strcpy(r->text,"ERR storage unavailable\r\n")); }
         BoardRequest *rq=&jobs[job].request;BoardResult *rs=&jobs[job].result;
-        if(rs->selected && !strncmp(rs->text,"SAVED ",6) && !access_record('P',rs->selected,rq->user))snprintf(rs->text,sizeof(rs->text),"POST SAVED LOG FAILED %u\r\n",rs->selected);
-        else if((!strncmp(rs->text,"ARTICLE ",8) || rs->service_action=='6') && !access_record('R',rs->service_action=='6'?rq->number:rs->selected,rq->user)) { rs->service_action=0;rs->selected=0;rs->draft_body[0]=0;strcpy(rs->text,"ERR board access storage\r\n"); }
+        if(rs->service_action=='6') { rs->feedback.article_access='R';rs->feedback.article_access_id=rq->number; }
+        if(rs->feedback.article_access_id && !access_record(rs->feedback.article_access,rs->feedback.article_access_id,rq->user)) {
+            if(rs->feedback.article_access=='P') { rs->feedback.audit_failed=1;snprintf(rs->text,sizeof(rs->text),"POST SAVED LOG FAILED %u\r\n",rs->selected); }
+            else {
+                rs->service_action=0;rs->selected=0;rs->feedback.failed=1;
+                memset(&rs->content,0,sizeof(rs->content));memset(&rs->page,0,sizeof(rs->page));
+                OPENSSL_cleanse(rs->draft_body,sizeof(rs->draft_body));
+                strcpy(rs->text,"ERR board access storage\r\n");
+            }
+        }
         if(access_changed) { rs->access_refresh=1;access_changed=0; }
         rs->member_level=members_level(rs->auth>0?(uint32_t)rs->auth:rq->user);
         if(rs->preferences && rq->op!='V')members_ui_preferences(rs->auth>0?(uint32_t)rs->auth:rq->user,&rs->editor_preference,&rs->columns,&rs->rows,&rs->ui_aux);

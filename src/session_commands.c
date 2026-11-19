@@ -43,7 +43,7 @@ static int utility_command(Session *s,char *line) {
         else { s->core.wake=s->core.now+(uint64_t)n; session_impl_emit(s,"WAITING\r\n"); }
     } else if(!strcmp(line,"QUIT")) {
         if(preference_exit_begin(&s->presentation.preferences,s->core.user,PREF_EXIT_QUIT)) { session_impl_command_core(s,"PREFS SAVE");preference_exit_submitted(&s->presentation.preferences,s->core.pending);return 1; }
-        s->presentation.preferences.exit_action=PREF_EXIT_NONE;if(s->presentation.ui.enabled)session_impl_queue_text(s,site_text(1));session_impl_emit(s,"BYE\r\n");s->core.closing=1;
+        s->presentation.preferences.exit_action=PREF_EXIT_NONE;if(s->presentation.ui.enabled)session_impl_queue_text(s,site_text(1));session_impl_emit(s,"BYE\r\n");session_core_close(&s->core);
     }
     else session_impl_emit(s,"ERR command\r\n");
 

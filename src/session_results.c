@@ -30,8 +30,11 @@
 
 void session_result(Session *s,const BoardResult *completion,uint64_t now) {
 
-    if(!session_core_complete(&s->core,completion,now))return;
-    if(reader_cancel_completion(&s->reading.reader,completion->sequence)) { session_impl_queue_text(s,ui_text(&s->presentation.ui,MSG_SCAN_STOP));session_impl_prompt(s);return; }
+    if(!session_core_matches(&s->core,completion))return;
+    if(completion->revoked) { session_revoke(s);return; }
+    int cancelled=reader_cancel_completion(&s->reading.reader,completion->sequence);
+    if(!session_core_complete_mode(&s->core,completion,now,cancelled))return;
+    if(cancelled) { session_impl_queue_text(s,ui_text(&s->presentation.ui,MSG_SCAN_STOP));session_impl_prompt(s);return; }
     if(s->presentation.preferences.exit_action) {
         PreferenceExit action=preference_exit_complete(&s->presentation.preferences,completion->feedback.preferences_saved);
         if(action!=PREF_EXIT_NONE) { session_impl_command_core(s,action==PREF_EXIT_LOGOUT?"LOGOUT":"QUIT");session_impl_prompt(s);return; }
@@ -41,7 +44,6 @@ void session_result(Session *s,const BoardResult *completion,uint64_t now) {
     if(completion->service_action=='E') { s->presentation.ui.input=completion->service_number==2?UI_REPLY:UI_POST;session_impl_prompt(s);return; }
     if(completion->mail_notify_user)session_mail_notify(s,completion->mail_notify_user,completion->mail_notify_deny,completion->mail_notify_revision);
     if(completion->chat_user)chat_apply_preferences(completion->chat_user,&completion->chat_preferences);
-    if(completion->revoked) { session_revoke(s); return; }
     if(vault_navigation_complete(&s->files.vault,completion->feedback.file_board_info)) {
         s->files.file_selected=0;s->files.vault_mode=1;s->mail_state.mail_mode=0;
     }
@@ -53,8 +55,7 @@ void session_result(Session *s,const BoardResult *completion,uint64_t now) {
     if(session_impl_profile_walk_result(s,completion,now))return;
     if(session_impl_batch_copy_result(s,completion,now))return;
     if(session_impl_report_result(s,completion,now))return;
-    if(completion->feedback.file_unlocked && completion->feedback.grant_board<=1024)s->core.vault_grants[completion->feedback.grant_board]=completion->feedback.grant_revision;
-    if(completion->auth) { s->presentation.classic_input=0;s->presentation.classic_id=0;s->presentation.classic_area=CM_MAIN;check_traversal_reset(&s->reading.check);memset(s->core.vault_grants,0,sizeof(s->core.vault_grants)); }
+    if(completion->auth) { s->presentation.classic_input=0;s->presentation.classic_id=0;s->presentation.classic_area=CM_MAIN;check_traversal_reset(&s->reading.check); }
     if(session_impl_vault_edit_result(s,completion,now))return;
     if(session_impl_message_result(s,completion,now))return;
     if(session_impl_mail_result(s,completion,now))return;
