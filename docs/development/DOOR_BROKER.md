@@ -177,9 +177,17 @@ game-server restart preserves committed SQLite data, parent service stop removes
 detached children, and stale BUSY markers prevent reuse. These are a synthetic
 game fixture, **not AREA-PC88 acceptance**. See [AREA-PC88 handoff](DOOR_AREA_PC88_HANDOFF.md).
 
-Still required: exact-SHA native FreeBSD isolated-launch results, Solaris process
-contracts/privilege backend, SELinux policy, complete OS service lifecycle tests,
-AREA-PC88-side integration and independent security review. Additional crash,
+Baseline main `ed3adacdb7771f4db4bcd342c1cd7d184506dca5` passed
+[FreeBSD jail acceptance](https://github.com/matsuotakeshi/liner-notes/actions/runs/44514710751)
+(artifact `14524706953`) and
+[Linux compatibility](https://github.com/matsuotakeshi/liner-notes/actions/runs/44512852526).
+These cover isolated launch and the crash lifecycle fixture below, not future
+changes or OS service activation. Private AREA-PC88 integration also passed for
+its pinned candidate combination; private evidence is retained separately, not
+published or generalized to later builds.
+
+Still required: Solaris process contracts/privilege backend, SELinux policy,
+complete OS service lifecycle tests and independent security review. Broader
 resource-exhaustion and timeout stress are not complete. User manual acceptance
 is not used to substitute for these development tests. Do not mark LN-38 complete
 or deploy this candidate yet.
@@ -263,3 +271,37 @@ still requires trusted-main integration; this change alone is not success eviden
 Reviewed `docs/manual/external-games.md` and `docs/manual/security.md`: this is
 a test fixture correction, with no product command, permission or setup change.
 The stable manual remains unchanged.
+
+### Admission and communication resource limits
+
+The next candidate bounds isolation request reads by one three-second monotonic
+deadline, including partial/trickled input. Broker-response reads use the same
+rule. The game-server consumer's existing `timeout` argument (default three
+seconds) now covers connect, send and the complete response, rather than each
+individual byte. Protocol fields, identities and policy JSON are unchanged.
+
+Broker output drain and close waits are each bounded to three seconds. A failed
+issuer response revokes the session before attempting the denial reply; a stuck
+close aborts that transport. No ticket/request content appears in diagnostics.
+This bounds a handler's waits; it is not a claim of resistance to arbitrary
+host-wide memory exhaustion or a compromised privileged supervisor.
+
+The isolation supervisor rejects new requests on peer-credential or fork failure
+without closing the watch pipes of running Doors. Transient accept resource
+errors (EMFILE, ENFILE, ENOBUFS, ENOMEM) use a 100-ms backoff; unrelated errors
+remain fatal. Existing worker count limits, UID checks, persistent BUSY markers
+and cleanup proof remain mandatory. No failure silently falls back to same-UID
+execution or clears a reservation.
+
+`test_door_isolation_admission.py`, included in `make check`, injects resource
+errors without exhausting the CI host, verifies preserved worker inventory and
+subsequent admission, and tests an absolute request deadline. Portable Broker
+tests verify a stalled writer/close, consumed-lease revocation, recovery and a
+trickled consumer response. The privileged Linux/FreeBSD fixture now sends a
+partial request from the BBS UID while two games are active, requires rejection
+within a bounded wait and checks both existing leases remain active. Unix-only
+tests are skipped explicitly on Windows. Native results for this change are
+pending the normal PR/main CI sequence, not inherited from the baseline above.
+
+Reviewed the stable Door and security manual chapters. Only the development
+status summary changes; no released configuration or HELP operation is added.

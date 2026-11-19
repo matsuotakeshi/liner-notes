@@ -10,6 +10,7 @@ from pathlib import Path
 from door_broker_core import Broker,Denied,identity,positive
 
 MAX_LINE=4096
+WRITE_TIMEOUT=3
 
 def peer_uid(sock):
     if sys.platform.startswith('linux'):
@@ -92,16 +93,21 @@ class Server:
                     if op not in ('consume','check') or set(request)!={'op','door','bbs','token'}:raise Denied('invalid consumer request')
                     positive(request['door'],86400);identity(request['bbs'])
                     result=(self.broker.consume if op=='consume' else self.broker.check)(uid,request['door'],request['bbs'],request['token'])
-                writer.write(json.dumps({'ok':True,'result':result},separators=(',',':')).encode()+b'\n');await writer.drain()
+                writer.write(json.dumps({'ok':True,'result':result},separators=(',',':')).encode()+b'\n')
+                await asyncio.wait_for(writer.drain(),WRITE_TIMEOUT)
                 if uid!=0:break
         except (Denied,ValueError,OSError,TimeoutError,asyncio.LimitOverrunError):
             # No exception text, request body, identity or token is logged/reflected.
-            with contextlib.suppress(OSError,ConnectionError):
-                writer.write(b'{"ok":false,"error":"authorization denied"}\n');await writer.drain()
+            # Revoke before attempting to notify a peer that may not read.
+            if session:self.broker.close(session)
+            with contextlib.suppress(OSError,ConnectionError,TimeoutError):
+                writer.write(b'{"ok":false,"error":"authorization denied"}\n')
+                await asyncio.wait_for(writer.drain(),WRITE_TIMEOUT)
         finally:
             if session:self.broker.close(session)
             self.clients.discard(writer);writer.close()
-            with contextlib.suppress(OSError):await writer.wait_closed()
+            try:await asyncio.wait_for(writer.wait_closed(),WRITE_TIMEOUT)
+            except (OSError,TimeoutError):writer.transport.abort()
 
 async def serve(config):
     if os.getuid()!=config['broker_uid'] or os.geteuid()!=config['broker_uid']:raise ValueError('run as dedicated Broker UID')

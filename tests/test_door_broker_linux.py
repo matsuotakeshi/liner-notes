@@ -171,6 +171,24 @@ while True:
                 except (TimeoutError,AssertionError) as error:raise AssertionError(('isolated Door launch',c.buf[-2000:])) from error
                 assert f'AUTH {member} UID {uid}'.encode() in out,out
             assert query(game_socket,{})['active']==2
+            # An authenticated BBS UID must not extend a request deadline by
+            # trickling bytes. Existing two Doors/leases remain live throughout.
+            slow_request=r'''
+import select,socket,sys,time
+with socket.socket(socket.AF_UNIX,socket.SOCK_STREAM) as s:
+    s.settimeout(2);s.connect(sys.argv[1]);end=time.monotonic()+6
+    result=b''
+    while time.monotonic()<end:
+        try:s.sendall(b' ')
+        except BrokenPipeError:pass
+        if select.select([s],[],[],.25)[0]:
+            result+=s.recv(128)
+            if b'ERR\n' in result:break
+    assert b'ERR\n' in result,'partial request kept admission alive'
+'''
+            subprocess.run([sys.executable,'-c',slow_request,str(isolation)],preexec_fn=identity(BBS),check=True,timeout=10)
+            assert services[1].poll() is None,'partial request stopped supervisor'
+            assert query(game_socket,{})['active']==2,'partial request revoked existing games'
             # Transfer PTY resize and enforce game-side authority on each mutation.
             clients[0].send(bytes([255,250,31,0,100,0,30,255,240]))
             for _ in range(20):

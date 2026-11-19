@@ -1,11 +1,12 @@
 """Broker authority, one-use/revocation, UID roles and bounded protocol tests."""
 import asyncio,json,sys,unittest
-from unittest.mock import patch
+from unittest.mock import patch,Mock
 from pathlib import Path
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]/'scripts'))
 from door_broker_core import Broker,Denied
 from door_broker import Server
 from door_auth_client import DoorAuthorization,AuthorizationError
+import door_auth_client
 
 class Core(unittest.TestCase):
     def setUp(self):
@@ -64,6 +65,23 @@ class Core(unittest.TestCase):
         with self.assertRaises(Denied):self.opened(door=3)
 
 class Consumer(unittest.TestCase):
+    def test_rpc_deadline_covers_trickled_response(self):
+        connection=Mock();connection.__enter__=Mock(return_value=connection);connection.__exit__=Mock(return_value=False)
+        connection.recv.return_value=b' '
+        with patch.object(door_auth_client,'socket',Mock(socket=Mock(return_value=connection))),patch.object(door_auth_client,'peer_uid',return_value=30),patch.object(door_auth_client.time,'monotonic',side_effect=[0,0,.5,1,2,3]):
+            with self.assertRaises(AuthorizationError):
+                door_auth_client.request('/fixture','check',bbs='bbs',door=1,token='secret',broker_uid=30)
+        self.assertEqual(connection.recv.call_count,2)
+        self.assertEqual([c.args[0] for c in connection.settimeout.call_args_list],[3,2.5,2,1])
+        connection.__exit__.assert_called_once()
+
+    def test_rpc_rejects_nonobject_response(self):
+        connection=Mock();connection.__enter__=Mock(return_value=connection);connection.__exit__=Mock(return_value=False)
+        connection.recv.side_effect=[b'[',b']',b'\n']
+        with patch.object(door_auth_client,'socket',Mock(socket=Mock(return_value=connection))),patch.object(door_auth_client,'peer_uid',return_value=30):
+            with self.assertRaises(AuthorizationError):
+                door_auth_client.request('/fixture','check',bbs='bbs',door=1,token='secret',broker_uid=30)
+
     def test_mutations_recheck_identity_and_liveness(self):
         broker=Broker('bbs',{40:[1]});session=broker.open(1,1,'s',0);ticket=broker.issue(session)
         def rpc(path,operation,*,bbs,door,token,broker_uid):
@@ -79,7 +97,7 @@ class Consumer(unittest.TestCase):
             with self.assertRaises(AuthorizationError):lease.authorize(1)
 
 class Writer:
-    def __init__(self,uid):self.uid=uid;self.data=bytearray();self.closed=False
+    def __init__(self,uid):self.uid=uid;self.data=bytearray();self.closed=False;self.transport=Mock()
     def get_extra_info(self,name):return self.uid
     def write(self,data):self.data.extend(data)
     async def drain(self):pass
@@ -114,10 +132,7 @@ class Protocol(unittest.IsolatedAsyncioTestCase):
             result=await self.request(uid,request);self.assertIn(b'"ok":false',result);self.assertNotIn(b'ticket',result)
         self.assertFalse(self.b.sessions)
     async def test_live_issuer_owns_lease(self):
-        reader=asyncio.StreamReader(limit=4096);writer=Writer(0)
-        reader.feed_data(b'{"op":"open","member":1,"door":1,"session":"s","generation":1}\n')
-        task=asyncio.create_task(self.server.handle(reader,writer))
-        for _ in range(5):await asyncio.sleep(0)
+        reader,writer,task=await self.live_issuer('s')
         token=json.loads(writer.data)['result']['ticket']
         result=json.loads(await self.request(40,dict(op='consume',door=1,bbs='bbs',token=token)))['result']
         self.assertEqual(result['claims']['member'],1)
@@ -165,5 +180,29 @@ class Protocol(unittest.IsolatedAsyncioTestCase):
         with self.assertRaises(Denied):self.b.check(40,1,'bbs',lease)
         self.assertTrue(writer.closed);self.assertFalse(self.server.clients)
         self.assertFalse(self.b.sessions);self.assertFalse(self.b.leases)
+
+    async def test_stalled_reply_revokes_lease_and_aborts_stalled_close(self):
+        broker=self.b;consumed=[]
+        class BlockedWriter(Writer):
+            async def drain(self):
+                if not consumed:
+                    ticket=json.loads(self.data)['result']['ticket']
+                    consumed.append(broker.consume(40,1,'bbs',ticket)['lease'])
+                else:
+                    # Revocation precedes even the attempted denial response.
+                    self_test.assertFalse(broker.sessions)
+                await asyncio.Future()
+            async def wait_closed(self):await asyncio.Future()
+        self_test=self
+        reader=asyncio.StreamReader();writer=BlockedWriter(0)
+        reader.feed_data(b'{"op":"open","member":1,"door":1,"session":"stalled","generation":0}\n')
+        with patch('door_broker.WRITE_TIMEOUT',.02):
+            await asyncio.wait_for(self.server.handle(reader,writer),2)
+        self.assertTrue(writer.closed);writer.transport.abort.assert_called_once()
+        self.assertFalse(self.server.clients);self.assertFalse(self.b.sessions)
+        self.assertFalse(self.b.tickets);self.assertFalse(self.b.leases)
+        with self.assertRaises(Denied):self.b.check(40,1,'bbs',consumed[0])
+        result=await self.request(0,dict(op='open',member=1,door=1,session='recovered',generation=0))
+        self.assertIn(b'"ok":true',result)
 
 if __name__=='__main__':unittest.main()
