@@ -44,7 +44,9 @@ inside writable game data.
 ## SELinux boundary
 
 Optional policy version 0.2.0 adds `liner_notes_broker_t`,
-`liner_notes_isolation_t`, and `liner_notes_consumer_t`. Existing BBS and Door
+`liner_notes_isolation_t`, and `liner_notes_consumer_t`. The three new domains do not join the generic `daemon` attribute, so the
+OS-wide cluster-mode daemon socket permission is not inherited. Explicit
+systemd and NoNewPrivileges transitions remain required. Existing BBS and Door
 domains remain `liner_notes_t` / `liner_notes_door_t`.
 
 | Source | Destination | Permitted action |

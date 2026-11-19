@@ -79,3 +79,28 @@ review. The updated native helper's protected-domain list requires an explicitly
 authorized installed-helper refresh, never bypassing its workflow hash check.
 The native mock consumer is not AREA-PC88: real-game evidence must name both
 source SHAs and cannot be inferred from a synthetic game or an earlier run.
+
+### Avoid inherited daemon-cluster socket permissions
+
+PR #141 at `07fb9448370329bd4c1e6d73ba88de42c9205bca` failed the compiled
+policy graph check in Actions job `135644083285`, run `44548102338`. Policy
+compilation and both RPM builds completed; the failure was a forbidden
+`liner_notes_t` to `liner_notes_broker_t` Unix socket `connectto` rule inherited
+from `allow daemon daemon:unix_stream_socket connectto`, conditional on
+`daemons_enable_cluster_mode`. The check must not ignore conditional rules or
+turn the host boolean off to mask the grant. This is a candidate MAC-policy
+boundary defect; the separate kernel-UID Broker admission remains unchanged.
+
+Use `init_domain` for only the three new roles, retaining the explicit
+NoNewPrivileges transition. Unlike `init_daemon_domain`, this interface does not
+join the generic daemon attribute. Reference definitions:
+[SELinux policy init interfaces](https://github.com/fedora-selinux/selinux-policy/blob/rawhide/policy/modules/system/init.if).
+The compiled graph now additionally requires absence from `daemon`, presence of
+the init-to-entrypoint type transition and `nnp_transition`, and rejects Web/link
+connections to Broker. Existing allow/deny checks remain unchanged. The stable
+BBS/Web/link domains and all runtime authentication code are unchanged.
+
+Local checks cannot compile the Rocky policy on Windows. Hosted policy CI must
+validate the resulting graph and RPM lifecycle; exact-main Enforcing acceptance
+still follows merge and the authorized protected-helper update. No VM or
+production changes are needed for this correction.
