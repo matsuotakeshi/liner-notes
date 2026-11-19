@@ -54,7 +54,7 @@ int session_impl_board_options(Session *s,char *line) {
         if(*tail)goto board_syntax;
         if(q.action=='P' && s->core.now<s->core.auth_after) { session_impl_emit(s,"ERR try later\r\n");return 1; }
         session_impl_submit(s,&q);
-        if(q.action=='A' && s->core.pending) { report_navigation_begin(&s->reading.report,REPORT_BOARDACCESS,q.number,0); }
+        if(q.action=='A' && s->core.pending) { report_navigation_begin(&rtbbs(s)->reading.report,REPORT_BOARDACCESS,q.number,0); }
         return 1;
 board_syntax:session_impl_emit(s,"ERR command\r\n");return 1;
     }
@@ -86,7 +86,7 @@ int session_impl_board_structure_command(Session *s,char *line) {
 
 int session_impl_board_unlock_result(Session *s,const BoardResult *completion,uint64_t now) {
     (void)now;
-    if(completion->service_action=='1') { s->auth.board_enter=completion->service_number;s->auth.board_lock=completion->board_grant;s->auth.password_mode='b'; }
+    if(completion->service_action=='1') { rtbbs(s)->auth.board_enter=completion->service_number;rtbbs(s)->auth.board_lock=completion->board_grant;rtbbs(s)->auth.password_mode='b'; }
     if(completion->service_action=='2') {
         BoardRequest q={0};q.op='j';q.number=completion->service_number;session_impl_submit(s,&q);return 1;
     }

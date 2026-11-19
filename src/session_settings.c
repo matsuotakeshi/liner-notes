@@ -35,9 +35,9 @@ int session_impl_preference_command(Session *s,char *line) {
         session_impl_submit(s,&q); return 1;
     }
     if(!strcmp(line,"PAGER") || !strcmp(line,"PAGER ON") || !strcmp(line,"PAGER OFF")) {
-        if(!strcmp(line,"PAGER ON")) s->presentation.pager_enabled=1;
-        if(!strcmp(line,"PAGER OFF")) s->presentation.pager_enabled=0;
-        session_impl_emit(s,s->presentation.pager_enabled?"PAGER ON\r\n":"PAGER OFF\r\n"); return 1;
+        if(!strcmp(line,"PAGER ON")) rtbbs(s)->presentation.pager_enabled=1;
+        if(!strcmp(line,"PAGER OFF")) rtbbs(s)->presentation.pager_enabled=0;
+        session_impl_emit(s,rtbbs(s)->presentation.pager_enabled?"PAGER ON\r\n":"PAGER OFF\r\n"); return 1;
     }
     if(!strncmp(line,"PAGER SIZE ",11)) {
         uint32_t cols,rows; const char *tail;
@@ -54,7 +54,7 @@ int session_impl_menu_settings_command(Session *s,char *line) {
     char out[128];
     if(!strncmp(line,"MENUMODE ",9)) {
         const char *mode=line+9;int n=!strcmp(mode,"BEGINNER")?0:!strcmp(mode,"STANDARD")?1:!strcmp(mode,"EXPERT")?2:-1;
-        if(n<0) { session_impl_emit(s,"ERR command\r\n");return 1; }s->presentation.menu_mode=n;s->presentation.menu_shown=0;
+        if(n<0) { session_impl_emit(s,"ERR command\r\n");return 1; }rtbbs(s)->presentation.menu_mode=n;rtbbs(s)->presentation.menu_shown=0;
         if(s->core.user) { BoardRequest q={0};q.op='}';q.action='v';q.number=(uint32_t)n;session_impl_submit(s,&q); }else session_impl_emit(s,"MENU MODE CHANGED\r\n");return 1;
     }
     if(!s->core.user && (!strcmp(line,"HANDLE") || !strncmp(line,"HANDLE ",7))) {
@@ -66,8 +66,8 @@ int session_impl_menu_settings_command(Session *s,char *line) {
 }
 
 PreferenceValues session_impl_session_preferences(const Session *s) {
-    return (PreferenceValues){s->presentation.ui.language,s->presentation.pager_enabled,s->editor.editor_line,s->presentation.columns,s->presentation.rows,
-                              (unsigned)s->editor.editor_numbers,s->connection.transfer_protocol};
+    return (PreferenceValues){rtbbs_const(s)->presentation.ui.language,rtbbs_const(s)->presentation.pager_enabled,rtbbs_const(s)->editor.editor_line,s->connection.columns,s->connection.rows,
+                              (unsigned)rtbbs_const(s)->editor.editor_numbers,s->connection.transfer_protocol};
 }
 
 void session_impl_preferences_request(const Session *s,BoardRequest *q) {
@@ -76,12 +76,12 @@ void session_impl_preferences_request(const Session *s,BoardRequest *q) {
     q->cursor=(uint32_t)record.language;q->title[0]=record.pager?'1':'0';
 }
 
-int session_disconnect_preferences(const Session *s,BoardRequest *out) {
+int session_rtbbs_disconnect_preferences(const Session *s,BoardRequest *out) {
     PreferenceValues values=session_impl_session_preferences(s);
     if(out)memset(out,0,sizeof(*out));
-    if(!preference_disconnect_needed(&s->presentation.preferences,s->core.user,&values))return 0;
+    if(!preference_disconnect_needed(&rtbbs_const(s)->presentation.preferences,s->core.user,&values))return 0;
     if(out) { out->op='V';out->number=1;out->user=s->core.user;out->user_epoch=s->core.user_epoch;session_impl_preferences_request(s,out); }
     return 1;
 }
 
-uint64_t session_ui_signature(const Session *s) { PreferenceValues values=session_impl_session_preferences(s);return preference_signature(&values); }
+uint64_t session_rtbbs_ui_signature(const Session *s) { PreferenceValues values=session_impl_session_preferences(s);return preference_signature(&values); }

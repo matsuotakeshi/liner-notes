@@ -206,7 +206,7 @@ test-legacy-transfers: runtime vaultctl
 	$(PYTHON) tests/test_stage61_transfer_menu.py ./runtime ./vaultctl $(LRZ) $(LSZ)
 
 clean:
-	rm -f test-session-core test-session-policy-core test-form-flow-core test-message-flow-core test-list-navigation-core test-mail-navigation-core test-preference-core test-traversal-core test-batch-core test-editor-interface test-connector-protocol test-terminal-policy test-connector-core test-notification-core test-connection-core test-chat-core test-door-core test-editor-core test-link-core test-authentication-core test-vault-management-core test-vault-query-core test-download-core test-download-store test-activity-core test-activity-store test-catalog-group-core test-catalog-group-store test-board-topology-core test-catalog-policy-core test-catalog-core test-member-settings-store test-mail-core test-member-core test-article-core liner-notes-door-lock runtime vaultctl memberctl dbconvert generate-scale generate-members test-adapters test-chat test-vault-core test-upload-core test-transfer-connector test-userlog test-stage61-userlog test-zhost
+	rm -f test-session-ui-lifecycle test-session-core test-session-policy-core test-form-flow-core test-message-flow-core test-list-navigation-core test-mail-navigation-core test-preference-core test-traversal-core test-batch-core test-editor-interface test-connector-protocol test-terminal-policy test-connector-core test-notification-core test-connection-core test-chat-core test-door-core test-editor-core test-link-core test-authentication-core test-vault-management-core test-vault-query-core test-download-core test-download-store test-activity-core test-activity-store test-catalog-group-core test-catalog-group-store test-board-topology-core test-catalog-policy-core test-catalog-core test-member-settings-store test-mail-core test-member-core test-article-core liner-notes-door-lock runtime vaultctl memberctl dbconvert generate-scale generate-members test-adapters test-chat test-vault-core test-upload-core test-transfer-connector test-userlog test-stage61-userlog test-zhost
 
 memberctl: src/db_index.h src/memberctl.c src/members.c src/members.h src/app_limits.h src/store_limits.h
 	$(CC) $(CPPFLAGS) $(SQLITE_CFLAGS) $(CFLAGS) $(LDFLAGS) -std=c11 -Wall -Wextra -Werror src/memberctl.c src/members.c -lcrypto $(SQLITE_LIBS) $(LDLIBS) src/storage_sqlite.c $(SQLITE_CFLAGS) -pthread -lcrypto $(SQLITE_LIBS) -o memberctl
@@ -616,4 +616,10 @@ check: test-session-core
 # Shared data contracts are independent of the worker lifecycle.
 runtime test-adapters test-session-core: src/operation.h src/operation_pages.h
 
-runtime test-adapters: src/session_ui.h
+runtime test-adapters: src/session_ui.h src/session_state.h src/session_io.h
+
+.PHONY: test-session-ui-lifecycle
+test-session-ui-lifecycle: tests/test_session_ui_lifecycle.c src/session.c src/session_ui.c src/session_core.c src/connector_core.c src/terminal_pager.c src/session.h src/session_ui.h src/session_io.h
+	$(CC) $(CPPFLAGS) $(CFLAGS) $(LDFLAGS) -std=c11 -Wall -Wextra -Werror -Isrc tests/test_session_ui_lifecycle.c src/session.c src/session_ui.c src/session_core.c src/connector_core.c src/terminal_pager.c -lcrypto $(LDLIBS) -o test-session-ui-lifecycle
+	./test-session-ui-lifecycle
+check: test-session-ui-lifecycle
