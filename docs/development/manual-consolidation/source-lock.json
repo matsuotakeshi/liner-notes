@@ -316,7 +316,7 @@
   "src/session_core.h": "60613af80053405c196984b62305093cef370d318d20c4157dd204fc31dc6702",
   "src/session_state.h": "f07dc961c277f7b3dd131c0a51cc0090fa96a8992e8a2097e271fc7050f5971a",
   "tests/test_session_core.c": "1fee3237a93778f2c6747861c85d4e8bf456f6180157b7398129f661f47cfd5c",
-  "tests/test_session_operations.c": "8dc9d99ed222b39f8dd0dee3a77ff2b183072519c9cd358634544917cf7ba21f",
+  "tests/test_session_operations.c": "87638fd23ca673d9f04e7ec13b490a2625afcbc09cf627a1fe4bed86765c8bdf",
   "tests/test_session_operations.py": "240ade5c9aecbbd22ff7b5f89c5d8970dfc1b4ef9adb9602916b52cba9a7c79a",
   "tests/test_session_operations_harness.py": "5ab850cdf1846889e6218c5eed5ec8d26f32633426059e3b148d6e9a4436f006",
   "src/operation.h": "20b80ff4db79e4b33b157f9366b4cf497628d432c31a680a52a72b786bfec2ae",

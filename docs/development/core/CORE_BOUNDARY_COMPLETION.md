@@ -106,3 +106,15 @@ MMM/Web/SSH adapters and Door Broker may use those boundaries without duplicatin
 ACL logic. DB normalization and new transport authentication remain separate
 approved workstreams, not unfinished Core extraction tasks. Validation is only
 complete when the candidate CI succeeds; record its SHA and runs in the PR.
+
+## PR #129 FIND fixture correction
+
+Commit 35792eaca3b16fed3405a7170d475e35058d24de failed Linux compatibility
+run 44446382247 on Rocky 9 and AlmaLinux 9 at `find-page`. The added headless
+fixture left the author empty. `article_core.c:validate_filter` requires an
+explicit author or `*`, as exercised by the existing article Core tests; SEARCH
+has a different input contract. Keep the empty-author request as a rejection /
+no-payload assertion and submit `*` for the successful FIND page. Assert success,
+page count and the original article ID. No runtime code, input validation,
+permissions or timeouts are changed. Actual corrected POSIX integration remains
+subject to Hosted CI for the new commit, not the preceding successful unit tests.

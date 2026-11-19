@@ -63,7 +63,12 @@ int session_operations_test(const char *directory,int verify,uint32_t expected_a
     memset(q,0,sizeof(*q));q->op='L';q->board=1;q->number=1;exchange(&s,q,r,"list");assert(r->feedback.page_found && !r->feedback.page_next);
     SessionResultView listed=session_core_result(r);assert(listed.page && listed.page->kind==OPERATION_PAGE_ARTICLES && listed.page->data.articles.count==1 && listed.page->data.articles.rows[0].id==article);
     memset(q,0,sizeof(*q));q->op='f';q->board=1;strcpy(q->title,"API");exchange(&s,q,r,"search-page");assert(r->page.kind==OPERATION_PAGE_ARTICLES && r->page.data.articles.count==1);
-    memset(q,0,sizeof(*q));q->op='Z';q->action=3;q->board=1;strcpy(q->title,"API");exchange(&s,q,r,"find-page");assert(r->page.kind==OPERATION_PAGE_ARTICLES && r->page.data.articles.rows[0].id==article);
+    memset(q,0,sizeof(*q));q->op='Z';q->action=3;q->board=1;strcpy(q->title,"API");
+    exchange(&s,q,r,"find-empty-author-denied");SessionResultView invalid_find=session_core_result(r);
+    assert(r->feedback.failed && r->page.kind==OPERATION_PAGE_NONE && invalid_find.status==SESSION_RESULT_FAILED && !invalid_find.page && !invalid_find.content && !invalid_find.body);
+    /* FIND requires an explicit author or the all-authors wildcard, unlike SEARCH. */
+    strcpy(q->username,"*");exchange(&s,q,r,"find-page");
+    assert(!r->feedback.failed && r->page.kind==OPERATION_PAGE_ARTICLES && r->page.data.articles.count==1 && r->page.data.articles.rows[0].id==article);
     memset(q,0,sizeof(*q));q->op='b';exchange(&s,q,r,"boards-page");assert(r->page.kind==OPERATION_PAGE_BOARDS && r->page.data.boards.count>0);
     memset(q,0,sizeof(*q));q->op='Z';q->action=7;q->number=s.user;exchange(&s,q,r,"profile-view");assert(r->page.kind==OPERATION_PAGE_PROFILE && r->page.data.profile.user==s.user);
     /* Existing terminal requests do not allocate a structured payload. */
