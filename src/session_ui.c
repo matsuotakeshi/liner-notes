@@ -2,11 +2,37 @@
 #include "session_io.h"
 #include <string.h>
 #include <stdlib.h>
+#include "ui_profile.h"
 #include <openssl/crypto.h>
 
 SessionUiConfig session_ui_default(void) {
     SessionUiConfig config={.count=1,.allowed=1,.policy=SESSION_UI_FIXED};
     config.adapters[0]=session_ui_rtbbs();return config;
+}
+
+int session_ui_configure(SessionUiConfig *config,const char *policy,const char *name,const char *allow) {
+    if(!config || !policy || !name || !allow || !*allow || strlen(allow)>255)return 0;
+    SessionUiConfig next=*config;
+    if(!strcmp(policy,"FIXED"))next.policy=SESSION_UI_FIXED;
+    else if(!strcmp(policy,"MEMBERS"))next.policy=SESSION_UI_MEMBERS;
+    else if(!strcmp(policy,"ALL"))next.policy=SESSION_UI_ALL;
+    else return 0;
+    unsigned i=0;for(;i<next.count;i++)if(!strcmp(name,next.adapters[i]->name))break;
+    if(i==next.count)return 0;
+    next.default_index=i;next.allowed=0;
+    const char *p=allow;
+    while(*p) {
+        const char *end=strchr(p,',');size_t length=end?(size_t)(end-p):strlen(p);
+        if(!length || length>31)return 0;
+        char part[32];memcpy(part,p,length);part[length]=0;
+        for(i=0;i<next.count;i++)if(!strcmp(part,next.adapters[i]->name))break;
+        if(i==next.count || (next.allowed&(1u<<i)))return 0;
+        next.allowed|=1u<<i;
+        if(!end)break;
+        p=end+1;if(!*p)return 0;
+    }
+    if(!session_ui_config_valid(&next))return 0;
+    *config=next;return 1;
 }
 
 int session_ui_config_valid(const SessionUiConfig *config) {
@@ -30,7 +56,7 @@ int session_ui_config_valid(const SessionUiConfig *config) {
 
 const char *session_ui_name(const Session *s) { return s->ui_binding.active?s->ui_binding.active->name:NULL; }
 
-SessionUiSelection session_ui_select(Session *s,const char *name) {
+SessionUiSelection session_ui_preflight(const Session *s,const char *name) {
     if(!s->ui_binding.active || !name)return SESSION_UI_INVALID;
     const SessionUiConfig *c=&s->ui_binding.config;
     unsigned i;
@@ -43,6 +69,12 @@ SessionUiSelection session_ui_select(Session *s,const char *name) {
        s->connection.binary || s->connection.connector_literal || s->connection.connector_block.data ||
        s->connection.binary_reader.used || !s->ui_binding.active->can_leave(s))return SESSION_UI_BUSY;
     if(c->adapters[i]==s->ui_binding.active)return SESSION_UI_UNCHANGED;
+    return SESSION_UI_SELECTED;
+}
+SessionUiSelection session_ui_select(Session *s,const char *name) {
+    SessionUiSelection result=session_ui_preflight(s,name);if(result!=SESSION_UI_SELECTED)return result;
+    const SessionUiConfig *c=&s->ui_binding.config;unsigned i=0;
+    while(strcmp(name,c->adapters[i]->name))i++;
     SessionUiSnapshot view=session_ui_snapshot(s);
     if(!session_ui_allocate(s,i))return SESSION_UI_INVALID;
     s->ui_binding.active->leave(s);s->ui_binding.active=c->adapters[i];s->ui_binding.state=s->ui_binding.states[i];
@@ -50,6 +82,16 @@ SessionUiSelection session_ui_select(Session *s,const char *name) {
     return SESSION_UI_SELECTED;
 }
 
+static void restore_choice(Session *s) {
+    if(!s->ui_binding.restore_pending || s->ui_binding.explicit_choice)return;
+    const SessionUiConfig *c=&s->ui_binding.config;
+    const char *fallback=c->adapters[c->default_index]->name;
+    const char *name=c->policy!=SESSION_UI_FIXED && *s->ui_binding.preferred?s->ui_binding.preferred:fallback;
+    SessionUiSelection result=session_ui_select(s,name);
+    if(result!=SESSION_UI_SELECTED && result!=SESSION_UI_UNCHANGED && result!=SESSION_UI_BUSY)
+        result=session_ui_select(s,fallback);
+    if(result!=SESSION_UI_BUSY)s->ui_binding.restore_pending=0;
+}
 void session_result(Session *s,const BoardResult *completion,uint64_t now) {
     if(!session_core_matches(&s->core,completion))return;
     if(completion->revoked) { session_revoke(s);return; }
@@ -57,6 +99,24 @@ void session_result(Session *s,const BoardResult *completion,uint64_t now) {
     SessionResultView view=session_core_receive(&s->core,completion,now,cancelled);
     if(view.status!=SESSION_RESULT_IGNORED && completion->auth)session_ui_discard_inactive(s);
     if(view.status!=SESSION_RESULT_IGNORED)s->ui_binding.active->result(s,completion,view,now,cancelled);
+    if(view.status==SESSION_RESULT_OK && (completion->auth>0 || completion->feedback.ui_profile_saved)) {
+        memcpy(s->ui_binding.preferred,completion->ui_profile,sizeof(s->ui_binding.preferred));
+        s->ui_binding.preferred[31]=0;
+        if(completion->auth>0 && !s->ui_binding.explicit_choice) { s->ui_binding.restore_pending=1;restore_choice(s); }
+    }
+}
+
+SessionUiSelection session_ui_choose(Session *s,const char *name) {
+    SessionUiSelection result=session_ui_select(s,name);
+    if(result==SESSION_UI_SELECTED || result==SESSION_UI_UNCHANGED) { s->ui_binding.explicit_choice=1;s->ui_binding.restore_pending=0; }
+    return result;
+}
+int session_ui_save_choice(Session *s,const char *name) {
+    if(!s->core.user || !name || (*name && !ui_profile_valid(name)))return 0;
+    OperationRequest *q=calloc(1,sizeof(*q));if(!q)return 0;
+    q->op='V';q->number=4;strcpy(q->title,name);
+    SessionOperationStatus status=session_submit(s,q);free(q);
+    return status==SESSION_OPERATION_ACCEPTED;
 }
 
 void session_impl_emit(Session *s,const char *text) {
@@ -82,7 +142,7 @@ void session_tick(Session *s,uint64_t now) {
         connector_block_clear(&s->connection.connector_block);session_abort(s);return;
     }
     if(s->connection.binary && connector_reader_expired(&s->connection.binary_reader,now)) { session_abort(s);return; }
-    if(s->core.active && !s->core.closing)s->ui_binding.active->tick(s,now);
+    if(s->core.active && !s->core.closing) { restore_choice(s);s->ui_binding.active->tick(s,now); }
 }
 
 SessionUiSnapshot session_ui_snapshot(const Session *s) {

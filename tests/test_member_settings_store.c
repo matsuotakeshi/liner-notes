@@ -10,6 +10,16 @@ static void sql(const char *text) { assert(sqlite3_exec(features_db,text,NULL,NU
 int main(void) {
     assert(sqlite3_open(":memory:",&features_db)==SQLITE_OK);
     sql("CREATE TABLE menu_preferences(id INTEGER PRIMARY KEY,value INTEGER);CREATE TABLE news(user INTEGER,kind INTEGER,stamp INTEGER NOT NULL,PRIMARY KEY(user,kind));CREATE TABLE news_scoped(user INTEGER,kind INTEGER,scope TEXT,stamp INTEGER NOT NULL,PRIMARY KEY(user,kind,scope));");
+    sql(UI_PREFERENCE_SCHEMA);
+    char profile[32];assert(member_settings_repository_ui_get(1,profile) && !*profile);
+    assert(member_settings_repository_ui_save(1,"future-ui"));
+    assert(member_settings_repository_ui_get(1,profile) && !strcmp(profile,"future-ui"));
+    sql("BEGIN");assert(member_settings_repository_ui_save(1,"rtbbs"));sql("ROLLBACK");
+    assert(member_settings_repository_ui_get(1,profile) && !strcmp(profile,"future-ui"));
+    assert(!member_settings_repository_ui_save(1,"INVALID UI"));
+    assert(!member_settings_repository_ui_save(0,"rtbbs"));
+    assert(member_settings_repository_ui_save(1,""));
+    assert(member_settings_repository_ui_get(1,profile) && !*profile);
     unsigned mode=99;uint64_t stamp=99;
     assert(member_settings_repository_menu_get(1,&mode) && mode==1);
     assert(member_settings_repository_check_get(1,0,"",&stamp) && !stamp);

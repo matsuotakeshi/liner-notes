@@ -634,3 +634,8 @@ test-ssh-sources:
 	$(PYTHON) tests/test_ssh_sources.py
 
 check: test-ssh-sources
+
+.PHONY: test-ui-selection
+test-ui-selection: runtime
+	$(PYTHON) tests/test_ui_selection.py ./runtime
+check: test-ui-selection

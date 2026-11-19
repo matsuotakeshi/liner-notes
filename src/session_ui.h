@@ -66,6 +66,7 @@ typedef struct {
 } SessionUiConfig;
 typedef struct {
     SessionUiConfig config; /* per-connection policy snapshot */
+    char preferred[32];int explicit_choice,restore_pending;
     const SessionUiAdapter *active;
     void *state;
     void *states[SESSION_UI_MAX];
@@ -75,6 +76,10 @@ typedef enum { SESSION_UI_SELECTED,SESSION_UI_UNCHANGED,SESSION_UI_UNKNOWN,
 
 const SessionUiAdapter *session_ui_rtbbs(void);
 SessionUiConfig session_ui_default(void);
+int session_ui_configure(SessionUiConfig *,const char *,const char *,const char *);
+SessionUiSelection session_ui_preflight(const Session *,const char *);
+SessionUiSelection session_ui_choose(Session *,const char *);
+int session_ui_save_choice(Session *,const char *);
 /* Config is copied; immutable adapters and their names must outlive the Session.
  * Registration/configuration is administrator-side C API, never client input.
  */

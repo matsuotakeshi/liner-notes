@@ -97,6 +97,9 @@ MemberOutcome member_core_password(const MemberActor *,const char *current,const
 typedef struct { int present,language,pager,editor; unsigned columns,rows,aux; } MemberPreferences;
 MemberOutcome member_core_preferences(const MemberActor *,MemberPreferences *out);
 MemberOutcome member_core_save_preferences(const MemberActor *,const MemberPreferences *input,MemberPreferences *out);
+/* Empty preference means the station default; only the authenticated owner. */
+MemberOutcome member_core_ui_get(const MemberActor *,char out[32]);
+MemberOutcome member_core_ui_save(const MemberActor *,const char *name);
 /* Own-account mail arrival setting. Query is read-only; ON/OFF retain store
  * duplicate suppression and revision-overflow handling. Only success returns
  * a user/revision snapshot for the caller to publish to live sessions. Core

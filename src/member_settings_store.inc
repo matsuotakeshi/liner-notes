@@ -3,6 +3,7 @@
 #include "member_settings_repository.h"
 #include <time.h>
 #include <sqlite3.h>
+#include "ui_profile.h"
 int member_settings_repository_ready(void) { return features_db && !features_broken; }
 int member_settings_repository_now(uint64_t *stamp) {
     if(!stamp)return 0;
@@ -35,6 +36,30 @@ int member_settings_repository_menu_save(uint32_t user,unsigned mode) {
     if(!user || mode>2)return 0;
     sqlite3_stmt *s=member_settings_statement("INSERT INTO menu_preferences VALUES(?,?) ON CONFLICT(id) DO UPDATE SET value=excluded.value");if(!s)return 0;
     int ok=sqlite3_bind_int64(s,1,user)==SQLITE_OK && sqlite3_bind_int(s,2,(int)mode)==SQLITE_OK && sqlite3_step(s)==SQLITE_DONE;
+    if(sqlite3_finalize(s)!=SQLITE_OK)ok=0;
+    return ok;
+}
+int member_settings_repository_ui_get(uint32_t user,char out[32]) {
+    if(!out)return 0;
+    *out=0;if(!user)return 0;
+    sqlite3_stmt *s=member_settings_statement("SELECT profile FROM ui_preferences WHERE user=?");if(!s)return 0;
+    int ok=sqlite3_bind_int64(s,1,user)==SQLITE_OK;
+    int rc=ok?sqlite3_step(s):SQLITE_ERROR;
+    if(rc==SQLITE_ROW) {
+        const char *name=(const char *)sqlite3_column_text(s,0);
+        ok=sqlite3_column_type(s,0)==SQLITE_TEXT && ui_profile_valid(name) && (int)strlen(name)==sqlite3_column_bytes(s,0);
+        if(ok)strcpy(out,name);
+    } else ok=rc==SQLITE_DONE;
+    if(sqlite3_finalize(s)!=SQLITE_OK)ok=0;
+    if(!ok)*out=0;
+    return ok;
+}
+int member_settings_repository_ui_save(uint32_t user,const char *name) {
+    if(!user || !name || (*name && !ui_profile_valid(name)))return 0;
+    sqlite3_stmt *s=member_settings_statement(*name?"INSERT INTO ui_preferences VALUES(?,?) ON CONFLICT(user) DO UPDATE SET profile=excluded.profile":"DELETE FROM ui_preferences WHERE user=?");if(!s)return 0;
+    int ok=sqlite3_bind_int64(s,1,user)==SQLITE_OK;
+    if(ok && *name)ok=sqlite3_bind_text(s,2,name,-1,SQLITE_TRANSIENT)==SQLITE_OK;
+    if(ok)ok=sqlite3_step(s)==SQLITE_DONE;
     if(sqlite3_finalize(s)!=SQLITE_OK)ok=0;
     return ok;
 }

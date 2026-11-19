@@ -39,6 +39,9 @@ fi
 : ${liner_notes_run_user:=liner_notes}
 : ${liner_notes_bind:=127.0.0.1}
 : ${liner_notes_port:=2222}
+: ${liner_notes_ui_policy:=FIXED}
+: ${liner_notes_ui_default:=rtbbs}
+: ${liner_notes_ui_allow:=rtbbs}
 : ${liner_notes_ssh_port:=0}
 : ${liner_notes_ssh_bind:=127.0.0.1}
 : ${liner_notes_ssh_host_key:=}
@@ -134,6 +137,9 @@ liner_notes_validate()
     done
     case "$liner_notes_registration" in open|approval|closed) ;; *) return 1 ;; esac
     case "$liner_notes_id_mode" in free|auto) ;; *) return 1 ;; esac
+    case "$liner_notes_ui_policy" in FIXED|MEMBERS|ALL) ;; *) return 1 ;; esac
+    case "$liner_notes_ui_default" in ""|*[!a-z0-9-]*) return 1 ;; esac
+    case "$liner_notes_ui_allow" in ""|*[!a-z0-9,-]*) return 1 ;; esac
     case "$liner_notes_registration_form" in simple|detailed) ;; *) return 1 ;; esac
     for _ln_flag in "$liner_notes_chat" "$liner_notes_mail" "$liner_notes_vault" "$liner_notes_userlog_public" "$liner_notes_rtbbs_member_policy"; do
         case "$_ln_flag" in YES|NO) ;; *) return 1 ;; esac
@@ -197,6 +203,7 @@ liner_notes_start()
     set -- "$@" --idle-seconds "$liner_notes_idle_seconds" --gather-count "$liner_notes_gather_count"
     [ -z "$liner_notes_user_log" ] || set -- "$@" --user-log "$liner_notes_user_log"
     [ -z "$liner_notes_chat_log" ] || set -- "$@" --chat-log "$liner_notes_chat_log"
+    set -- "$@" --ui-policy "$liner_notes_ui_policy" --ui-default "$liner_notes_ui_default" --ui-allow "$liner_notes_ui_allow"
     set -- "$@" --id-mode "$liner_notes_id_mode" --registration-form "$liner_notes_registration_form"
     set -- "$@" --registration "$liner_notes_registration" --banner "$liner_notes_banner" \
         --max-articles "$liner_notes_max_articles" --max-mail "$liner_notes_max_mail" --max-user-posts "$liner_notes_max_user_posts"

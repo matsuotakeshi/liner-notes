@@ -59,7 +59,7 @@ void session_revoke(Session *s) {
 }
 int session_logout(Session *s) {
     if(!session_core_logout(&s->core))return 0;
-    session_ui_discard_inactive(s);return 1;
+    session_ui_discard_inactive(s);s->ui_binding.preferred[0]=0;s->ui_binding.explicit_choice=0;return 1;
 }
 
 void session_impl_binary_frame(Session *s,unsigned char kind,const void *data,size_t size) {
