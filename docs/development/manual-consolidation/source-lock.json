@@ -92,7 +92,7 @@
   "linux/selinux/liner-notes-selinux.spec": "e62fd7cfecd5a2ad1a06cd43cbf5dfba5cb794c20279f896e187a482860d36c4",
   "linux/selinux/selinux_labels.py": "d8c3a3664c5781bfe5fa9174fe8369e5c0adba89630d794db9eb8f62af7b521d",
   "ci/selinux_root.py": "8150d379508604d01312ac73c27a112c97e89ea36b2561b19fc3d941e1c227b4",
-  "ci/selinux_native.py": "dbdaf800bb5bdcab6efc78a791e94352e34b0575e7c205d2a664d8f705d60e86",
+  "ci/selinux_native.py": "7fa4c95acb07717ff10b9b1bb8d841768591f6ee728255553b227033355b8a03",
   "ci/solaris_ci.py": "1229e6fb03b7b30ead9ebabc39e4e45c9543cbf7cc58ada3d71d790626f54705",
   "scripts/install-solaris.py": "f440934a9889f7282fc6ab5eb4b9f63f7ed79153ef4a72c9e170ea8da5b3d2bc",
   "scripts/link_maintenance.py": "ee76d893e80f536f65bcf869348d7a083eafc3f0d5280dcd35de431dbfc16c30",

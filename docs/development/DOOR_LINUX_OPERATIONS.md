@@ -185,3 +185,16 @@ force removal or remove a home directory. Do not unload
 the policy while any candidate domain survives. Independent security review,
 Solaris isolation and a production game-server policy remain separate gates;
 no local portable test or earlier commit's CI certifies them.
+
+## PR 142 manual/source review
+
+Reviewed `ci/selinux_native.py` against `docs/manual/security.md`: the change
+adds `door_accounts` and `door_account_plan` to the recovery record. The guarded
+main/Enforcing admission, service permissions and policy removal checks are
+unchanged. The manual now distinguishes the original `liner_notes_ci` services
+from temporary Broker NSS identities and describes safe interrupted cleanup and
+bounded pre-cleanup unit journals. Only the reviewed native source fingerprint
+is refreshed; this records documentation correspondence, not native acceptance.
+The initial PR checks failed on that omitted source-lock refresh in manual/RPM/DEB.
+The separate doctor failure was an Ubuntu mirror connection timeout while
+fetching clang, before its functional tests; no application defect was inferred.
