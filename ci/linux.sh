@@ -16,9 +16,11 @@ runuser -u bbstest -- bash -c '
   python3.11 tests/test_linux_install.py
 '
 cd /home/bbstest/source
+python3.11 tests/test_door_broker_linux.py ./runtime
 python3.11 scripts/install-linux.py --python /usr/bin/python3.11
 useradd --system --home-dir /var/lib/liner-notes --shell /sbin/nologin liner_notes
 systemd-analyze verify /usr/local/lib/systemd/system/liner-notes.service
+systemd-analyze verify /usr/local/share/liner-notes/door-services/*.service
 /usr/local/bin/liner-notes-admin --help
 /usr/local/bin/liner-notes-doctor --help
 /usr/local/bin/liner-notes-check-resume --help

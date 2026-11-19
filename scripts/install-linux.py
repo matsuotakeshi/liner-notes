@@ -89,6 +89,9 @@ def install(destdir,prefix,python,unitdir='/usr/local/lib/systemd/system'):
     for name,path in [('liner-notes.env','/etc/liner-notes/liner-notes.env'),('liner-notes.service',unitdir+'/liner-notes.service')]:
         content=(ROOT/'linux'/name).read_text().replace('@PREFIX@',prefix).encode()
         put(path,content,0o640 if name.endswith('.env') else 0o644,sample=True)
+    for name in ('liner-notes-door-broker.service','liner-notes-door-isolation.service'):
+        content=(ROOT/'linux'/name).read_text().replace('@PREFIX@',prefix).replace('@PYTHON@',python).encode()
+        put(share+'/door-services/'+name,content)
     print('Installed programs and samples. Existing settings preserved; accounts, data and services unchanged.')
 
 
