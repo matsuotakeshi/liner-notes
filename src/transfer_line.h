@@ -6,4 +6,5 @@
 #define TRANSFER_LINE_CHUNK 672
 int transfer_line_command(const char *);
 void transfer_line_execute(TransferBackend,const Principal *,const char *,char *,size_t);
+VaultResult transfer_line_result(TransferBackend,const Principal *,const char *,char *,size_t,uint32_t *started);
 #endif

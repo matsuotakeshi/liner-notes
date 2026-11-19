@@ -40,4 +40,20 @@ class SessionBoundaries(unittest.TestCase):
             self.assertTrue(set(quoted)<= {'session_policy_core.h'},name)
             self.assertNotRegex(code(text),r'\b(?:Session|BoardRequest|Ui|socket|connect|fopen|sqlite3_open|board_submit)\b')
 
+    def test_control_effects_do_not_parse_display_payload(self):
+        for p in (ROOT/'src').glob('session*.c'):
+            text=p.read_text(encoding='utf-8')
+            self.assertNotRegex(text,r'(?:strn?cmp|strstr|sscanf|check_traversal_response|list_continuation_parse|batch_response_ids|vault_children_response)\([^;\n]*completion->text')
+
+    def test_operation_boundary_is_ui_independent(self):
+        for name in ('session_core.h','session_core.c'):
+            text=(ROOT/'src'/name).read_text(encoding='utf-8')
+            self.assertNotRegex(text,r'#include "(?:ui|session|session_state|session_internal)\.h"')
+            self.assertNotRegex(code(text),r'\b(?:Session|Ui|ui_format|session_line|board_submit)\b')
+        text=(ROOT/'src/session.h').read_text(encoding='utf-8')
+        self.assertIn('SessionCore core;',text)
+        self.assertIn('SessionAuth auth;',text)
+        self.assertIn('SessionEditor editor;',text)
+        self.assertNotIn('union',code(text))
+
 if __name__=='__main__':unittest.main()

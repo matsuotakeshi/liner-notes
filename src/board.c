@@ -240,15 +240,15 @@ static void display_article_page(const BoardRequest *q,BoardResult *r,int search
                                  article_list(&actor,q->board,q->number,&page);
     if(result!=ARTICLE_OK) {
         switch(result) {
-        case ARTICLE_REVOKED: r->revoked=1;strcpy(r->text,"ERR session revoked\r\n");break;
-        case ARTICLE_BOARD_DENIED: strcpy(r->text,"ERR board unavailable\r\n");break;
-        case ARTICLE_INVALID_QUERY: strcpy(r->text,"ERR search query\r\n");break;
-        case ARTICLE_INVALID_CURSOR: strcpy(r->text,"ERR search cursor\r\n");break;
-        case ARTICLE_MEMBER_STORAGE: strcpy(r->text,"ERR member storage unavailable\r\n");break;
-        case ARTICLE_MODERATION_STORAGE: strcpy(r->text,"ERR moderation storage unavailable\r\n");break;
-        case ARTICLE_POLICY_STORAGE: strcpy(r->text,"ERR board policy storage\r\n");break;
-        case ARTICLE_EXTRAS_STORAGE: strcpy(r->text,"ERR extras storage\r\n");break;
-        default: strcpy(r->text,"ERR article storage\r\n");break;
+        case ARTICLE_REVOKED: r->revoked=1;(r->feedback.failed=1,strcpy(r->text,"ERR session revoked\r\n"));break;
+        case ARTICLE_BOARD_DENIED: (r->feedback.failed=1,strcpy(r->text,"ERR board unavailable\r\n"));break;
+        case ARTICLE_INVALID_QUERY: (r->feedback.failed=1,strcpy(r->text,"ERR search query\r\n"));break;
+        case ARTICLE_INVALID_CURSOR: (r->feedback.failed=1,strcpy(r->text,"ERR search cursor\r\n"));break;
+        case ARTICLE_MEMBER_STORAGE: (r->feedback.failed=1,strcpy(r->text,"ERR member storage unavailable\r\n"));break;
+        case ARTICLE_MODERATION_STORAGE: (r->feedback.failed=1,strcpy(r->text,"ERR moderation storage unavailable\r\n"));break;
+        case ARTICLE_POLICY_STORAGE: (r->feedback.failed=1,strcpy(r->text,"ERR board policy storage\r\n"));break;
+        case ARTICLE_EXTRAS_STORAGE: (r->feedback.failed=1,strcpy(r->text,"ERR extras storage\r\n"));break;
+        default: (r->feedback.failed=1,strcpy(r->text,"ERR article storage\r\n"));break;
         }
         return;
     }
@@ -258,22 +258,22 @@ static void display_article_page(const BoardRequest *q,BoardResult *r,int search
         const ArticleSummary *row=&page.rows[i];
         pos+=(size_t)snprintf(r->text+pos,sizeof(r->text)-pos,"%u %u %s\r\n",row->id,row->parent,row->title);
     }
-    snprintf(r->text+pos,sizeof(r->text)-pos,"END NEXT %u\r\n",page.next);
+    (r->feedback.page_found=1,r->feedback.page_next=page.next,snprintf(r->text+pos,sizeof(r->text)-pos,"END NEXT %u\r\n",page.next));
 }
 static void display_article_tree(const BoardRequest *q,BoardResult *r) {
     ArticleActor actor={q->user,q->user_epoch,q->board_grants};ArticleTreePage page;
     ArticleOutcome result=article_tree(&actor,q->board,q->number,q->cursor,&page);
     if(result!=ARTICLE_OK) {
         switch(result) {
-        case ARTICLE_REVOKED: r->revoked=1;strcpy(r->text,"ERR session revoked\r\n");break;
-        case ARTICLE_BOARD_DENIED: strcpy(r->text,"ERR board unavailable\r\n");break;
-        case ARTICLE_NOT_FOUND: strcpy(r->text,"ERR no article\r\n");break;
-        case ARTICLE_INVALID_CURSOR: strcpy(r->text,"ERR tree cursor\r\n");break;
-        case ARTICLE_MEMBER_STORAGE: strcpy(r->text,"ERR member storage unavailable\r\n");break;
-        case ARTICLE_MODERATION_STORAGE: strcpy(r->text,"ERR moderation storage unavailable\r\n");break;
-        case ARTICLE_POLICY_STORAGE: strcpy(r->text,"ERR board policy storage\r\n");break;
-        case ARTICLE_EXTRAS_STORAGE: strcpy(r->text,"ERR extras storage\r\n");break;
-        default: strcpy(r->text,"ERR article storage\r\n");break;
+        case ARTICLE_REVOKED: r->revoked=1;(r->feedback.failed=1,strcpy(r->text,"ERR session revoked\r\n"));break;
+        case ARTICLE_BOARD_DENIED: (r->feedback.failed=1,strcpy(r->text,"ERR board unavailable\r\n"));break;
+        case ARTICLE_NOT_FOUND: (r->feedback.failed=1,strcpy(r->text,"ERR no article\r\n"));break;
+        case ARTICLE_INVALID_CURSOR: (r->feedback.failed=1,strcpy(r->text,"ERR tree cursor\r\n"));break;
+        case ARTICLE_MEMBER_STORAGE: (r->feedback.failed=1,strcpy(r->text,"ERR member storage unavailable\r\n"));break;
+        case ARTICLE_MODERATION_STORAGE: (r->feedback.failed=1,strcpy(r->text,"ERR moderation storage unavailable\r\n"));break;
+        case ARTICLE_POLICY_STORAGE: (r->feedback.failed=1,strcpy(r->text,"ERR board policy storage\r\n"));break;
+        case ARTICLE_EXTRAS_STORAGE: (r->feedback.failed=1,strcpy(r->text,"ERR extras storage\r\n"));break;
+        default: (r->feedback.failed=1,strcpy(r->text,"ERR article storage\r\n"));break;
         }
         return;
     }
@@ -283,22 +283,22 @@ static void display_article_tree(const BoardRequest *q,BoardResult *r) {
         pos+=(size_t)snprintf(r->text+pos,sizeof(r->text)-pos,"%*s#%u parent=%u depth=%u %.80s\r\n",
                              (int)indent,"",row->summary.id,row->summary.parent,row->depth,row->summary.title);
     }
-    snprintf(r->text+pos,sizeof(r->text)-pos,"END NEXT %u\r\n",page.next);
+    (r->feedback.page_found=1,r->feedback.page_next=page.next,snprintf(r->text+pos,sizeof(r->text)-pos,"END NEXT %u\r\n",page.next));
 }
 static void display_article_notes(const BoardRequest *q,BoardResult *r) {
     ArticleActor actor={q->user,q->user_epoch,q->board_grants};ArticleNotesPage page;
     ArticleOutcome result=article_notes(&actor,q->board,q->number,q->notes_unread,&page);
     if(result!=ARTICLE_OK) {
         switch(result) {
-        case ARTICLE_LOGIN_REQUIRED: strcpy(r->text,"ERR login required\r\n");break;
-        case ARTICLE_REVOKED: r->revoked=1;strcpy(r->text,"ERR session revoked\r\n");break;
-        case ARTICLE_BOARD_DENIED: strcpy(r->text,"ERR board unavailable\r\n");break;
-        case ARTICLE_MEMBER_STORAGE: strcpy(r->text,"ERR member storage unavailable\r\n");break;
-        case ARTICLE_MODERATION_STORAGE: strcpy(r->text,"ERR moderation storage unavailable\r\n");break;
-        case ARTICLE_POLICY_STORAGE: strcpy(r->text,"ERR board policy storage\r\n");break;
-        case ARTICLE_EXTRAS_STORAGE: strcpy(r->text,"ERR extras storage\r\n");break;
-        case ARTICLE_READ_STATE_STORAGE: strcpy(r->text,"ERR read-state storage\r\n");break;
-        default: strcpy(r->text,"ERR storage unavailable\r\n");break;
+        case ARTICLE_LOGIN_REQUIRED: (r->feedback.failed=1,strcpy(r->text,"ERR login required\r\n"));break;
+        case ARTICLE_REVOKED: r->revoked=1;(r->feedback.failed=1,strcpy(r->text,"ERR session revoked\r\n"));break;
+        case ARTICLE_BOARD_DENIED: (r->feedback.failed=1,strcpy(r->text,"ERR board unavailable\r\n"));break;
+        case ARTICLE_MEMBER_STORAGE: (r->feedback.failed=1,strcpy(r->text,"ERR member storage unavailable\r\n"));break;
+        case ARTICLE_MODERATION_STORAGE: (r->feedback.failed=1,strcpy(r->text,"ERR moderation storage unavailable\r\n"));break;
+        case ARTICLE_POLICY_STORAGE: (r->feedback.failed=1,strcpy(r->text,"ERR board policy storage\r\n"));break;
+        case ARTICLE_EXTRAS_STORAGE: (r->feedback.failed=1,strcpy(r->text,"ERR extras storage\r\n"));break;
+        case ARTICLE_READ_STATE_STORAGE: (r->feedback.failed=1,strcpy(r->text,"ERR read-state storage\r\n"));break;
+        default: (r->feedback.failed=1,strcpy(r->text,"ERR storage unavailable\r\n"));break;
         }
         return;
     }
@@ -312,7 +312,7 @@ static void display_article_notes(const BoardRequest *q,BoardResult *r) {
         pos+=(size_t)snprintf(r->text+pos,sizeof(r->text)-pos,"#%u replies=%u latest=%u updated=%s unread=%s %.80s\r\n",
                              row->summary.id,row->replies,row->latest,date,unread_text,row->summary.title);
     }
-    snprintf(r->text+pos,sizeof(r->text)-pos,"END NEXT %u\r\n",page.next);
+    (r->feedback.page_found=1,r->feedback.page_next=page.next,snprintf(r->text+pos,sizeof(r->text)-pos,"END NEXT %u\r\n",page.next));
 }
 static void display_article(const BoardRequest *q,uint32_t id,BoardResult *r,int inspect) {
     ArticleActor actor={q->user,q->user_epoch,q->board_grants};ArticleView view;
@@ -322,17 +322,19 @@ static void display_article(const BoardRequest *q,uint32_t id,BoardResult *r,int
     if(result!=ARTICLE_OK) {
         r->selected=0;
         switch(result) {
-        case ARTICLE_REVOKED: r->revoked=1;strcpy(r->text,"ERR session revoked\r\n");break;
-        case ARTICLE_NOT_FOUND: strcpy(r->text,"ERR no article\r\n");break;
-        case ARTICLE_ADMIN_REQUIRED: strcpy(r->text,"ERR admin required\r\n");break;
-        case ARTICLE_MEMBER_STORAGE: strcpy(r->text,"ERR member storage unavailable\r\n");break;
-        case ARTICLE_MODERATION_STORAGE: strcpy(r->text,"ERR moderation storage unavailable\r\n");break;
-        case ARTICLE_POLICY_STORAGE: strcpy(r->text,"ERR board policy storage\r\n");break;
-        case ARTICLE_EXTRAS_STORAGE: strcpy(r->text,"ERR extras storage\r\n");break;
-        default: strcpy(r->text,"ERR article storage\r\n");break;
+        case ARTICLE_REVOKED: r->revoked=1;(r->feedback.failed=1,strcpy(r->text,"ERR session revoked\r\n"));break;
+        case ARTICLE_NOT_FOUND: (r->feedback.failed=1,strcpy(r->text,"ERR no article\r\n"));break;
+        case ARTICLE_ADMIN_REQUIRED: (r->feedback.failed=1,strcpy(r->text,"ERR admin required\r\n"));break;
+        case ARTICLE_MEMBER_STORAGE: (r->feedback.failed=1,strcpy(r->text,"ERR member storage unavailable\r\n"));break;
+        case ARTICLE_MODERATION_STORAGE: (r->feedback.failed=1,strcpy(r->text,"ERR moderation storage unavailable\r\n"));break;
+        case ARTICLE_POLICY_STORAGE: (r->feedback.failed=1,strcpy(r->text,"ERR board policy storage\r\n"));break;
+        case ARTICLE_EXTRAS_STORAGE: (r->feedback.failed=1,strcpy(r->text,"ERR extras storage\r\n"));break;
+        default: (r->feedback.failed=1,strcpy(r->text,"ERR article storage\r\n"));break;
         }
     } else {
         r->selected=view.id;
+        if(q->structured) { r->content.kind=1;r->content.state=view.state;r->content.id=view.id;r->content.parent=view.parent;r->content.board=view.board;
+            r->content.size=view.body_size;snprintf(r->content.author,sizeof(r->content.author),"%s",view.author);snprintf(r->content.title,sizeof(r->content.title),"%s",view.title); }
         if(view.state==ARTICLE_WITHDRAWN)
             snprintf(r->text,sizeof(r->text),"WITHDRAWN %u PARENT %u\r\n",view.id,view.parent);
         else if(view.state==ARTICLE_CONCEALED)
@@ -341,7 +343,7 @@ static void display_article(const BoardRequest *q,uint32_t id,BoardResult *r,int
                       view.id,view.parent,*view.author?view.author:"guest",view.inspected_hidden?" HIDDEN 1":"",
                       view.title,view.body_size,r->draft_body);
     }
-    OPENSSL_cleanse(r->draft_body,sizeof(r->draft_body));
+    if(!q->structured || result!=ARTICLE_OK)OPENSSL_cleanse(r->draft_body,sizeof(r->draft_body));
 }
 static void article_read_state(const BoardRequest *q,BoardResult *r) {
     ArticleActor actor={q->user,q->user_epoch,q->board_grants};ArticleUnreadPage page;
@@ -350,20 +352,21 @@ static void article_read_state(const BoardRequest *q,BoardResult *r) {
                                article_unread(&actor,q->board,q->number,q->cursor,&page);
     if(result!=ARTICLE_OK) {
         switch(result) {
-        case ARTICLE_LOGIN_REQUIRED: strcpy(r->text,"ERR login required\r\n");break;
-        case ARTICLE_REVOKED: r->revoked=1;strcpy(r->text,"ERR session revoked\r\n");break;
-        case ARTICLE_BOARD_DENIED: strcpy(r->text,"ERR board unavailable\r\n");break;
-        case ARTICLE_NOT_FOUND: strcpy(r->text,"ERR no article\r\n");break;
-        case ARTICLE_HIDDEN: strcpy(r->text,"ERR article hidden\r\n");break;
-        case ARTICLE_MEMBER_STORAGE: strcpy(r->text,"ERR member storage unavailable\r\n");break;
-        case ARTICLE_MODERATION_STORAGE: strcpy(r->text,"ERR moderation storage unavailable\r\n");break;
-        case ARTICLE_POLICY_STORAGE: strcpy(r->text,"ERR board policy storage\r\n");break;
-        case ARTICLE_EXTRAS_STORAGE: strcpy(r->text,"ERR extras storage\r\n");break;
-        case ARTICLE_READ_STATE_STORAGE: strcpy(r->text,"ERR read-state storage\r\n");break;
-        default: strcpy(r->text,"ERR article storage\r\n");break;
+        case ARTICLE_LOGIN_REQUIRED: (r->feedback.failed=1,strcpy(r->text,"ERR login required\r\n"));break;
+        case ARTICLE_REVOKED: r->revoked=1;(r->feedback.failed=1,strcpy(r->text,"ERR session revoked\r\n"));break;
+        case ARTICLE_BOARD_DENIED: (r->feedback.failed=1,strcpy(r->text,"ERR board unavailable\r\n"));break;
+        case ARTICLE_NOT_FOUND: (r->feedback.failed=1,strcpy(r->text,"ERR no article\r\n"));break;
+        case ARTICLE_HIDDEN: (r->feedback.failed=1,strcpy(r->text,"ERR article hidden\r\n"));break;
+        case ARTICLE_MEMBER_STORAGE: (r->feedback.failed=1,strcpy(r->text,"ERR member storage unavailable\r\n"));break;
+        case ARTICLE_MODERATION_STORAGE: (r->feedback.failed=1,strcpy(r->text,"ERR moderation storage unavailable\r\n"));break;
+        case ARTICLE_POLICY_STORAGE: (r->feedback.failed=1,strcpy(r->text,"ERR board policy storage\r\n"));break;
+        case ARTICLE_EXTRAS_STORAGE: (r->feedback.failed=1,strcpy(r->text,"ERR extras storage\r\n"));break;
+        case ARTICLE_READ_STATE_STORAGE: (r->feedback.failed=1,strcpy(r->text,"ERR read-state storage\r\n"));break;
+        default: (r->feedback.failed=1,strcpy(r->text,"ERR article storage\r\n"));break;
         }
         return;
     }
+    if(mark)r->feedback.seen=q->op=='s';
     if(mark)snprintf(r->text,sizeof(r->text),"%s %u\r\n",q->op=='s'?"SEEN":"UNSEEN",q->number);
     else if(q->op=='n') {
         if(page.first)display_article(q,page.first,r,0);else strcpy(r->text,"NO UNREAD\r\n");
@@ -374,7 +377,7 @@ static void article_read_state(const BoardRequest *q,BoardResult *r) {
             pos+=(size_t)snprintf(r->text+pos,sizeof(r->text)-pos,"#%u root=%u %.80s\r\n",
                                  row->summary.id,row->root,row->summary.title);
         }
-        snprintf(r->text+pos,sizeof(r->text)-pos,"END NEXT %u\r\n",page.next);
+        (r->feedback.page_found=1,r->feedback.page_next=page.next,snprintf(r->text+pos,sizeof(r->text)-pos,"END NEXT %u\r\n",page.next));
     }
 }
 static uint32_t checksum(const unsigned char *p,size_t n) {
@@ -491,53 +494,53 @@ static void extra_execute(const BoardRequest *q,BoardResult *r) {
         case ARTICLE_OK:
             snprintf(r->text,sizeof(r->text),q->action==1?"WITHDRAW SAVED %u\r\n":"RETITLED %u\r\n",q->number);break;
         case ARTICLE_CONFIRM: snprintf(r->text,sizeof(r->text),"WITHDRAW CONFIRM %u\r\n",q->number);break;
-        case ARTICLE_LOGIN_REQUIRED: strcpy(r->text,"ERR login required\r\n");break;
-        case ARTICLE_REVOKED: r->revoked=1;strcpy(r->text,"ERR session revoked\r\n");break;
-        case ARTICLE_MEMBER_STORAGE: strcpy(r->text,"ERR member storage unavailable\r\n");break;
-        case ARTICLE_MODERATION_STORAGE: strcpy(r->text,"ERR moderation storage unavailable\r\n");break;
-        case ARTICLE_POLICY_STORAGE: strcpy(r->text,"ERR board policy storage\r\n");break;
-        case ARTICLE_EXTRAS_STORAGE: strcpy(r->text,"ERR extras storage\r\n");break;
-        case ARTICLE_NOT_FOUND: strcpy(r->text,"ERR no article\r\n");break;
-        case ARTICLE_OWNER_REQUIRED: strcpy(r->text,"ERR article owner\r\n");break;
-        case ARTICLE_IMPORTED: strcpy(r->text,"ERR imported article; use HIDE for local moderation\r\n");break;
-        case ARTICLE_LINK_STORAGE: strcpy(r->text,"ERR link storage; restart inspection required\r\n");break;
-        case ARTICLE_HIDDEN: strcpy(r->text,"ERR article hidden\r\n");break;
-        case ARTICLE_POSTING_DENIED: strcpy(r->text,"ERR posting denied\r\n");break;
-        case ARTICLE_INVALID_TITLE: strcpy(r->text,"ERR title 1..80 bytes, no controls\r\n");break;
+        case ARTICLE_LOGIN_REQUIRED: (r->feedback.failed=1,strcpy(r->text,"ERR login required\r\n"));break;
+        case ARTICLE_REVOKED: r->revoked=1;(r->feedback.failed=1,strcpy(r->text,"ERR session revoked\r\n"));break;
+        case ARTICLE_MEMBER_STORAGE: (r->feedback.failed=1,strcpy(r->text,"ERR member storage unavailable\r\n"));break;
+        case ARTICLE_MODERATION_STORAGE: (r->feedback.failed=1,strcpy(r->text,"ERR moderation storage unavailable\r\n"));break;
+        case ARTICLE_POLICY_STORAGE: (r->feedback.failed=1,strcpy(r->text,"ERR board policy storage\r\n"));break;
+        case ARTICLE_EXTRAS_STORAGE: (r->feedback.failed=1,strcpy(r->text,"ERR extras storage\r\n"));break;
+        case ARTICLE_NOT_FOUND: (r->feedback.failed=1,strcpy(r->text,"ERR no article\r\n"));break;
+        case ARTICLE_OWNER_REQUIRED: (r->feedback.failed=1,strcpy(r->text,"ERR article owner\r\n"));break;
+        case ARTICLE_IMPORTED: (r->feedback.failed=1,strcpy(r->text,"ERR imported article; use HIDE for local moderation\r\n"));break;
+        case ARTICLE_LINK_STORAGE: (r->feedback.failed=1,strcpy(r->text,"ERR link storage; restart inspection required\r\n"));break;
+        case ARTICLE_HIDDEN: (r->feedback.failed=1,strcpy(r->text,"ERR article hidden\r\n"));break;
+        case ARTICLE_POSTING_DENIED: (r->feedback.failed=1,strcpy(r->text,"ERR posting denied\r\n"));break;
+        case ARTICLE_INVALID_TITLE: (r->feedback.failed=1,strcpy(r->text,"ERR title 1..80 bytes, no controls\r\n"));break;
         case ARTICLE_STORAGE: case ARTICLE_BUFFER_TOO_SMALL: case ARTICLE_INVALID_READ:
         case ARTICLE_LEGACY_BOARDS: case ARTICLE_LEGACY_MEMBERS: case ARTICLE_BODY_LIMIT:
         case ARTICLE_FULL: case ARTICLE_INVALID_DRAFT: case ARTICLE_LEGACY_BODY:
         case ARTICLE_POST_UNAVAILABLE: case ARTICLE_POST_UNCERTAIN: case ARTICLE_DRAFT_CONFLICT:
-            strcpy(r->text,"ERR article storage\r\n");break;
-        case ARTICLE_ADMIN_REQUIRED: strcpy(r->text,"ERR admin required\r\n");break;
-        case ARTICLE_WITHDRAWN_TARGET: strcpy(r->text,"ERR article withdrawn\r\n");break;
-        case ARTICLE_MODERATION_WRITE: strcpy(r->text,"ERR moderation storage uncertain\r\n");break;
-        case ARTICLE_BOARD_DENIED: strcpy(r->text,"ERR board unavailable\r\n");break;
-        case ARTICLE_INVALID_QUERY: strcpy(r->text,"ERR search query\r\n");break;
-        case ARTICLE_INVALID_CURSOR: strcpy(r->text,"ERR search cursor\r\n");break;
-        case ARTICLE_READ_STATE_STORAGE: strcpy(r->text,"ERR read-state storage\r\n");break;
-        case ARTICLE_MANAGEMENT_INVALID: strcpy(r->text,"ERR command\r\n");break;
-        case ARTICLE_CATALOG_STORAGE: strcpy(r->text,"ERR catalog storage\r\n");break;
-        case ARTICLE_SETTINGS_STORAGE: strcpy(r->text,"ERR settings storage\r\n");break;
+            (r->feedback.failed=1,strcpy(r->text,"ERR article storage\r\n"));break;
+        case ARTICLE_ADMIN_REQUIRED: (r->feedback.failed=1,strcpy(r->text,"ERR admin required\r\n"));break;
+        case ARTICLE_WITHDRAWN_TARGET: (r->feedback.failed=1,strcpy(r->text,"ERR article withdrawn\r\n"));break;
+        case ARTICLE_MODERATION_WRITE: (r->feedback.failed=1,strcpy(r->text,"ERR moderation storage uncertain\r\n"));break;
+        case ARTICLE_BOARD_DENIED: (r->feedback.failed=1,strcpy(r->text,"ERR board unavailable\r\n"));break;
+        case ARTICLE_INVALID_QUERY: (r->feedback.failed=1,strcpy(r->text,"ERR search query\r\n"));break;
+        case ARTICLE_INVALID_CURSOR: (r->feedback.failed=1,strcpy(r->text,"ERR search cursor\r\n"));break;
+        case ARTICLE_READ_STATE_STORAGE: (r->feedback.failed=1,strcpy(r->text,"ERR read-state storage\r\n"));break;
+        case ARTICLE_MANAGEMENT_INVALID: (r->feedback.failed=1,strcpy(r->text,"ERR command\r\n"));break;
+        case ARTICLE_CATALOG_STORAGE: (r->feedback.failed=1,strcpy(r->text,"ERR catalog storage\r\n"));break;
+        case ARTICLE_SETTINGS_STORAGE: (r->feedback.failed=1,strcpy(r->text,"ERR settings storage\r\n"));break;
         }
         return;
     }
     if(q->action==11) {
         uint64_t since;
-        if((q->until?(since=q->since,0):!date_filter(q->title,&since)) || q->cursor>CONTENT_ID_MAX+1 || (q->scope<0 || q->scope>2)) { strcpy(r->text,"ERR extended syntax\r\n");return; }
+        if((q->until?(since=q->since,0):!date_filter(q->title,&since)) || q->cursor>CONTENT_ID_MAX+1 || (q->scope<0 || q->scope>2)) { (r->feedback.failed=1,strcpy(r->text,"ERR extended syntax\r\n"));return; }
         ArticleActor actor={q->user,q->user_epoch,q->board_grants};ArticlePage page;
         ArticleOutcome result=article_news(&actor,q->board,(ArticleScope)q->scope,q->cursor,since,q->until,&page);
         if(result!=ARTICLE_OK) {
             switch(result) {
-            case ARTICLE_REVOKED: r->revoked=1;strcpy(r->text,"ERR session revoked\r\n");break;
-            case ARTICLE_BOARD_DENIED: strcpy(r->text,"ERR board unavailable\r\n");break;
+            case ARTICLE_REVOKED: r->revoked=1;(r->feedback.failed=1,strcpy(r->text,"ERR session revoked\r\n"));break;
+            case ARTICLE_BOARD_DENIED: (r->feedback.failed=1,strcpy(r->text,"ERR board unavailable\r\n"));break;
             case ARTICLE_INVALID_QUERY: case ARTICLE_INVALID_CURSOR:
-                strcpy(r->text,"ERR extended syntax\r\n");break;
-            case ARTICLE_MEMBER_STORAGE: strcpy(r->text,"ERR member storage unavailable\r\n");break;
-            case ARTICLE_MODERATION_STORAGE: strcpy(r->text,"ERR moderation storage unavailable\r\n");break;
-            case ARTICLE_POLICY_STORAGE: strcpy(r->text,"ERR board policy storage\r\n");break;
-            case ARTICLE_EXTRAS_STORAGE: strcpy(r->text,"ERR extras storage\r\n");break;
-            default: strcpy(r->text,"ERR article storage\r\n");break;
+                (r->feedback.failed=1,strcpy(r->text,"ERR extended syntax\r\n"));break;
+            case ARTICLE_MEMBER_STORAGE: (r->feedback.failed=1,strcpy(r->text,"ERR member storage unavailable\r\n"));break;
+            case ARTICLE_MODERATION_STORAGE: (r->feedback.failed=1,strcpy(r->text,"ERR moderation storage unavailable\r\n"));break;
+            case ARTICLE_POLICY_STORAGE: (r->feedback.failed=1,strcpy(r->text,"ERR board policy storage\r\n"));break;
+            case ARTICLE_EXTRAS_STORAGE: (r->feedback.failed=1,strcpy(r->text,"ERR extras storage\r\n"));break;
+            default: (r->feedback.failed=1,strcpy(r->text,"ERR article storage\r\n"));break;
             }
             return;
         }
@@ -546,7 +549,7 @@ static void extra_execute(const BoardRequest *q,BoardResult *r) {
             const ArticleSummary *row=&page.rows[i];
             pos+=(size_t)snprintf(r->text+pos,sizeof(r->text)-pos,"%u %u %u %s\r\n",row->id,row->board,row->parent,row->title);
         }
-        snprintf(r->text+pos,sizeof(r->text)-pos,"END NEXT %u\r\n",page.next);return;
+        (r->feedback.page_found=1,r->feedback.page_next=page.next,snprintf(r->text+pos,sizeof(r->text)-pos,"END NEXT %u\r\n",page.next));return;
     }
     if(q->action==3 || q->action==4) {
         ArticleActor actor={q->user,q->user_epoch,q->board_grants};
@@ -556,14 +559,14 @@ static void extra_execute(const BoardRequest *q,BoardResult *r) {
                                              article_find(&actor,&filter,q->cursor,&page);
         if(result!=ARTICLE_OK) {
             switch(result) {
-            case ARTICLE_REVOKED: r->revoked=1;strcpy(r->text,"ERR session revoked\r\n");break;
-            case ARTICLE_BOARD_DENIED: strcpy(r->text,"ERR board unavailable\r\n");break;
-            case ARTICLE_INVALID_QUERY: case ARTICLE_INVALID_CURSOR: strcpy(r->text,"ERR find syntax\r\n");break;
-            case ARTICLE_MEMBER_STORAGE: strcpy(r->text,"ERR member storage unavailable\r\n");break;
-            case ARTICLE_MODERATION_STORAGE: strcpy(r->text,"ERR moderation storage unavailable\r\n");break;
-            case ARTICLE_POLICY_STORAGE: strcpy(r->text,"ERR board policy storage\r\n");break;
-            case ARTICLE_EXTRAS_STORAGE: strcpy(r->text,"ERR extras storage\r\n");break;
-            default: strcpy(r->text,"ERR article storage\r\n");break;
+            case ARTICLE_REVOKED: r->revoked=1;(r->feedback.failed=1,strcpy(r->text,"ERR session revoked\r\n"));break;
+            case ARTICLE_BOARD_DENIED: (r->feedback.failed=1,strcpy(r->text,"ERR board unavailable\r\n"));break;
+            case ARTICLE_INVALID_QUERY: case ARTICLE_INVALID_CURSOR: (r->feedback.failed=1,strcpy(r->text,"ERR find syntax\r\n"));break;
+            case ARTICLE_MEMBER_STORAGE: (r->feedback.failed=1,strcpy(r->text,"ERR member storage unavailable\r\n"));break;
+            case ARTICLE_MODERATION_STORAGE: (r->feedback.failed=1,strcpy(r->text,"ERR moderation storage unavailable\r\n"));break;
+            case ARTICLE_POLICY_STORAGE: (r->feedback.failed=1,strcpy(r->text,"ERR board policy storage\r\n"));break;
+            case ARTICLE_EXTRAS_STORAGE: (r->feedback.failed=1,strcpy(r->text,"ERR extras storage\r\n"));break;
+            default: (r->feedback.failed=1,strcpy(r->text,"ERR article storage\r\n"));break;
             }
             return;
         }
@@ -580,10 +583,10 @@ static void extra_execute(const BoardRequest *q,BoardResult *r) {
             const ArticleSummary *row=&page.rows[i];
             pos+=(size_t)snprintf(r->text+pos,sizeof(r->text)-pos,"%u %u %u %s\r\n",row->id,row->board,row->parent,row->title);
         }
-        snprintf(r->text+pos,sizeof(r->text)-pos,"END NEXT %u\r\n",page.next);return;
+        (r->feedback.page_found=1,r->feedback.page_next=page.next,snprintf(r->text+pos,sizeof(r->text)-pos,"END NEXT %u\r\n",page.next));return;
     }
     if(q->action==5) {
-        if(!q->number || q->number>article_count || !catalog_read((*article_at(q->number-1)).board,q->user)) { strcpy(r->text,"ERR no article\r\n"); return; }
+        if(!q->number || q->number>article_count || !catalog_read((*article_at(q->number-1)).board,q->user)) { (r->feedback.failed=1,strcpy(r->text,"ERR no article\r\n")); return; }
         display_article(q,q->number,r,0); r->board=(*article_at(q->number-1)).board; r->direct=1; return;
     }
     if(q->action==6) {
@@ -595,11 +598,11 @@ static void extra_execute(const BoardRequest *q,BoardResult *r) {
         snprintf(r->text,sizeof(r->text),"INFO %u %s\r\nDESCRIPTION %s\r\n%sEND INFO\r\n",info.id,info.title,info.description,information);
         return;
     }
-    if(!q->user) { strcpy(r->text,"ERR login required\r\n"); return; }
+    if(!q->user) { (r->feedback.failed=1,strcpy(r->text,"ERR login required\r\n")); return; }
     if(q->action==7 || q->action==17) {
         uint32_t target=q->number;const char *login=*q->username?q->username:NULL;
         if(q->action==17) {
-            if(!q->number || q->number>article_count || unavailable(q->number) || !catalog_read(board_of(q->number),q->user)) { strcpy(r->text,"ERR no article\r\n");return; }
+            if(!q->number || q->number>article_count || unavailable(q->number) || !catalog_read(board_of(q->number),q->user)) { (r->feedback.failed=1,strcpy(r->text,"ERR no article\r\n"));return; }
             target=0;login=article_at(q->number-1)->author;
         }
         MemberActor actor={q->user,q->user_epoch};MemberProfile profile;
@@ -615,7 +618,7 @@ static void extra_execute(const BoardRequest *q,BoardResult *r) {
         snprintf(r->text+used,sizeof(r->text)-used,"END PROFILE\r\n");return;
     }
     if(q->action>=12 && q->action<=16) {
-        if(!extra_text(q->body,320,1)) { strcpy(r->text,"ERR profile text\r\n");return; }
+        if(!extra_text(q->body,320,1)) { (r->feedback.failed=1,strcpy(r->text,"ERR profile text\r\n"));return; }
         MemberActor actor={q->user,q->user_epoch};
         MemberOutcome result=member_core_profile_set(&actor,(unsigned)q->action-10,q->body);
         if(result!=MEMBER_CORE_OK) { member_result(result==MEMBER_CORE_PROFILE_TEXT?MEMBER_CORE_EXTRAS_STORAGE:result,r);return; }
@@ -623,7 +626,7 @@ static void extra_execute(const BoardRequest *q,BoardResult *r) {
     }
     if(q->action==8 || q->action==9) {
         const char *text=q->action==8?q->title:q->body;
-        if(!extra_text(text,q->action==8?80:320,1)) { strcpy(r->text,"ERR profile text\r\n"); return; }
+        if(!extra_text(text,q->action==8?80:320,1)) { (r->feedback.failed=1,strcpy(r->text,"ERR profile text\r\n")); return; }
         MemberActor actor={q->user,q->user_epoch};
         MemberOutcome result=member_core_profile_set(&actor,q->action==8?0:1,text);
         if(result!=MEMBER_CORE_OK) { member_result(result==MEMBER_CORE_PROFILE_TEXT?MEMBER_CORE_EXTRAS_STORAGE:result,r);return; }
@@ -648,9 +651,9 @@ static void extra_execute(const BoardRequest *q,BoardResult *r) {
             const MemberProfileRow *row=&page.rows[i];
             pos+=(size_t)snprintf(r->text+pos,sizeof(r->text)-pos,"%u %s %s\r\n",row->user,row->name,row->handle);
         }
-        snprintf(r->text+pos,sizeof(r->text)-pos,"END NEXT %u\r\n",page.next);return;
+        (r->feedback.page_found=1,r->feedback.page_next=page.next,snprintf(r->text+pos,sizeof(r->text)-pos,"END NEXT %u\r\n",page.next));return;
     }
-    strcpy(r->text,"ERR command\r\n");
+    (r->feedback.failed=1,strcpy(r->text,"ERR command\r\n"));
 }
 static const char *mail_text(const BoardRequest *q,MessageId id,const char *raw) { return q->scope?message_text(q->scope==2?LANGUAGE_EN:LANGUAGE_JA,id):raw; }
 int mail_repository_enabled(void) { return board_feature_enabled("mail"); }
@@ -662,16 +665,17 @@ static size_t mail_attachment_text(const BoardRequest *q,uint32_t id,char *out,s
     return (size_t)snprintf(out,size,mail_text(q,MSG_MAIL_ATTACHMENT_INFO,"MAIL ATTACHMENT %u SIZE %u NAME %s\r\n"),info.id,info.size,info.name);
 }
 static void mail_result(const BoardRequest *q,MailOutcome result,BoardResult *r) {
+    r->feedback.failed=1;
     switch(result) {
-    case MAIL_CORE_LOGIN_REQUIRED:strcpy(r->text,"ERR login required\r\n");break;
-    case MAIL_CORE_REVOKED:r->revoked=1;strcpy(r->text,"ERR session revoked\r\n");break;
-    case MAIL_CORE_MEMBER_STORAGE:strcpy(r->text,"ERR member storage unavailable\r\n");break;
-    case MAIL_CORE_MODERATION_STORAGE:strcpy(r->text,"ERR moderation storage unavailable\r\n");break;
-    case MAIL_CORE_DISABLED:strcpy(r->text,"ERR feature disabled\r\n");break;
-    case MAIL_CORE_BODY_LIMIT:strcpy(r->text,"ERR body limit\r\n");break;
-    case MAIL_CORE_SYSOP_UNAVAILABLE:strcpy(r->text,"ERR SYSOP unavailable\r\n");break;
-    case MAIL_CORE_BUFFER_STORAGE:strcpy(r->text,"ERR storage unavailable\r\n");break;
-    case MAIL_CORE_BODY_STORAGE:body_read_failed=1;strcpy(r->text,"ERR storage unavailable\r\n");break;
+    case MAIL_CORE_LOGIN_REQUIRED:(r->feedback.failed=1,strcpy(r->text,"ERR login required\r\n"));break;
+    case MAIL_CORE_REVOKED:r->revoked=1;(r->feedback.failed=1,strcpy(r->text,"ERR session revoked\r\n"));break;
+    case MAIL_CORE_MEMBER_STORAGE:(r->feedback.failed=1,strcpy(r->text,"ERR member storage unavailable\r\n"));break;
+    case MAIL_CORE_MODERATION_STORAGE:(r->feedback.failed=1,strcpy(r->text,"ERR moderation storage unavailable\r\n"));break;
+    case MAIL_CORE_DISABLED:(r->feedback.failed=1,strcpy(r->text,"ERR feature disabled\r\n"));break;
+    case MAIL_CORE_BODY_LIMIT:(r->feedback.failed=1,strcpy(r->text,"ERR body limit\r\n"));break;
+    case MAIL_CORE_SYSOP_UNAVAILABLE:(r->feedback.failed=1,strcpy(r->text,"ERR SYSOP unavailable\r\n"));break;
+    case MAIL_CORE_BUFFER_STORAGE:(r->feedback.failed=1,strcpy(r->text,"ERR storage unavailable\r\n"));break;
+    case MAIL_CORE_BODY_STORAGE:body_read_failed=1;(r->feedback.failed=1,strcpy(r->text,"ERR storage unavailable\r\n"));break;
     case MAIL_CORE_STORAGE:snprintf(r->text,sizeof(r->text),"%s",mail_text(q,MSG_MAIL_STORAGE,"MAIL ERROR storage\r\n"));break;
     default:snprintf(r->text,sizeof(r->text),"%s",mail_text(q,MSG_MAIL_UNAVAILABLE,"MAIL ERROR unavailable\r\n"));break;
     }
@@ -685,24 +689,24 @@ static void mail_transfer_execute(const BoardRequest *q,BoardResult *r) {
     MailTransferContext context={{q->user,q->user_epoch},MAIL_CORE_OK};
     if(!strncmp(q->body,"FILE ",5)) {
         char *end;unsigned long id=strtoul(q->body+5,&end,10);
-        if(end==q->body+5 || *end || !id || id>VAULT_ID_MAX) { strcpy(r->text,"ERR no file\r\n");return; }
+        if(end==q->body+5 || *end || !id || id>VAULT_ID_MAX) { (r->feedback.failed=1,strcpy(r->text,"ERR no file\r\n"));return; }
         TransferRequest request={.operation=TRANSFER_INFO,.id=(uint32_t)id};TransferReply reply;VaultResult status;
         MailOutcome result=mail_core_transfer(&context.actor,&request,&reply,&status);
-        if(result!=MAIL_CORE_OK) { if(result==MAIL_CORE_STORAGE)strcpy(r->text,"ERR no file\r\n");else mail_result(q,result,r);return; }
-        if(status!=VAULT_OK) { strcpy(r->text,"ERR no file\r\n");return; }
+        if(result!=MAIL_CORE_OK) { if(result==MAIL_CORE_STORAGE)(r->feedback.failed=1,strcpy(r->text,"ERR no file\r\n"));else mail_result(q,result,r);return; }
+        if(status!=VAULT_OK) { (r->feedback.failed=1,strcpy(r->text,"ERR no file\r\n"));return; }
         const VaultEntry *e=&reply.entry;char hash[65];vault_hex(e->sha256,hash);
         snprintf(r->text,sizeof(r->text),"FILE %u %u %s\r\nNAME %s\r\nDESCRIPTION %s\r\nEND FILE\r\n",e->id,e->size,hash,e->name,e->description);return;
     }
     TransferBackend backend={&context,mail_transfer_request};
-    transfer_line_execute(backend,NULL,q->body,r->text,sizeof(r->text));
-    if(context.outcome==MAIL_CORE_STORAGE)strcpy(r->text,"ERR vault storage\r\n");
+    r->feedback.failed=transfer_line_result(backend,NULL,q->body,r->text,sizeof(r->text),NULL)!=VAULT_OK;
+    if(context.outcome==MAIL_CORE_STORAGE)(r->feedback.failed=1,strcpy(r->text,"ERR vault storage\r\n"));
     else if(context.outcome!=MAIL_CORE_OK)mail_result(q,context.outcome,r);
 }
 static void mail_execute(const BoardRequest *q,BoardResult *r) {
     /* Preserve the completion kind even on quota refusal so a failed send
      * returns to the editor with its unsent text and draft revision intact. */
     r->mail_action=q->action;
-    if((q->action=='S' || q->action=='W') && strlen(q->body)>ln_limit("BODY",BOARD_BODY)) { strcpy(r->text,"ERR body limit\r\n");return; }
+    if((q->action=='S' || q->action=='W') && strlen(q->body)>ln_limit("BODY",BOARD_BODY)) { (r->feedback.failed=1,strcpy(r->text,"ERR body limit\r\n"));return; }
     MailActor actor={q->user,q->user_epoch};
     if(mailbox_broken()) { snprintf(r->text,sizeof(r->text),"%s",mail_text(q,MSG_MAIL_STORAGE,"MAIL ERROR storage\r\n"));return; }
     uint32_t id=q->number;
@@ -775,7 +779,7 @@ static void mail_execute(const BoardRequest *q,BoardResult *r) {
             pos+=(size_t)snprintf(r->text+pos,sizeof(r->text)-pos,mail_text(q,MSG_MAIL_ROW,"MAIL ROW %u %s %s %u %s\r\n"),m->id,m->from,m->to,(unsigned)m->read,m->title);
         }
         r->mail_next=page.next;
-        snprintf(r->text+pos,sizeof(r->text)-pos,mail_text(q,MSG_MAIL_END,"MAIL END NEXT %u\r\n"),r->mail_next);return;
+        snprintf(r->text+pos,sizeof(r->text)-pos,mail_text(q,MSG_MAIL_END,"MAIL END NEXT %u\r\n"),r->mail_next);r->feedback.page_found=1;r->feedback.page_next=r->mail_next;return;
     }
     if(q->action=='R' || q->action=='N' || q->action=='T' || q->action=='f') {
         MailReadMode mode=q->action=='R'?MAIL_READ_ID:q->action=='N'?MAIL_READ_UNREAD:q->action=='T'?MAIL_READ_LATEST:MAIL_READ_SEQUENCE;
@@ -787,6 +791,8 @@ static void mail_execute(const BoardRequest *q,BoardResult *r) {
         if(q->action=='f')r->mail_action='R';
         r->mail_id=item.message.id;
         const MailSummary *m=&item.message;
+        if(q->structured && m->id) { r->content.kind=2;r->content.id=m->id;r->content.parent=m->parent;r->content.sender=m->sender;r->content.recipient=m->recipient;r->content.at=m->time;r->content.size=strlen(r->draft_body);
+            snprintf(r->content.author,sizeof(r->content.author),"%s",m->from);snprintf(r->content.recipient_name,sizeof(r->content.recipient_name),"%s",m->to);snprintf(r->content.title,sizeof(r->content.title),"%s",m->title);r->mail_attachments=item.attachments; }
         size_t offset=0;for(unsigned i=0;i<item.attachments.count;i++)offset+=mail_attachment_text(q,item.attachments.ids[i],r->text+offset,sizeof(r->text)-offset);
         snprintf(r->text+offset,sizeof(r->text)-offset,mail_text(q,MSG_MAIL_ITEM,"MAIL ITEM %u FROM %s TO %s READ %u REPLY %u\r\nTITLE %s\r\nBODY\r\n%sMAIL END\r\n"),m->id,m->from,m->to,(unsigned)m->read,m->parent,m->title,r->draft_body);return;
     }
@@ -802,7 +808,7 @@ static void mail_execute(const BoardRequest *q,BoardResult *r) {
         r->mail_delivery=q->number;r->mail_id=id;
         snprintf(r->text,sizeof(r->text),mail_text(q,MSG_MAIL_SENT,"MAIL SENT %u\r\n"),id);return;
     }
-unavailable:snprintf(r->text,sizeof(r->text),"%s",mail_text(q,MSG_MAIL_UNAVAILABLE,"MAIL ERROR unavailable\r\n"));return;
+unavailable:r->feedback.failed=1;snprintf(r->text,sizeof(r->text),"%s",mail_text(q,MSG_MAIL_UNAVAILABLE,"MAIL ERROR unavailable\r\n"));return;
 }
 #include "link_schema.h"
 #include "features64.inc"
@@ -853,26 +859,26 @@ int article_repository_append(uint32_t board,uint32_t parent,uint32_t user,
 
 static void post_result(ArticleOutcome result,BoardResult *r) {
     switch(result) {
-    case ARTICLE_REVOKED: r->revoked=1;strcpy(r->text,"ERR session revoked\r\n");break;
-    case ARTICLE_LOGIN_REQUIRED: strcpy(r->text,"ERR login required\r\n");break;
-    case ARTICLE_BOARD_DENIED: strcpy(r->text,"ERR board unavailable\r\n");break;
-    case ARTICLE_POSTING_DENIED: strcpy(r->text,"ERR posting denied\r\n");break;
-    case ARTICLE_NOT_FOUND: strcpy(r->text,"ERR no parent\r\n");break;
-    case ARTICLE_HIDDEN: strcpy(r->text,"ERR article hidden\r\n");break;
-    case ARTICLE_MEMBER_STORAGE: strcpy(r->text,"ERR member storage unavailable\r\n");break;
-    case ARTICLE_MODERATION_STORAGE: strcpy(r->text,"ERR moderation storage unavailable\r\n");break;
-    case ARTICLE_POLICY_STORAGE: strcpy(r->text,"ERR board policy storage\r\n");break;
-    case ARTICLE_EXTRAS_STORAGE: strcpy(r->text,"ERR extras storage\r\n");break;
-    case ARTICLE_LEGACY_BOARDS: strcpy(r->text,"ERR multiple boards need RTBOARD4\r\n");break;
-    case ARTICLE_LEGACY_MEMBERS: strcpy(r->text,"ERR member posting needs RTBOARD3\r\n");break;
-    case ARTICLE_BODY_LIMIT: strcpy(r->text,"ERR body limit\r\n");break;
-    case ARTICLE_FULL: strcpy(r->text,"ERR board full\r\n");break;
-    case ARTICLE_INVALID_DRAFT: strcpy(r->text,"ERR draft\r\n");break;
-    case ARTICLE_DRAFT_CONFLICT: strcpy(r->text,"ERR draft conflict\r\n");break;
-    case ARTICLE_LEGACY_BODY: strcpy(r->text,"ERR legacy board capacity; compact to RTBOARD4 first\r\n");break;
-    case ARTICLE_POST_UNAVAILABLE: strcpy(r->text,"ERR storage unavailable\r\n");break;
-    case ARTICLE_POST_UNCERTAIN: strcpy(r->text,"ERR storage uncertain; restart inspection required\r\n");break;
-    default: strcpy(r->text,"ERR article storage\r\n");break;
+    case ARTICLE_REVOKED: r->revoked=1;(r->feedback.failed=1,strcpy(r->text,"ERR session revoked\r\n"));break;
+    case ARTICLE_LOGIN_REQUIRED: (r->feedback.failed=1,strcpy(r->text,"ERR login required\r\n"));break;
+    case ARTICLE_BOARD_DENIED: (r->feedback.failed=1,strcpy(r->text,"ERR board unavailable\r\n"));break;
+    case ARTICLE_POSTING_DENIED: (r->feedback.failed=1,strcpy(r->text,"ERR posting denied\r\n"));break;
+    case ARTICLE_NOT_FOUND: (r->feedback.failed=1,strcpy(r->text,"ERR no parent\r\n"));break;
+    case ARTICLE_HIDDEN: (r->feedback.failed=1,strcpy(r->text,"ERR article hidden\r\n"));break;
+    case ARTICLE_MEMBER_STORAGE: (r->feedback.failed=1,strcpy(r->text,"ERR member storage unavailable\r\n"));break;
+    case ARTICLE_MODERATION_STORAGE: (r->feedback.failed=1,strcpy(r->text,"ERR moderation storage unavailable\r\n"));break;
+    case ARTICLE_POLICY_STORAGE: (r->feedback.failed=1,strcpy(r->text,"ERR board policy storage\r\n"));break;
+    case ARTICLE_EXTRAS_STORAGE: (r->feedback.failed=1,strcpy(r->text,"ERR extras storage\r\n"));break;
+    case ARTICLE_LEGACY_BOARDS: (r->feedback.failed=1,strcpy(r->text,"ERR multiple boards need RTBOARD4\r\n"));break;
+    case ARTICLE_LEGACY_MEMBERS: (r->feedback.failed=1,strcpy(r->text,"ERR member posting needs RTBOARD3\r\n"));break;
+    case ARTICLE_BODY_LIMIT: (r->feedback.failed=1,strcpy(r->text,"ERR body limit\r\n"));break;
+    case ARTICLE_FULL: (r->feedback.failed=1,strcpy(r->text,"ERR board full\r\n"));break;
+    case ARTICLE_INVALID_DRAFT: (r->feedback.failed=1,strcpy(r->text,"ERR draft\r\n"));break;
+    case ARTICLE_DRAFT_CONFLICT: (r->feedback.failed=1,strcpy(r->text,"ERR draft conflict\r\n"));break;
+    case ARTICLE_LEGACY_BODY: (r->feedback.failed=1,strcpy(r->text,"ERR legacy board capacity; compact to RTBOARD4 first\r\n"));break;
+    case ARTICLE_POST_UNAVAILABLE: (r->feedback.failed=1,strcpy(r->text,"ERR storage unavailable\r\n"));break;
+    case ARTICLE_POST_UNCERTAIN: (r->feedback.failed=1,strcpy(r->text,"ERR storage uncertain; restart inspection required\r\n"));break;
+    default: (r->feedback.failed=1,strcpy(r->text,"ERR article storage\r\n"));break;
     }
 }
 
@@ -899,26 +905,26 @@ static const char *member_state_text(MemberState state) {
 }
 static void member_result(MemberOutcome result,BoardResult *r) {
     switch(result) {
-    case MEMBER_CORE_REVOKED:r->revoked=1;strcpy(r->text,"ERR session revoked\r\n");break;
-    case MEMBER_CORE_ADMIN_REQUIRED:strcpy(r->text,"ERR admin required\r\n");break;
-    case MEMBER_CORE_NOT_FOUND:strcpy(r->text,"ERR no member\r\n");break;
-    case MEMBER_CORE_LOGIN_REQUIRED:strcpy(r->text,"ERR login required\r\n");break;
-    case MEMBER_CORE_RIGHTS_INVALID:strcpy(r->text,"ERR rights syntax\r\n");break;
-    case MEMBER_CORE_PREFERENCES:strcpy(r->text,"ERR preferences\r\n");break;
-    case MEMBER_CORE_PROFILE_TEXT:strcpy(r->text,"ERR profile text\r\n");break;
-    case MEMBER_CORE_PROFILE_UNAVAILABLE:strcpy(r->text,"ERR profile unavailable\r\n");break;
-    case MEMBER_CORE_PROFILE_SEARCH_DENIED:strcpy(r->text,"ERR profile search permission\r\n");break;
-    case MEMBER_CORE_APPLICATION_INVALID:strcpy(r->text,"ERR command\r\n");break;
-    case MEMBER_CORE_SETTINGS_STORAGE:strcpy(r->text,"ERR settings storage\r\n");break;
-    case MEMBER_CORE_PROFILE_EDIT:strcpy(r->text,"ERR profile permission or value\r\n");break;
-    case MEMBER_CORE_PROFILE_ADMINISTRATOR:strcpy(r->text,"ERR profile administrator required\r\n");break;
-    case MEMBER_CORE_PASSWORD:strcpy(r->text,"ERR password change\r\n");break;
-    case MEMBER_CORE_STATE:strcpy(r->text,"ERR member state\r\n");break;
-    case MEMBER_CORE_PROTECTED:strcpy(r->text,"ERR protected member\r\n");break;
-    case MEMBER_CORE_EXTRAS_STORAGE:strcpy(r->text,"ERR extras storage\r\n");break;
-    case MEMBER_CORE_MODERATION_UNCERTAIN:strcpy(r->text,"ERR moderation storage uncertain\r\n");break;
-    case MEMBER_CORE_MODERATION_STORAGE:strcpy(r->text,"ERR moderation storage unavailable\r\n");break;
-    default:strcpy(r->text,"ERR member storage unavailable\r\n");break;
+    case MEMBER_CORE_REVOKED:r->revoked=1;(r->feedback.failed=1,strcpy(r->text,"ERR session revoked\r\n"));break;
+    case MEMBER_CORE_ADMIN_REQUIRED:(r->feedback.failed=1,strcpy(r->text,"ERR admin required\r\n"));break;
+    case MEMBER_CORE_NOT_FOUND:(r->feedback.failed=1,strcpy(r->text,"ERR no member\r\n"));break;
+    case MEMBER_CORE_LOGIN_REQUIRED:(r->feedback.failed=1,strcpy(r->text,"ERR login required\r\n"));break;
+    case MEMBER_CORE_RIGHTS_INVALID:(r->feedback.failed=1,strcpy(r->text,"ERR rights syntax\r\n"));break;
+    case MEMBER_CORE_PREFERENCES:(r->feedback.failed=1,strcpy(r->text,"ERR preferences\r\n"));break;
+    case MEMBER_CORE_PROFILE_TEXT:(r->feedback.failed=1,strcpy(r->text,"ERR profile text\r\n"));break;
+    case MEMBER_CORE_PROFILE_UNAVAILABLE:(r->feedback.failed=1,strcpy(r->text,"ERR profile unavailable\r\n"));break;
+    case MEMBER_CORE_PROFILE_SEARCH_DENIED:(r->feedback.failed=1,strcpy(r->text,"ERR profile search permission\r\n"));break;
+    case MEMBER_CORE_APPLICATION_INVALID:(r->feedback.failed=1,strcpy(r->text,"ERR command\r\n"));break;
+    case MEMBER_CORE_SETTINGS_STORAGE:(r->feedback.failed=1,strcpy(r->text,"ERR settings storage\r\n"));break;
+    case MEMBER_CORE_PROFILE_EDIT:(r->feedback.failed=1,strcpy(r->text,"ERR profile permission or value\r\n"));break;
+    case MEMBER_CORE_PROFILE_ADMINISTRATOR:(r->feedback.failed=1,strcpy(r->text,"ERR profile administrator required\r\n"));break;
+    case MEMBER_CORE_PASSWORD:(r->feedback.failed=1,strcpy(r->text,"ERR password change\r\n"));break;
+    case MEMBER_CORE_STATE:(r->feedback.failed=1,strcpy(r->text,"ERR member state\r\n"));break;
+    case MEMBER_CORE_PROTECTED:(r->feedback.failed=1,strcpy(r->text,"ERR protected member\r\n"));break;
+    case MEMBER_CORE_EXTRAS_STORAGE:(r->feedback.failed=1,strcpy(r->text,"ERR extras storage\r\n"));break;
+    case MEMBER_CORE_MODERATION_UNCERTAIN:(r->feedback.failed=1,strcpy(r->text,"ERR moderation storage uncertain\r\n"));break;
+    case MEMBER_CORE_MODERATION_STORAGE:(r->feedback.failed=1,strcpy(r->text,"ERR moderation storage unavailable\r\n"));break;
+    default:(r->feedback.failed=1,strcpy(r->text,"ERR member storage unavailable\r\n"));break;
     }
 }
 
@@ -958,29 +964,29 @@ static void authentication_execute(const BoardRequest *q,BoardResult *r) {
         if(result.automatic_id)snprintf(r->text,sizeof(r->text),"APPLICATION SAVED %s\r\n",result.account_name);
         else strcpy(r->text,"APPLICATION SAVED\r\n");
         break;
-    case AUTH_APPLICATION_STORAGE:snprintf(r->text,sizeof(r->text),"ERR application storage; account %s reserved\r\n",result.account_name);break;
-    case AUTH_REGISTRATION_CLOSED:strcpy(r->text,"ERR registration closed\r\n");break;
-    case AUTH_APPLICATION_INVALID:strcpy(r->text,"ERR application values\r\n");break;
-    case AUTH_MODERATION_STORAGE:strcpy(r->text,"ERR moderation storage unavailable\r\n");break;
-    case AUTH_BOARD_STORAGE:r->auth=0;strcpy(r->text,"ERR board policy storage\r\n");break;
-    case AUTH_EXTRAS_STORAGE:r->auth=0;strcpy(r->text,"ERR extras storage\r\n");break;
-    case AUTH_MEMBER_STORAGE:r->auth=0;strcpy(r->text,"ERR member storage unavailable\r\n");break;
-    default:strcpy(r->text,"ERR authentication\r\n");break;
+    case AUTH_APPLICATION_STORAGE:(r->feedback.failed=1,snprintf(r->text,sizeof(r->text),"ERR application storage; account %s reserved\r\n",result.account_name));break;
+    case AUTH_REGISTRATION_CLOSED:(r->feedback.failed=1,strcpy(r->text,"ERR registration closed\r\n"));break;
+    case AUTH_APPLICATION_INVALID:(r->feedback.failed=1,strcpy(r->text,"ERR application values\r\n"));break;
+    case AUTH_MODERATION_STORAGE:(r->feedback.failed=1,strcpy(r->text,"ERR moderation storage unavailable\r\n"));break;
+    case AUTH_BOARD_STORAGE:r->auth=0;(r->feedback.failed=1,strcpy(r->text,"ERR board policy storage\r\n"));break;
+    case AUTH_EXTRAS_STORAGE:r->auth=0;(r->feedback.failed=1,strcpy(r->text,"ERR extras storage\r\n"));break;
+    case AUTH_MEMBER_STORAGE:r->auth=0;(r->feedback.failed=1,strcpy(r->text,"ERR member storage unavailable\r\n"));break;
+    default:(r->feedback.failed=1,strcpy(r->text,"ERR authentication\r\n"));break;
     }
 }
 
 static void execute(const BoardRequest *q,BoardResult *r) {
     memset(r,0,sizeof(*r));
     policy_context(q->board_grants);
-    if(features_broken || policy_broken() || move_journal.broken || access_journal.broken) { r->session=q->session;r->slot=q->slot;strcpy(r->text,"ERR board policy storage\r\n");return; }
+    if(features_broken || policy_broken() || move_journal.broken || access_journal.broken) { r->session=q->session;r->slot=q->slot;(r->feedback.failed=1,strcpy(r->text,"ERR board policy storage\r\n"));return; }
     r->deferred=0;r->binary_enter=0;r->binary_size=0;
     r->session=q->session; r->slot=q->slot;r->zcontrol=q->zcontrol; r->selected=0; r->auth=0; r->board=0; r->editing=0; r->user_epoch=0; r->account_user=0; r->account_epoch=0; r->revoked=0; r->password_changed=0; r->preferences=0; r->language=0; r->pager=0; r->draft_loaded=0; r->draft_revision=0; r->draft_parent=0;
-    if(extras_broken() || profile_store_broken()) { strcpy(r->text,"ERR extras storage\r\n"); return; }
-    if(members_broken()) { strcpy(r->text,"ERR member storage unavailable\r\n"); return; }
-    if(((q->op=='m' || q->op==BOARD_MAIL_TRANSFER || (q->op=='@' && q->action==1)) && !board_feature_enabled("mail")) || (q->op=='&' && !board_feature_enabled("chat")) || (strchr("@Y$^",q->op) && !(q->op=='@' && q->action==1) && !board_feature_enabled("vault"))) { strcpy(r->text,"ERR feature disabled\r\n");return; }
+    if(extras_broken() || profile_store_broken()) { (r->feedback.failed=1,strcpy(r->text,"ERR extras storage\r\n")); return; }
+    if(members_broken()) { (r->feedback.failed=1,strcpy(r->text,"ERR member storage unavailable\r\n")); return; }
+    if(((q->op=='m' || q->op==BOARD_MAIL_TRANSFER || (q->op=='@' && q->action==1)) && !board_feature_enabled("mail")) || (q->op=='&' && !board_feature_enabled("chat")) || (strchr("@Y$^",q->op) && !(q->op=='@' && q->action==1) && !board_feature_enabled("vault"))) { (r->feedback.failed=1,strcpy(r->text,"ERR feature disabled\r\n"));return; }
     if(q->op=='a' || q->op=='g') { authentication_execute(q,r);return; }
     if(q->user && (moderation_suspended(q->user) || q->user_epoch!=moderation_epoch(q->user))) {
-        r->revoked=1; strcpy(r->text,"ERR session revoked\r\n"); return;
+        r->revoked=1; (r->feedback.failed=1,strcpy(r->text,"ERR session revoked\r\n")); return;
     }
     if(q->op=='}') { advanced_execute(q,r);return; }
     if(q->op==BOARD_LINK) { link_execute(q,r);return; }
@@ -996,7 +1002,7 @@ static void execute(const BoardRequest *q,BoardResult *r) {
         MailActor actor={q->user,q->user_epoch};MailDelivery delivery;
         MailOutcome result=mail_core_sysop_send(&actor,q->title,q->body,&delivery);
         if(result!=MAIL_CORE_OK) {
-            if(result==MAIL_CORE_STORAGE || result==MAIL_CORE_UNAVAILABLE)strcpy(r->text,"ERR mail storage or limit\r\n");
+            if(result==MAIL_CORE_STORAGE || result==MAIL_CORE_UNAVAILABLE)(r->feedback.failed=1,strcpy(r->text,"ERR mail storage or limit\r\n"));
             else mail_result(q,result,r);
             return;
         }
@@ -1021,7 +1027,7 @@ static void execute(const BoardRequest *q,BoardResult *r) {
             size_t used=(size_t)snprintf(r->text,sizeof(r->text),"APPLICATIONS\r\n");
             for(unsigned i=0;i<page.count;i++)
                 used+=(size_t)snprintf(r->text+used,sizeof(r->text)-used,"APPLICATION %u %s\r\n",page.rows[i].id,page.rows[i].name);
-            snprintf(r->text+used,sizeof(r->text)-used,"END NEXT %u\r\n",page.next);return;
+            (r->feedback.page_found=1,r->feedback.page_next=page.next,snprintf(r->text+used,sizeof(r->text)-used,"END NEXT %u\r\n",page.next));return;
         }
         if(q->action=='A' || q->action=='L' || q->action=='G' || q->action=='D') {
             MemberActor actor={q->user,q->user_epoch};MemberChange change;
@@ -1032,9 +1038,9 @@ static void execute(const BoardRequest *q,BoardResult *r) {
             if(outcome!=MEMBER_CORE_OK) { member_result(outcome,r);return; }
             r->account_user=change.user;r->account_epoch=change.epoch;
         } else {
-            if(!members_name(q->user)) { strcpy(r->text,"ERR login required\r\n");return; }
-            if(!moderation_admin(q->user)) { strcpy(r->text,"ERR admin required\r\n");return; }
-            if(!members_active(target)) { strcpy(r->text,"ERR no member\r\n");return; }
+            if(!members_name(q->user)) { (r->feedback.failed=1,strcpy(r->text,"ERR login required\r\n"));return; }
+            if(!moderation_admin(q->user)) { (r->feedback.failed=1,strcpy(r->text,"ERR admin required\r\n"));return; }
+            if(!members_active(target)) { (r->feedback.failed=1,strcpy(r->text,"ERR no member\r\n"));return; }
         }
         char groups[401]="";size_t used=0;
         for(unsigned i=0;i<100;i++)if(members_in_group(target,i+1))used+=(size_t)snprintf(groups+used,sizeof(groups)-used,"%s%u",used?",":"",i+1);
@@ -1046,19 +1052,19 @@ static void execute(const BoardRequest *q,BoardResult *r) {
         if(result!=MEMBER_CORE_OK) { member_result(result,r);return; }
         snprintf(r->text,sizeof(r->text),"ROLE %s\r\n",role==MEMBER_ROLE_ADMIN?"admin":role==MEMBER_ROLE_MEMBER?"member":"guest");return;
     }
-    if(strchr("hri",q->op) && !catalog_manage(q->board,q->user)) { strcpy(r->text,"ERR admin required\r\n"); return; }
-    if(moderation_broken()) { strcpy(r->text,"ERR moderation storage unavailable\r\n"); return; }
-    if(q->op==BOARD_MAIL_TRANSFER) { if(!members_name(q->user)) { strcpy(r->text,"ERR login required\r\n");return; }mail_transfer_execute(q,r);return; }
-    if(q->op=='m') { if(!members_name(q->user)) { strcpy(r->text,"ERR login required\r\n");return; }mail_execute(q,r);return; }
+    if(strchr("hri",q->op) && !catalog_manage(q->board,q->user)) { (r->feedback.failed=1,strcpy(r->text,"ERR admin required\r\n")); return; }
+    if(moderation_broken()) { (r->feedback.failed=1,strcpy(r->text,"ERR moderation storage unavailable\r\n")); return; }
+    if(q->op==BOARD_MAIL_TRANSFER) { if(!members_name(q->user)) { (r->feedback.failed=1,strcpy(r->text,"ERR login required\r\n"));return; }mail_transfer_execute(q,r);return; }
+    if(q->op=='m') { if(!members_name(q->user)) { (r->feedback.failed=1,strcpy(r->text,"ERR login required\r\n"));return; }mail_execute(q,r);return; }
     if(q->op=='&') {
         Principal p={0};IdentityProvider identity=identity_legacy_provider();
-        if(!identity.resolve(identity.context,q->user,q->user_epoch,&p)) { strcpy(r->text,"ERR login required\r\n");return; }
+        if(!identity.resolve(identity.context,q->user,q->user_epoch,&p)) { (r->feedback.failed=1,strcpy(r->text,"ERR login required\r\n"));return; }
         if(q->action=='K') {
             MemberActor actor={q->user,q->user_epoch};MemberChatKick removal;
             MemberOutcome result=member_core_chat_kick(&actor,q->body,&removal);
             if(result!=MEMBER_CORE_OK) {
                 r->chat_action='!';
-                if(result==MEMBER_CORE_NOT_FOUND)strcpy(r->text,"ERR member not found\r\n");
+                if(result==MEMBER_CORE_NOT_FOUND)(r->feedback.failed=1,strcpy(r->text,"ERR member not found\r\n"));
                 else member_result(result,r);
                 return;
             }
@@ -1088,21 +1094,21 @@ static void execute(const BoardRequest *q,BoardResult *r) {
     }
     if(q->op=='@' || q->op=='Y' || q->op=='$' || q->op=='^') {
         Principal p={0};IdentityProvider identity=identity_legacy_provider();
-        if(!identity.resolve(identity.context,q->user,q->user_epoch,&p)) { strcpy(r->text,"ERR login required\r\n");return; }
+        if(!identity.resolve(identity.context,q->user,q->user_epoch,&p)) { (r->feedback.failed=1,strcpy(r->text,"ERR login required\r\n"));return; }
         memcpy(p.vault_grants,q->vault_grants,sizeof(p.vault_grants));
         if(q->op=='@') { r->binary_enter=1;return; }
         BoardRequest copy=*q;
         if(q->op=='Y' && (q->action==VAULT_CMD_OWNER || q->action==VAULT_CMD_BOARDSIGOP)) {
-            Principal target={0};if(q->cursor && !identity.resolve(identity.context,q->cursor,moderation_epoch(q->cursor),&target)) { strcpy(r->text,"ERR no member\r\n");return; }
-            if(q->action==VAULT_CMD_OWNER) { if(!q->cursor) { strcpy(r->text,"ERR no member\r\n");return; }strcpy(copy.body,target.subject); }
+            Principal target={0};if(q->cursor && !identity.resolve(identity.context,q->cursor,moderation_epoch(q->cursor),&target)) { (r->feedback.failed=1,strcpy(r->text,"ERR no member\r\n"));return; }
+            if(q->action==VAULT_CMD_OWNER) { if(!q->cursor) { (r->feedback.failed=1,strcpy(r->text,"ERR no member\r\n"));return; }strcpy(copy.body,target.subject); }
             else snprintf(copy.body,sizeof(copy.body),"%s|%s",q->title,target.subject);
         }
         if(vault_worker_submit(&copy,&p))r->deferred=1;
-        else strcpy(r->text,"ERR vault busy\r\n");
+        else (r->feedback.failed=1,strcpy(r->text,"ERR vault busy\r\n"));
         return;
     }
     if(q->op==')') {
-        if(!q->user) { strcpy(r->text,"ERR login required\r\n");return; }
+        if(!q->user) { (r->feedback.failed=1,strcpy(r->text,"ERR login required\r\n"));return; }
         if(q->action=='G') {
             MemberActor actor={q->user,q->user_epoch};MemberGroupMove change;
             MemberOutcome outcome=member_core_group_move(&actor,q->number,q->cursor,&change);
@@ -1158,9 +1164,9 @@ static void execute(const BoardRequest *q,BoardResult *r) {
         return;
     }
     if(q->op=='V') {
-        if(!q->user) { strcpy(r->text,"ERR login required\r\n"); return; }
+        if(!q->user) { (r->feedback.failed=1,strcpy(r->text,"ERR login required\r\n")); return; }
         if(q->number>2 || (q->number==1 && (q->cursor>1 || q->title[0]<'0' || q->title[0]>'1' || q->title[1]))) {
-            strcpy(r->text,"ERR preferences\r\n"); return;
+            (r->feedback.failed=1,strcpy(r->text,"ERR preferences\r\n")); return;
         }
         MemberActor actor={q->user,q->user_epoch};MemberPreferences preferences;
         MemberOutcome result;
@@ -1177,7 +1183,7 @@ static void execute(const BoardRequest *q,BoardResult *r) {
             r->language=preferences.language;r->pager=preferences.pager;r->editor_preference=preferences.editor;
             r->columns=preferences.columns;r->rows=preferences.rows;r->ui_aux=preferences.aux;
         }
-        snprintf(r->text,sizeof(r->text),"PREFS %s %s %s\r\n",q->number==1?"SAVED":q->number==2?"LOADED":"STORED",preferences.language?"en":"ja",preferences.pager?"ON":"OFF");return;
+        r->feedback.preferences_saved=q->number==1;snprintf(r->text,sizeof(r->text),"PREFS %s %s %s\r\n",q->number==1?"SAVED":q->number==2?"LOADED":"STORED",preferences.language?"en":"ja",preferences.pager?"ON":"OFF");return;
     }
     if(q->op=='~') {
         MemberActor actor={q->user,q->user_epoch};MemberChange change;
@@ -1202,9 +1208,9 @@ static void execute(const BoardRequest *q,BoardResult *r) {
         ArticleActor actor={q->user,q->user_epoch,q->board_grants};ArticleAuditPage page;
         ArticleOutcome result=article_audit(&actor,q->board,q->number,q->audit_article,q->audit_actor,q->title,&page);
         if(result!=ARTICLE_OK) {
-            if(result==ARTICLE_INVALID_QUERY)strcpy(r->text,"ERR audit filter\r\n");
-            else if(result==ARTICLE_INVALID_CURSOR)strcpy(r->text,"ERR audit cursor\r\n");
-            else if(result==ARTICLE_ADMIN_REQUIRED)strcpy(r->text,"ERR admin required\r\n");
+            if(result==ARTICLE_INVALID_QUERY)(r->feedback.failed=1,strcpy(r->text,"ERR audit filter\r\n"));
+            else if(result==ARTICLE_INVALID_CURSOR)(r->feedback.failed=1,strcpy(r->text,"ERR audit cursor\r\n"));
+            else if(result==ARTICLE_ADMIN_REQUIRED)(r->feedback.failed=1,strcpy(r->text,"ERR admin required\r\n"));
             else post_result(result,r);
             return;
         }
@@ -1220,7 +1226,7 @@ static void execute(const BoardRequest *q,BoardResult *r) {
             pos+=(size_t)snprintf(r->text+pos,sizeof(r->text)-pos,"EVENT %u %s %u %s %s %u %u\r\n",
                 row->sequence,date,row->actor,row->actor_name,actions[row->action],row->target,row->board);
         }
-        snprintf(r->text+pos,sizeof(r->text)-pos,"END NEXT %u\r\n",page.next);return;
+        (r->feedback.page_found=1,r->feedback.page_next=page.next,snprintf(r->text+pos,sizeof(r->text)-pos,"END NEXT %u\r\n",page.next));return;
     }
     if(q->op=='l' || q->op=='t') {
         MemberActor actor={q->user,q->user_epoch};MemberOutcome result;
@@ -1236,7 +1242,7 @@ static void execute(const BoardRequest *q,BoardResult *r) {
             const MemberSummary *member=&page.rows[i];
             pos+=(size_t)snprintf(r->text+pos,sizeof(r->text)-pos,"MEMBER %u %s %s\r\n",member->id,member->name,member_state_text(member->state));
         }
-        snprintf(r->text+pos,sizeof(r->text)-pos,"END NEXT %u\r\n",page.next);return;
+        (r->feedback.page_found=1,r->feedback.page_next=page.next,snprintf(r->text+pos,sizeof(r->text)-pos,"END NEXT %u\r\n",page.next));return;
     }
     if(q->op=='x' || q->op=='y') {
         MemberActor actor={q->user,q->user_epoch};MemberChange change;
@@ -1252,15 +1258,15 @@ static void execute(const BoardRequest *q,BoardResult *r) {
                                         article_boards(&actor,q->number,q->action=='C',&page);
         if(result!=ARTICLE_OK) {
             switch(result) {
-            case ARTICLE_LOGIN_REQUIRED: strcpy(r->text,"ERR login required\r\n");break;
-            case ARTICLE_REVOKED: r->revoked=1;strcpy(r->text,"ERR session revoked\r\n");break;
-            case ARTICLE_BOARD_DENIED: strcpy(r->text,"ERR board unavailable\r\n");break;
-            case ARTICLE_MEMBER_STORAGE: strcpy(r->text,"ERR member storage unavailable\r\n");break;
-            case ARTICLE_MODERATION_STORAGE: strcpy(r->text,"ERR moderation storage unavailable\r\n");break;
-            case ARTICLE_POLICY_STORAGE: strcpy(r->text,"ERR board policy storage\r\n");break;
-            case ARTICLE_EXTRAS_STORAGE: strcpy(r->text,"ERR extras storage\r\n");break;
-            case ARTICLE_READ_STATE_STORAGE: strcpy(r->text,"ERR read-state storage\r\n");break;
-            default: strcpy(r->text,"ERR article storage\r\n");break;
+            case ARTICLE_LOGIN_REQUIRED: (r->feedback.failed=1,strcpy(r->text,"ERR login required\r\n"));break;
+            case ARTICLE_REVOKED: r->revoked=1;(r->feedback.failed=1,strcpy(r->text,"ERR session revoked\r\n"));break;
+            case ARTICLE_BOARD_DENIED: (r->feedback.failed=1,strcpy(r->text,"ERR board unavailable\r\n"));break;
+            case ARTICLE_MEMBER_STORAGE: (r->feedback.failed=1,strcpy(r->text,"ERR member storage unavailable\r\n"));break;
+            case ARTICLE_MODERATION_STORAGE: (r->feedback.failed=1,strcpy(r->text,"ERR moderation storage unavailable\r\n"));break;
+            case ARTICLE_POLICY_STORAGE: (r->feedback.failed=1,strcpy(r->text,"ERR board policy storage\r\n"));break;
+            case ARTICLE_EXTRAS_STORAGE: (r->feedback.failed=1,strcpy(r->text,"ERR extras storage\r\n"));break;
+            case ARTICLE_READ_STATE_STORAGE: (r->feedback.failed=1,strcpy(r->text,"ERR read-state storage\r\n"));break;
+            default: (r->feedback.failed=1,strcpy(r->text,"ERR article storage\r\n"));break;
             }
             return;
         }
@@ -1277,18 +1283,18 @@ static void execute(const BoardRequest *q,BoardResult *r) {
             pos+=(size_t)snprintf(r->text+pos,sizeof(r->text)-pos,"%*s#%u parent=%u depth=%u write=%s unread=%s %.80s\r\n",
                 (int)indent,"",row->id,row->parent,row->depth,row->writable?"yes":"no",count,row->title);
         }
-        snprintf(r->text+pos,sizeof(r->text)-pos,"END NEXT %u\r\n",page.next);return;
+        (r->feedback.page_found=1,r->feedback.page_next=page.next,snprintf(r->text+pos,sizeof(r->text)-pos,"END NEXT %u\r\n",page.next));return;
     }
     if(q->op=='j') {
         ArticleActor actor={q->user,q->user_epoch,q->board_grants};ArticleBoardEntry entry;
         ArticleOutcome result=article_enter_board(&actor,q->number,&entry);
         if(result!=ARTICLE_OK) { post_result(result,r);return; }
-        if(entry.password_board && q->action=='t')strcpy(r->text,"ERR try later\r\n");
+        if(entry.password_board && q->action=='t')(r->feedback.failed=1,strcpy(r->text,"ERR try later\r\n"));
         else if(entry.password_board) { r->service_action='1';r->service_number=entry.id;r->board_grant=entry.password_board;strcpy(r->text,"BOARD PASSWORD\r\n"); }
         else { r->board=entry.id;if(entry.menu)r->service_action='7';snprintf(r->text,sizeof(r->text),"BOARD %u %.80s\r\n",entry.id,entry.title); }
         return;
     }
-    if(!catalog_read(q->board,q->user)) { strcpy(r->text,"ERR board unavailable\r\n"); return; }
+    if(!catalog_read(q->board,q->user)) { (r->feedback.failed=1,strcpy(r->text,"ERR board unavailable\r\n")); return; }
     if(q->op=='f') {
         display_article_page(q,r,1);return;
     }
@@ -1303,10 +1309,10 @@ static void execute(const BoardRequest *q,BoardResult *r) {
         return;
     }
     if(q->number && strchr("RUCNBTsunvhri",q->op) && !on_board(q->number,q->board)) {
-        strcpy(r->text,"ERR no article\r\n"); return;
+        (r->feedback.failed=1,strcpy(r->text,"ERR no article\r\n")); return;
     }
     if(strchr("hri",q->op)) {
-        if(!on_board(q->number,q->board)) { strcpy(r->text,"ERR no article\r\n"); return; }
+        if(!on_board(q->number,q->board)) { (r->feedback.failed=1,strcpy(r->text,"ERR no article\r\n")); return; }
         if(q->op=='i') { display_article(q,q->number,r,1); return; }
         ArticleActor actor={q->user,q->user_epoch,q->board_grants};
         ArticleOutcome result=q->op=='h'?article_hide(&actor,q->board,q->number):
@@ -1314,46 +1320,46 @@ static void execute(const BoardRequest *q,BoardResult *r) {
         switch(result) {
         case ARTICLE_OK:
             snprintf(r->text,sizeof(r->text),"%s %u\r\n",q->op=='h'?"HIDDEN SAVED":"RESTORED",q->number);break;
-        case ARTICLE_LOGIN_REQUIRED: strcpy(r->text,"ERR login required\r\n");break;
-        case ARTICLE_REVOKED: r->revoked=1;strcpy(r->text,"ERR session revoked\r\n");break;
-        case ARTICLE_ADMIN_REQUIRED: strcpy(r->text,"ERR admin required\r\n");break;
-        case ARTICLE_MEMBER_STORAGE: strcpy(r->text,"ERR member storage unavailable\r\n");break;
-        case ARTICLE_MODERATION_STORAGE: strcpy(r->text,"ERR moderation storage unavailable\r\n");break;
-        case ARTICLE_POLICY_STORAGE: strcpy(r->text,"ERR board policy storage\r\n");break;
-        case ARTICLE_EXTRAS_STORAGE: strcpy(r->text,"ERR extras storage\r\n");break;
-        case ARTICLE_NOT_FOUND: strcpy(r->text,"ERR no article\r\n");break;
-        case ARTICLE_WITHDRAWN_TARGET: strcpy(r->text,"ERR article withdrawn\r\n");break;
-        default: strcpy(r->text,"ERR moderation storage uncertain\r\n");break;
+        case ARTICLE_LOGIN_REQUIRED: (r->feedback.failed=1,strcpy(r->text,"ERR login required\r\n"));break;
+        case ARTICLE_REVOKED: r->revoked=1;(r->feedback.failed=1,strcpy(r->text,"ERR session revoked\r\n"));break;
+        case ARTICLE_ADMIN_REQUIRED: (r->feedback.failed=1,strcpy(r->text,"ERR admin required\r\n"));break;
+        case ARTICLE_MEMBER_STORAGE: (r->feedback.failed=1,strcpy(r->text,"ERR member storage unavailable\r\n"));break;
+        case ARTICLE_MODERATION_STORAGE: (r->feedback.failed=1,strcpy(r->text,"ERR moderation storage unavailable\r\n"));break;
+        case ARTICLE_POLICY_STORAGE: (r->feedback.failed=1,strcpy(r->text,"ERR board policy storage\r\n"));break;
+        case ARTICLE_EXTRAS_STORAGE: (r->feedback.failed=1,strcpy(r->text,"ERR extras storage\r\n"));break;
+        case ARTICLE_NOT_FOUND: (r->feedback.failed=1,strcpy(r->text,"ERR no article\r\n"));break;
+        case ARTICLE_WITHDRAWN_TARGET: (r->feedback.failed=1,strcpy(r->text,"ERR article withdrawn\r\n"));break;
+        default: (r->feedback.failed=1,strcpy(r->text,"ERR moderation storage uncertain\r\n"));break;
         }
         return;
     }
-    if(q->number && strchr("su",q->op) && unavailable(q->number)) { strcpy(r->text,"ERR article hidden\r\n"); return; }
+    if(q->number && strchr("su",q->op) && unavailable(q->number)) { (r->feedback.failed=1,strcpy(r->text,"ERR article hidden\r\n")); return; }
     if(q->op=='s' || q->op=='u' || q->op=='v' || q->op=='n') {
         article_read_state(q,r);return;
     }
     if(q->op=='R') {
-        if(q->number==0 || q->number>article_count) { strcpy(r->text,"ERR no article\r\n"); return; }
+        if(q->number==0 || q->number>article_count) { (r->feedback.failed=1,strcpy(r->text,"ERR no article\r\n")); return; }
         display_article(q,q->number,r,0);
     } else if(q->op=='U' || q->op=='C' || q->op=='N' || q->op=='B') {
-        if(!q->number || q->number>article_count) { strcpy(r->text,"ERR no current article\r\n"); return; }
+        if(!q->number || q->number>article_count) { (r->feedback.failed=1,strcpy(r->text,"ERR no current article\r\n")); return; }
         ArticleActor actor={q->user,q->user_epoch,q->board_grants};ArticleSummary target;
         ArticleDirection direction=q->op=='U'?ARTICLE_PARENT:q->op=='C'?ARTICLE_CHILD:
                                    q->op=='N'?ARTICLE_NEXT:ARTICLE_PREVIOUS;
         ArticleOutcome result=article_navigate(&actor,q->board,q->number,direction,&target);
         if(result!=ARTICLE_OK) {
             switch(result) {
-            case ARTICLE_REVOKED: r->revoked=1;strcpy(r->text,"ERR session revoked\r\n");break;
-            case ARTICLE_BOARD_DENIED: strcpy(r->text,"ERR board unavailable\r\n");break;
-            case ARTICLE_NOT_FOUND: strcpy(r->text,"ERR no article\r\n");break;
-            case ARTICLE_MEMBER_STORAGE: strcpy(r->text,"ERR member storage unavailable\r\n");break;
-            case ARTICLE_MODERATION_STORAGE: strcpy(r->text,"ERR moderation storage unavailable\r\n");break;
-            case ARTICLE_POLICY_STORAGE: strcpy(r->text,"ERR board policy storage\r\n");break;
-            case ARTICLE_EXTRAS_STORAGE: strcpy(r->text,"ERR extras storage\r\n");break;
-            default: strcpy(r->text,"ERR article storage\r\n");break;
+            case ARTICLE_REVOKED: r->revoked=1;(r->feedback.failed=1,strcpy(r->text,"ERR session revoked\r\n"));break;
+            case ARTICLE_BOARD_DENIED: (r->feedback.failed=1,strcpy(r->text,"ERR board unavailable\r\n"));break;
+            case ARTICLE_NOT_FOUND: (r->feedback.failed=1,strcpy(r->text,"ERR no article\r\n"));break;
+            case ARTICLE_MEMBER_STORAGE: (r->feedback.failed=1,strcpy(r->text,"ERR member storage unavailable\r\n"));break;
+            case ARTICLE_MODERATION_STORAGE: (r->feedback.failed=1,strcpy(r->text,"ERR moderation storage unavailable\r\n"));break;
+            case ARTICLE_POLICY_STORAGE: (r->feedback.failed=1,strcpy(r->text,"ERR board policy storage\r\n"));break;
+            case ARTICLE_EXTRAS_STORAGE: (r->feedback.failed=1,strcpy(r->text,"ERR extras storage\r\n"));break;
+            default: (r->feedback.failed=1,strcpy(r->text,"ERR article storage\r\n"));break;
             }
             return;
         }
-        if(!target.id) { strcpy(r->text,"ERR no neighbour\r\n"); return; }
+        if(!target.id) { (r->feedback.failed=1,strcpy(r->text,"ERR no neighbour\r\n")); return; }
         display_article(q,target.id,r,0);
     } else if(q->op=='T') {
         display_article_tree(q,r);
@@ -1377,14 +1383,14 @@ static void *work(void *unused)
         if(ui_head && (job<0 || ui_head->ticket<jobs[job].ticket)) {
             UiSave *save=ui_head;ui_head=save->next;if(!ui_head)ui_tail=NULL;UNLOCK();
             BoardResult *result=calloc(1,sizeof(*result));
-            if(result) { execute(&save->request,result);if(strncmp(result->text,"PREFS SAVED",11) && !result->revoked)fprintf(stderr,"disconnect preferences: %s",result->text);free(result); }
+            if(result) { execute(&save->request,result);if(!result->feedback.preferences_saved && !result->revoked)fprintf(stderr,"disconnect preferences: %s",result->text);free(result); }
             else fprintf(stderr,"disconnect preferences: allocation failed\n");
             free(save);LOCK();continue;
         }
         if(job<0) { if(ending) break; WAIT(); continue; }
         jobs[job].state=2; UNLOCK();
         body_read_failed=0;execute(&jobs[job].request,&jobs[job].result);
-        if(body_read_failed) { BoardResult *r=&jobs[job].result;unsigned long session=r->session;int slot=r->slot;memset(r,0,sizeof(*r));r->session=session;r->slot=slot;r->board=jobs[job].request.board;strcpy(r->text,"ERR storage unavailable\r\n"); }
+        if(body_read_failed) { BoardResult *r=&jobs[job].result;unsigned long session=r->session;int slot=r->slot;memset(r,0,sizeof(*r));r->session=session;r->slot=slot;r->board=jobs[job].request.board;(r->feedback.failed=1,strcpy(r->text,"ERR storage unavailable\r\n")); }
         BoardRequest *rq=&jobs[job].request;BoardResult *rs=&jobs[job].result;
         if(rs->selected && !strncmp(rs->text,"SAVED ",6) && !access_record('P',rs->selected,rq->user))snprintf(rs->text,sizeof(rs->text),"POST SAVED LOG FAILED %u\r\n",rs->selected);
         else if((!strncmp(rs->text,"ARTICLE ",8) || rs->service_action=='6') && !access_record('R',rs->service_action=='6'?rq->number:rs->selected,rq->user)) { rs->service_action=0;rs->selected=0;rs->draft_body[0]=0;strcpy(rs->text,"ERR board access storage\r\n"); }

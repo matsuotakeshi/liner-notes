@@ -28,7 +28,7 @@ static void link_result(LinkOutcome outcome,BoardResult *r) {
     case LINK_POST_UNCERTAIN:message="ERR storage uncertain; restart inspection required";break;
     default:break;
     }
-    snprintf(r->text,sizeof(r->text),"%s\r\n",message);
+    r->feedback.failed=1;snprintf(r->text,sizeof(r->text),"%s\r\n",message);
 }
 static void link_execute(const BoardRequest *q,BoardResult *r) {
     LinkActor actor={q->user,q->user_epoch,q->board_grants};LinkOutcome outcome;

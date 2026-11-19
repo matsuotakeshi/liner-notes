@@ -1,5 +1,8 @@
 # Session adapter decomposition
 
+Follow-up: [state and operation boundary](SESSION_STATE_API.md) supersedes the
+flat Session layout and submission details below. This document records PR #127.
+
 Baseline: main `663e7ec15bd7edb90e1c0846d79ffc0821b24166` (PR #126).
 This change decomposes the complete former Session translation unit and the
 textually included classic bindings into separately compiled adapter modules.

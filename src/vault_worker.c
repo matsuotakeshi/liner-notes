@@ -56,13 +56,13 @@ static void *work(void *unused)
         Job *j=&jobs[index];j->state=2;UNLOCK();
         BoardRequest *q=&j->request;BoardResult *r=&j->result;memset(r,0,sizeof(*r));r->sigop=-1;r->session=q->session;r->slot=q->slot;r->zcontrol=q->zcontrol;
         IdentityProvider identity={j,resolve};vault_bridge_guard(guard,j);
-        if(!guard(j)) { r->revoked=1;strcpy(r->text,"ERR session revoked\r\n"); }
-        else if(q->op=='Y')vault_bridge_execute(identity,q->user,q->user_epoch,q->action,q->number,(*q->body || q->action==VAULT_CMD_DESCRIPTION || q->action==VAULT_CMD_BOARDSET || q->action>=VAULT_CMD_OWNER)?q->body:q->title,r->text,sizeof(r->text));
+        if(!guard(j)) { r->revoked=1;(r->feedback.failed=1,strcpy(r->text,"ERR session revoked\r\n")); }
+        else if(q->op=='Y')vault_bridge_execute(identity,q->user,q->user_epoch,q->action,q->number,(*q->body || q->action==VAULT_CMD_DESCRIPTION || q->action==VAULT_CMD_BOARDSET || q->action>=VAULT_CMD_OWNER)?q->body:q->title,r);
         else if(q->op=='^')vault_bridge_binary(identity,q,r);
-        else vault_bridge_transfer(identity,q->user,q->user_epoch,q->body,q->zcontrol?(unsigned)q->scope:0,r->text,sizeof(r->text));
+        else vault_bridge_transfer(identity,q->user,q->user_epoch,q->body,q->zcontrol?(unsigned)q->scope:0,r);
         vault_bridge_guard(NULL,NULL);
         if(q->op=='Y' && (q->action==VAULT_CMD_PASSWORD || q->action==VAULT_CMD_UNLOCK))OPENSSL_cleanse(q->body,sizeof(q->body));
-        if(!guard(j)) { r->binary_size=0;r->revoked=1;strcpy(r->text,"ERR session revoked\r\n"); }
+        if(!guard(j)) { memset(&r->feedback,0,sizeof(r->feedback));memset(&r->content,0,sizeof(r->content));OPENSSL_cleanse(r->draft_body,sizeof(r->draft_body));r->binary_size=0;r->revoked=1;(r->feedback.failed=1,strcpy(r->text,"ERR session revoked\r\n")); }
         LOCK();j->state=3;board_completion_notify();
     }
     UNLOCK();

@@ -13,6 +13,8 @@
 #include <stdint.h>
 #include "board.h"
 #include "ui.h"
+#include "session_core.h"
+#include "session_state.h"
 /* The adapter owns queuing/backpressure. write copies bytes synchronously and
  * returns 0 on failure. No OS handles, Telnet commands or HTTP frames here. */
 typedef struct {
@@ -24,44 +26,36 @@ typedef struct {
 } SessionIO;
 typedef struct {
     SessionIO io;
-    unsigned long id;
-    int slot,active,board_enabled,member_mode;
-    Ui ui;
-    uint64_t connected_at;int talk_once,talk_return_editor,status_pending;uint32_t file_selected,file_selecting;ProfileForm profile_form;ProfileWalk profile_walk;int batch_screen,batch_copying;BatchSelection batch;int classic_area,classic_input,classic_direction;uint32_t classic_id;
-    int door,game_menu;int pager_enabled, help_page,menu_mode,menu_shown,editor_upload_question;
-    char guest_handle[33];
-    unsigned columns,rows;
-    size_t page_offset;
-    char page[CONTENT_DISPLAY];
-    uint64_t now,wake,auth_after;
-    int closing,editing,pending,password_mode;uint32_t reset_target,boardpass_target,board_enter,board_lock;uint32_t board_grants[1025],vault_grants[1025];char filepass_path[49];int filepass_setting;
-    ReportNavigation report;
-    GatherFlow gather;SysopMailFlow sysop_mail;NotificationState notifications;
-    int editor_line,editor_input,editor_numbers,editor_upload,editor_confirm;uint64_t editor_deadline;uint32_t editor_at;
-    char upload_description[241],upload_filename[101];int upload_batch;
-    VaultNavigation vault;
-    unsigned mail_batch_protocol;
-    MailNavigation mail;
-    int outside_talk,mail_mode,mail_pending,mail_input; uint32_t mail_revision;
-    unsigned search_first,search_last;int memo_input;int chatting,chat_notice,chat_pending,chat_prompting,talk_select,talk_lost;
-    unsigned long talk_target,reply_target;
-    PreferenceLifecycle preferences;unsigned transfer_protocol,zmodem_protocol;int zmodem_available,zmodem,zmodem_start,zmodem_receive,vault_mode;uint32_t zmodem_id;char zmodem_text[513];
-    int binary,binary_allowed,binary_menu;
+    int door;
+    char upload_description[241];
+    char upload_filename[101];
+    int upload_batch;
+    unsigned transfer_protocol;
+    unsigned zmodem_protocol;
+    int zmodem_available;
+    int zmodem;
+    int zmodem_start;
+    int zmodem_receive;
+    uint32_t zmodem_id;
+    char zmodem_text[513];
+    int binary;
+    int binary_allowed;
+    int binary_menu;
     ConnectorReader binary_reader;
-    uint32_t current,user,board,user_epoch;unsigned member_level;
-    char username[33];
-    /* Opt-in transport synchronization; never an authentication credential. */
     char connector_token[65];
     int connector_literal;
     ConnectorBlock connector_block;
-    char old_password[129], new_password[129];
-    BoardRequest draft, scan;
-    CheckTraversal check;
-    ReaderState reader;
-    ApplicationForm application;int profile_filter;unsigned profile_group;
-    uint32_t draft_revision;
-    int undo_available;
-    char undo_title[BOARD_TITLE+1], undo_body[BOARD_BODY+1];
+} SessionConnection;
+typedef struct {
+    SessionCore core;
+    SessionAuth auth;
+    SessionPresentation presentation;
+    SessionEditor editor;
+    SessionReading reading;
+    SessionFiles files;
+    SessionMailState mail_state;
+    SessionConversation conversation;
+    SessionConnection connection;
 } Session;
 void session_init(Session *,SessionIO,unsigned long id,int slot,int boards,int members,int menu,Language);
 void session_dimensions(Session *,unsigned columns,unsigned rows);

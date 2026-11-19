@@ -9,8 +9,8 @@ void vault_bridge_close(void);
 /* Thin application adapter. The current board worker supplies its identity
  * provider; the vault library never reads an account or article store. */
 void vault_bridge_execute(IdentityProvider identity,uint32_t user,uint32_t epoch,
-    int operation,uint32_t id,const char *argument,char *out,size_t size);
-void vault_bridge_transfer(IdentityProvider,uint32_t user,uint32_t epoch,const char *line,unsigned protocol,char *out,size_t size);
+    int operation,uint32_t id,const char *argument,BoardResult *);
+void vault_bridge_transfer(IdentityProvider,uint32_t user,uint32_t epoch,const char *line,unsigned protocol,BoardResult *);
 void vault_bridge_guard(int (*guard)(void *),void *context);
 void vault_bridge_binary(IdentityProvider,const BoardRequest *,BoardResult *);
 #endif

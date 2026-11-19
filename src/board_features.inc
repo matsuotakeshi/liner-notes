@@ -133,7 +133,7 @@ static void board_policy_result(CatalogOutcome result,BoardResult *r) {
     case CATALOG_CORE_STORAGE:error="ERR catalog storage\r\n";break;
     case CATALOG_CORE_POLICY_STORAGE:case CATALOG_CORE_BUFFER:break;
     }
-    snprintf(r->text,sizeof(r->text),"%s",error);
+    r->feedback.failed=1;snprintf(r->text,sizeof(r->text),"%s",error);
 }
 static void board_policy_execute(const BoardRequest *q,uint32_t b,BoardResult *r) {
     CatalogActor actor={q->user,q->user_epoch};CatalogOutcome result;
@@ -146,7 +146,7 @@ static void board_policy_execute(const BoardRequest *q,uint32_t b,BoardResult *r
             used+=(size_t)snprintf(r->text+used,sizeof(r->text)-used,"ACCESSROW %u %u %u %c %llu\r\n",
                                   row->sequence,row->article,row->user,row->kind,(unsigned long long)row->time);
         }
-        snprintf(r->text+used,sizeof(r->text)-used,"END NEXT %u\r\n",page.next);return;
+        (r->feedback.page_found=1,r->feedback.page_next=page.next,snprintf(r->text+used,sizeof(r->text)-used,"END NEXT %u\r\n",page.next));return;
     }
     if(q->action=='O') {
         if(!*q->body) {
@@ -223,7 +223,7 @@ static void board_topology_result(BoardTopologyOutcome result,BoardResult *r) {
     case TOPOLOGY_FULL:error="ERR board full\r\n";break;
     case TOPOLOGY_INVALID:break;
     }
-    snprintf(r->text,sizeof(r->text),"%s",error);
+    r->feedback.failed=1;snprintf(r->text,sizeof(r->text),"%s",error);
 }
 static void board_topology_execute(const BoardRequest *q,uint32_t board,int cascade,BoardResult *r) {
     CatalogActor actor={q->user,q->user_epoch};
@@ -238,22 +238,22 @@ static void board_topology_execute(const BoardRequest *q,uint32_t board,int casc
 static void board_features(const BoardRequest *q,BoardResult *r) {
     uint32_t b=q->number?q->number:q->board;
     if(q->action=='U') {
-        if(!catalog_visible(b,q->user) || policy_locked(b,q->user)!=(int)q->cursor) { strcpy(r->text,"ERR board unavailable\r\n");return; }
-        uint32_t revision=policy_unlock(q->cursor,q->password);if(!revision) { strcpy(r->text,"ERR authentication\r\n");return; }
+        if(!catalog_visible(b,q->user) || policy_locked(b,q->user)!=(int)q->cursor) { (r->feedback.failed=1,strcpy(r->text,"ERR board unavailable\r\n"));return; }
+        uint32_t revision=policy_unlock(q->cursor,q->password);if(!revision) { (r->feedback.failed=1,strcpy(r->text,"ERR authentication\r\n"));return; }
         r->board_grant=q->cursor;r->board_revision=revision;r->service_action='2';r->service_number=b;return;
     }
     if(q->action=='G') {
         ArticleActor actor={q->user,q->user_epoch,q->board_grants};
         ArticleOutcome result=article_import_buffer(&actor,q->board,q->number,r->draft_body,sizeof(r->draft_body));
         if(result==ARTICLE_OK)strcpy(r->text,"ARTICLE IMPORTED TO BUFFER\r\n");
-        else if(result==ARTICLE_NOT_FOUND)strcpy(r->text,"ERR no article\r\n");
-        else if(result==ARTICLE_LOGIN_REQUIRED)strcpy(r->text,"ERR login required\r\n");
-        else if(result==ARTICLE_REVOKED) { r->revoked=1;strcpy(r->text,"ERR session revoked\r\n"); }
-        else strcpy(r->text,"ERR article storage\r\n");
+        else if(result==ARTICLE_NOT_FOUND)(r->feedback.failed=1,strcpy(r->text,"ERR no article\r\n"));
+        else if(result==ARTICLE_LOGIN_REQUIRED)(r->feedback.failed=1,strcpy(r->text,"ERR login required\r\n"));
+        else if(result==ARTICLE_REVOKED) { r->revoked=1;(r->feedback.failed=1,strcpy(r->text,"ERR session revoked\r\n")); }
+        else (r->feedback.failed=1,strcpy(r->text,"ERR article storage\r\n"));
         return;
     }
     if(q->action && strchr("AOPSCIW",q->action)) { board_policy_execute(q,b,r);return; }
     if(q->action && strchr("DMB",q->action)) { board_topology_execute(q,b,0,r);return; }
-    if(!catalog_manage(b,q->user) || !moderation_admin(q->user)) { strcpy(r->text,"ERR admin required\r\n");return; }
-    strcpy(r->text,"ERR command\r\n");
+    if(!catalog_manage(b,q->user) || !moderation_admin(q->user)) { (r->feedback.failed=1,strcpy(r->text,"ERR admin required\r\n"));return; }
+    (r->feedback.failed=1,strcpy(r->text,"ERR command\r\n"));
 }

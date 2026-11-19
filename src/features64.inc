@@ -120,7 +120,7 @@ static void catalog_group_result(CatalogGroupOutcome result,BoardResult *r) {
     case GROUP_CORE_SETTINGS_STORAGE:error="ERR settings storage\r\n";break;
     case GROUP_CORE_INVALID:break;
     }
-    snprintf(r->text,sizeof(r->text),"%s",error);
+    r->feedback.failed=1;snprintf(r->text,sizeof(r->text),"%s",error);
 }
 static void catalog_group_execute(const BoardRequest *q,BoardResult *r) {
     CatalogActor actor={q->user,q->user_epoch};CatalogGroupChange change;
@@ -134,20 +134,20 @@ static void catalog_group_execute(const BoardRequest *q,BoardResult *r) {
 }
 static void article_management_result(ArticleOutcome result,BoardResult *r) {
     switch(result) {
-    case ARTICLE_REVOKED:r->revoked=1;strcpy(r->text,"ERR session revoked\r\n");break;
-    case ARTICLE_LOGIN_REQUIRED:strcpy(r->text,"ERR login required\r\n");break;
-    case ARTICLE_ADMIN_REQUIRED:strcpy(r->text,"ERR admin required\r\n");break;
-    case ARTICLE_MANAGEMENT_INVALID:strcpy(r->text,"ERR command\r\n");break;
-    case ARTICLE_MEMBER_STORAGE:strcpy(r->text,"ERR member storage unavailable\r\n");break;
-    case ARTICLE_MODERATION_STORAGE:strcpy(r->text,"ERR moderation storage unavailable\r\n");break;
-    case ARTICLE_POLICY_STORAGE:strcpy(r->text,"ERR board policy storage\r\n");break;
-    case ARTICLE_EXTRAS_STORAGE:strcpy(r->text,"ERR extras storage\r\n");break;
-    case ARTICLE_SETTINGS_STORAGE:strcpy(r->text,"ERR settings storage\r\n");break;
-    default:strcpy(r->text,"ERR article storage\r\n");break;
+    case ARTICLE_REVOKED:r->revoked=1;(r->feedback.failed=1,strcpy(r->text,"ERR session revoked\r\n"));break;
+    case ARTICLE_LOGIN_REQUIRED:(r->feedback.failed=1,strcpy(r->text,"ERR login required\r\n"));break;
+    case ARTICLE_ADMIN_REQUIRED:(r->feedback.failed=1,strcpy(r->text,"ERR admin required\r\n"));break;
+    case ARTICLE_MANAGEMENT_INVALID:(r->feedback.failed=1,strcpy(r->text,"ERR command\r\n"));break;
+    case ARTICLE_MEMBER_STORAGE:(r->feedback.failed=1,strcpy(r->text,"ERR member storage unavailable\r\n"));break;
+    case ARTICLE_MODERATION_STORAGE:(r->feedback.failed=1,strcpy(r->text,"ERR moderation storage unavailable\r\n"));break;
+    case ARTICLE_POLICY_STORAGE:(r->feedback.failed=1,strcpy(r->text,"ERR board policy storage\r\n"));break;
+    case ARTICLE_EXTRAS_STORAGE:(r->feedback.failed=1,strcpy(r->text,"ERR extras storage\r\n"));break;
+    case ARTICLE_SETTINGS_STORAGE:(r->feedback.failed=1,strcpy(r->text,"ERR settings storage\r\n"));break;
+    default:(r->feedback.failed=1,strcpy(r->text,"ERR article storage\r\n"));break;
     }
 }
 static void advanced_execute(const BoardRequest *q,BoardResult *r) {
-    if(!q->user) { strcpy(r->text,"ERR login required\r\n");return; }
+    if(!q->user) { (r->feedback.failed=1,strcpy(r->text,"ERR login required\r\n"));return; }
     if(q->action=='J') { r->service_action='J';r->service_number=q->number;r->service_next=(unsigned)members_level(q->user);return; }
     if(q->action=='v') {
         MemberActor actor={q->user,q->user_epoch};
@@ -172,7 +172,7 @@ static void advanced_execute(const BoardRequest *q,BoardResult *r) {
         if(result==MEMBER_CORE_INVALID)goto invalid;
         if(result!=MEMBER_CORE_OK) { member_result(result,r);return; }
         if(q->action=='N') { r->service_action='n';r->service_number=q->number;r->since=window.since;r->until=window.until; }
-        else strcpy(r->text,"CHECKPOINT SAVED\r\n");
+        else { r->feedback.checkpoint_saved=1;strcpy(r->text,"CHECKPOINT SAVED\r\n"); }
         return;
     }
     if(q->action=='M') {
@@ -186,13 +186,14 @@ static void advanced_execute(const BoardRequest *q,BoardResult *r) {
         MailOutcome result=mail_core_attachment_batch(&actor,q->number,&attachments);
         if(result==MAIL_CORE_DISABLED) { strcpy(r->text,"MAIL ERROR unavailable\r\n");return; }
         if(result!=MAIL_CORE_OK) { mail_result(q,result,r);return; }
+        r->feedback.mail_batch=1;r->feedback.count=attachments.count;memcpy(r->feedback.ids,attachments.ids,attachments.count*sizeof(*attachments.ids));
         size_t n=(size_t)snprintf(r->text,sizeof(r->text),"MAILBATCH");
         for(unsigned i=0;i<attachments.count;i++)n+=(size_t)snprintf(r->text+n,sizeof(r->text)-n," %u",attachments.ids[i]);
         snprintf(r->text+n,sizeof(r->text)-n,"\r\n");return;
     }
     if(q->action=='D') { board_topology_execute(q,q->number,1,r);return; }
     if(q->action=='G' || q->action=='g') { catalog_group_execute(q,r);return; }
-    if(!moderation_admin(q->user)) { strcpy(r->text,"ERR admin required\r\n");return; }
+    if(!moderation_admin(q->user)) { (r->feedback.failed=1,strcpy(r->text,"ERR admin required\r\n"));return; }
     if(q->action=='A') {
         MemberActor actor={q->user,q->user_epoch};MemberApplication application;
         MemberOutcome result=member_core_application_get(&actor,q->number,&application);
@@ -212,5 +213,5 @@ static void advanced_execute(const BoardRequest *q,BoardResult *r) {
         if(result!=MEMBER_CORE_OK)member_result(result,r);else strcpy(r->text,"APPLICATION SAVED\r\n");
         return;
     }
-invalid:strcpy(r->text,"ERR command\r\n");return;
+invalid:(r->feedback.failed=1,strcpy(r->text,"ERR command\r\n"));return;
 }
