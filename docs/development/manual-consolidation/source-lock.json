@@ -1,6 +1,6 @@
 {
   "LICENSE": "fb981668c18a279e285fc4d83fba1e836cc84dd4daa73c9697d3cfd2d8aca6e0",
-  "Makefile": "34515a276489c3f95dff993d98e06a21ad91d0a32a799adf42607a00c49ae887",
+  "Makefile": "b17b2c8306c6204fd89c2c269d40a1fb6b04b4bf070970c9d770c6d5a24fa2a9",
   "boards.example.conf": "4bd1a17ecf3966d3829510e8495a1362fb8b922cd754badccc739f5e5ab0bde8",
   "ci/build-freebsd-package.sh": "4e62899471d1f1a6c44e00a783c1aff771332140704ae778da95a95048474108",
   "debian/changelog": "8f3574a094f5a3677a9a7188e530ecdbdc006138b082b57243ca8441c644114d",
@@ -330,13 +330,13 @@
   "src/ssh_transport.c": "ea316c594fcd1ed2e737232bd1209f668badfc0304ebccb90cb924a53eea0be5",
   "src/ssh_transport.h": "58a6705421a4d5ddb68ed7adf0d5104698d24848785b5eb480732cfdb0469edf",
   "src/member_keys.h": "7d91cb27e4d304cc9f33fdca9c679fc90fe85290dee9f210bd67403eb8393bbb",
-  "scripts/door_broker.py": "d275e904b53ba5f7ba706319c6e1da1a744b43092c9cf93159149d1bff142392",
+  "scripts/door_broker.py": "f8f83531cd32282133c46abe2daddbf71fb45f6c6e013be2c02c52585ede7608",
   "scripts/door_broker_core.py": "94f2f5fa0747236f5d8592b10d63d5bae34767a0401a615de58c6398b712424c",
-  "scripts/door_auth_client.py": "60d53e12159b6ca3ba8d5c8f359627340707dbcf6d497aedeb26717e9e52a588",
-  "scripts/door_isolation.py": "0bd59aada047c1a02bba3f9a979afc20c48858137aafb03b98e7018f2233190d",
+  "scripts/door_auth_client.py": "c36c345de7b4a6be82067ecb52e4e52e5c0f887e6008840243ca11a22688aa4e",
+  "scripts/door_isolation.py": "1bc478e6a8f0ec3bb4dc82739e8ba150126cada2187d4a10ece039d65a7e6ef2",
   "scripts/door_processes.py": "b32cb7cff9b6bd5c40154c7a9f258fed826a634954f25f592018569ea26864f1",
   "src/door_isolation.inc": "8a9630b140e70713de21d2820a0fc639c9392f21d5a390900d32a824f743173e",
-  "tests/test_door_broker.py": "26c3f339427cfba8edcf370059b997c83da237a4f75e2fa34d722c75a6e0dc9e",
-  "tests/test_door_broker_linux.py": "21acf96f8b0e6890cbf51b3b4d0c01c09f212b3f72dc9dbe55749f1cb081a467",
+  "tests/test_door_broker.py": "38e6ff60ef3115caa95cf616c274996db85fa787ebb0eb13f5adde6f96335137",
+  "tests/test_door_broker_linux.py": "881bc021ac00ebeb9e29c2916fe439971291f0cecec7a4dcc86e12f3b113eac6",
   "tests/test_door_processes.py": "29da7e5a6c1d4b3b20042dddbea44ed45b14a51466890ec97074bb7c3c01b7bf"
 }

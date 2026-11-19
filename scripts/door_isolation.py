@@ -5,7 +5,7 @@ Fixed root-owned policy selects binaries and dedicated slot UIDs. The BBS never
 supplies an executable or working directory. No privilege-changing executable
 is installed setuid. Solaris remains disabled pending contract-based process isolation.
 """
-import argparse,array,contextlib,fcntl,json,os,pty,resource,secrets,select,signal,socket,stat,struct,sys,time
+import argparse,array,contextlib,errno,fcntl,json,os,pty,resource,secrets,select,signal,socket,stat,struct,sys,time
 from pathlib import Path
 from door_broker import peer_uid,secure_path,configuration as broker_configuration
 from door_broker_core import identity,positive,auth_generation
@@ -13,9 +13,13 @@ from door_processes import Scope, processes, supported, no_new_privileges
 
 class Rejected(ValueError):pass
 
-def read_line(sock):
+def read_line(sock,timeout=3):
+    deadline=time.monotonic()+timeout
     data=bytearray()
     while len(data)<=4096:
+        remaining=deadline-time.monotonic()
+        if remaining<=0:raise TimeoutError('request deadline')
+        sock.settimeout(remaining)
         b=sock.recv(1)
         if not b:raise Rejected('closed request')
         if b==b'\n':return json.loads(data)
@@ -159,6 +163,34 @@ def termios_TIOCSWINSZ():
     import termios
     return termios.TIOCSWINSZ
 
+def accept_connection(listener):
+    try:return listener.accept()[0]
+    except socket.timeout:return None
+    except OSError as error:
+        if error.errno not in (errno.EMFILE,errno.ENFILE,errno.ENOBUFS,errno.ENOMEM):raise
+        # Retain live workers and back off instead of spinning or revoking
+        # unrelated games when admission resources run out.
+        time.sleep(.1)
+        return None
+
+
+def start_worker(config,connection,listener,watch,alive,children):
+    # Reject only this request on credential/fork failure. Existing worker
+    # watch pipes and reservations belong to already-running Doors.
+    try:
+        if peer_uid(connection)!=config['bbs_uid'] or len(children)>=len(config['slots'])+8:return
+        pid=os.fork()
+    except OSError:
+        print('{"event":"admission-unavailable"}',file=sys.stderr,flush=True)
+        return
+    if pid==0:
+        listener.close();os.close(alive)
+        signal.signal(signal.SIGTERM,signal.SIG_IGN);signal.signal(signal.SIGINT,signal.SIG_IGN)
+        try:supervise(config,connection,watch)
+        finally:os._exit(0)
+    children.add(pid)
+
+
 def main():
     parser=argparse.ArgumentParser(description=__doc__);parser.add_argument('--config',required=True);args=parser.parse_args()
     if not supported() or os.getuid()!=0:parser.exit(1,'Isolation requires root and a supported Linux/FreeBSD process backend.\n')
@@ -182,19 +214,10 @@ def main():
     try:
         while not stopping:
             reap()
-            try:connection,_=listener.accept()
-            except socket.timeout:continue
+            connection=accept_connection(listener)
+            if connection is None:continue
             try:
-                if peer_uid(connection)!=config['bbs_uid'] or len(children)>=len(config['slots'])+8:continue
-                pid=os.fork()
-                if pid==0:
-                    listener.close();os.close(alive)
-                    # Termination is driven by the parent pipe. A service stop must
-                    # not bypass finally/UID cleanup in these trusted workers.
-                    signal.signal(signal.SIGTERM,signal.SIG_IGN);signal.signal(signal.SIGINT,signal.SIG_IGN)
-                    try:supervise(config,connection,watch)
-                    finally:os._exit(0)
-                children.add(pid)
+                start_worker(config,connection,listener,watch,alive,children)
             finally:connection.close()
     finally:
         listener.close();os.close(alive);os.close(watch)
