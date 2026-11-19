@@ -4,8 +4,10 @@ from pathlib import Path
 import stat
 import subprocess
 import sys
+import tempfile
 import unittest
 from unittest.mock import Mock,patch
+import door_rc_process as rc_process
 
 ROOT=Path(__file__).resolve().parents[1]
 sys.path.insert(0,str(ROOT/'scripts'))
@@ -57,6 +59,68 @@ class Readiness(unittest.TestCase):
     def test_rc_template_syntax(self):
         for role in ('broker','isolation'):
             subprocess.run(['sh','-n',str(ROOT/'ports/comms/liner-notes/files'/('liner_notes_door_'+role+'.in'))],check=True)
+
+
+class RcLifecycle(unittest.TestCase):
+    def process(self,base):
+        # No rc command or real process is started by these portable tests.
+        process=rc_process.RcProcess.__new__(rc_process.RcProcess)
+        process.name='fixture';process.rc=base/'rc'
+        process.pidfile=base/'fixture.pid';process.env={}
+        process.pid=100;process.returncode=None;process.stopper=None
+        process.wait_verified=False
+        return process
+
+    def test_old_wait_does_not_inspect_or_stop_replacement(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            base=Path(tmp);old=self.process(base)
+            with patch.object(rc_process.os,'kill',side_effect=ProcessLookupError) as kill, \
+                    patch.object(rc_process.subprocess,'run',return_value=Mock(returncode=1)) as run, \
+                    patch.object(rc_process.subprocess,'Popen') as spawn:
+                self.assertEqual(old.wait(timeout=0),0)
+                self.assertEqual(run.call_count,1)
+                # A later generation now owns the same rc service and PID file.
+                old.pidfile.write_text('200\n')
+                run.return_value.returncode=0
+                kill.side_effect=None
+                self.assertEqual(old.wait(timeout=0),0)
+                self.assertEqual(old.poll(),0)
+                self.assertEqual(run.call_count,1)
+                self.assertEqual(kill.call_count,1)
+                spawn.assert_not_called()
+                current=self.process(base);current.pid=200
+                self.assertIsNone(current.poll())
+                with self.assertRaises(subprocess.TimeoutExpired):current.wait(timeout=0)
+
+    def test_first_wait_still_rejects_ready_service(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            process=self.process(Path(tmp))
+            with patch.object(rc_process.os,'kill',side_effect=ProcessLookupError), \
+                    patch.object(rc_process.subprocess,'run',return_value=Mock(returncode=0)) as run:
+                with self.assertRaisesRegex(AssertionError,'still ready'):process.wait(timeout=0)
+                self.assertFalse(process.wait_verified)
+                run.return_value.returncode=1
+                self.assertEqual(process.wait(timeout=0),0)
+                self.assertEqual(run.call_count,2)
+
+    def test_stop_failure_is_not_cached_as_success(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            process=self.process(Path(tmp));process.stopper=Mock(returncode=1)
+            process.stopper.communicate.return_value=(b'',b'stop failed')
+            with patch.object(rc_process.os,'kill',side_effect=ProcessLookupError), \
+                    patch.object(rc_process.subprocess,'run') as run:
+                with self.assertRaisesRegex(AssertionError,'rc stop failed'):process.wait(timeout=0)
+                self.assertFalse(process.wait_verified);run.assert_not_called()
+
+    def test_dead_child_waits_for_pidfile_release(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            process=self.process(Path(tmp));process.pidfile.write_text('100\n')
+            with patch.object(rc_process.os,'kill',side_effect=ProcessLookupError), \
+                    patch.object(rc_process.subprocess,'run',return_value=Mock(returncode=1)) as run:
+                with self.assertRaises(subprocess.TimeoutExpired):process.wait(timeout=0)
+                self.assertFalse(process.wait_verified);run.assert_not_called()
+                process.pidfile.unlink()
+                self.assertEqual(process.wait(timeout=0),0)
 
 
 if __name__=='__main__':unittest.main()
