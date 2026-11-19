@@ -150,7 +150,7 @@ class FixtureAccounts(unittest.TestCase):
         self.grp.getgrgid.side_effect = lambda key: lookup(self.groups, key, 'gr_gid')
         with patch.dict(sys.modules, {'pwd': self.pwd, 'grp': self.grp}):
             self.accounts = services.Accounts(Mock(path=Path('/fixture/generation')), self.command,
-                                              30, 40, (20, 30, 40, 50, 51))
+                                              30, 40, (20, 30, 40, 50, 51), bbs=20)
         self.idle = patch.object(self.accounts, 'idle'); self.idle.start(); self.addCleanup(self.idle.stop)
 
     def command(self, *args):
@@ -159,7 +159,8 @@ class FixtureAccounts(unittest.TestCase):
         if args[0].endswith('/groupadd'):
             self.groups[name] = SimpleNamespace(gr_name=name, gr_gid=int(args[2]), gr_mem=[])
         elif args[0].endswith('/useradd'):
-            self.users[name] = SimpleNamespace(pw_name=name, pw_uid=30, pw_gid=30,
+            self.users[name] = SimpleNamespace(pw_name=name, pw_uid=int(args[args.index('--uid')+1]),
+                                               pw_gid=int(args[args.index('--gid')+1]),
                                                pw_dir='/nonexistent', pw_shell='/usr/sbin/nologin')
         elif args[0].endswith('/userdel'): del self.users[name]
         elif args[0].endswith('/groupdel'): del self.groups[name]
@@ -167,15 +168,19 @@ class FixtureAccounts(unittest.TestCase):
     def test_create_nonlogin_identity_and_remove_only_owned_entries(self):
         self.accounts.create()
         self.assertEqual(self.pwd.getpwuid(30).pw_name, self.accounts.user)
-        self.assertEqual(self.grp.getgrgid(40).gr_gid, 40)
-        call = self.calls[-1]
-        for flag in ('--no-create-home', '--no-log-init', '--no-user-group'): self.assertIn(flag, call)
-        self.assertEqual(call[call.index('--password')+1], '!')
+        for uid in (20, 30, 40):
+            self.assertEqual(self.pwd.getpwuid(uid).pw_gid, uid)
+            self.assertEqual(self.grp.getgrgid(uid).gr_mem, [])
+        for uid in (50, 51):
+            with self.assertRaises(KeyError): self.pwd.getpwuid(uid)
+        for call in self.calls[-3:]:
+            for flag in ('--no-create-home', '--no-log-init', '--no-user-group'): self.assertIn(flag, call)
+            self.assertEqual(call[call.index('--password')+1], '!')
         self.accounts.close()
         self.assertFalse(self.users); self.assertFalse(self.groups)
-        self.assertEqual([c[0] for c in self.calls[-3:]],
-                         ['/usr/sbin/userdel', '/usr/sbin/groupdel', '/usr/sbin/groupdel'])
-        for c in self.calls[-3:]: self.assertEqual(len(c), 2)
+        self.assertEqual([c[0] for c in self.calls[-6:]],
+                         ['/usr/sbin/userdel']*3 + ['/usr/sbin/groupdel']*3)
+        for c in self.calls[-6:]: self.assertEqual(len(c), 2)
         self.assertEqual(self.accounts.fixture.door_accounts, [])
 
     def test_collision_causes_no_changes(self):
@@ -196,9 +201,30 @@ class FixtureAccounts(unittest.TestCase):
             return original(*args)
         self.accounts.command = fail
         with self.assertRaisesRegex(RuntimeError, 'creation failed'): self.accounts.create()
-        self.assertEqual(len(self.accounts.fixture.door_accounts), 2)
+        self.assertEqual(len(self.accounts.fixture.door_accounts), 3)
         self.accounts.close()
         self.assertFalse(self.groups)
+
+    def test_partial_user_creation_removes_only_successful_accounts(self):
+        original = self.accounts.command
+        def fail(*args):
+            if args[0].endswith('/useradd') and args[-1] == self.accounts.users[1][0]:
+                raise RuntimeError('consumer creation failed')
+            return original(*args)
+        self.accounts.command = fail
+        with self.assertRaisesRegex(RuntimeError, 'consumer creation failed'): self.accounts.create()
+        self.assertEqual(len(self.accounts.fixture.door_account_plan), 6)
+        self.assertEqual(len(self.accounts.fixture.door_accounts), 4)
+        self.accounts.close()
+        self.assertFalse(self.users); self.assertFalse(self.groups)
+
+    def test_consumer_and_bbs_name_collisions_are_checked_before_changes(self):
+        for name, uid in self.accounts.users[1:]:
+            with self.subTest(uid=uid):
+                self.users[name] = SimpleNamespace(pw_name=name, pw_uid=999)
+                with self.assertRaisesRegex(ValueError, 'already allocated'): self.accounts.create()
+                self.assertFalse(self.calls)
+                del self.users[name]
 
     def test_changed_user_retained(self):
         self.accounts.create(); self.calls.clear()
@@ -275,20 +301,25 @@ def real_accounts():
     def command(*args): subprocess.run(args, check=True, capture_output=True, text=True)
     with tempfile.TemporaryDirectory(prefix='lnci-accounts-') as directory:
         fixture = Mock(path=Path(directory))
-        accounts = services.Accounts(fixture, command, 64502, 64503, range(64501, 64506))
+        accounts = services.Accounts(fixture, command, 64502, 64503, range(64501, 64506), bbs=64501)
         try:
             accounts.create()
-            assert pwd.getpwuid(64502).pw_name == accounts.user
-            assert grp.getgrgid(64503).gr_mem == []
-            # The broker primary group and explicit supplementary consumer group
-            # must resolve via NSS before systemd can execute the entrypoint.
-            assert os.getgrouplist(accounts.user, 64502) == [64502]
+            for name, uid in accounts.users:
+                assert pwd.getpwuid(uid).pw_name == name
+                assert grp.getgrgid(uid).gr_mem == []
+                assert os.getgrouplist(name, uid) == [uid]
+                # Resolve NSS and initialize groups as systemd does for each
+                # service; raw numeric setuid alone missed the consumer failure.
+                subprocess.run([sys.executable, '-c',
+                    'import os, pwd, sys; uid=int(sys.argv[1]); name=pwd.getpwuid(uid).pw_name; '
+                    'os.initgroups(name, uid); os.setgid(uid); os.setuid(uid); '
+                    'assert os.getuid()==uid and os.getgid()==uid and os.getgroups()==[uid]', str(uid)], check=True)
             subprocess.run([sys.executable, '-c',
                 'import os; assert os.getuid()==64502; assert os.getgid()==64502; assert os.getgroups()==[64503]'],
                 user=64502, group=64502, extra_groups=[64503], check=True)
         finally:
             accounts.close()
-        for lookup, key in ((pwd.getpwuid, 64502), (grp.getgrgid, 64502), (grp.getgrgid, 64503)):
+        for lookup, key in ((fn, uid) for uid in range(64501, 64506) for fn in (pwd.getpwuid, grp.getgrgid)):
             try: lookup(key)
             except KeyError: pass
             else: raise AssertionError('Fixture identity survived cleanup')
