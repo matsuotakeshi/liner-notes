@@ -1,9 +1,11 @@
 """Broker authority, one-use/revocation, UID roles and bounded protocol tests."""
 import asyncio,json,sys,unittest
+from unittest.mock import patch
 from pathlib import Path
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]/'scripts'))
 from door_broker_core import Broker,Denied
 from door_broker import Server
+from door_auth_client import DoorAuthorization,AuthorizationError
 
 class Core(unittest.TestCase):
     def setUp(self):
@@ -45,11 +47,36 @@ class Core(unittest.TestCase):
         with self.assertRaises(Denied):self.b.check(40,1,'bbs-a',lease)
         for i in range(4):self.opened(session='n'+str(i))
         with self.assertRaises(Denied):self.opened(session='extra')
+    def test_generation_zero_is_authenticated_and_not_reusable(self):
+        s,token=self.opened(generation=0)
+        result=self.b.consume(40,1,'bbs-a',token)
+        self.assertEqual(result['claims']['generation'],0)
+        self.b.close(s)
+        with self.assertRaises(Denied):self.opened(generation=0)
+        for value in (-1,True,2**32,'0'):
+            with self.assertRaises(Denied):self.opened(session='other',generation=value)
+        fresh,token=self.opened(generation=1)
+        self.assertEqual(self.b.consume(40,1,'bbs-a',token)['claims']['generation'],1)
     def test_invalid_identity_types(self):
         for value in (True,0,-1,1000000,'1'):
             with self.assertRaises(Denied):self.opened(member=value)
         with self.assertRaises(Denied):self.opened(session='bad\nname')
         with self.assertRaises(Denied):self.opened(door=3)
+
+class Consumer(unittest.TestCase):
+    def test_mutations_recheck_identity_and_liveness(self):
+        broker=Broker('bbs',{40:[1]});session=broker.open(1,1,'s',0);ticket=broker.issue(session)
+        def rpc(path,operation,*,bbs,door,token,broker_uid):
+            self.assertEqual(broker_uid,30)
+            try:return (broker.consume if operation=='consume' else broker.check)(40,door,bbs,token)
+            except Denied:raise AuthorizationError('denied') from None
+        with patch('door_auth_client.request',side_effect=rpc):
+            lease=DoorAuthorization('/fixture',bbs='bbs',door=1,ticket=ticket,broker_uid=30)
+            self.assertEqual(lease.authorize(1)['member'],1)
+            for target in (2,True,'1'):
+                with self.assertRaises(AuthorizationError):lease.authorize(target)
+            broker.close(session)
+            with self.assertRaises(AuthorizationError):lease.authorize(1)
 
 class Writer:
     def __init__(self,uid):self.uid=uid;self.data=bytearray();self.closed=False

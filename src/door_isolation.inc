@@ -11,7 +11,7 @@ int doors_isolation_config(const char *path) {
 }
 static int isolation_enabled(void) { return *isolation_socket!=0; }
 static Door *isolated_start(const DoorSpec *g,unsigned level,uint32_t user,const char *name,unsigned columns,unsigned rows,uint64_t now,unsigned long bbs_session,uint32_t epoch) {
-    if(!bbs_session || !epoch || strlen(name)>32)return NULL;
+    if(!bbs_session || strlen(name)>32)return NULL;
     int fd=socket(AF_UNIX,SOCK_STREAM|SOCK_CLOEXEC,0);if(fd<0)return NULL;
     struct sockaddr_un address={0};address.sun_family=AF_UNIX;strcpy(address.sun_path,isolation_socket);
     struct timeval limit={3,0};setsockopt(fd,SOL_SOCKET,SO_RCVTIMEO,&limit,sizeof(limit));setsockopt(fd,SOL_SOCKET,SO_SNDTIMEO,&limit,sizeof(limit));
@@ -37,7 +37,7 @@ static Door *isolated_start(const DoorSpec *g,unsigned level,uint32_t user,const
             for(size_t i=0;i<size/sizeof(int);i++) { if(count++==0)master=fds[i];else close(fds[i]); }
         }
     }
-    if(received!=3 || memcmp(reply,"OK\n",3) || count!=1 || (message.msg_flags&(MSG_CTRUNC|MSG_TRUNC))) { if(master>=0)close(master);close(fd);return NULL; }
+    if(received!=3 || memcmp(reply,"OK\n",3) || count!=1 || !isatty(master) || (message.msg_flags&(MSG_CTRUNC|MSG_TRUNC))) { if(master>=0)close(master);close(fd);return NULL; }
     Door *d=calloc(1,sizeof(*d));if(!d) { close(master);close(fd);return NULL; }
     d->fd=master;d->remote=fd;d->lock=-1;d->until=now+(uint64_t)g->seconds*1000;
     if(fcntl(master,F_SETFL,O_NONBLOCK) || fcntl(fd,F_SETFL,O_NONBLOCK)) { close(master);close(fd);free(d);return NULL; }

@@ -13,6 +13,11 @@ def positive(value,maximum=2**63-1):
     if type(value) is not int or not 0<value<=maximum:raise Denied('invalid request')
     return value
 
+def auth_generation(value):
+    # Existing moderation_epoch starts at zero; zero is not unauthenticated.
+    if type(value) is not int or not 0<=value<=0xffffffff:raise Denied('invalid generation')
+    return value
+
 def identity(value):
     if not isinstance(value,str) or not re.fullmatch(r'[A-Za-z0-9_.-]{1,64}',value):raise Denied('invalid request')
     return value
@@ -48,7 +53,7 @@ class Broker:
         self.generations={key:value for key,value in self.generations.items() if now<value[1]}
 
     def open(self,member,door,session,generation):
-        member=positive(member,999999);door=positive(door,86400);session=identity(session);generation=positive(generation)
+        member=positive(member,999999);door=positive(door,86400);session=identity(session);generation=auth_generation(generation)
         self.sweep()
         previous=self.generations.get(session)
         if previous and generation<=previous[0]:raise Denied('stale generation')

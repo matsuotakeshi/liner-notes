@@ -8,7 +8,7 @@ is installed setuid. FreeBSD/Solaris backends are deliberately unavailable here.
 import argparse,array,contextlib,ctypes,fcntl,json,os,pty,resource,secrets,select,signal,socket,stat,struct,sys,time
 from pathlib import Path
 from door_broker import peer_uid,secure_path,configuration as broker_configuration
-from door_broker_core import identity,positive
+from door_broker_core import identity,positive,auth_generation
 
 class Rejected(ValueError):pass
 
@@ -82,7 +82,7 @@ def broker_open(config,request):
 
 def request_check(request):
     if not isinstance(request,dict) or set(request)!={'door','user','level','columns','rows','namehex','session','generation'}:raise Rejected('request fields')
-    positive(request['door'],86400);positive(request['user'],999999);positive(request['generation']);identity(request['session'])
+    positive(request['door'],86400);positive(request['user'],999999);auth_generation(request['generation']);identity(request['session'])
     if type(request['level']) is not int or not 0<=request['level']<=5:raise Rejected('level')
     if type(request['columns']) is not int or not 20<=request['columns']<=240 or type(request['rows']) is not int or not 5<=request['rows']<=100:raise Rejected('dimensions')
     name=bytes.fromhex(request['namehex']).decode('utf8')
@@ -102,13 +102,15 @@ def slot_acquire(config,door,level):
     raise Rejected('no isolated slot')
 
 def supervise(config,connection):
-    slot=None;lock=None;issuer=None;master=None;slave=None;ticket_read=None;pid=None;run=None
+    slot=None;lock=None;issuer=None;master=None;slave=None;ticket_read=None;pid=None;run=None;phase="request"
     try:
         connection.settimeout(3);request=read_line(connection);name=request_check(request)
+        phase='slot'
         slot,lock=slot_acquire(config,request['door'],request['level'])
         # This supervisor is trusted, single-threaded, and owns one unique slot UID.
         if ctypes.CDLL(None,use_errno=True).prctl(36,1,0,0,0)!=0:raise Rejected('subreaper unavailable')
         token=None
+        phase='broker'
         if slot['auth']:issuer,token=broker_open(config,request)
         if token:
             ticket_read,ticket_write=os.pipe();os.write(ticket_write,(token+'\n').encode());os.close(ticket_write)
@@ -117,12 +119,14 @@ def supervise(config,connection):
             drop=run/'DORINFO1.DEF'
             drop.write_text('Liner notes\r\nSYSOP\r\n\r\nCOM0\r\n0 BAUD,N,8,1\r\n0\r\nLN%09d\r\n\r\n\r\n1\r\n%d\r\n%d\r\n'%(request['user'],request['level'],(slot['seconds']+59)//60),newline='')
             os.chmod(drop,0o600);os.chown(drop,slot['uid'],slot['gid']);os.chown(run,slot['uid'],slot['gid'])
+        phase='pty'
         master,slave=pty.openpty();fcntl.ioctl(slave,termios_TIOCSWINSZ(),struct.pack('HHHH',request['rows'],request['columns'],0,0))
         env={'PATH':'/usr/local/bin:/usr/bin:/bin','TERM':'xterm','LANG':'C.UTF-8','HOME':slot['cwd'],
              'LINER_USER_ID':str(request['user']),'LINER_USER':name,'LINER_DOOR_ID':str(slot['door']),
              'LINER_DOOR_NODE':str(slot['node']),'LINER_DOOR_DROP_DIR':str(run or ''),
              'COLUMNS':str(request['columns']),'LINES':str(request['rows'])}
         if token:env['LINER_AUTH_FD']='3' # descriptor number only, never the credential
+        phase='launch'
         pid=os.fork()
         if pid==0:
             try:
@@ -146,9 +150,12 @@ def supervise(config,connection):
             sockets=[connection]+([issuer] if issuer else [])
             readable,_,_=select.select(sockets,[],[],0.1)
             if readable:break # EOF, STOP, unexpected data or Broker death all revoke
-            done,_=os.waitpid(pid,os.WNOHANG)
-            if done:pid=None;break
-    except (OSError,ValueError,KeyError,TypeError):
+            done,status=os.waitpid(pid,os.WNOHANG)
+            if done:
+                if status:print(json.dumps(dict(event='door-exit',status=os.waitstatus_to_exitcode(status))),file=sys.stderr,flush=True)
+                pid=None;break
+    except (OSError,ValueError,KeyError,TypeError) as error:
+        print(json.dumps(dict(event='launch-rejected',phase=phase,error=type(error).__name__,errno=getattr(error,'errno',None))),file=sys.stderr,flush=True)
         with contextlib.suppress(OSError):connection.sendall(b'ERR\n')
     finally:
         if issuer:issuer.close() # invalidate even consumed leases before cleanup
@@ -177,6 +184,7 @@ def termios_TIOCSWINSZ():
 def main():
     parser=argparse.ArgumentParser(description=__doc__);parser.add_argument('--config',required=True);args=parser.parse_args()
     if not sys.platform.startswith('linux') or os.getuid()!=0 or not hasattr(os,'pidfd_open') or not hasattr(signal,'pidfd_send_signal'):parser.exit(1,'Isolation supervisor currently requires Linux, root and pidfd support.\n')
+    resource.setrlimit(resource.RLIMIT_CORE,(0,0))
     config=config_read(args.config);endpoint=Path(config['socket'])
     if endpoint.exists() or endpoint.is_symlink():parser.exit(1,'Socket exists; verify the old supervisor is stopped.\n')
     listener=socket.socket(socket.AF_UNIX,socket.SOCK_STREAM);old=os.umask(0o077)

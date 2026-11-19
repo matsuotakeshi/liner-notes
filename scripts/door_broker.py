@@ -5,7 +5,7 @@ Issuer is the privileged isolation supervisor (UID 0), never a game or the BBS
 UID. Its live socket owns authorization lifetime. Consumer UIDs are dedicated
 game servers. A TCP listener and unauthenticated protocol are not provided.
 """
-import argparse,asyncio,contextlib,ctypes,json,os,socket,stat,struct,sys
+import argparse,asyncio,contextlib,ctypes,json,os,signal,socket,stat,struct,sys
 from pathlib import Path
 from door_broker_core import Broker,Denied,identity,positive
 
@@ -102,7 +102,9 @@ async def serve(config):
     inode=endpoint.lstat().st_ino
     try:
         os.chown(endpoint,-1,config['socket_gid']);os.chmod(endpoint,0o660)
-        async with listener:await listener.serve_forever()
+        stop=asyncio.Event();loop=asyncio.get_running_loop()
+        for sig in (signal.SIGTERM,signal.SIGINT):loop.add_signal_handler(sig,stop.set)
+        async with listener:await stop.wait()
     finally:
         for writer in list(server.clients):writer.close()
         if endpoint.exists() and endpoint.lstat().st_ino==inode:endpoint.unlink()
@@ -110,6 +112,8 @@ async def serve(config):
 def main():
     parser=argparse.ArgumentParser(description=__doc__);parser.add_argument('--config',required=True)
     args=parser.parse_args()
+    import resource
+    resource.setrlimit(resource.RLIMIT_CORE,(0,0))
     try:asyncio.run(serve(configuration(args.config)))
     except KeyboardInterrupt:pass
     except (ValueError,OSError):parser.exit(1,'Broker startup rejected; check configuration, identity and permissions.\n')

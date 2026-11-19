@@ -36,16 +36,18 @@ dedicated and distinct from the service accounts and privileged groups.
 
 Issuer sends one bounded JSON line with `op=open`, member, Door ID, session and
 generation. Session contains a random launch nonce plus the Core connection ID;
-generation is the Core authentication epoch. The issuer connection remains open
+generation is the Core authentication epoch, including valid initial epoch 0. The issuer connection remains open
 for the complete game lifetime. Broker returns a 256-bit random, 30-second
 one-use ticket. Only its SHA-256 lookup key is kept internally. The supervisor
 passes the ticket through FD 3; `LINER_AUTH_FD=3` contains no credential.
 No password, signing secret, token or lease is placed in command arguments/logs.
 
 The game-server consumer uses `door_auth_client.request(path, 'consume', bbs=...,
-door=..., token=...)` under its registered UID. It obtains bound claims and a
+door=..., token=..., broker_uid=...)` under its registered UID. It obtains bound claims and a
 random lease. Claims include BBS/member/Door/session/generation/ticket identity
-and remaining validity. The game server must derive player identity from these
+and remaining validity. The client checks the Broker socket peer UID before sending credentials.
+`DoorAuthorization.authorize(member)` rechecks the lease and rejects a different
+member before a game mutation. The game server must derive player identity from these
 claims, reject operations targeting another member, and call `check` before
 every authoritative mutation. Never trust a Door-provided member ID or cache a
 successful check indefinitely. Protect the Door-to-game-server channel too.
@@ -55,7 +57,9 @@ implemented.
 Reusing a ticket, changing BBS/Door, using another consumer UID, forged tokens,
 old generations, closed issuer connections and expired sessions are rejected.
 Old-session close cannot invalidate a replacement session. Broker restart drops
-all tickets and leases. Existing game data is outside the Broker and untouched.
+all tickets and leases. SIGTERM removes its socket on a clean shutdown; an
+unclean leftover socket is never silently removed on startup. Core dumps are
+disabled in both services. Existing game data is outside the Broker and untouched.
 Broker death makes the supervisor stop the game. The game server must fail
 closed if it cannot reach the Broker, including for already consumed tickets.
 

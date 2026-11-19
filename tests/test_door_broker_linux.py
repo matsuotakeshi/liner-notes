@@ -14,7 +14,7 @@ def identity(uid,groups=()):
 def ready(path,process):
     for _ in range(100):
         if Path(path).exists():return
-        if process.poll() is not None:raise AssertionError('service exited during startup')
+        if process.poll() is not None:raise AssertionError(('service exited during startup',process.stderr.read(2048)))
         time.sleep(.05)
     raise AssertionError('service startup timeout')
 
@@ -29,13 +29,13 @@ def game_server(path,broker,scripts):
             raw=c.makefile('rb').readline(4096);data=json.loads(raw)
             if 'ticket' in data:
                 try:
-                    result=request(str(broker),'consume',bbs='fixture',door=1,token=data['ticket'])
+                    result=request(str(broker),'consume',bbs='fixture',door=1,token=data['ticket'],broker_uid=BROKER)
                     leases.append(result['lease']);answer=result['claims']
                 except AuthorizationError:answer={'denied':True}
             else:
                 active=0
                 for lease in leases:
-                    try:request(str(broker),'check',bbs='fixture',door=1,token=lease);active+=1
+                    try:request(str(broker),'check',bbs='fixture',door=1,token=lease,broker_uid=BROKER);active+=1
                     except AuthorizationError:pass
                 answer={'active':active}
             c.sendall(json.dumps(answer).encode()+b'\n')
@@ -55,6 +55,7 @@ def run(binary):
         for name in ('door_broker.py','door_broker_core.py','door_isolation.py','door_auth_client.py'):shutil.copy2(ROOT/'scripts'/name,scripts/name)
         runtime=p/'runtime';shutil.copy2(binary,runtime);runtime.chmod(0o755)
         data=p/'data';data.mkdir(mode=0o700);os.chown(data,BBS,BBS)
+        (data/'private').write_text('private BBS fixture');os.chown(data/'private',BBS,BBS);(data/'private').chmod(0o600)
         broker_dir=p/'broker';broker_dir.mkdir(mode=0o755);os.chown(broker_dir,BROKER,BROKER)
         state=p/'state';state.mkdir(mode=0o711)
         game_dir=p/'server';game_dir.mkdir(mode=0o755);os.chown(game_dir,GAME,GAME)
@@ -70,6 +71,10 @@ with socket.socket(socket.AF_UNIX,socket.SOCK_STREAM) as c:
 assert claims['member']==int(os.environ['LINER_USER_ID'])
 assert 'ticket' not in str(os.environ).lower()
 assert Path(os.environ['LINER_DOOR_DROP_DIR'],'DORINFO1.DEF').is_file()
+try:Path(PRIVATE_PATH).read_bytes()
+except PermissionError:pass
+else:raise AssertionError('Door read private BBS data')
+assert not os.getgroups(), 'supplementary groups inherited'
 print('AUTH '+str(claims['member'])+' UID '+str(os.getuid())+'\r\nKEY> ',end='',flush=True)
 while True:
     key=os.read(0,1)
@@ -80,7 +85,7 @@ while True:
             os.setsid();signal.signal(signal.SIGHUP,signal.SIG_IGN)
             while True:time.sleep(1)
         print('CHILD '+str(child)+'\r\nKEY> ',end='',flush=True)
-""".replace('GAME_SOCKET',repr(str(game_socket))));wrapper.chmod(0o755)
+""".replace('GAME_SOCKET',repr(str(game_socket))).replace('PRIVATE_PATH',repr(str(data/'private'))));wrapper.chmod(0o755)
         slots=[]
         for node,uid in enumerate((SLOT1,SLOT2),1):
             cwd=p/('slot'+str(node));cwd.mkdir();os.chown(cwd,uid,uid)
@@ -102,7 +107,9 @@ while True:
             bbs=Server(str(runtime),data/'notes',preexec_fn=identity(BBS),members=data/'members',menu=True,telnet=True,language='en',options=['--doors',str(doors),'--door-isolation-socket',str(isolation)])
             for name,member,uid in [('alice',1,SLOT1),('bob',2,SLOT2)]:
                 c=Client(bbs.port);clients.append(c);c.until();c.send(('REGISTER '+name+'\r\nfixture-password\r\n').encode());assert b'Logged in' in c.until()
-                c.cmd('GAME',b'0:main] > ');out=c.cmd('1',b'KEY> ')
+                c.cmd('GAME',b'0:main] > ')
+                try:out=c.cmd('1',b'KEY> ')
+                except (TimeoutError,AssertionError) as error:raise AssertionError(('isolated Door launch',c.buf[-2000:])) from error
                 assert f'AUTH {member} UID {uid}'.encode() in out,out
             assert query(game_socket,{})['active']==2
             clients[0].send(b'f');out=clients[0].until(b'KEY> ');child=int(re.search(rb'CHILD (\d+)',out)[1]);clients[0].close()
@@ -127,6 +134,8 @@ while True:
             for process in services:
                 if process.poll() is None:process.terminate()
                 process.wait(timeout=5)
+                errors=process.stderr.read(2048)
+                if errors:print('Service diagnostics:',errors.decode('utf8','replace'),flush=True)
             for uid in (SLOT1,SLOT2):
                 for _ in range(50):
                     if not processes(uid,terminate=True):break
