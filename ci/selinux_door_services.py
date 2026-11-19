@@ -26,8 +26,8 @@ def argv(arguments):
 
 
 class Accounts:
-    """NSS identities needed by systemd SupplementaryGroups, never shared users."""
-    def __init__(self, fixture, command, broker, game, uids):
+    """NSS identities for every non-root systemd service, never shared users."""
+    def __init__(self, fixture, command, broker, game, uids, *, bbs):
         import grp
         import pwd
         self.pwd, self.grp = pwd, grp
@@ -35,7 +35,9 @@ class Accounts:
         self.broker, self.game, self.uids = broker, game, tuple(uids)
         suffix = hashlib.sha256(str(fixture.path).encode()).hexdigest()[:12]
         self.user = 'lnci_b_' + suffix
-        self.groups = [('lnci_bg_' + suffix, broker), ('lnci_g_' + suffix, game)]
+        self.users = [(self.user, broker), ('lnci_c_' + suffix, game), ('lnci_s_' + suffix, bbs)]
+        self.groups = [('lnci_bg_' + suffix, broker), ('lnci_g_' + suffix, game),
+                       ('lnci_sg_' + suffix, bbs)]
         self.created = []
 
     def record(self):
@@ -70,23 +72,25 @@ class Accounts:
         for uid in self.uids:
             self.absent(self.pwd.getpwuid, uid)
             self.absent(self.grp.getgrgid, uid)
-        self.absent(self.pwd.getpwnam, self.user)
+        for name, uid in self.users:
+            self.absent(self.pwd.getpwnam, name)
         for name, gid in self.groups:
             self.absent(self.grp.getgrnam, name)
         self.fixture.door_account_plan = [
             {'kind': 'group', 'name': name, 'id': gid} for name, gid in self.groups
-        ] + [{'kind': 'user', 'name': self.user, 'id': self.broker}]
+        ] + [{'kind': 'user', 'name': name, 'id': uid} for name, uid in self.users]
         self.record()  # recovery intent survives interruption during account tools
         for name, gid in self.groups:
             self.command('/usr/sbin/groupadd', '--gid', str(gid), name)
             self.created.append({'kind': 'group', 'name': name, 'id': gid})
             self.record()
-        self.command('/usr/sbin/useradd', '--uid', str(self.broker),
-                     '--gid', str(self.broker), '--no-user-group', '--no-create-home',
-                     '--no-log-init', '-K', 'SUB_UID_COUNT=0', '-K', 'SUB_GID_COUNT=0', '--home-dir', '/nonexistent', '--shell', '/usr/sbin/nologin',
-                     '--password', '!', self.user)
-        self.created.append({'kind': 'user', 'name': self.user, 'id': self.broker})
-        self.record()
+        for name, uid in self.users:
+            self.command('/usr/sbin/useradd', '--uid', str(uid),
+                         '--gid', str(uid), '--no-user-group', '--no-create-home',
+                         '--no-log-init', '-K', 'SUB_UID_COUNT=0', '-K', 'SUB_GID_COUNT=0', '--home-dir', '/nonexistent', '--shell', '/usr/sbin/nologin',
+                         '--password', '!', name)
+            self.created.append({'kind': 'user', 'name': name, 'id': uid})
+            self.record()
 
     def close(self):
         if not self.created:
@@ -94,6 +98,7 @@ class Accounts:
         self.idle()
         # Validate the entire set before deleting anything. Preserve changed
         # identities for explicit recovery instead of deleting foreign state.
+        owned_users = {(entry['name'], entry['id']) for entry in self.created if entry['kind'] == 'user'}
         for entry in reversed(self.created):
             name, uid = entry['name'], entry['id']
             if entry['kind'] == 'user':
@@ -107,7 +112,7 @@ class Accounts:
                 if group.gr_gid != uid or group.gr_mem or self.grp.getgrgid(uid).gr_name != name:
                     raise ValueError('Fixture group changed; retain for recovery')
                 for user in self.pwd.getpwall():
-                    if user.pw_gid == uid and (user.pw_name != self.user or user.pw_uid != self.broker):
+                    if user.pw_gid == uid and (user.pw_name, user.pw_uid) not in owned_users:
                         raise ValueError('Foreign user references fixture group')
         for entry in reversed(self.created.copy()):
             tool = '/usr/sbin/userdel' if entry['kind'] == 'user' else '/usr/sbin/groupdel'
@@ -263,7 +268,7 @@ class Backend:
         self.fixture, self.command = fixture, command
         self.path = fixture.path
         self.units = []
-        self.accounts = Accounts(fixture, command, BROKER, GAME, (BBS, BROKER, GAME, SLOT1, SLOT2))
+        self.accounts = Accounts(fixture, command, BROKER, GAME, (BBS, BROKER, GAME, SLOT1, SLOT2), bbs=BBS)
         fixture.door_slot_uids = [SLOT1, SLOT2]
         fixture.save_record()
 

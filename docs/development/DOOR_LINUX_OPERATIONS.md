@@ -153,9 +153,11 @@ new confined process is alive.
   paths and dependency names. All test units have a 300-second runtime watchdog.
   No existing BBS service is changed. Test units and port mappings have unique
   names recorded in the root-only fixture record.
-  The Broker uses a temporary locked/non-login NSS account with its own group
-  and a separate consumer group. Numeric UIDs alone are insufficient when
-  systemd initializes `SupplementaryGroups` (observed `217/USER` before exec).
+  Broker, consumer and BBS each use a temporary locked/non-login NSS account
+  with a distinct primary group; Broker also uses the consumer supplementary
+  group. Numeric UIDs alone are insufficient for systemd credential setup
+  (observed `217/USER` before exec). Door slot UIDs remain unregistered because
+  the isolation launcher drops their numeric credentials directly.
   All fixture IDs and generated names must be unused; existing identities are
   never reused or changed. No home directory is created. The native fixture
   records both creation intent (`door_account_plan`) and created identities
@@ -250,3 +252,26 @@ installed selinux_root.py import was the older 09b84e1b digest. With explicit
 permission, only that helper was backed up and replaced by reviewed main bytes
 (8150d379), preserving root:wheel/0644. Its failed acceptance job was rerun on
 the same main SHA; the result is separate from Rocky readiness acceptance.
+
+## Native consumer identity (2026-11-20)
+
+At main `b02fbdf6fb51999e91adb9d739d5629d3f4a0ac2`, run
+[44574999661](https://github.com/matsuotakeshi/liner-notes/actions/runs/44574999661)
+passed policy compilation and progressed beyond Broker/isolation readiness.
+The consumer unit then failed before exec with `Failed to determine user
+credentials` / `217/USER` (Artifact 14556038443). The fixture had registered the
+Broker user and consumer group but not the consumer user. Its later BBS unit
+also lacked an NSS user and primary group.
+
+The adapter now registers all three systemd service users and primary groups.
+Collision checks cover all names and reserved IDs before changes. Recovery
+intent and successful creation records include each account; cleanup checks
+every created identity and foreign group reference before deleting any entry.
+Tests cover partial user creation, additional name collisions, all service
+credentials and preservation of the unregistered Door slots. The existing
+Hosted Rocky container test checks real NSS/group initialization and UID/GID
+drop for every service user before removing the accounts.
+
+This fixes the test adapter only: no production accounts, service templates,
+SELinux grants or privileged installed helper are changed. Hosted checks do
+not replace trusted-main native Enforcing acceptance, which remains pending.
