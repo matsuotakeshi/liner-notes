@@ -59,3 +59,6 @@ choice's ownership. Existing Core ACLs, binary/connector and Door barriers apply
 
 Windows focused tests do not establish POSIX runtime compatibility. Hosted and
 main-only native CI must validate their respective commits before acceptance.
+
+Invalid/overlong UI names use the shared JA/EN error catalog. The catalog
+coverage check and real-socket i18n test cover both language presentations.

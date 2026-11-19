@@ -148,6 +148,7 @@ static const char *error_text(const Ui *u,const char *p) {
         {"ERR article number",MSG_ERR_NUMBER},
         {"ERR board number",MSG_ERR_BOARD_NUMBER},
         {"ERR tree syntax",MSG_ERR_TREE},
+        {"ERR UI",MSG_ERR_UI_SELECTION},
         {"ERR command",MSG_ERR_COMMAND},
         {"ERR draft",MSG_ERR_DRAFT},
         {"ERR member posting needs RTBOARD3",MSG_ERR_V3},
