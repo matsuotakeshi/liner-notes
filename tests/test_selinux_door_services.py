@@ -1,4 +1,5 @@
 """Portable tests for the native adapter, not claims of Enforcing execution."""
+import errno
 import importlib.util
 from pathlib import Path
 import subprocess
@@ -75,6 +76,7 @@ class Units(unittest.TestCase):
         # readiness's import is local to the native path; provide its public API.
         templates={r:(ROOT/'linux'/('liner-notes-door-'+r+'.service')).read_text() for r in backend.configs}
         with patch.dict(sys.modules,{'door_broker':Mock()}),patch.object(services.Path,'read_text',autospec=True) as read,patch.object(services,'Process') as proc:
+            proc.return_value.poll.return_value = None
             read.side_effect=lambda path: ('{"socket":"/fixture/socket"}' if path in backend.configs.values()
                                           else templates['broker' if 'broker' in path.name else 'isolation'])
             for role in templates:
@@ -87,6 +89,49 @@ class Units(unittest.TestCase):
                 if role=='isolation':
                     for line in ('KillMode=process','SendSIGKILL=no','TimeoutStopSec=infinity'):
                         self.assertIn(line,text)
+
+
+class SocketReadiness(unittest.TestCase):
+    def setUp(self):
+        self.process = Mock(); self.process.poll.return_value = None
+        self.check = Mock()
+        modules = patch.dict(sys.modules, {'door_broker': Mock(check_ready=self.check)})
+        modules.start(); self.addCleanup(modules.stop)
+        sleep = patch.object(services.time, 'sleep')
+        self.sleep = sleep.start(); self.addCleanup(sleep.stop)
+
+    def test_missing_then_bound_not_listening_then_ready(self):
+        self.check.side_effect = [FileNotFoundError(errno.ENOENT, 'not created'),
+                                 ConnectionRefusedError(errno.ECONNREFUSED, 'not listening'), None]
+        services.wait_ready(self.process, '/fixture/socket', 30)
+        self.assertEqual(self.check.call_count, 3)
+        for call in self.check.call_args_list: self.assertEqual(call.args, ('/fixture/socket', 30))
+        self.assertEqual(self.sleep.call_count, 2)
+        self.process.diagnostics.assert_not_called()
+
+    def test_absent_socket_stays_failure_at_deadline(self):
+        self.check.side_effect = FileNotFoundError(errno.ENOENT, 'absent')
+        with self.assertRaisesRegex(TimeoutError, 'deadline expired'):
+            services.wait_ready(self.process, '/fixture/socket', 30, timeout=0)
+        self.process.diagnostics.assert_called_once()
+        self.sleep.assert_not_called()
+
+    def test_early_exit_is_not_retried(self):
+        self.process.poll.return_value = 1
+        with self.assertRaisesRegex(RuntimeError, 'exited before'):
+            services.wait_ready(self.process, '/fixture/socket', 30)
+        self.check.assert_not_called(); self.sleep.assert_not_called()
+        self.process.diagnostics.assert_called_once()
+
+    def test_bad_identity_and_permission_failure_are_not_retried(self):
+        for error in (ValueError('socket peer identity'), ValueError('socket identity'),
+                      PermissionError(errno.EACCES, 'denied')):
+            self.check.reset_mock(); self.process.diagnostics.reset_mock()
+            self.check.side_effect = error
+            with self.assertRaises(type(error)):
+                services.wait_ready(self.process, '/fixture/socket', 30)
+            self.check.assert_called_once(); self.sleep.assert_not_called()
+            self.process.diagnostics.assert_called_once()
 
 
 class FixtureAccounts(unittest.TestCase):

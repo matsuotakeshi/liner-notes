@@ -231,3 +231,22 @@ updated the source-lock for that file only. FreeBSD/Linux/Solaris build commands
 archive entry validation, CRC patch and resume receipt behavior are preserved.
 The new unit tests cover retry exhaustion, HTTP/certificate/hash/size refusal,
 HTTPS downgrade rejection, and verified/corrupt cache handling.
+
+## Native service readiness (2026-11-20)
+
+At main `0a012617ae9c8ba91d85b36f1aaf09b618a0398e`, both Broker and isolation
+started in their expected SELinux domains. The adapter then probed isolation.sock
+before it existed (`FileNotFoundError`); Type=simple and process-label admission
+are not socket readiness. The adapter now checks the service is still alive and
+retries only ENOENT/ECONNREFUSED within five seconds. Socket owner/type and kernel
+peer UID checks are unchanged; identity/permission failures and early exit fail
+immediately. Startup diagnostics are captured on readiness failure. Tests cover
+delayed creation/listen, deadline, exited process and refused identity/access.
+No service startup timeout or SELinux permission is relaxed. Canonical service
+security guidance remains unchanged; this is an internal fixture sequencing fix.
+
+Separately, FreeBSD isolated upgrade stopped before execution because its
+installed selinux_root.py import was the older 09b84e1b digest. With explicit
+permission, only that helper was backed up and replaced by reviewed main bytes
+(8150d379), preserving root:wheel/0644. Its failed acceptance job was rerun on
+the same main SHA; the result is separate from Rocky readiness acceptance.

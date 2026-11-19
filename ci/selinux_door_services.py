@@ -6,6 +6,7 @@ Units have unique names;
 only their own runtime unit files are removed. The parent SELinux fixture owns
 policy loading, the VM gate, state record, audit filtering and final cleanup.
 """
+import errno
 import hashlib
 import io
 import json
@@ -221,6 +222,30 @@ class Process:
         return self.poll() is None
 
 
+def wait_ready(process, endpoint, uid, timeout=5):
+    """Type=simple/process-label success precedes socket creation/listen."""
+    from door_broker import check_ready
+    deadline = time.monotonic() + timeout
+    try:
+        while True:
+            if process.poll() is not None:
+                raise RuntimeError('Door service exited before socket readiness')
+            try:
+                # Keep the existing socket-type/owner and kernel peer-UID checks.
+                # No ticket or game operation is sent by this readiness probe.
+                check_ready(endpoint, uid)
+                return
+            except OSError as error:
+                if error.errno not in (errno.ENOENT, errno.ECONNREFUSED):
+                    raise
+                if time.monotonic() >= deadline:
+                    raise TimeoutError('Door service socket readiness deadline expired') from error
+                time.sleep(.1)
+    except Exception:
+        process.diagnostics()
+        raise
+
+
 class Backend:
     def __init__(self, fixture, command):
         import grp
@@ -309,8 +334,7 @@ class Backend:
         lines.append('ReadWritePaths='+str(self.base))
         lines.append('RuntimeMaxSec=300')
         process = Process(self, role, '\n'.join(lines)+'\n', 'liner_notes_'+role+'_t')
-        from door_broker import check_ready
-        check_ready(json.loads(self.configs[role].read_text())['socket'], self.ids[role])
+        wait_ready(process, json.loads(self.configs[role].read_text())['socket'], self.ids[role])
         return process
 
     def start_game(self, socket, broker, scripts):
