@@ -314,6 +314,7 @@ class Backend:
     def unit(self, role, command, domain, *, directory=None, output='journal'):
         uid = self.ids[role]
         text = ('[Service]\nType=simple\nUser='+str(uid)+'\nGroup='+str(uid)+
+                ('\nEnvironment=LINER_DOOR_DIAGNOSTICS=1' if role == 'bbs' else '')+
                 '\nWorkingDirectory='+str(directory or self.base)+
                 '\nNoNewPrivileges=yes\nPrivateTmp=yes\nProtectHome=yes\nProtectSystem=strict'+
                 '\nReadWritePaths='+str(self.base)+'\nRestart=no\nRuntimeMaxSec=300\nLimitCORE=0\nUMask=0077'+

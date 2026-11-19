@@ -275,3 +275,40 @@ drop for every service user before removing the accounts.
 This fixes the test adapter only: no production accounts, service templates,
 SELinux grants or privileged installed helper are changed. Hosted checks do
 not replace trusted-main native Enforcing acceptance, which remains pending.
+
+
+## Isolated launch diagnosis (2026-11-20, candidate only)
+
+Main `4664068c6a7a83307aaa6515d352859ef24c1e0b`, native run
+[44580196385](https://github.com/matsuotakeshi/liner-notes/actions/runs/44580196385),
+Artifact 14559187298: all four service domains were entered. Broker/isolation
+socket readiness and consumer/BBS NSS registration succeeded. Selecting game 1
+returned `Game unavailable` before the authenticated game prompt. The captured
+service journals and filtered AVC output did not identify a failed operation.
+This is not evidence of a policy denial or proof that more startup time is needed.
+The root cause remains open; this change adds evidence, not a claimed fix.
+
+The opt-in `LINER_DOOR_DIAGNOSTICS=1` environment setting emits
+`DOOR_LAUNCH_FAILURE phase=<fixed-label> errno=<number>` to runtime stderr.
+Only the isolated acceptance BBS unit enables it automatically. Unset, `0`, and
+other values remain silent. No path, account, member/session ID, request, ticket,
+key or game data is logged. The helper preserves errno and existing user-facing
+responses. Review the phase rather than treating errno 0 (validation failure or
+non-OS error) as success. Labels distinguish session admission, identity/catalog
+selection, socket/connect/peer, random/request encoding, sending, reply/descriptor
+validation, PTY and nonblocking setup. Existing journal capture exports these
+lines without adding access to host logs or running a second privileged probe.
+Do not enable this optional diagnostic permanently on public servers without
+considering repeated failed-launch log volume. No production setting is changed.
+
+Local portable tests compile the C logger and check exact opt-in, output and errno
+preservation. Linux/FreeBSD CI also compiles the actual isolation client and tests
+a missing socket with diagnostics on/off; the Windows run marks that Unix case
+not applicable. Existing native acceptance still requires the real authenticated
+Door lifecycle to pass, not merely a new diagnostic line.
+
+Reviewed `src/doors.c`, `src/runtime.c`, `src/door_isolation.inc` against the
+canonical Door guidance: ACL, peer UID/FD validation, timeouts, replies and process
+cleanup are unchanged. `Makefile` only adds the header dependency and focused test.
+Their source-lock hashes are updated after this review. The stable public manual
+remains unchanged; this candidate diagnostic is documented here until release.
