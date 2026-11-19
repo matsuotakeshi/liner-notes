@@ -17,6 +17,7 @@ from test_runtime import Client as Raw
 from test_members import auth, PASSWORD
 from test_telnet import Client as Telnet
 from ssh_screen import Screen, MAIL_PROMPT
+from ssh_openssh import pty_ping
 
 
 def port():
@@ -148,21 +149,12 @@ for line in sys.stdin:
                       '-o', 'StrictHostKeyChecking=yes', '-o', f'UserKnownHostsFile={root/"known_hosts"}']
             (root/'known_hosts').write_text(f'[127.0.0.1]:{ssh_port} '+host.with_suffix('.pub').read_text())
             result = subprocess.run(common+['alice@127.0.0.1', 'id'], capture_output=True, timeout=12)
-            assert result.returncode != 0 and b'uid=' not in result.stdout
-            child = subprocess.Popen(common+['-tt', 'alice@127.0.0.1'], stdin=subprocess.PIPE,
-                                     stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-            try:
-                child.stdin.write(b'PING\r\n'); child.stdin.flush()
-                import select
-                output = b''; deadline = time.monotonic()+12
-                while b'PONG' not in output and time.monotonic()<deadline:
-                    if select.select([child.stdout], [], [], .2)[0]:
-                        chunk = os.read(child.stdout.fileno(), 8192)
-                        if not chunk: break
-                        output += chunk
-                assert b'PONG' in output, output[-1500:]
-            finally:
-                child.terminate(); child.communicate(timeout=5)
+            exec_diagnostics = {'returncode': result.returncode, 'stderr': result.stderr[-4096:],
+                                'stdout': result.stdout[-1500:]}
+            print('OpenSSH exec-denial diagnostics:', exec_diagnostics, flush=True)
+            assert result.returncode != 0 and b'uid=' not in result.stdout, exec_diagnostics
+            pty_ping(common+['-tt', 'alice@127.0.0.1'])
+            print('PASS OpenSSH via 80x24 PTY: BBS prompt and PING')
 
             # PTY is supplied by existing Door machinery, including live resizing.
             output = a.cmd('DOOR 1', b'DOOR> ')

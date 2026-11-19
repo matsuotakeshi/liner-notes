@@ -165,6 +165,21 @@ responses, preserved trailing output and a missing response. These run through
 the existing `test-ssh-sources` check. Runtime behavior is unchanged; encrypted
 acceptance still requires the corrected Hosted integration run.
 
+Head `10ae8e8b7c54f5e6fe3eba2f2a0fca4124be2ef0` passed the mail case
+and the Paramiko authentication/request-denial checks on both distributions in
+[run 44469613101](https://github.com/matsuotakeshi/liner-notes/actions/runs/44469613101).
+It failed the OpenSSH PING check with empty stdout. That invocation used pipes;
+its stderr was discarded, so the exact cause remains unconfirmed. The corrected
+test starts OpenSSH with a real 80x24 local PTY and `TERM=xterm`, waits for the
+initial BBS prompt, then sends PING. It records the phase, stderr, terminal tail,
+exit status and whether test cleanup terminated the child. Cleanup terminates
+and reaps the test client on success, failure and timeout. Host-key checking,
+authentication requirements and the 12-second response timeout are unchanged.
+Small POSIX harness tests cover terminal size, separate stderr, early exit and
+timeout cleanup before the encrypted integration test. Windows cannot execute
+those PTY checks; local syntax/source tests are not interoperability evidence.
+No BBS implementation or PTY acceptance policy has changed in this correction.
+
 Do not treat source checks or Windows stub compilation as encrypted runtime
 acceptance. Record the actual PR head, CI run and OS result. Pending native SSH,
 SELinux and Solaris results must stay explicit. No release or deployment is

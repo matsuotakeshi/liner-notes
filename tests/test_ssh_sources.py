@@ -2,8 +2,13 @@
 from pathlib import Path
 import base64
 import importlib.util
+import contextlib
+import io
+import os
+import sys
 import unittest
 from ssh_screen import Screen, MAIL_PROMPT
+from ssh_openssh import pty_ping
 
 ROOT = Path(__file__).resolve().parents[1]
 spec = importlib.util.spec_from_file_location('fingerprint', ROOT/'scripts/ssh-key-fingerprint.py')
@@ -56,6 +61,48 @@ class SshScreenTests(unittest.TestCase):
         screen = Screen(ScriptedChannel([self.notice]))
         with self.assertRaisesRegex(AssertionError, 'missing marker'):
             screen.cmd('MAIL READ 1', MAIL_PROMPT)
+
+
+@unittest.skipUnless(os.name == 'posix', 'real PTY checks require POSIX')
+class OpenSshPtyHarnessTests(unittest.TestCase):
+    def test_real_terminal_dimensions_prompt_and_separate_stderr(self):
+        script = '''import os, termios, time
+assert os.isatty(0) and os.isatty(1)
+assert termios.tcgetwinsize(0) == (24, 80)
+assert os.environ['TERM'] == 'xterm'
+os.write(2, b'synthetic SSH diagnostic\\n')
+os.write(1, b'MAIN [fixture] > ')
+data = b''
+while not data.endswith(b'\\r'):
+    data += os.read(0, 1)
+assert data == b'PING\\r', data
+os.write(1, b'PONG\\r\\nMAIN [fixture] > ')
+time.sleep(30)
+'''
+        with contextlib.redirect_stdout(io.StringIO()):
+            result = pty_ping([sys.executable, '-c', script])
+        self.assertEqual(result['phase'], 'complete')
+        self.assertEqual(result['stderr'], b'synthetic SSH diagnostic\n')
+        self.assertNotIn(b'synthetic SSH diagnostic', result['terminal_tail'])
+        self.assertEqual(result['cleanup'], 'test SIGTERM')
+        self.assertIsNotNone(result['returncode'])
+
+    def test_early_exit_reports_error_and_exit_status(self):
+        with contextlib.redirect_stdout(io.StringIO()), self.assertRaises(AssertionError) as error:
+            pty_ping([sys.executable, '-c',
+                      "import sys; sys.stderr.write('synthetic OpenSSH error'); sys.exit(42)"])
+        message = str(error.exception)
+        self.assertIn('synthetic OpenSSH error', message)
+        self.assertIn("'returncode': 42", message)
+        self.assertIn('initial BBS prompt', message)
+
+    def test_timeout_reports_phase_and_reaps_child(self):
+        with contextlib.redirect_stdout(io.StringIO()), self.assertRaises(AssertionError) as error:
+            pty_ping([sys.executable, '-c', 'import time; time.sleep(30)'], timeout=0.2)
+        message = str(error.exception)
+        self.assertIn('TimeoutError', message)
+        self.assertIn('test SIGTERM', message)
+        self.assertNotIn("'returncode': None", message)
 
 
 class SshSources(unittest.TestCase):
