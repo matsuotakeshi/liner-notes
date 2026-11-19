@@ -15,6 +15,7 @@
 #include "ui.h"
 #include "session_core.h"
 #include "session_state.h"
+#include "session_ui.h"
 /* The adapter owns queuing/backpressure. write copies bytes synchronously and
  * returns 0 on failure. No OS handles, Telnet commands or HTTP frames here. */
 typedef struct {
@@ -46,7 +47,8 @@ typedef struct {
     int connector_literal;
     ConnectorBlock connector_block;
 } SessionConnection;
-typedef struct {
+struct Session {
+    SessionUiBinding ui_binding;
     SessionCore core;
     SessionAuth auth;
     SessionPresentation presentation;
@@ -56,7 +58,8 @@ typedef struct {
     SessionMailState mail_state;
     SessionConversation conversation;
     SessionConnection connection;
-} Session;
+};
+int session_init_ui(Session *,SessionIO,unsigned long id,int slot,int boards,int members,int menu,Language,const SessionUiConfig *);
 void session_init(Session *,SessionIO,unsigned long id,int slot,int boards,int members,int menu,Language);
 void session_dimensions(Session *,unsigned columns,unsigned rows);
 void session_abort(Session *);

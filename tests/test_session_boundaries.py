@@ -68,6 +68,20 @@ class SessionBoundaries(unittest.TestCase):
             self.assertNotRegex(text,r'->core\.(?:user|user_epoch|board|current|member_level)\s*=(?!=)',p.name)
             self.assertNotRegex(text,r'->core\.(?:board_grants|vault_grants)\[[^]]+\]\s*=',p.name)
 
+    def test_ui_result_dispatch_is_after_core_receive(self):
+        dispatcher=(ROOT/'src/session_ui.c').read_text(encoding='utf-8').split('void session_result(',1)[1].split('void session_impl_emit(',1)[0]
+        self.assertLess(dispatcher.index('session_core_matches'),dispatcher.index('->keep_position'))
+        self.assertLess(dispatcher.index('session_core_receive'),dispatcher.index('->result(s,'))
+        for p in (ROOT/'src').glob('session*.c'):
+            if p.name in ('session_core.c','session_ui.c'):continue
+            self.assertNotRegex(code(p.read_text(encoding='utf-8')),r'\bsession_core_(?:complete|complete_mode|receive)\s*\(',p.name)
+        session=(ROOT/'src/session.c').read_text(encoding='utf-8')
+        self.assertIn('s->ui_binding.active->line(s,line,size)',session)
+        self.assertNotIn('session_impl_normalize_command',session)
+        make=(ROOT/'Makefile').read_text(encoding='utf-8')
+        recipe=next(line for line in make.splitlines() if line.startswith('\t$(CC)') and ' -o test-adapters' in line)
+        self.assertIn('tests/test_session_ui.c',recipe)
+
     def test_worker_audit_does_not_infer_events_from_display(self):
         text=(ROOT/'src/board.c').read_text(encoding='utf-8')
         self.assertNotRegex(text,r'(?:strn?cmp|strstr|sscanf)\(rs->text')

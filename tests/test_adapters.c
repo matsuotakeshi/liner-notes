@@ -15,6 +15,7 @@ static void reset(Memory *m) { m->size=0; m->data[0]=0; }
 static void feed(Telnet *t,const unsigned char *p,size_t n) {
     unsigned char b; for(size_t i=0;i<n;i++) assert(telnet_receive(t,p[i],&b)==TN_NONE);
 }
+void session_ui_adapter_test(void);
 int session_operations_test(const char *directory,int verify,uint32_t article,uint32_t mail);
 int main(int argc,char **argv) {
     if(argc==3 && !strcmp(argv[1],"--session-seed"))return session_operations_test(argv[2],0,0,0);
@@ -24,6 +25,7 @@ int main(int argc,char **argv) {
         return session_operations_test(argv[2],1,(uint32_t)article,(uint32_t)mail);
     }
     assert(argc==1);
+    session_ui_adapter_test();
     /* Runtime report failures must use the requested language, not raw ERR text. */
     for(int lang=LANGUAGE_JA;lang<LANGUAGE_COUNT;lang++) {
         Ui ui={.language=(Language)lang,.enabled=1};char output[256];

@@ -28,12 +28,9 @@
 #include <limits.h>
 #include <openssl/crypto.h>
 
-void session_result(Session *s,const BoardResult *completion,uint64_t now) {
-
-    if(!session_core_matches(&s->core,completion))return;
-    if(completion->revoked) { session_revoke(s);return; }
-    int cancelled=reader_cancel_completion(&s->reading.reader,completion->sequence);
-    if(!session_core_complete_mode(&s->core,completion,now,cancelled))return;
+void session_rtbbs_result(Session *s,const OperationResult *completion,SessionResultView view,uint64_t now,int cancelled) {
+    /* The shared receiver has already applied Core effects exactly once. */
+    if(view.status==SESSION_RESULT_IGNORED || view.status==SESSION_RESULT_REVOKED)return;
     if(cancelled) { session_impl_queue_text(s,ui_text(&s->presentation.ui,MSG_SCAN_STOP));session_impl_prompt(s);return; }
     if(s->presentation.preferences.exit_action) {
         PreferenceExit action=preference_exit_complete(&s->presentation.preferences,completion->feedback.preferences_saved);
