@@ -129,3 +129,17 @@ restore. The socket UI test also checks refusal in mail, no saved preference on
 refusal, and successful saving after leaving mail. Runtime UI restrictions and
 DB migration criteria are unchanged. These revised socket tests require the new
 Hosted CI result; the earlier failure is not considered a migration pass.
+
+Follow-up run 44670873414 at 46586ef reached the exact acknowledgement check
+and exposed another precondition: posting sets the RTBBS classic area to BOARD
+even for RAW clients (session_impl_article_result). Closing mail sets UI_HOME
+and clears mail mode, but does not clear that selected board context in RAW.
+The initial correction was therefore insufficient. Migration preferences are
+now saved immediately after login, before posting. The UI socket test retains
+the board/mail rejection case and verifies that a rejected reset does not erase
+the saved preference. Source, converted and restored DB checks remain required.
+
+A local full adapter build with Windows/UCRT could not execute because the
+POSIX storage layer requires flock/fcntl/pread and related flags. No portability
+stubs or relaxed build flags were added. Python syntax and whitespace checks
+are local checks; socket and migration acceptance remain Hosted CI gates.

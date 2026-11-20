@@ -26,15 +26,16 @@ def run_version(binary,version):
     seed.execute('INSERT INTO storage_meta VALUES(1,?,randomblob(16))',(version,))
   s=Server(binary,source/'notes',members=source/'members',options=['--database',str(db),'--ui-policy','MEMBERS']);c=Client(s.port)
   try:
-   auth(c,'alice',True);post(c,'日本語','body 1');post(c,'large','x'*3000)
-   send(c,'alice','mail','private body')
-   assert cmd(c,'0')==b'MAIL CLOSED'
-   cmd(c,'PROFILESET MACHINE FreeBSD')
+   auth(c,'alice',True)
+   # Seed the migration setting at the main prompt, before posting selects a
+   # board. Leaving mail alone does not leave that previously selected board.
+   reply=cmd(c,'UI RTBBS');assert reply==b'UI PREF SAVED rtbbs',reply
    assert not cmd(c,'LANG en').startswith(b'ERR ')
    reply=cmd(c,'PREFS SAVE');assert reply==b'PREFS SAVED en OFF',reply
-   # UI selection is intentionally refused inside mail. Require the actual
-   # saved acknowledgement, not merely the absence of an ERR prefix.
-   reply=cmd(c,'UI RTBBS');assert reply==b'UI PREF SAVED rtbbs',reply
+   post(c,'日本語','body 1');post(c,'large','x'*3000)
+   send(c,'alice','mail','private body')
+   assert cmd(c,'0')==b'MAIL CLOSED'
+   reply=cmd(c,'PROFILESET MACHINE FreeBSD');assert reply==b'PROFILE SAVED',reply
    files=MailConnector('127.0.0.1',s.port,'alice',PASSWORD)
    attached=[]
    try:
@@ -47,7 +48,7 @@ def run_version(binary,version):
    for ident,_,_ in attached:command(c,'/ATTACH '+str(ident),b'MAIL ATTACHMENT ')
    c.send(b'attachment body\n');command(c,'.',b'MAIL SENT 2')
    assert cmd(c,'0')==b'MAIL CLOSED'
-   cmd(c,'WITHDRAW 1 CONFIRM')
+   reply=cmd(c,'WITHDRAW 1 CONFIRM');assert reply==b'WITHDRAW SAVED 1',reply
    admin('db-structure','--root',source,'--database',db,'--board','notes','--members','members',p/'locked',success=False)
   finally:c.close();s.close()
   with closing(sqlite3.connect(db)) as original:

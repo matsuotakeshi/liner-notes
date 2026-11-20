@@ -5,7 +5,7 @@ import sqlite3
 import subprocess
 import sys
 import tempfile
-from test_board import Server
+from test_board import Server,post
 from test_runtime import Client
 from test_members import auth
 from test_mail import send
@@ -41,6 +41,13 @@ def run(binary):
                 assert rows() == []
                 assert cmd(alice, '0') == b'MAIL CLOSED'
                 assert cmd(alice, 'UI RTBBS') == b'UI PREF SAVED rtbbs'
+                assert rows() == [(1, 'rtbbs')]
+                # A selected article keeps the board context across mail.
+                # Closing mail must not be mistaken for returning to main.
+                post(alice, 'board selection', 'body')
+                send(alice, 'alice', 'nested mail', 'body')
+                assert cmd(alice, '0') == b'MAIL CLOSED'
+                assert cmd(alice, 'UI RESET') == b'Finish the current operation before changing UI.'
                 assert rows() == [(1, 'rtbbs')]
         with closing(start('FIXED')) as server:
             with closing(Client(server.port)) as alice:
