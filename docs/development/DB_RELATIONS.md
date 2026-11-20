@@ -114,3 +114,18 @@ Windows/UCRT GCC -O2 -std=c11 -Wall -Wextra -Werror with SQLite/OpenSSL:
 The five-source migration matrix and 12,000+12,000 runtime/RSS test are added to
 existing CI, not reported as executed locally. The Windows skips are not OS
 acceptance. CI evidence is associated with the final PR head, not this base SHA.
+
+## Migration fixture correction (2026-11-20)
+
+Linux compatibility run 44670067604 at aee926d failed on both Rocky and AlmaLinux
+at the UI-preference assertion in test_stage73_database.py. The fixture sent mail
+and then requested UI selection without leaving mail. The existing UI boundary
+correctly refuses this with a human-readable busy response; the fixture accepted
+any response without an ERR prefix and never saved the preference.
+
+The fixture now exits mail explicitly, requires the exact save acknowledgement,
+and checks the source setting before conversion as well as after conversion and
+restore. The socket UI test also checks refusal in mail, no saved preference on
+refusal, and successful saving after leaving mail. Runtime UI restrictions and
+DB migration criteria are unchanged. These revised socket tests require the new
+Hosted CI result; the earlier failure is not considered a migration pass.

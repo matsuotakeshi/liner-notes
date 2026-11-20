@@ -27,10 +27,14 @@ def run_version(binary,version):
   s=Server(binary,source/'notes',members=source/'members',options=['--database',str(db),'--ui-policy','MEMBERS']);c=Client(s.port)
   try:
    auth(c,'alice',True);post(c,'日本語','body 1');post(c,'large','x'*3000)
-   send(c,'alice','mail','private body');cmd(c,'PROFILESET MACHINE FreeBSD')
+   send(c,'alice','mail','private body')
+   assert cmd(c,'0')==b'MAIL CLOSED'
+   cmd(c,'PROFILESET MACHINE FreeBSD')
    assert not cmd(c,'LANG en').startswith(b'ERR ')
-   assert not cmd(c,'PREFS SAVE').startswith(b'ERR ')
-   assert not cmd(c,'UI RTBBS').startswith(b'ERR ')
+   reply=cmd(c,'PREFS SAVE');assert reply==b'PREFS SAVED en OFF',reply
+   # UI selection is intentionally refused inside mail. Require the actual
+   # saved acknowledgement, not merely the absence of an ERR prefix.
+   reply=cmd(c,'UI RTBBS');assert reply==b'UI PREF SAVED rtbbs',reply
    files=MailConnector('127.0.0.1',s.port,'alice',PASSWORD)
    attached=[]
    try:
@@ -42,9 +46,13 @@ def run_version(binary,version):
    command(c,'MAIL SEND alice relations',b'MAIL EDIT ')
    for ident,_,_ in attached:command(c,'/ATTACH '+str(ident),b'MAIL ATTACHMENT ')
    c.send(b'attachment body\n');command(c,'.',b'MAIL SENT 2')
+   assert cmd(c,'0')==b'MAIL CLOSED'
    cmd(c,'WITHDRAW 1 CONFIRM')
    admin('db-structure','--root',source,'--database',db,'--board','notes','--members','members',p/'locked',success=False)
   finally:c.close();s.close()
+  with closing(sqlite3.connect(db)) as original:
+   saved=original.execute('SELECT user,profile FROM ui_preferences ORDER BY user').fetchall()
+   assert saved==[(1,'rtbbs')],('source UI preference',version,saved)
   before=hashlib.sha256(db.read_bytes()).digest()
   copy=p/'structured'
   # A service account may own its data directory while /var/db is read-only.
@@ -65,7 +73,8 @@ def run_version(binary,version):
     assert d.execute('SELECT count(*) FROM blocks').fetchone()==(0,)
     assert d.execute('SELECT count(*) FROM vault_records').fetchone()[0]>=6
     assert d.execute('SELECT sum(length(attributes)) FROM member_records').fetchone()==(0,)
-    assert d.execute('SELECT profile FROM ui_preferences WHERE user=1').fetchone()==('rtbbs',)
+    saved=d.execute('SELECT user,profile FROM ui_preferences ORDER BY user').fetchall()
+    assert saved==[(1,'rtbbs')],('converted/restored UI preference',version,round,saved)
     from normalized_fields import validate_relations
     validate_relations(d)
     assert d.execute('SELECT file_id FROM mail_attachments ORDER BY ordinal').fetchall()==[(x[0],) for x in attached]
