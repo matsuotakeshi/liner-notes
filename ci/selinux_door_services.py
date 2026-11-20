@@ -53,6 +53,27 @@ def private_diagnostics(path):
     if len(content) > 16384: output.append('DIAGNOSTIC_TRUNCATED')
     return ('\n'.join(output)+'\n').encode() if output else b''
 
+
+def probe_delivery(command, name, pid, since):
+    """Check only the fixed marker, including records missing unit attribution."""
+    found = {'unit': False, 'pid': False}
+    queries = {'unit': ['-u', name], 'pid': ['_PID='+str(pid)]}
+    for attempt in range(3):
+        for kind, match in queries.items():
+            if found[kind]: continue
+            result = command('journalctl', '--no-pager', '-b', '--since', since,
+                             '-n', '40', '-o', 'json', *match, check=False)
+            if result.returncode: continue
+            for line in result.stdout.splitlines():
+                try: record = json.loads(line)
+                except ValueError: continue
+                if isinstance(record, dict) and record.get('MESSAGE') == 'LINER_DOOR_JOURNAL_PROBE':
+                    if kind == 'pid' and record.get('_PID') != str(pid): continue
+                    found[kind] = True
+        if any(found.values()): break
+        if attempt < 2: time.sleep(.1)
+    return found
+
 ROOT = Path(__file__).resolve().parents[1]
 
 
@@ -161,6 +182,7 @@ class Accounts:
 class Process:
     def __init__(self, backend, role, text, domain, *, diagnostic=None):
         self.backend = backend
+        self.started_at = time.strftime('%Y-%m-%d %H:%M:%S')
         self.name = backend.fixture.path.name + '-door-' + role + '-' + str(len(backend.units))
         self.file = Path('/run/systemd/system') / (self.name + '.service')
         self.content = text
@@ -362,6 +384,13 @@ class Backend:
             entry.write_text(script); entry.chmod(0o755)
             self.label(entry, role+'_exec')
         self.ids = {'bbs': BBS, 'broker': BROKER, 'consumer': GAME, 'isolation': 0}
+        capture = base/'scripts'/'selinux_isolation_entry.py'
+        capture.write_bytes((ROOT/'ci'/'selinux_isolation_entry.py').read_bytes())
+        capture.chmod(0o644); self.label(capture, 'ro')
+        entry = base/'entry-isolation-capture'
+        entry.write_text((base/'entry-isolation').read_text().replace(
+            'door_isolation.py', 'selinux_isolation_entry.py'))
+        entry.chmod(0o755); self.label(entry, 'isolation_exec')
         self.probe_journal()
 
     def probe_journal(self):
@@ -388,10 +417,10 @@ class Backend:
         if set(record) != {'bytes', 'errno'} or any(type(x) is not int for x in record.values()):
             raise ValueError('invalid journal probe result')
         probe.diagnostics()
-        self.journal_ok = (record == {'bytes': 25, 'errno': 0} and
-                           b'LINER_DOOR_JOURNAL_PROBE' in probe.stderr.getvalue())
-        self.fixture.results.append({'door_journal': record, 'verified': self.journal_ok})
-        print('DOOR_JOURNAL_PROBE ' + json.dumps({'write': record, 'verified': self.journal_ok}), flush=True)
+        delivery = probe_delivery(self.command, probe.name, probe.pid, probe.started_at)
+        self.journal_ok = record == {'bytes': 25, 'errno': 0} and any(delivery.values())
+        self.fixture.results.append({'door_journal': record, 'delivery': delivery, 'verified': self.journal_ok})
+        print('DOOR_JOURNAL_PROBE ' + json.dumps({'write': record, 'delivery': delivery, 'verified': self.journal_ok}), flush=True)
 
     def assert_journal(self):
         assert self.journal_ok, 'isolation journal write/delivery failed (see DOOR_JOURNAL_PROBE)'
@@ -416,11 +445,13 @@ class Backend:
     def start_service(self, role):
         # Preserve the shipped hardening, preflight and termination settings.
         # Translate only identities and instance paths for this isolated copy.
+        diagnostic = self.diagnostic_path() if role == 'isolation' else None
+        entry = (argv([self.base/'entry-isolation-capture', '--diagnostic', diagnostic, '--'])
+                 if diagnostic is not None else str(self.base/('entry-'+role)))
         template = (ROOT/'linux'/('liner-notes-door-'+role+'.service')).read_text()
-        template = template.replace('@PREFIX@/libexec/liner-notes/door-'+role, str(self.base/('entry-'+role)))
+        template = template.replace('@PREFIX@/libexec/liner-notes/door-'+role, entry)
         template = template.replace('/etc/liner-notes/door-'+role+'.json', str(self.configs[role]))
         lines = []
-        diagnostic = self.diagnostic_path() if role == 'isolation' else None
         for line in template.splitlines():
             if line.startswith(('Requires=', 'After=', 'Before=', 'WantedBy=', 'RuntimeDirectory=',
                                 'RuntimeDirectoryMode=', 'StateDirectory=', 'StateDirectoryMode=', 'ReadWritePaths=')):
@@ -428,8 +459,6 @@ class Backend:
             if line.startswith('User='):line='User='+str(self.ids[role])
             if line.startswith('Group='):line='Group='+str(self.ids[role])
             if line.startswith('SupplementaryGroups='):line='SupplementaryGroups='+str(self.ids['consumer'])
-            if diagnostic is not None and line.startswith('StandardError='):
-                line='StandardError=append:'+str(diagnostic)
             if line == '[Install]':continue
             lines.append(line)
         lines.append('ReadWritePaths='+str(self.base))

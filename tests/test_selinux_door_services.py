@@ -90,11 +90,12 @@ class Units(unittest.TestCase):
                 self.assertNotIn('ExecStop=',text);self.assertNotIn('ExecStartPost=',text)
                 self.assertEqual('Environment=LINER_DOOR_DIAGNOSTICS=1' in text,role=='isolation')
                 if role=='isolation':
-                    self.assertIn('StandardError=append:'+str(Path('/fixture/state/log')),text)
-                    self.assertNotIn('StandardError=journal',text)
+                    self.assertIn('entry-isolation-capture',text)
+                    self.assertIn('--diagnostic',text)
+                    self.assertNotIn('StandardError=append:',text)
                     for line in ('KillMode=process','SendSIGKILL=no','TimeoutStopSec=infinity'):
                         self.assertIn(line,text)
-                else:self.assertIn('StandardError=journal',text)
+                self.assertIn('StandardError=journal',text)
 
     def test_launch_diagnostics_are_enabled_only_in_fixture_bbs_unit(self):
         backend = services.Backend.__new__(services.Backend)
@@ -339,6 +340,30 @@ def real_accounts():
             except KeyError: pass
             else: raise AssertionError('Fixture identity survived cleanup')
     print('PASS disposable Rocky fixture NSS identity lifecycle')
+    # Real descriptor/exec checks share this already guarded disposable container.
+    with tempfile.TemporaryDirectory(prefix='lnci-capture-') as directory:
+        base=Path(directory);entry=base/'selinux_isolation_entry.py';log=base/'private.jsonl'
+        entry.write_bytes((ROOT/'ci/selinux_isolation_entry.py').read_bytes())
+        (base/'door_isolation.py').write_text(
+            "import json,os,sys\nprint(json.dumps({'pid':os.getpid(),'args':sys.argv[1:],"
+            "'flags':[sys.flags.ignore_environment,sys.flags.no_user_site,sys.flags.dont_write_bytecode]}))\n"
+            "os.write(2,b'captured\\n')\n")
+        log.write_bytes(b'preserved\n');log.chmod(0o600)
+        args=[sys.executable,'-E','-s','-B',str(entry),'--diagnostic',str(log),'--','--config','fixture','--check-config']
+        child=subprocess.Popen(args,stdout=subprocess.PIPE,stderr=subprocess.PIPE)
+        out,err=child.communicate(timeout=5)
+        assert child.returncode==0 and not err
+        assert json.loads(out)=={'pid':child.pid,'args':['--config','fixture','--check-config'],'flags':[1,1,1]}
+        assert log.read_bytes()==b'preserved\ncaptured\n'
+        log.chmod(0o644)
+        rejected=subprocess.run(args,capture_output=True,timeout=5)
+        assert rejected.returncode!=0 and not rejected.stdout
+        log.chmod(0o600);alias=base/'alias';alias.symlink_to(log)
+        link_args=args.copy();link_args[link_args.index('--diagnostic')+1]=str(alias)
+        rejected=subprocess.run(link_args,capture_output=True,timeout=5)
+        assert rejected.returncode!=0 and not rejected.stdout
+        assert log.read_bytes()==b'preserved\ncaptured\n'
+    print('PASS disposable Rocky capture: fixed exec/PID/flags/append, public-file and symlink refusal')
 
 
 class JournalProbe(unittest.TestCase):
@@ -392,17 +417,48 @@ class JournalProbe(unittest.TestCase):
                 backend=services.Backend.__new__(services.Backend);backend.base=Path(tmp)
                 (backend.base/'state').mkdir();(backend.base/'scripts').mkdir()
                 (backend.base/'entry-isolation').write_text('python -E -s -B /fixture/scripts/door_isolation.py "$@"')
-                backend.fixture=Mock(results=[]);backend.label=Mock()
+                backend.fixture=Mock(results=[]);backend.label=Mock();backend.command=Mock()
                 process=Mock(returncode=0,stderr=io.BytesIO(output))
                 def start(role,command,domain):
                     self.assertEqual((role,domain),('isolation','liner_notes_isolation_t'))
                     Path(command[-1]).write_text(json.dumps({'bytes':count,'errno':number}))
                     return process
                 backend.unit=Mock(side_effect=start)
-                with patch('builtins.print'):backend.probe_journal()
+                with patch('builtins.print'),patch.object(services,'probe_delivery',return_value={'unit':bool(output),'pid':False}):backend.probe_journal()
                 self.assertEqual(backend.journal_ok,expected)
                 process.terminate.assert_called_once();process.wait.assert_called_once_with(10)
                 self.assertIn('selinux_journal_probe.py',(backend.base/'entry-journal-probe').read_text())
+
+    def test_pid_delivery_is_bounded_to_fixture_boot_time_and_pid(self):
+        def command(*args, **kw):
+            self.assertIn('-b',args);self.assertIn('--since',args);self.assertIn('2026-11-20 10:21:22',args)
+            self.assertIn('40',args);self.assertFalse(kw['check'])
+            output = json.dumps({'MESSAGE':'LINER_DOOR_JOURNAL_PROBE','_PID':'123'}) if args[-1]=='_PID=123' else ''
+            return Mock(returncode=0,stdout=output)
+        result=services.probe_delivery(command,'fixture-unit',123,'2026-11-20 10:21:22')
+        self.assertEqual(result,{'unit':False,'pid':True})
+
+    def test_delivery_requires_exact_marker_and_matching_pid(self):
+        for data in ({'MESSAGE':'private LINER_DOOR_JOURNAL_PROBE','_PID':'123'},
+                     {'MESSAGE':'LINER_DOOR_JOURNAL_PROBE','_PID':'999'}):
+            def command(*args, **kw):
+                return Mock(returncode=0,stdout=json.dumps(data) if args[-1]=='_PID=123' else '')
+            with patch.object(services.time,'sleep') as pause:
+                self.assertEqual(services.probe_delivery(command,'fixture',123,'start'),{'unit':False,'pid':False})
+                self.assertEqual(pause.call_count,2)
+
+    def test_journal_command_errors_do_not_pass(self):
+        command=Mock(return_value=Mock(returncode=1,stdout='{"MESSAGE":"LINER_DOOR_JOURNAL_PROBE"}'))
+        with patch.object(services.time,'sleep'):
+            self.assertEqual(services.probe_delivery(command,'fixture',123,'start'),{'unit':False,'pid':False})
+        self.assertEqual(command.call_count,6)
+
+    def test_delayed_marker_is_observed_without_accepting_absence(self):
+        command=Mock(side_effect=[Mock(returncode=0,stdout='')]*2 +
+                     [Mock(returncode=0,stdout='{"MESSAGE":"LINER_DOOR_JOURNAL_PROBE"}'),Mock(returncode=0,stdout='')])
+        with patch.object(services.time,'sleep') as pause:
+            self.assertEqual(services.probe_delivery(command,'fixture',123,'start'),{'unit':True,'pid':False})
+            pause.assert_called_once_with(.1)
 
     def filtered(self,content,**overrides):
         info=dict(st_mode=0o100600,st_uid=0,st_nlink=1);info.update(overrides)
@@ -430,6 +486,51 @@ class JournalProbe(unittest.TestCase):
             self.assertIn(b'worker-exit',p.stderr.read())
             p.diagnostics()
             read.assert_called_once()
+
+
+class ConfinedEntry(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        spec=importlib.util.spec_from_file_location('isolation_entry',ROOT/'ci/selinux_isolation_entry.py')
+        cls.entry=importlib.util.module_from_spec(spec);spec.loader.exec_module(cls.entry)
+
+    def test_open_is_append_only_and_no_follow_before_dup(self):
+        entry=self.entry
+        info=SimpleNamespace(st_mode=0o100600,st_uid=0,st_nlink=1)
+        with patch.object(entry.os,'O_NOFOLLOW',0x100000,create=True), \
+             patch.object(entry.os,'open',return_value=7) as opened, \
+             patch.object(entry.os,'fstat',return_value=info), \
+             patch.object(entry.os,'dup2') as dup,patch.object(entry.os,'close') as close:
+            entry.redirect_stderr('/fixed/log')
+            opened.assert_called_once_with('/fixed/log',entry.os.O_WRONLY|entry.os.O_APPEND|0x100000)
+            dup.assert_called_once_with(7,2);close.assert_called_once_with(7)
+
+    def test_invalid_files_never_replace_stderr(self):
+        for changes in ({'st_uid':10},{'st_mode':0o100644},{'st_nlink':2},{'st_mode':0o040600}):
+            info=dict(st_mode=0o100600,st_uid=0,st_nlink=1);info.update(changes)
+            with self.subTest(info=info),patch.object(self.entry.os,'O_NOFOLLOW',0x100000,create=True), \
+                 patch.object(self.entry.os,'open',return_value=7), \
+                 patch.object(self.entry.os,'fstat',return_value=SimpleNamespace(**info)), \
+                 patch.object(self.entry.os,'dup2') as dup,patch.object(self.entry.os,'close') as close:
+                with self.assertRaisesRegex(ValueError,'unsafe'):self.entry.redirect_stderr('/fixed/log')
+                dup.assert_not_called();close.assert_called_once_with(7)
+
+    def test_open_denial_does_not_fall_back_or_exec(self):
+        with patch.object(self.entry.os,'O_NOFOLLOW',0x100000,create=True), \
+             patch.object(self.entry.os,'open',side_effect=PermissionError),patch.object(self.entry.os,'dup2') as dup:
+            with self.assertRaises(PermissionError):self.entry.redirect_stderr('/fixed/log')
+            dup.assert_not_called()
+
+    def test_original_flags_config_and_preflight_survive_exec(self):
+        for tail in ([],['--check-config']):
+            arguments=['entry','--diagnostic','/fixed/log','--','--config','/fixed/config',*tail]
+            with patch.object(sys,'argv',arguments),patch.object(self.entry,'redirect_stderr') as redirect, \
+                 patch.object(self.entry.os,'execv') as execute:
+                self.entry.main()
+            redirect.assert_called_once_with('/fixed/log')
+            expected=[sys.executable,'-E','-s','-B',str(Path(self.entry.__file__).with_name('door_isolation.py')),
+                      '--config','/fixed/config',*tail]
+            execute.assert_called_once_with(sys.executable,expected)
 
 
 if __name__=='__main__':
