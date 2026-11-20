@@ -641,3 +641,20 @@ test-storage-relations: tests/test_storage_relations.c src/storage_records.inc
 	$(CC) $(CPPFLAGS) $(SQLITE_CFLAGS) $(CFLAGS) $(LDFLAGS) -std=c11 -Wall -Wextra -Werror -Isrc tests/test_storage_relations.c $(SQLITE_LIBS) -o test-storage-relations
 	./test-storage-relations
 	$(PYTHON) tests/test_structured_relations.py
+.PHONY: test-ui-selection
+test-ui-selection: runtime
+	$(PYTHON) tests/test_ui_selection.py ./runtime
+check: test-ui-selection
+# All Door launch paths rebuild when the opt-in isolation adapter changes.
+runtime: src/door_isolation.inc
+runtime: src/door_diagnostics.h
+
+.PHONY: test-door-broker
+check: test-door-broker
+test-door-broker:
+	$(PYTHON) tests/test_door_worker_diagnostics.py
+	$(PYTHON) tests/test_door_diagnostics.py
+	$(PYTHON) tests/test_door_broker.py
+	$(PYTHON) tests/test_door_processes.py
+	$(PYTHON) tests/test_door_isolation_admission.py
+	$(PYTHON) tests/test_door_services.py

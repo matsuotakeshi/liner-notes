@@ -14,6 +14,7 @@ STREAM_LIST='.liner-sqlite-streams.json'
 LAYOUT='.liner-storage-layout.json'
 TABLES={
  'board_deletions':'board INTEGER PRIMARY KEY,actor INTEGER,depth INTEGER,done INTEGER',
+ 'ui_preferences':'user INTEGER PRIMARY KEY CHECK(user>0),profile TEXT NOT NULL CHECK(length(profile) BETWEEN 1 AND 31)',
  'menu_preferences':'id INTEGER PRIMARY KEY,value INTEGER',
  'guest_boards':'id INTEGER PRIMARY KEY,value INTEGER',
  'news_scoped':'user INTEGER,kind INTEGER,scope TEXT,stamp INTEGER NOT NULL,PRIMARY KEY(user,kind,scope)',

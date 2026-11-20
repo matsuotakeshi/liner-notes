@@ -16,6 +16,9 @@ static int settings_ready,settings_get_ok,settings_save_ok,settings_clock_ok;
 static unsigned settings_reads,settings_writes,settings_mode,settings_kind;
 static uint32_t settings_user;static uint64_t settings_stamp,settings_now;
 static char settings_scope[81];
+static char saved_ui[32];
+int member_settings_repository_ui_get(uint32_t user,char out[32]) { settings_reads++;settings_user=user;strcpy(out,saved_ui);return settings_get_ok; }
+int member_settings_repository_ui_save(uint32_t user,const char *name) { settings_user=user;if(!settings_save_ok)return 0;strcpy(saved_ui,name);settings_writes++;return 1; }
 int member_settings_repository_ready(void) { return settings_ready; }
 int member_settings_repository_now(uint64_t *out) { *out=settings_now;return settings_clock_ok; }
 int member_settings_repository_menu_get(uint32_t user,unsigned *out) {
@@ -1766,6 +1769,8 @@ static void reading_settings_authority(void) {
         assert(member_core_check_commit(&actor,MEMBER_CHECK_MAIL,"",100)==want);
         assert(member_core_menu_get(&actor,&mode)==want && mode==0);
         assert(member_core_menu_save(&actor,MEMBER_MENU_BEGINNER)==want);
+        char ui_name[32];assert(member_core_ui_get(&actor,ui_name)==want && !*ui_name);
+        assert(member_core_ui_save(&actor,"rtbbs")==want);
         assert(!settings_reads && !settings_writes);
     }
     MemberCheckWindow window;assert(member_core_check_begin(NULL,MEMBER_CHECK_MAIL,"",&window)==MEMBER_CORE_LOGIN_REQUIRED);
@@ -1773,6 +1778,12 @@ static void reading_settings_authority(void) {
 }
 static void reading_settings_failures(void) {
     MemberActor actor=reset();MemberCheckWindow out;MemberMenuMode mode;
+    char ui_name[32];assert(member_core_ui_save(&actor,"future-ui")==MEMBER_CORE_OK);
+    assert(member_core_ui_get(&actor,ui_name)==MEMBER_CORE_OK && !strcmp(ui_name,"future-ui"));
+    assert(member_core_ui_save(&actor,"bad name")==MEMBER_CORE_INVALID);
+    settings_save_ok=0;assert(member_core_ui_save(&actor,"rtbbs")==MEMBER_CORE_SETTINGS_STORAGE);settings_save_ok=1;
+    assert(member_core_ui_get(&actor,ui_name)==MEMBER_CORE_OK && !strcmp(ui_name,"future-ui"));
+    assert(member_core_ui_save(&actor,"")==MEMBER_CORE_OK);
     for(unsigned i=0;i<3;i++) {
         assert(member_core_menu_save(&actor,(MemberMenuMode)i)==MEMBER_CORE_OK);
         assert(member_core_menu_get(&actor,&mode)==MEMBER_CORE_OK && (unsigned)mode==i);

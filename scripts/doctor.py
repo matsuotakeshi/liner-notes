@@ -71,7 +71,7 @@ FIX = {
  'default': ('統合マニュアルの該当設定・所有者・依存関係を確認し、修正後に再診断してください。', 'Review the corresponding manual settings, ownership and dependencies, then rerun the check.'),
 }
 FLAGS = {'--menu', '--telnet', '--rtbbs-member-policy', '--userlog-public'}
-VALUES = set('ssh-port ssh-bind ssh-host-key ssh-member-keys ssh-attempts ssh-timeout database database-structured limits timezone sysinfo goodbye doors link-accounts zmodem-helper vault-dir menu-dir help-dir admins lang bind banner disable registration id-mode id-prefix id-digits id-first login-text-dir registration-form max-articles max-mail max-user-posts gather-count user-log chat-log userlog-keep idle-seconds level-seconds time-warning time-grace'.split())
+VALUES = set('ui-policy ui-default ui-allow ssh-port ssh-bind ssh-host-key ssh-member-keys ssh-attempts ssh-timeout database database-structured limits timezone sysinfo goodbye doors door-isolation-socket link-accounts zmodem-helper vault-dir menu-dir help-dir admins lang bind banner disable registration id-mode id-prefix id-digits id-first login-text-dir registration-form max-articles max-mail max-user-posts gather-count user-log chat-log userlog-keep idle-seconds level-seconds time-warning time-grace'.split())
 
 
 class InspectionChanged(ValueError):
@@ -148,12 +148,16 @@ def options(text):
     out['port'] = int(args[0])
     out.update(zip(('board', 'members', 'catalog'), args[1:]))
     ipaddress.IPv4Address(out.get('bind', '127.0.0.1'))
-    for key, allowed in [('lang', {'ja', 'en'}), ('registration', {'open', 'approval', 'closed'}), ('id-mode', {'free', 'auto'}), ('registration-form', {'simple', 'detailed'})]:
+    for key, allowed in [('ui-policy', {'FIXED', 'MEMBERS', 'ALL'}), ('lang', {'ja', 'en'}), ('registration', {'open', 'approval', 'closed'}), ('id-mode', {'free', 'auto'}), ('registration-form', {'simple', 'detailed'})]:
         if key in out and out[key] not in allowed:
             raise ValueError('enum')
     for key,maximum in [('max-articles',2147483646),('max-mail',2147483646),('max-user-posts',2147483646),('idle-seconds',86400),('userlog-keep',1000000),('time-warning',1000000),('time-grace',1000000),('gather-count',1000)]:
         if key in out and (not out[key].isascii() or not out[key].isdigit() or int(out[key]) > maximum):
             raise ValueError('number')
+    if any(key in out for key in ('ui-policy', 'ui-default', 'ui-allow')):
+        profiles = out.get('ui-allow', 'rtbbs').split(',')
+        if any(not re.fullmatch(r'[a-z0-9-]{1,31}', value) for value in profiles) or len(set(profiles)) != len(profiles) or out.get('ui-default', 'rtbbs') not in profiles:
+            raise ValueError('UI default/allowlist')
     for key, low, high in [('ssh-port', 0, 65535), ('ssh-attempts', 1, 20), ('ssh-timeout', 1, 300)]:
         if key in out and (not out[key].isascii() or not out[key].isdigit() or not low <= int(out[key]) <= high):
             raise ValueError('SSH number')

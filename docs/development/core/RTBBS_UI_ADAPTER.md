@@ -98,11 +98,12 @@ secret input, Door/transfer or partial connector input. RTBBS additionally requi
 a safe main-menu state: no registration/editor/confirmation/paging/scan/check,
 mail/vault/batch, chat/talk/Gather or submenu operation.
 
-Production registers RTBBS only. RAW is a mode, not a second profile. Public UI
-selection/configuration, stored preferred UI and login fallback are not enabled
-while the next UI is on hold. Those are later multiple-UI rollout work, not claimed
-as delivered RTBBS commands. MMM/MASH/WebUI are not implemented or modified here.
-No database schema, ID, installation layout, HELP command or public protocol changes.
+Production registers RTBBS only. RAW is a mode, not a second profile. The next
+development candidate adds public UI selection/configuration, owner-only saved
+preferences and login fallback (see [UI selection](UI_SELECTION.md)).
+MMM/MASH/WebUI are not implemented or modified here.
+The selection follow-up adds a settings table and UI commands; existing record
+formats, IDs and the installation layout remain unchanged.
 All C consumers must be rebuilt together; old struct layouts are not a binary ABI.
 
 ## Verification and evidence

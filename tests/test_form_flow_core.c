@@ -48,6 +48,18 @@ static void application_tests(void) {
     /* Refuse an append without altering an already full caller-owned value. */
     application_form_begin(&f);memset(f.body,'a',sizeof(f.body)-1);f.body[sizeof(f.body)-1]=0;
     assert(application_form_input(&f,APPLICATION_VALUE,"x",1)==APPLICATION_INVALID && f.step==1 && strlen(f.body)==sizeof(f.body)-1);
+    /* Include delimiters and the NUL in the exact-capacity boundary. */
+    const char record[]="REALNAME|x\n";
+    size_t prefix=sizeof(f.body)-sizeof(record);
+    application_form_begin(&f);memset(f.body,'p',prefix);f.body[prefix]=0;
+    assert(application_form_input(&f,APPLICATION_VALUE,"x",1)==APPLICATION_PROMPT);
+    assert(f.step==2 && strlen(f.body)==sizeof(f.body)-1);
+    assert(!memcmp(f.body+prefix,record,sizeof(record)));
+    for(size_t i=0;i<prefix;i++)assert(f.body[i]=='p');
+    application_form_begin(&f);memset(f.body,'p',prefix+1);f.body[prefix+1]=0;
+    ApplicationForm before=f;
+    assert(application_form_input(&f,APPLICATION_VALUE,"x",1)==APPLICATION_INVALID);
+    assert(!memcmp(&f,&before,sizeof(f)));
 }
 static void profile_tests(void) {
     const char *keys[]={"HANDLE","BIO","LOCATION","OCCUPATION","INTERESTS","WEBSITE","CONTACT","MACHINE","BIRTHDAY","REALNAME","KANA","ADDRESS","PHONE","GROUP"};

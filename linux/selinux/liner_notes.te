@@ -1,7 +1,8 @@
-policy_module(liner_notes, 0.1.0)
+policy_module(liner_notes, 0.2.0)
 
 # No permissive domains, blanket unconfined attribute or audit2allow output.
 attribute liner_notes_domain;
+attribute liner_notes_isolated_service;
 
 type liner_notes_t;
 type liner_notes_exec_t;
@@ -118,8 +119,27 @@ dev_read_urand(liner_notes_domain)
 dev_rw_null(liner_notes_domain)
 kernel_read_system_state(liner_notes_domain)
 logging_send_syslog_msg(liner_notes_domain)
+# systemd opens the journal stream before the domain transition. Without these
+# inherited-FD permissions SELinux substitutes /null at exec: writes appear to
+# succeed but no record reaches the journal. Do not grant connectto or daemon.
+gen_require(`type init_t;')
+allow liner_notes_isolated_service init_t:fd use;
+allow liner_notes_isolated_service init_t:unix_stream_socket { getattr read write };
 corecmd_exec_shell(liner_notes_domain)
-corecmd_exec_bin(liner_notes_domain)
+# Preserve the existing domains' interfaces. Do not apply this interface to
+# isolated services: it assigns sys_resource_type as well as file execution.
+corecmd_exec_bin(liner_notes_t)
+corecmd_exec_bin(liner_notes_web_t)
+corecmd_exec_bin(liner_notes_link_t)
+corecmd_exec_bin(liner_notes_admin_t)
+corecmd_exec_bin(liner_notes_door_t)
+corecmd_exec_bin(liner_notes_transfer_t)
+# Fixed Python interpreters need bin_t execution, not CAP_SYS_RESOURCE or the
+# broad execution of every base read-only file. Keep this attribute-free.
+gen_require(`type bin_t;')
+read_lnk_files_pattern(liner_notes_isolated_service, bin_t, bin_t)
+list_dirs_pattern(liner_notes_isolated_service, bin_t, bin_t)
+can_exec(liner_notes_isolated_service, bin_t)
 list_dirs_pattern(liner_notes_domain, liner_notes_ro_t, liner_notes_ro_t)
 read_files_pattern(liner_notes_domain, liner_notes_ro_t, liner_notes_ro_t)
 allow liner_notes_domain liner_notes_etc_t:dir search_dir_perms;
@@ -268,3 +288,103 @@ allow liner_notes_admin_t { liner_notes_web_data_t liner_notes_door_data_t liner
 manage_dirs_pattern(liner_notes_admin_t, liner_notes_backup_t, liner_notes_backup_t)
 manage_files_pattern(liner_notes_admin_t, liner_notes_backup_t, liner_notes_backup_t)
 allow liner_notes_admin_t liner_notes_backup_t:file map;
+
+# Opt-in isolated Door services. Issuer authority belongs only to the supervisor.
+# Do not put these entrypoints under the game-executable path.
+# init_domain permits the fixed systemd transition without joining `daemon`.
+# That attribute inherits cross-daemon connectto under cluster-mode policy,
+# which would bypass the explicit role-to-role socket allowlist below.
+
+type liner_notes_broker_t;
+type liner_notes_broker_exec_t;
+init_domain(liner_notes_broker_t, liner_notes_broker_exec_t)
+init_nnp_daemon_domain(liner_notes_broker_t)
+typeattribute liner_notes_broker_t liner_notes_domain;
+typeattribute liner_notes_broker_t liner_notes_isolated_service;
+allow liner_notes_broker_t liner_notes_broker_exec_t:file execute_no_trans;
+type liner_notes_broker_etc_t;
+files_config_file(liner_notes_broker_etc_t)
+read_files_pattern(liner_notes_broker_t, liner_notes_broker_etc_t, liner_notes_broker_etc_t)
+type liner_notes_broker_run_t;
+files_pid_file(liner_notes_broker_run_t)
+manage_dirs_pattern(liner_notes_broker_t, liner_notes_broker_run_t, liner_notes_broker_run_t)
+manage_sock_files_pattern(liner_notes_broker_t, liner_notes_broker_run_t, liner_notes_broker_run_t)
+
+type liner_notes_isolation_t;
+type liner_notes_isolation_exec_t;
+init_domain(liner_notes_isolation_t, liner_notes_isolation_exec_t)
+init_nnp_daemon_domain(liner_notes_isolation_t)
+typeattribute liner_notes_isolation_t liner_notes_domain;
+typeattribute liner_notes_isolation_t liner_notes_isolated_service;
+allow liner_notes_isolation_t liner_notes_isolation_exec_t:file execute_no_trans;
+type liner_notes_isolation_etc_t;
+files_config_file(liner_notes_isolation_etc_t)
+read_files_pattern(liner_notes_isolation_t, liner_notes_isolation_etc_t, liner_notes_isolation_etc_t)
+type liner_notes_isolation_run_t;
+files_pid_file(liner_notes_isolation_run_t)
+manage_dirs_pattern(liner_notes_isolation_t, liner_notes_isolation_run_t, liner_notes_isolation_run_t)
+manage_sock_files_pattern(liner_notes_isolation_t, liner_notes_isolation_run_t, liner_notes_isolation_run_t)
+
+type liner_notes_consumer_t;
+type liner_notes_consumer_exec_t;
+init_domain(liner_notes_consumer_t, liner_notes_consumer_exec_t)
+init_nnp_daemon_domain(liner_notes_consumer_t)
+typeattribute liner_notes_consumer_t liner_notes_domain;
+typeattribute liner_notes_consumer_t liner_notes_isolated_service;
+allow liner_notes_consumer_t liner_notes_consumer_exec_t:file execute_no_trans;
+type liner_notes_consumer_etc_t;
+files_config_file(liner_notes_consumer_etc_t)
+read_files_pattern(liner_notes_consumer_t, liner_notes_consumer_etc_t, liner_notes_consumer_etc_t)
+type liner_notes_consumer_run_t;
+files_pid_file(liner_notes_consumer_run_t)
+manage_dirs_pattern(liner_notes_consumer_t, liner_notes_consumer_run_t, liner_notes_consumer_run_t)
+manage_sock_files_pattern(liner_notes_consumer_t, liner_notes_consumer_run_t, liner_notes_consumer_run_t)
+
+type liner_notes_isolation_state_t;
+files_type(liner_notes_isolation_state_t)
+manage_dirs_pattern(liner_notes_isolation_t, liner_notes_isolation_state_t, liner_notes_isolation_state_t)
+manage_files_pattern(liner_notes_isolation_t, liner_notes_isolation_state_t, liner_notes_isolation_state_t)
+# Only per-run subdirectories become readable by slots, never reservation files.
+type_transition liner_notes_isolation_t liner_notes_isolation_state_t:dir liner_notes_door_drop_t;
+manage_dirs_pattern(liner_notes_isolation_t, liner_notes_door_drop_t, liner_notes_door_drop_t)
+manage_files_pattern(liner_notes_isolation_t, liner_notes_door_drop_t, liner_notes_door_drop_t)
+allow liner_notes_door_t liner_notes_isolation_state_t:dir search_dir_perms;
+allow liner_notes_isolation_t liner_notes_door_data_t:dir search_dir_perms;
+read_files_pattern(liner_notes_isolation_t, liner_notes_broker_etc_t, liner_notes_broker_etc_t)
+
+# systemd service also has a matching capability bounding set. No SYS_ADMIN,
+# SYS_PTRACE, network binding or BBS database access for the root supervisor.
+allow liner_notes_isolation_t self:capability { setuid setgid kill chown dac_override fowner };
+# Dedicated slot safety scans /proc/PID/status across process domains. Permit
+# only directory traversal and ordinary status-file reads, not ptrace, signals,
+# writes, links or broad process-management interfaces.
+gen_require(`attribute domain;')
+allow liner_notes_isolation_t domain:dir search;
+allow liner_notes_isolation_t domain:file { getattr open read };
+term_create_pty(liner_notes_isolation_t, liner_notes_devpts_t)
+allow liner_notes_isolation_t liner_notes_devpts_t:chr_file rw_chr_file_perms;
+domtrans_pattern(liner_notes_isolation_t, liner_notes_door_exec_t, liner_notes_door_t)
+allow liner_notes_isolation_t liner_notes_door_t:process2 nnp_transition;
+allow liner_notes_isolation_t liner_notes_door_t:process { signal sigkill sigstop signull };
+allow liner_notes_door_t liner_notes_isolation_t:fd use;
+allow liner_notes_door_t liner_notes_isolation_t:fifo_file read_fifo_file_perms;
+allow liner_notes_t liner_notes_isolation_t:fd use;
+allow liner_notes_t liner_notes_isolation_run_t:dir search_dir_perms;
+allow liner_notes_t liner_notes_isolation_run_t:sock_file write_sock_file_perms;
+allow liner_notes_t liner_notes_isolation_t:unix_stream_socket connectto;
+
+# Only the supervisor and game server connect to Broker; BBS and Door cannot.
+allow { liner_notes_isolation_t liner_notes_consumer_t } liner_notes_broker_run_t:dir search_dir_perms;
+allow { liner_notes_isolation_t liner_notes_consumer_t } liner_notes_broker_run_t:sock_file write_sock_file_perms;
+allow { liner_notes_isolation_t liner_notes_consumer_t } liner_notes_broker_t:unix_stream_socket connectto;
+# The game client talks to its server. UID + ticket + live lease remain required.
+allow liner_notes_door_t liner_notes_consumer_run_t:dir search_dir_perms;
+allow liner_notes_door_t liner_notes_consumer_run_t:sock_file write_sock_file_perms;
+allow liner_notes_door_t liner_notes_consumer_t:unix_stream_socket connectto;
+manage_files_pattern(liner_notes_consumer_t, liner_notes_door_data_t, liner_notes_door_data_t)
+allow liner_notes_consumer_t liner_notes_door_data_t:dir search_dir_perms;
+allow liner_notes_consumer_t liner_notes_door_data_t:file map;
+# The test consumer and optional local game server own their SQLite files, not
+# the BBS store. Socket labels remain consumer_run_t.
+type_transition liner_notes_consumer_t liner_notes_consumer_run_t:file liner_notes_door_data_t;
+manage_files_pattern(liner_notes_consumer_t, liner_notes_consumer_run_t, liner_notes_door_data_t)

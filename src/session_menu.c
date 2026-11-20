@@ -39,6 +39,26 @@ int session_impl_door_command(Session *s,char *line) {
 }
 
 void session_impl_command(Session *s,char *line) {
+    if((!strcmp(line,"UI") || !strncmp(line,"UI ",3)) && !session_secret(s) && !rtbbs(s)->editor.editing) {
+        int en=rtbbs(s)->presentation.ui.language==LANGUAGE_EN;
+        const SessionUiConfig *config=&s->ui_binding.config;
+        if(!strcmp(line,"UI")) {
+            char text[512];size_t used=(size_t)snprintf(text,sizeof(text),"UI %s / %s / DEFAULT %s\r\n",session_ui_name(s),config->policy==SESSION_UI_FIXED?"FIXED":config->policy==SESSION_UI_MEMBERS?"MEMBERS":"ALL",config->adapters[config->default_index]->name);
+            for(unsigned i=0;i<config->count && used<sizeof(text);i++)if((config->allowed&(1u<<i)) && (config->policy!=SESSION_UI_FIXED || i==config->default_index))used+=(size_t)snprintf(text+used,sizeof(text)-used,"  UI %s\r\n",config->adapters[i]->name);
+            session_impl_queue_text(s,text);session_impl_prompt(s);return;
+        }
+        char name[32];const char *input=line+3;int reset=!strcmp(input,"RESET");
+        if(reset)input=config->adapters[config->default_index]->name;
+        size_t n=strlen(input);if(!n || n>=sizeof(name)) { session_impl_emit(s,"ERR UI\r\n");session_impl_prompt(s);return; }
+        for(size_t i=0;i<=n;i++)name[i]=input[i]>='A' && input[i]<='Z'?(char)(input[i]+32):input[i];
+        SessionUiSelection result=session_ui_choose(s,name);
+        if(result==SESSION_UI_SELECTED || result==SESSION_UI_UNCHANGED) {
+            if(s->core.user) {
+                if(!session_ui_save_choice(s,reset?"":name))session_impl_emit(s,en?"UI selected; preference was not saved.\r\n":"UIを選択しましたが、設定を保存できませんでした。\r\n");
+            } else session_impl_emit(s,en?"UI selected for this connection.\r\n":"この接続中のUIを選択しました。\r\n");
+        } else session_impl_emit(s,result==SESSION_UI_BUSY?(en?"Finish the current operation before changing UI.\r\n":"操作を終了してからUIを切り替えてください。\r\n"):(en?"UI selection is not permitted or unavailable.\r\n":"選択できないUI、または選択が許可されていません。\r\n"));
+        session_impl_prompt(s);return;
+    }
     if(rtbbs(s)->conversation.chatting) { session_impl_chat_input(s,line);return; }
     char mapped[INPUT_LINE_MAX+128]; const char *action=NULL;
     if(rtbbs(s)->presentation.page[0]) {

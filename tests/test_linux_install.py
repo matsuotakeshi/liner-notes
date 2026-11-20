@@ -23,7 +23,17 @@ with tempfile.TemporaryDirectory(prefix='install-linux-') as tmp:
     assert (docs/'manual/boards.md').read_bytes()==(ROOT/'docs/manual/boards.md').read_bytes()
     assert (docs/'index.html').is_file() or (docs/'index.md').is_file()
     assert not list(docs.glob('STAGE*.md')) and not (docs/'development').exists()
+    for name in ('liner-notes-door-broker.service','liner-notes-door-isolation.service'):
+        unit=stage/'usr/local/share/liner-notes/door-services'/name
+        assert unit.is_file() and '@PYTHON@' not in unit.read_text()
+        assert not (stage/'usr/local/lib/systemd/system'/name).exists(), 'Candidate must not activate automatically'
     assert not (stage/'var').exists(),'Installer must not create or alter instance data'
+    for role in ('broker','isolation'):
+        entry=stage/'usr/local/libexec/liner-notes'/('door-'+role)
+        assert entry.stat().st_mode&0o777==0o755
+        assert '@PREFIX@' not in entry.read_text() and '@PYTHON@' not in entry.read_text()
+        assert f'door_{role}.py "$@"' in entry.read_text()
+        subprocess.run(['sh','-n',entry],check=True)
     assert (stage/'usr/local/sbin/liner-notes').read_bytes()==(ROOT/'runtime').read_bytes()
     helper=stage/'usr/local/libexec/liner-notes-door-lock'
     assert helper.read_bytes()==(ROOT/'liner-notes-door-lock').read_bytes()

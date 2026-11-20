@@ -16,9 +16,12 @@ runuser -u bbstest -- bash -c '
   python3.11 tests/test_linux_install.py
 '
 cd /home/bbstest/source
+# Match the restrictive mask inherited from the FreeBSD jail helper.
+(umask 077; python3.11 tests/test_door_broker_linux.py ./runtime)
 python3.11 scripts/install-linux.py --python /usr/bin/python3.11
 useradd --system --home-dir /var/lib/liner-notes --shell /sbin/nologin liner_notes
 systemd-analyze verify /usr/local/lib/systemd/system/liner-notes.service
+systemd-analyze verify /usr/local/share/liner-notes/door-services/*.service
 /usr/local/bin/liner-notes-admin --help
 /usr/local/bin/liner-notes-doctor --help
 /usr/local/bin/liner-notes-check-resume --help
@@ -35,8 +38,14 @@ runuser -u bbstest -- bash -c '
   .web-venv/bin/python tests/test_ssh_transport.py ./runtime
   make PYTHON="$PWD/.web-venv/bin/python" test-doctor
   make CC=clang PYTHON="$PWD/.web-venv/bin/python" SQLITE_CFLAGS= SQLITE_LIBS=-lsqlite3 test-stage73 test-stage74
-  if ! python3.11 scripts/build-lrzsz.py /home/bbstest/lrzsz-check; then
-    cat /home/bbstest/lrzsz-check/build.txt
+  archive_args=()
+  if [ -f /source/build/lrzsz-source/lrzsz-0.13.1.tar.gz ]; then
+    archive_args=(--archive /source/build/lrzsz-source/lrzsz-0.13.1.tar.gz)
+  fi
+  if ! python3.11 scripts/build-lrzsz.py /home/bbstest/lrzsz-check "${archive_args[@]}"; then
+    if [ -f /home/bbstest/lrzsz-check/build.txt ]; then
+      cat /home/bbstest/lrzsz-check/build.txt
+    fi
     exit 1
   fi
   make CC=clang PYTHON=python3.11 SQLITE_CFLAGS= SQLITE_LIBS=-lsqlite3 test-zmodem LRZ=/home/bbstest/lrzsz-check/local/bin/lrz LSZ=/home/bbstest/lrzsz-check/local/bin/lsz

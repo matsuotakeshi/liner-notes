@@ -65,10 +65,19 @@ int main(void) {
     Session s;SessionIO io={NULL,write_bytes,NULL,NULL};
     SessionUiAdapter other=adapter;other.name="second";
     SessionUiConfig config=session_ui_default();config.adapters[1]=&other;config.count=2;config.allowed=3;config.policy=SESSION_UI_ALL;
+    SessionUiConfig parsed=config;
+    assert(session_ui_configure(&parsed,"MEMBERS","second","first,second"));
+    assert(parsed.policy==SESSION_UI_MEMBERS && parsed.default_index==1 && parsed.allowed==3);
+    assert(!session_ui_configure(&parsed,"ALL","first","second"));
+    assert(!session_ui_configure(&parsed,"ALL","first","first,first"));
+    assert(!session_ui_configure(&parsed,"ALL","first","first,"));
+    assert(!session_ui_configure(&parsed,"ALL","missing","first"));
+    assert(!session_ui_configure(&parsed,"ALL","first","mmm"));
+    assert(parsed.policy==SESSION_UI_MEMBERS && parsed.default_index==1);
     assert(session_init_ui(&s,io,77,2,1,1,1,LANGUAGE_EN,&config));
     assert(sizeof(State)<128 && s.ui_binding.state && !s.ui_binding.states[1]);
     State *first=state(&s);strcpy(first->draft,"private to first");
-    assert(session_ui_select(&s,"second")==SESSION_UI_SELECTED && state(&s)!=first && !state(&s)->draft[0]);
+    assert(session_ui_choose(&s,"second")==SESSION_UI_SELECTED && state(&s)!=first && !state(&s)->draft[0]);
     assert(snapshot(&s).menu && snapshot(&s).language==LANGUAGE_EN);
     strcpy(state(&s)->draft,"private to second");
     assert(session_ui_select(&s,"first")==SESSION_UI_SELECTED && state(&s)==first && !strcmp(first->draft,"private to first"));
@@ -94,7 +103,9 @@ int main(void) {
     session_result(&s,r,52);assert(!delivered && s.core.user==12 && s.ui_binding.states[0]);
     r->session=77;session_result(&s,r,53);assert(delivered==1 && s.core.user==9 && !s.ui_binding.states[0] && discarded==1);
     assert(session_ui_select(&s,"first")==SESSION_UI_SELECTED && !state(&s)->draft[0]);
+    s.ui_binding.restore_pending=1;
     assert(session_logout(&s) && !s.core.user && !s.ui_binding.states[1] && discarded==2);
+    assert(!s.ui_binding.restore_pending && !s.ui_binding.preferred[0] && !s.ui_binding.explicit_choice);
     assert(!session_chat_event(&s,&event));
     assert(session_ui_select(&s,"second")==SESSION_UI_SELECTED);
     s.core.user=9;session_revoke(&s);assert(!s.core.user && s.core.closing && !s.ui_binding.states[0] && revoked==1);
@@ -103,5 +114,23 @@ int main(void) {
     session_dispose(&s);assert(cleaned==5); /* idempotent teardown */
     config.count=0;assert(!session_init_ui(&s,io,78,0,1,1,1,LANGUAGE_EN,&config));
     assert(!s.core.active && !session_disconnect_preferences(&s,q));session_dispose(&s);
+    config.count=2;
+    for(unsigned mode=0;mode<5;mode++) {
+        config.policy=mode==2?SESSION_UI_FIXED:SESSION_UI_MEMBERS;
+        config.allowed=mode==3?1:3;
+        assert(session_init_ui(&s,io,77,2,1,1,1,LANGUAGE_EN,&config));
+        if(mode==4) { s.ui_binding.config.policy=SESSION_UI_ALL;assert(session_ui_choose(&s,"first")==SESSION_UI_UNCHANGED); }
+        memset(r,0,sizeof(*r));r->session=77;r->slot=2;r->auth=12;r->user_epoch=3;
+        strcpy(r->ui_profile,mode==1?"missing":"second");
+        session_result(&s,r,100);
+        assert(!strcmp(session_ui_name(&s),mode==0?"second":"first"));
+        assert(!strcmp(s.ui_binding.preferred,r->ui_profile)); /* restriction does not erase preference */
+        if(mode==0) {
+            assert(session_ui_save_choice(&s,"second") && s.core.pending);
+            r->auth=0;r->feedback.ui_profile_saved=1;session_result(&s,r,101);
+            assert(!s.core.pending && !strcmp(s.ui_binding.preferred,"second"));
+        }
+        session_dispose(&s);
+    }
     free(q);free(r);puts("PASS: opaque UI ownership, independent routing, identity invalidation, teardown and typed Core operations");return 0;
 }

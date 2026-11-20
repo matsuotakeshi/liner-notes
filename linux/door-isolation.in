@@ -1,0 +1,3 @@
+#!/bin/sh
+# Fixed labelled entrypoint: never take executable paths from the BBS.
+exec @PYTHON@ -E -s -B @PREFIX@/share/liner-notes/scripts/door_isolation.py "$@"

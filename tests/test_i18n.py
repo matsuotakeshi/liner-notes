@@ -40,7 +40,8 @@ def catalogs():
     for name in ['runtime.c','board.c'] + session_sources:
         source=(ROOT/'src'/name).read_text(encoding='utf-8')
         errors=set(re.findall(r'"(ERR [^"\\]+)',source))
-        assert all('"'+error+'"' in ui for error in errors),(name,errors)
+        missing={error for error in errors if '"'+error+'"' not in ui}
+        assert not missing,(name,missing)
     print('PASS: complete UTF-8 catalogs, unique IDs, printf signatures and all protocol error mappings')
 
 
@@ -58,6 +59,8 @@ def run(binary):
             assert 'Unknown command' in a.cmd('bad-command')
             assert '操作が分かりません' in b.cmd('bad-command')
             assert 'Unsupported language' in a.cmd('LANG fr')
+            assert 'Invalid UI name' in a.cmd('UI '+('X'*32))
+            assert 'UI名が正しくありません' in b.cmd('UI '+('X'*32))
             assert 'Display language: en' in a.cmd('LANG')
             assert 'Username' in a.cmd('REGISTER','> ')
             assert 'Password' in a.cmd('alice','> ')
