@@ -84,8 +84,21 @@ static int payload(void) {
     for (int fd = 3; fd < 256; ++fd) {
         if (fcntl(fd, F_GETFD) >= 0 || errno != EBADF) value.descriptors_closed = 0;
     }
-    /* chroot("/") has no namespace effect, even if the denial assertion fails. */
-    value.chroot_denied = chroot("/") == -1 && errno == EPERM;
+    /* Solaris can allow chroot("/") when it names the system root even without
+     * proc_chroot. Test a genuine root change, not that no-op. /lib exists in
+     * both the host and our minimal loader root. If unexpectedly allowed this
+     * only moves inward; the reporter then uses existing pipes and exits. */
+    struct stat current, target;
+    if (stat("/",&current) || stat("/lib",&target)) child_error("chroot-target",70);
+    if (!S_ISDIR(target.st_mode) ||
+        (current.st_dev == target.st_dev && current.st_ino == target.st_ino)) {
+        errno = EINVAL; child_error("chroot-target",70);
+    }
+    int changed = chroot("/lib"), change_errno = errno;
+    if (changed == -1 && change_errno != EPERM) {
+        errno = change_errno; child_error("chroot-denial",70);
+    }
+    value.chroot_denied = changed == -1 && change_errno == EPERM;
     char ready = 'R', ack = 0;
     if (!transfer(1, &ready, 1, 1) || !transfer(1, &value, sizeof(value), 1)) return 71;
     return transfer(0, &ack, 1, 0) && ack == 'A' ? 0 : 72;

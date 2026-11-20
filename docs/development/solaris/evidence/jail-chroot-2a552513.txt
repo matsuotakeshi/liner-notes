@@ -1,0 +1,67 @@
+Source SHA: 2a5525136d395f827801a58f850016a2acf3df02
+Run: https://github.com/matsuotakeshi/liner-notes/actions/runs/44754533467
+Artifact ID: 14640350640
+Artifact SHA-256: e88f9f8142552b26d1cb033cf6186a9d5a4188bbb26ec54de20ba10560042abe
+
+Relevant CI failure (original lines 1024-1052):
+SOLARIS_JAIL_INTERPRETER /usr/lib/amd64/ld.so.1
+F.....
+======================================================================
+FAIL: test_native_compiler_and_unprivileged_refusal (__main__.JailFixture.test_native_compiler_and_unprivileged_refusal)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/export/home/ci-test/ci/native-solaris-i8z6a_i6/source/tests/test_solaris_door_jail.py", line 241, in test_native_compiler_and_unprivileged_refusal
+    self.assertEqual(value[1:],(0,1,1))
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^
+AssertionError: Tuples differ: (0, 1, 0) != (0, 1, 1)
+
+First differing element 2:
+0
+1
+
+- (0, 1, 0)
+?        ^
+
++ (0, 1, 1)
+?        ^
+
+
+----------------------------------------------------------------------
+Ran 17 tests in 0.235s
+
+FAILED (failures=1)
+{"receipt": "/tmp/tmp_rlq0z26/private/result.json", "source_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "cleanup_complete": true}
+{"receipt": "/tmp/tmp5myx2ij8/private/result.json", "source_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "cleanup_complete": false}
+gmake: *** [Makefile:663: test-door-broker] Error 1
+
+Exact-main reporter inspection (CI account, truss and ppriv):
+{"source_sha": "2a5525136d395f827801a58f850016a2acf3df02", "source_hash": "f3e049032920a811309c621aac28008d1bd88d8f275f800efc9193741d20494e", "directory": "/export/home/ci-test/ci/liner-door-loader-a6bpdkah"}
+
+Interpreter Section:  .interp
+	/usr/lib/amd64/ld.so.1
+
+	libc.so.1 =>	 /lib/64/libc.so.1
+
+UNPRIVILEGED_REFUSAL 80
+TRACE_EXIT 0
+FLAGS (0, 0, 1, 0)
+chroot("/")					= 0
+
+UNTRACED_FLAGS (0, 0, 1, 0)
+11428:	/export/home/ci-test/ci/liner-door-loader-a6bpdkah/probe --inside
+flags = <none>
+	E: dax_access,file_link_any,file_read,file_write,net_access,proc_exec,proc_fork,proc_info,proc_self,proc_session,sys_ib_info
+	I: dax_access,file_link_any,file_read,file_write,net_access,proc_exec,proc_fork,proc_info,proc_self,proc_session,sys_ib_info
+	P: dax_access,file_link_any,file_read,file_write,net_access,proc_exec,proc_fork,proc_info,proc_self,proc_session,sys_ib_info
+	L: cmi_access,cmi_owner,contract_event,contract_identity,contract_observer,cpc_cpu,dax_access,dtrace_kernel,dtrace_proc,dtrace_user,file_audit,file_chown,file_chown_self,file_dac_execute,file_dac_read,file_dac_search,file_dac_write,file_downgrade_sl,file_flag_set,file_link_any,file_owner,file_read,file_retention_override,file_setid,file_upgrade_sl,file_write,graphics_access,graphics_map,ipc_dac_read,ipc_dac_write,ipc_mrp_access,ipc_owner,kstat_manage,kstat_rd_sensitive,net_access,net_bindmlp,net_icmpaccess,net_mac_aware,net_mac_implicit,net_observability,net_privaddr,net_rawaccess,proc_audit,proc_chroot,proc_clock_highres,proc_exec,proc_fork,proc_info,proc_lock_memory,proc_owner,proc_priocntl,proc_self,proc_session,proc_setid,proc_taskid,proc_zone,sys_acct,sys_admin,sys_audit,sys_config,sys_devices,sys_dl_config,sys_flow_config,sys_ib_config,sys_ib_info,sys_ip_config,sys_ipc_config,sys_iptun_config,sys_linkdir,sys_mount,sys_net_config,sys_nfs,sys_ppp_config,sys_res_bind,sys_res_config,sys_resource,sys_share,sys_smb,sys_suser_compat,sys_time,sys_trans_label,win_colormap,win_config,win_dac_read,win_dac_write,win_devices,win_dga,win_downgrade_sl,win_fontpath,win_mac_read,win_mac_write,win_selection,win_upgrade_sl
+
+
+Distinct target inspection (disposable CI-user Python process):
+CHROOT_DIFFERENT_DIRECTORY_EXIT 1
+{"same_directory": false}
+Traceback (most recent call last):
+  File "<string>", line 1, in <module>
+    import os,json; a=os.stat('/'); b=os.stat('/lib'); print(json.dumps({'same_directory':(a.st_dev,a.st_ino)==(b.st_dev,b.st_ino)}),flush=True); os.chroot('/lib'); print('UNEXPECTED_CHROOT_SUCCESS',flush=True)
+                                                                                                                                                  ~~~~~~~~~^^^^^^^^
+PermissionError: [Errno 1] Insufficient privileges: '/lib'
+

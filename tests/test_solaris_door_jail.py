@@ -234,6 +234,10 @@ class JailFixture(unittest.TestCase):
 
             # The reporter protocol and diagnostic channel are independent even
             # without root. Namespace flags must NOT claim isolation on the host.
+            # / is a Solaris no-op and is not a privilege-denial test. Require
+            # an existing distinct /lib target; the expected denial stays true.
+            current, target = os.stat('/'), os.stat('/lib')
+            self.assertNotEqual((current.st_dev,current.st_ino),(target.st_dev,target.st_ino))
             with subprocess.Popen([str(binary),'--inside'],stdin=subprocess.PIPE,
                                   stdout=subprocess.PIPE,stderr=subprocess.PIPE) as child:
                 self.assertEqual(child.stdout.read(1),b'R')
