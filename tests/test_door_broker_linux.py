@@ -261,6 +261,29 @@ with socket.socket(socket.AF_UNIX,socket.SOCK_STREAM) as s:
             out=clients[1].cmd('1',b'KEY> ');assert b'AUTH 2' in out
             clients[1].send(b'g');assert b'SAVED' in clients[1].until(b'KEY> ')
             assert query(game_socket,{})['players']==[[1,1],[2,2]]
+            # Losing the Broker must revoke a live Door, reclaim its descendants,
+            # and deny new launches. Recovery cannot resurrect cached leases.
+            clients[1].send(b'f');clients[1].until(b'KEY> ')
+            broker_inode=endpoint.lstat().st_ino
+            services[0].kill();services[0].wait(timeout=10)
+            clients[1].until(b'0:main] > ')
+            wait_for(released,'Broker death left live/reserved Door')
+            assert query(game_socket,{})=={'active':0,'players':[[1,1],[2,2]]}
+            out=clients[1].cmd('1',b'0:main] > ')
+            assert b'AUTH ' not in out,'Broker outage bypassed authentication'
+            wait_for(released,'failed Broker launch retained a clean slot')
+            # SIGKILL leaves a socket. Remove only this dead fixture generation,
+            # after verifying identity and completion; never reset BUSY markers.
+            st=endpoint.lstat()
+            assert stat.S_ISSOCK(st.st_mode) and st.st_ino==broker_inode and st.st_uid==BROKER
+            endpoint.unlink()
+            recovered_broker=start_service(0);ready(endpoint,recovered_broker)
+            assert query(game_socket,{})=={'active':0,'players':[[1,1],[2,2]]}
+            lobby()
+            assert query(game_socket,{})['active']==1
+            clients[1].send(b'x');assert b'DENIED' in clients[1].until(b'KEY> ')
+            assert query(game_socket,{})['players']==[[1,1],[2,2]]
+            print('PASS Broker SIGKILL/outage/restart: old leases denied, data retained, fresh login required',flush=True)
             # Stopping the parent supervisor revokes live workers/leases and reaps
             # their detached children before the durable slots become reusable.
             clients[1].send(b'f');clients[1].until(b'KEY> ')

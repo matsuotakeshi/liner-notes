@@ -43,11 +43,12 @@ Audit stderr logs contain accepted/rejected and slot, not passwords/key material
 CONNECTIONS identifies SSH. Durable USERLOG retains the compatible RAW transport
 tag for SSH sessions; it still records the BBS member, connection and duration.
 
-**Trusted Door boundary:** installed games still execute as the service UID.
+**Trusted Door boundary:** legacy games still execute as the service UID.
 The host key is readable by that UID and the runtime holds private key material.
-This feature does not claim protection against malicious same-UID Door code.
-Do not install untrusted games. UID isolation and the Door authentication Broker
-are separate work; no Broker or game API is implemented here.
+This configuration does not protect against malicious same-UID Door code.
+The separate opt-in [Door Broker candidate](../DOOR_BROKER.md) now requires every
+Door to use dedicated slot UIDs. SSH authentication alone does not enable that
+isolation. Its OS/security acceptance gates remain independent of SSH tests.
 
 ## Build and operating systems
 
@@ -189,3 +190,20 @@ Primary references: [libssh server API](https://api.libssh.org/stable/group__lib
 [libssh features](https://www.libssh.org/features/). The asynchronous message API
 uses supported deprecated accessors, locally annotated; other compiler warnings
 and all existing CI gates remain enforced.
+
+## Acceptance expansion, 2026-11-20
+
+The existing encrypted Hosted test additionally checks SCP and X11 rejection,
+zero/oversized PTY requests, and the startup deadline after successful password
+authentication (before channel, before PTY and before shell). Telnet must still
+respond after each deadline. Suspending a member with a live SSH Door must close
+that connection and reap the Door before the member can resume with a fresh login.
+A separate four-slot fixture checks the shared Telnet/SSH cap, surviving clients,
+three aborted handshakes and reuse of the released slot. It observes the Core's
+connection inventory before reconnecting, without increasing limits/timeouts.
+
+See [the evidence and pending-gate register](../DOOR_SSH_ACCEPTANCE.md). These
+new cases require the current PR's Linux compatibility results; source inspection
+and Windows syntax tests are not encrypted acceptance. FreeBSD/Solaris libssh
+runtime and dedicated SSH SELinux validation remain outstanding. No main-only
+runner admission or production configuration is changed.
