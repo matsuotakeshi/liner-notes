@@ -44,6 +44,7 @@ static Door *isolated_start(const DoorSpec *g,unsigned level,uint32_t user,const
             for(size_t i=0;i<size/sizeof(int);i++) { if(count++==0)master=fds[i];else close(fds[i]); }
         }
     }
+    door_reply_diagnostic(reply,(long)received,count,message.msg_flags&(MSG_CTRUNC|MSG_TRUNC),receive_error);
     if(received!=3 || memcmp(reply,"OK\n",3) || count!=1 || !isatty(master) || (message.msg_flags&(MSG_CTRUNC|MSG_TRUNC))) {
         const char *phase=received!=3?"isolation-receive":memcmp(reply,"OK\n",3)?"isolation-rejected":count!=1?"isolation-fd-count":(message.msg_flags&(MSG_CTRUNC|MSG_TRUNC))?"isolation-truncated":"isolation-pty";
         door_launch_diagnostic(phase,received<0?receive_error:0);

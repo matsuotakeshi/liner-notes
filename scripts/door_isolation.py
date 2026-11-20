@@ -24,6 +24,16 @@ def failure_event(event,phase,error):
     except Exception:
         pass # failed diagnostics must not prevent revocation/cleanup or ERR
 
+
+def parent_event(event,*,reason=None,worker=None,status=None,active=None,error=None):
+    if os.environ.get('LINER_DOOR_DIAGNOSTICS')!='1':return
+    fields={'event':event}
+    if reason is not None:fields['reason']=reason # fixed call-site label
+    for key,value in (('worker',worker),('status',status),('active',active),('errno',error)):
+        if isinstance(value,int):fields[key]=value
+    with contextlib.suppress(Exception):
+        print(json.dumps(fields),file=sys.stderr,flush=True)
+
 def read_line(sock,timeout=3):
     deadline=time.monotonic()+timeout
     data=bytearray()
@@ -208,10 +218,16 @@ def accept_connection(listener):
 def start_worker(config,connection,listener,watch,alive,children):
     # Reject only this request on credential/fork failure. Existing worker
     # watch pipes and reservations belong to already-running Doors.
+    phase='credentials'
     try:
-        if peer_uid(connection)!=config['bbs_uid'] or len(children)>=len(config['slots'])+8:return
+        if peer_uid(connection)!=config['bbs_uid']:
+            parent_event('admission-rejected',reason='peer',active=len(children));return
+        if len(children)>=len(config['slots'])+8:
+            parent_event('admission-rejected',reason='capacity',active=len(children));return
+        phase='fork'
         pid=os.fork()
-    except OSError:
+    except OSError as error:
+        parent_event('admission-rejected',reason=phase,active=len(children),error=error.errno)
         print('{"event":"admission-unavailable"}',file=sys.stderr,flush=True)
         return
     if pid==0:
@@ -224,6 +240,19 @@ def start_worker(config,connection,listener,watch,alive,children):
             status=1;failure_event('worker-failed',phase,error)
         finally:os._exit(status)
     children.add(pid)
+    parent_event('worker-accepted',worker=pid,active=len(children))
+
+
+def reap_workers(children):
+    for child in list(children):
+        done,status=os.waitpid(child,os.WNOHANG)
+        if done:
+            children.remove(child)
+            result=os.waitstatus_to_exitcode(status)
+            parent_event('worker-reaped',worker=child,status=result,active=len(children))
+            if status:
+                with contextlib.suppress(Exception):
+                    print(json.dumps(dict(event='worker-exit',status=result)),file=sys.stderr,flush=True)
 
 
 def main():
@@ -250,17 +279,9 @@ def main():
         nonlocal stopping
         stopping=True
     for sig in (signal.SIGTERM,signal.SIGINT):signal.signal(sig,stop)
-    def reap():
-        for child in list(children):
-            done,status=os.waitpid(child,os.WNOHANG)
-            if done:
-                children.remove(child)
-                if status:
-                    with contextlib.suppress(Exception):
-                        print(json.dumps(dict(event='worker-exit',status=os.waitstatus_to_exitcode(status))),file=sys.stderr,flush=True)
     try:
         while not stopping:
-            reap()
+            reap_workers(children)
             connection=accept_connection(listener)
             if connection is None:continue
             try:
@@ -271,6 +292,6 @@ def main():
         if endpoint.exists() and endpoint.lstat().st_ino==inode:endpoint.unlink()
         # Parent death also closes alive, revoking every worker. Do not forcibly
         # kill a worker and silently make its slot reusable after partial cleanup.
-        while children:reap();time.sleep(.05)
+        while children:reap_workers(children);time.sleep(.05)
 
 if __name__=='__main__':main()

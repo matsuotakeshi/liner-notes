@@ -25,6 +25,16 @@ int main(void) {
     return errno==EDOM?0:1;
 }
 ''')
+        cls.reply = cls.compile('reply', '''
+#include "door_diagnostics.h"
+int main(int argc,char **argv) {
+    if(argc!=4)return 2;
+    long length=strtol(argv[2],NULL,10);
+    errno=EDOM;
+    door_reply_diagnostic(length<=0?NULL:argv[1],length,atoi(argv[3]),1,length<0?42:0);
+    return errno==EDOM?0:1;
+}
+''')
 
     @classmethod
     def compile(cls, name, source, libraries=()):
@@ -50,6 +60,21 @@ int main(void) {
         result = self.execute(self.probe, '1')
         self.assertEqual(result.stdout, '')
         self.assertEqual(result.stderr, 'DOOR_LAUNCH_FAILURE phase=isolation-connect errno=42\n')
+
+    def test_reply_categories_never_print_received_payload(self):
+        for value,length,kind in [('OK\n',3,'OK'),('ERR',3,'ERR_PREFIX'),('DON',3,'DONE_PREFIX'),
+                                  ('private-ticket',3,'OTHER'),('ok\n',3,'OTHER'),
+                                  ('OK',2,'SHORT'),('E',1,'SHORT'),('',0,'EOF'),('',-1,'IO_ERROR')]:
+            with self.subTest(kind=kind,value=value):
+                result=self.execute(self.reply,'1',value,length,2)
+                self.assertEqual(result.stdout,'')
+                self.assertEqual(result.stderr,f'DOOR_ISOLATION_REPLY result={kind} bytes={length} fds=2 truncated=1 errno={42 if length<0 else 0}\n')
+                self.assertNotIn('private',result.stderr)
+
+    def test_reply_diagnostics_require_exact_opt_in(self):
+        for enabled in (None,'','0','true'):
+            with self.subTest(enabled=enabled):
+                self.assertEqual(self.execute(self.reply,enabled,'private-ticket',3,0).stderr,'')
 
     @unittest.skipUnless(sys.platform.startswith(('linux','freebsd')), 'Unix isolation client only')
     def test_real_isolation_connect_failure_is_private_and_default_silent(self):
