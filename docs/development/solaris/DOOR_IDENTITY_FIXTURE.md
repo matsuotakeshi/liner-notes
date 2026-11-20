@@ -105,7 +105,10 @@ false. The production backend continues to refuse Solaris.
 
 The runner validates immutable root ownership, ancestors, regular files and
 hashes, and refuses source execution from a developer checkout. Compiler paths
-are resolved and checked, compiler environment overrides are removed, inherited
+are resolved and checked. Root-owned system compiler hardlink aliases are allowed;
+the single-link requirement continues to apply to private fixture files. Compiler
+ownership, ancestor trust, file type and group/other write restrictions are unchanged.
+Compiler environment overrides are removed, inherited
 FDs are closed and the fixture holds a dedicated root-only lock. No compiler or
 policy path comes from a BBS request. It never grants root execution to `ci-test`.
 
@@ -149,3 +152,44 @@ The native C probe has not yet been compiled from this candidate on Solaris;
 LAN execution remains trusted-main only. No root bundle has been installed or
 executed, and no set-ID matrix result is claimed. Root-credential fixture approval
 is separate from the earlier library installations and SMF fixture permission.
+
+## First approved root attempt: compiler preflight refusal
+
+PR #156 merged as `916ca4bab0fdbefe9c17b8a69ebc21a81d1030f8` after all ten Hosted
+workflows passed. Its same-SHA Solaris Native CI
+[44721754052](https://github.com/matsuotakeshi/liner-notes/actions/runs/44721754052)
+and the other ten main workflows, including Release Set and isolated upgrade,
+passed. The user authorized the fixed root installation and trial on 10.0.0.52.
+
+The exact two source files were extracted from that main commit, hashed and
+installed in `/opt/liner-notes-ci/door-boundary` with root-only permissions. The
+first `--run` stopped before creating its disposable directory: `trusted(compiler)`
+applied the private fixture's single-link rule to the packaged GCC executable.
+Read-only inspection confirmed `/usr/gcc/15/bin/gcc` is root-owned, mode 0555,
+and has **three** hardlinks; its ancestors are root-owned mode 0755. This is a
+test-launcher preflight defect, not evidence of an identity escape or confinement.
+No synthetic set-ID files were created and no UID/GID matrix case executed.
+
+The correction distinguishes the protected system compiler from private fixture
+files. Tests cover packaged aliases plus refusal of non-root ownership,
+group/other writes, symlinks and writable ancestors. The ordinary non-root Solaris
+test now calls the same compiler preflight before compilation, so this failure
+will be visible in normal native CI rather than only at root execution.
+
+Local evidence: `build/solaris-door-boundary/approved-916ca4b/execution.log`,
+its source bundle and `manifest.json`. Installed source SHA-256 values:
+
+- Python fixture: `5e8e1caf9d067c2572cff5605cde0912cdde675b2d4552352f65552d15ba69ae`
+- C reporter: `546e8d33dd75f603e12b3d6450df00b9a115eea9e80449c15b9e67af9cefa653`
+
+The installed bundle is retained unchanged; it is not patched from the candidate
+branch. After the correction's Hosted checks, merge and same-SHA non-root Solaris
+validation, back up only those installed files/manifest under a new root-only
+backup directory, holding the fixture lock. Verify the old hashes above and the
+new reviewed-main hashes before replacing those same files; keep the lock and
+permissions. Then rerun the fixed `--run` command. No other installed helper,
+account, service, package, mount or sudo rule is part of that continuation.
+
+Correction local result: 18 tests passed / 1 Solaris-only skip. Native execution
+of the correction and the credential matrix remain pending. Authenticated Door
+launch is still disabled, with no change to its security or acceptance criteria.
