@@ -473,3 +473,45 @@ file descriptors and exec, confirming PID/flags/arguments, preservation of prior
 log content, and rejection of public files and symlinks. These are not substitutes
 for main-only Enforcing verification. BBS behavior, policy, root helper and
 installed service templates are unchanged; no production operation is required.
+
+## Slot permission location (2026-11-20, CI-only investigation)
+
+Main `3be84ebbf4f98ebd7355c174e8222e7ba4f82349`, native run
+[44657216416](https://github.com/matsuotakeshi/liner-notes/actions/runs/44657216416),
+Artifact 14594308254, now starts the isolation service and captures:
+
+```text
+worker-accepted
+launch-rejected errno=13 phase=slot
+```
+
+The earlier diagnostic `222/STDERR` failure is no longer present. The actual
+request is admitted; access is denied during slot acquisition. This covers file
+open/stat/lock, checking reservation length, scanning existing processes and
+writing/syncing BUSY. Linux process scanning uses pidfd_open and /proc status
+reads. The current evidence does not identify which operation is denied and does
+not justify adding permissions. Journal marker delivery is still unverified.
+
+For the next investigation, the CI entry described above uses `runpy` instead of
+exec to observe Python exception events while running the original isolation
+source. Only exact sibling source filenames and the functions `slot_acquire` and
+`processes` are traced. Only EACCES/EPERM events emit `slot-permission-error` with
+fixed function name, numeric source line and errno. No exception text, file path,
+traceback, local variable, UID, request or token is exported. A denial propagating
+from processes to slot_acquire can produce two records; the inner location is the
+operation of interest. Interpret line numbers against the exact main SHA being
+tested, not a later checkout.
+
+The diagnostic process retains its domain, PID, Python flags and isolation argv.
+Existing stderr/private-file validation, log filtering, journal gate and original
+Door lifecycle tests remain. Trace/argv state is restored on normal completion
+or exceptions; diagnostic write errors do not replace the original denial.
+Unrelated frames and ordinary process-disappearance races are not logged.
+The normal installed entry and all BBS/permission/process-isolation code remain
+unchanged. This is instrumentation, not a repair or a production configuration.
+
+Portable tests exercise actual Python exception events and privacy/failure paths.
+The existing disposable Rocky check runs the instrumented entry as a real child,
+verifies unchanged PID/flags/arguments, and checks two propagated denial locations
+without exposing the synthetic secret. Main-only Enforcing CI must still identify
+the actual denied operation before any corrective policy or code change.

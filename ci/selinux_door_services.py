@@ -22,12 +22,13 @@ def private_diagnostics(path):
     """Export only the isolation service's bounded, allowlisted diagnostic fields."""
     events = {'worker-accepted', 'worker-reaped', 'admission-rejected',
               'admission-unavailable', 'worker-exit', 'door-exit', 'launch-rejected',
-              'launch-failed', 'cleanup-failed', 'worker-failed'}
+              'launch-failed', 'cleanup-failed', 'worker-failed', 'slot-permission-error'}
     labels = {'phase': {'request', 'slot', 'scope', 'broker', 'ticket-pipe', 'dropfile',
                        'pty', 'launch', 'handoff', 'running', 'revoke', 'descriptors',
                        'scope-stop', 'dropfile-remove', 'slot-release', 'connection-close',
                        'setup', 'supervise'},
-              'reason': {'peer', 'capacity', 'credentials', 'fork'}}
+              'reason': {'peer', 'capacity', 'credentials', 'fork'},
+              'function': {'slot_acquire', 'processes'}}
     flags = os.O_RDONLY | getattr(os, 'O_NOFOLLOW', 0)
     fd = os.open(path, flags)
     with os.fdopen(fd, 'rb') as stream:
@@ -44,7 +45,7 @@ def private_diagnostics(path):
         if not isinstance(item, dict) or not isinstance(item.get('event'), str) or item['event'] not in events:
             continue
         clean = {'event': item['event']}
-        for key in ('worker', 'active', 'status', 'errno'):
+        for key in ('worker', 'active', 'status', 'errno', 'line'):
             if type(item.get(key)) is int: clean[key] = item[key]
         for key, allowed in labels.items():
             if isinstance(item.get(key), str) and item[key] in allowed: clean[key] = item[key]

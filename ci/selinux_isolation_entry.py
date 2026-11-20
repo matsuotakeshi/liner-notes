@@ -1,9 +1,34 @@
 """CI-only entry: open diagnostic stderr after the isolation domain transition."""
 import argparse
+import errno
+import json
 import os
 from pathlib import Path
+import runpy
 import stat
 import sys
+
+
+def permission_trace():
+    """Only two known frames, numeric source lines/errno, never traceback/locals."""
+    directory = Path(__file__).parent
+    targets = {str(directory/'door_isolation.py'): 'slot_acquire',
+               str(directory/'door_processes.py'): 'processes'}
+    def trace(frame, event, arg):
+        function = targets.get(frame.f_code.co_filename)
+        if function is None or frame.f_code.co_name != function:
+            return None
+        if event == 'exception':
+            error = arg[1]
+            if isinstance(error, OSError) and error.errno in (errno.EACCES, errno.EPERM):
+                try:
+                    print(json.dumps({'event': 'slot-permission-error', 'function': function,
+                                      'line': frame.f_lineno, 'errno': error.errno}),
+                          file=sys.stderr, flush=True)
+                except Exception:
+                    pass # evidence must not alter refusal/cleanup
+        return trace
+    return trace
 
 
 def redirect_stderr(path):
@@ -27,9 +52,18 @@ def main():
         parser.error('expected fixed isolation arguments after --')
     redirect_stderr(args.diagnostic)
     # Both files are in the existing root-owned fixture scripts directory.
-    # Keep the shipped Python isolation flags, PID, environment and argv.
+    # Keep Python flags, PID, environment and argv. This CI-only runpy variant
+    # observes only permission exceptions from the two fixed functions above.
     target = Path(__file__).with_name('door_isolation.py')
-    os.execv(sys.executable, [sys.executable, '-E', '-s', '-B', str(target), *args.arguments[1:]])
+    previous_trace = sys.gettrace()
+    previous_argv = sys.argv
+    try:
+        sys.argv = [str(target), *args.arguments[1:]]
+        sys.settrace(permission_trace())
+        runpy.run_path(str(target), run_name='__main__')
+    finally:
+        sys.settrace(previous_trace)
+        sys.argv = previous_argv
 
 
 if __name__ == '__main__':

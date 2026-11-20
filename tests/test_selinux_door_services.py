@@ -344,8 +344,11 @@ def real_accounts():
     with tempfile.TemporaryDirectory(prefix='lnci-capture-') as directory:
         base=Path(directory);entry=base/'selinux_isolation_entry.py';log=base/'private.jsonl'
         entry.write_bytes((ROOT/'ci/selinux_isolation_entry.py').read_bytes())
+        (base/'door_processes.py').write_text("def processes():\n    raise PermissionError(13,'synthetic secret')\n")
         (base/'door_isolation.py').write_text(
-            "import json,os,sys\nprint(json.dumps({'pid':os.getpid(),'args':sys.argv[1:],"
+            "import json,os,sys\nfrom door_processes import processes\ndef slot_acquire():\n    processes()\n"
+            "try:slot_acquire()\nexcept PermissionError:pass\n"
+            "print(json.dumps({'pid':os.getpid(),'args':sys.argv[1:],"
             "'flags':[sys.flags.ignore_environment,sys.flags.no_user_site,sys.flags.dont_write_bytecode]}))\n"
             "os.write(2,b'captured\\n')\n")
         log.write_bytes(b'preserved\n');log.chmod(0o600)
@@ -354,7 +357,11 @@ def real_accounts():
         out,err=child.communicate(timeout=5)
         assert child.returncode==0 and not err
         assert json.loads(out)=={'pid':child.pid,'args':['--config','fixture','--check-config'],'flags':[1,1,1]}
-        assert log.read_bytes()==b'preserved\ncaptured\n'
+        saved=log.read_bytes();lines=saved.splitlines()
+        assert lines[0]==b'preserved' and lines[-1]==b'captured' and b'synthetic secret' not in saved
+        assert [json.loads(line) for line in lines[1:-1]]==[
+            {'event':'slot-permission-error','function':'processes','line':2,'errno':13},
+            {'event':'slot-permission-error','function':'slot_acquire','line':4,'errno':13}]
         log.chmod(0o644)
         rejected=subprocess.run(args,capture_output=True,timeout=5)
         assert rejected.returncode!=0 and not rejected.stdout
@@ -362,8 +369,8 @@ def real_accounts():
         link_args=args.copy();link_args[link_args.index('--diagnostic')+1]=str(alias)
         rejected=subprocess.run(link_args,capture_output=True,timeout=5)
         assert rejected.returncode!=0 and not rejected.stdout
-        assert log.read_bytes()==b'preserved\ncaptured\n'
-    print('PASS disposable Rocky capture: fixed exec/PID/flags/append, public-file and symlink refusal')
+        assert log.read_bytes()==saved
+    print('PASS disposable Rocky capture: unchanged PID/flags/argv, permission locations, append and unsafe-file refusal')
 
 
 class JournalProbe(unittest.TestCase):
@@ -473,6 +480,12 @@ class JournalProbe(unittest.TestCase):
         self.assertEqual(json.loads(self.filtered(content)),dict(event='launch-rejected',phase='slot',errno=13))
         self.assertEqual(self.filtered(b'x'*20000),b'DIAGNOSTIC_TRUNCATED\n')
 
+    def test_permission_location_filter_omits_private_context(self):
+        item={'event':'slot-permission-error','function':'processes','line':44,'errno':13,
+              'filename':'/private/path','locals':{'ticket':'secret'},'traceback':'secret'}
+        self.assertEqual(json.loads(self.filtered(json.dumps(item).encode())),
+                         {'event':'slot-permission-error','function':'processes','line':44,'errno':13})
+
     def test_unsafe_private_files_are_rejected(self):
         for info in ({'st_uid':123},{'st_mode':0o100644},{'st_nlink':2},{'st_mode':0o040600}):
             with self.subTest(info=info),self.assertRaisesRegex(ValueError,'unsafe'):
@@ -521,16 +534,65 @@ class ConfinedEntry(unittest.TestCase):
             with self.assertRaises(PermissionError):self.entry.redirect_stderr('/fixed/log')
             dup.assert_not_called()
 
-    def test_original_flags_config_and_preflight_survive_exec(self):
+    def test_original_config_preflight_and_trace_restore(self):
         for tail in ([],['--check-config']):
             arguments=['entry','--diagnostic','/fixed/log','--','--config','/fixed/config',*tail]
+            previous_trace=sys.gettrace()
+            target=str(Path(self.entry.__file__).with_name('door_isolation.py'))
+            def execute(path,run_name):
+                self.assertEqual(sys.argv,[target,'--config','/fixed/config',*tail])
+                self.assertEqual(run_name,'__main__')
+                self.assertTrue(callable(sys.gettrace()))
             with patch.object(sys,'argv',arguments),patch.object(self.entry,'redirect_stderr') as redirect, \
-                 patch.object(self.entry.os,'execv') as execute:
+                 patch.object(self.entry.runpy,'run_path',side_effect=execute) as run:
                 self.entry.main()
+                self.assertIs(sys.argv,arguments)
             redirect.assert_called_once_with('/fixed/log')
-            expected=[sys.executable,'-E','-s','-B',str(Path(self.entry.__file__).with_name('door_isolation.py')),
-                      '--config','/fixed/config',*tail]
-            execute.assert_called_once_with(sys.executable,expected)
+            run.assert_called_once_with(target,run_name='__main__')
+            self.assertIs(sys.gettrace(),previous_trace)
+
+    def test_trace_and_argv_restore_on_program_failure(self):
+        arguments=['entry','--diagnostic','/fixed/log','--','--config','/fixed/config']
+        previous_trace=sys.gettrace()
+        with patch.object(sys,'argv',arguments),patch.object(self.entry,'redirect_stderr'), \
+             patch.object(self.entry.runpy,'run_path',side_effect=SystemExit(3)):
+            with self.assertRaises(SystemExit) as error:self.entry.main()
+            self.assertEqual(error.exception.code,3)
+            self.assertIs(sys.argv,arguments)
+        self.assertIs(sys.gettrace(),previous_trace)
+
+    def trace_error(self,filename,function,number,broken_log=False):
+        import contextlib,io
+        path=str(Path(self.entry.__file__).with_name(filename))
+        code=compile('def '+function+'():\n    raise OSError('+str(number)+', "private ticket /path")\n',path,'exec')
+        namespace={};exec(code,namespace)
+        output=io.StringIO();sink=Mock() if broken_log else output
+        if broken_log:sink.write.side_effect=OSError('log failed')
+        previous=sys.gettrace()
+        try:
+            with contextlib.redirect_stderr(sink):
+                sys.settrace(self.entry.permission_trace())
+                with self.assertRaises(OSError) as error:namespace[function]()
+        finally:sys.settrace(previous)
+        self.assertEqual(error.exception.errno,number)
+        return output.getvalue()
+
+    def test_real_exception_events_reveal_only_fixed_function_line_errno(self):
+        for filename,function in [('door_isolation.py','slot_acquire'),('door_processes.py','processes')]:
+            for number in (errno.EACCES,errno.EPERM):
+                with self.subTest(function=function,number=number):
+                    output=self.trace_error(filename,function,number)
+                    self.assertEqual(json.loads(output),{'event':'slot-permission-error','function':function,'line':2,'errno':number})
+                    self.assertNotIn('private',output);self.assertNotIn('/path',output)
+
+    def test_unrelated_frames_and_non_permission_errors_are_silent(self):
+        for filename,function,number in [('other.py','processes',errno.EACCES),
+                                         ('door_isolation.py','other',errno.EACCES),
+                                         ('door_processes.py','processes',errno.ENOENT)]:
+            self.assertEqual(self.trace_error(filename,function,number),'')
+
+    def test_failed_trace_output_preserves_original_denial(self):
+        self.assertEqual(self.trace_error('door_processes.py','processes',errno.EACCES,True),'')
 
 
 if __name__=='__main__':
