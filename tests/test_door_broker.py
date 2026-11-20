@@ -91,6 +91,29 @@ class Load(unittest.TestCase):
         b.open(1,1,'fresh-after-expiry',0)
 
 class Consumer(unittest.TestCase):
+    def test_wrong_socket_peer_receives_no_credential(self):
+        connection=Mock();connection.__enter__=Mock(return_value=connection);connection.__exit__=Mock(return_value=False)
+        with patch.object(door_auth_client,'socket',Mock(socket=Mock(return_value=connection))),patch.object(door_auth_client,'peer_uid',return_value=41):
+            with self.assertRaisesRegex(AuthorizationError,'identity mismatch'):
+                door_auth_client.request('/fixture','consume',bbs='bbs',door=1,token='private-ticket',broker_uid=30)
+        connection.sendall.assert_not_called()
+        connection.recv.assert_not_called()
+        connection.__exit__.assert_called_once()
+
+    def test_broker_outage_never_uses_cached_authority(self):
+        claims=dict(bbs='bbs',member=1,door=1,session='s',generation=0,ticket_id='id')
+        with patch('door_auth_client.request',return_value=dict(lease='private-lease',claims=claims)):
+            lease=DoorAuthorization('/fixture',bbs='bbs',door=1,ticket='private-ticket',broker_uid=30)
+        with patch('door_auth_client.request',side_effect=AuthorizationError('authorization unavailable')) as rpc:
+            for _ in range(3):
+                with self.assertRaises(AuthorizationError):lease.authorize(1)
+            self.assertEqual(rpc.call_count,3)
+            self.assertTrue(all(call.args[1]=='check' for call in rpc.call_args_list))
+        # A recovered endpoint cannot substitute any component of the binding.
+        for field,value in [('bbs','other'),('member',2),('door',2),('session','new'),('generation',1),('ticket_id','new')]:
+            with self.subTest(field=field),patch('door_auth_client.request',return_value=dict(claims,**{field:value})):
+                with self.assertRaisesRegex(AuthorizationError,'binding mismatch'):lease.authorize()
+
     def test_rpc_deadline_covers_trickled_response(self):
         connection=Mock();connection.__enter__=Mock(return_value=connection);connection.__exit__=Mock(return_value=False)
         connection.recv.return_value=b' '
@@ -165,6 +188,21 @@ class Protocol(unittest.IsolatedAsyncioTestCase):
         reader.feed_eof();await task
         check=await self.request(40,dict(op='check',door=1,bbs='bbs',token=result['lease']))
         self.assertIn(b'"ok":false',check)
+    async def test_concurrent_consumers_have_one_winner(self):
+        reader,writer,task=await self.live_issuer('race')
+        try:
+            ticket=json.loads(writer.data)['result']['ticket']
+            request=dict(op='consume',door=1,bbs='bbs',token=ticket)
+            results=[json.loads(raw) for raw in await asyncio.gather(*(self.request(40,request) for _ in range(16)))]
+            winners=[r for r in results if r['ok']]
+            self.assertEqual(len(winners),1)
+            self.assertEqual(len(self.b.leases),1)
+            self.assertFalse(self.b.tickets)
+            lease=winners[0]['result']['lease']
+            self.assertEqual(self.b.check(40,1,'bbs',lease)['session'],'race')
+        finally:
+            reader.feed_eof();await asyncio.wait_for(task,5)
+        self.assertFalse(self.b.leases or self.server.clients)
     async def test_128_parallel_issuers_revoke_without_disturbing_survivors(self):
         live=await asyncio.gather(*(self.live_issuer('parallel'+str(i)) for i in range(128)))
         try:

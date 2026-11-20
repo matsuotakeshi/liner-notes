@@ -34,6 +34,13 @@ def reject(fn):
     raise AssertionError('forbidden SSH request succeeded')
 
 
+def closed(transport, reason, seconds=6):
+    deadline = time.monotonic() + seconds
+    while transport.is_active() and time.monotonic() < deadline:
+        time.sleep(.03)
+    assert not transport.is_active(), reason
+
+
 def run(binary):
     binary = str(Path(binary).resolve())
     with tempfile.TemporaryDirectory(prefix='ln-ssh-') as tmp:
@@ -129,10 +136,14 @@ for line in sys.stdin:
             print('PASS SSH password/key account binding, UTF-8 and Telnet coexistence')
 
             # Restrictions apply after valid auth, not merely to anonymous clients.
-            for request in ('exec', 'sftp', 'no-pty-shell'):
+            for request in ('exec', 'sftp', 'scp', 'x11', 'no-pty-shell', 'zero-pty', 'oversize-pty'):
                 t = connect(); ch = t.open_session(timeout=10)
                 if request == 'exec': reject(lambda: ch.exec_command('id'))
                 elif request == 'sftp': reject(lambda: ch.invoke_subsystem('sftp'))
+                elif request == 'scp': reject(lambda: ch.exec_command('scp -t /tmp/ln-forbidden'))
+                elif request == 'x11': reject(lambda: ch.request_x11(auth_cookie='00'*16))
+                elif request == 'zero-pty': reject(lambda: ch.get_pty(width=0, height=24))
+                elif request == 'oversize-pty': reject(lambda: ch.get_pty(width=65536, height=24))
                 else: reject(ch.invoke_shell)
                 t.close()
             t = connect()
@@ -142,6 +153,15 @@ for line in sys.stdin:
             reject(lambda: t.open_session(timeout=5))
             assert t.global_request('tcpip-forward', ('127.0.0.1', 0), wait=True) is None
             print('PASS exec, subsystem, forwarding, extra channel and shell-without-PTY denied')
+            # Auth success alone must not remove the bounded shell-start deadline.
+            for phase in ('authenticated', 'channel', 'pty'):
+                idle = connect()
+                if phase != 'authenticated':
+                    idle_channel = idle.open_session(timeout=10)
+                    if phase == 'pty': idle_channel.get_pty(width=80, height=24)
+                closed(idle, 'SSH startup deadline bypassed at '+phase)
+                assert b'PONG' in telnet.cmd('PING')
+            print('PASS authenticated/channel/PTY startup deadlines; Telnet remains responsive')
 
             # Actual OpenSSH client interoperability and no command execution.
             common = ['ssh', '-F', '/dev/null', '-p', str(ssh_port), '-i', str(private),
@@ -174,7 +194,18 @@ for line in sys.stdin:
             else: raise AssertionError('Door survived SSH disconnect')
             print('PASS Door return, crash, timeout, resize and disconnect cleanup')
 
+            # Core revocation must stop an already authenticated SSH Door too,
+            # not merely deny the next password attempt.
+            victim = screen(connect('bob'))
+            output = victim.cmd('DOOR 1', b'DOOR> ')
+            revoked_pid = int(re.search(rb'SSH_DOOR_PID=(\d+)', output)[1])
             a.cmd('SUSPEND 2')
+            closed(victim.channel.get_transport(), 'suspended SSH Door stayed connected')
+            for _ in range(50):
+                try: os.kill(revoked_pid, 0)
+                except ProcessLookupError: break
+                time.sleep(.1)
+            else: raise AssertionError('Door survived account suspension')
             reject(lambda: connect('bob'))
             a.cmd('RESUME 2')
             assert b'PONG' in screen(connect('bob')).cmd('PING')
@@ -208,6 +239,42 @@ for line in sys.stdin:
         # New connection records keep the existing durable USERLOG format readable.
         again = Server(binary, root/'notes', members=root/'members')
         c = Raw(again.port); auth(c, 'alice'); c.send(b'PING\n'); c.expect(b'PONG'); c.close(); again.close()
+        # A small configured cap is shared by Telnet and SSH, including clients
+        # that disconnect mid-handshake. No host-wide connection flood is used.
+        limits = root/'limits'; limits.write_text('connections=4\n')
+        server = Server(binary, root/'notes', members=root/'members', telnet=True,
+                        menu=True, language='en', admins=admins, options=options+['--limits', str(limits)])
+        transports = []; telnet = Telnet(server.port)
+        try:
+            telnet.until()
+            survivors = [screen(connect()) for _ in range(3)]
+            assert survivors[0].cmd('CONNECTIONS').count(b'  Connected ')==4
+            reject(connect)
+            assert b'PONG' in telnet.cmd('PING')
+            for survivor in survivors: assert b'PONG' in survivor.cmd('PING')
+            survivors.pop().channel.get_transport().close()
+            def wait_count(count):
+                # Observe close processing on a surviving authenticated channel,
+                # without racing connection retries or changing the limit.
+                deadline = time.monotonic()+6
+                while survivors[0].cmd('CONNECTIONS').count(b'  Connected ')!=count:
+                    assert time.monotonic()<deadline, 'SSH connection slot was not released'
+                    time.sleep(.03)
+            wait_count(3)
+            for _ in range(3):
+                with socket.create_connection(('127.0.0.1', ssh_port), timeout=6) as aborted:
+                    with aborted.makefile('rb') as banner:
+                        assert banner.readline(256).startswith(b'SSH-2.0-')
+                wait_count(3)
+            replacement = screen(connect())
+            assert b'PONG' in replacement.cmd('PING')
+            print('PASS shared four-connection cap, aborted handshakes and SSH slot reuse')
+        finally:
+            telnet.close()
+            for t in transports:t.close()
+            server.proc.terminate();_, errors = server.proc.communicate(timeout=10)
+            assert server.proc.returncode==0, errors
+            assert PASSWORD not in errors and fingerprint not in errors, 'credential leaked'
     print('SSH integration passed')
 
 
