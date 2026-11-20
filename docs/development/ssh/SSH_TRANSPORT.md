@@ -69,8 +69,11 @@ OpenSSH/Paramiko. Existing native CI still checks the common runtime with its
 installed dependencies. FreeBSD encrypted-runtime and Solaris libssh builds
 remain **unverified** until the trusted-main native environments have the
 dependency and run this test. No VM packages are installed by this PR.
-Windows SSH is unsupported. Dedicated SELinux SSH port/key labeling and denial
-tests are also pending; do not call this Enforcing SSH acceptance completed.
+Windows SSH is unsupported. The dedicated SELinux SSH port/key labels and
+positive/negative acceptance fixtures are now implemented as candidates; do not
+call Enforcing SSH acceptance completed until the exact-main native job passes.
+The [platform acceptance procedure](../SSH_PLATFORM_ACCEPTANCE.md) describes
+the manual main-only SSH suite, dependency checks and separate receipts.
 
 ## Candidate configuration
 

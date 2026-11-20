@@ -54,11 +54,13 @@ jobs:
       - name: Verify fresh-instance bootstrap against the real runtime
         run: |
           sudo apt-get update
-          sudo apt-get install -y clang libssl-dev libsqlite3-dev python3-venv
+          sudo apt-get install -y clang libssl-dev libsqlite3-dev libssh-dev openssh-client python3-venv
           CC=clang python3 tests/test_door_diagnostics.py
           python3 -m venv build/selinux-bootstrap-venv
           build/selinux-bootstrap-venv/bin/pip install -r link-requirements.txt
-          make -j2 runtime vaultctl dbconvert CC=clang SQLITE_CFLAGS= SQLITE_LIBS=-lsqlite3
+          build/selinux-bootstrap-venv/bin/pip install -r tests/ssh-requirements.txt
+          make -j2 runtime vaultctl dbconvert CC=clang SQLITE_CFLAGS= SQLITE_LIBS=-lsqlite3 SSH_CFLAGS=-DLINER_SSH SSH_LIBS=-lssh
+          build/selinux-bootstrap-venv/bin/python -B tests/test_selinux_ssh.py ./runtime
           python3 scripts/build-lrzsz.py build/selinux-lrzsz --archive build/lrzsz-source/lrzsz-0.13.1.tar.gz
           build/selinux-bootstrap-venv/bin/python -B tests/test_selinux_bootstrap.py ./runtime \
             build/selinux-lrzsz/local/bin/lrz build/selinux-lrzsz/local/bin/lsz

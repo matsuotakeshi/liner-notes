@@ -1,0 +1,36 @@
+name: Embedded SSH Native Acceptance
+on:
+  workflow_dispatch:
+    inputs:
+      target:
+        description: Installed libssh required; Solaris is explicit, never part of all
+        type: choice
+        options: [all, freebsd, rocky, ubuntu, solaris]
+        default: all
+permissions:
+  contents: read
+concurrency:
+  group: liner-notes-native-hosts
+  cancel-in-progress: false
+jobs:
+  ssh:
+    if: ${{ github.repository == 'matsuotakeshi/liner-notes' && github.ref == 'refs/heads/main' && github.event_name == 'workflow_dispatch' }}
+    runs-on: [self-hosted, Linux, X64]
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Verify encrypted connections on exact trusted main
+        env:
+          TARGET: ${{ inputs.target }}
+        run: python3 ci/native_ci.py --suite ssh --target "$TARGET" --output "$RUNNER_TEMP/embedded-ssh-results"
+      - uses: actions/upload-artifact@v4
+        if: ${{ always() }}
+        with:
+          name: embedded-ssh-native-results
+          path: |
+            ${{ runner.temp }}/embedded-ssh-results/*.log
+            ${{ runner.temp }}/embedded-ssh-results/results.json
+          if-no-files-found: error
+          retention-days: 30

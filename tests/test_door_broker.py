@@ -223,7 +223,8 @@ class Protocol(unittest.IsolatedAsyncioTestCase):
         result=await self.request(0,{'op':'wrong','secret':'do-not-echo'})
         self.assertIn(b'"ok":false',result);self.assertNotIn(b'do-not-echo',result)
     async def test_oversize_truncated_and_nonobject_requests_release_client(self):
-        payloads=[b'x'*4097+b'\n',b'{"secret":"do-not-echo"}',b'[]\n',b'null\n',b'\xff\n']
+        payloads=[b'x'*4097+b'\n',b'{"secret":"do-not-echo"}',b'[]\n',b'null\n',b'\xff\n',
+                  b'['*1500+b'0'+b']'*1500+b'\n']
         for payload in payloads:
             with self.subTest(kind=payload[:1],length=len(payload)):
                 reader=asyncio.StreamReader(limit=4096);writer=Writer(0)
@@ -238,6 +239,11 @@ class Protocol(unittest.IsolatedAsyncioTestCase):
         reader,writer,task=await self.live_issuer('capacity')
         try:
             self.assertTrue(self.b.sessions)
+            ticket=json.loads(writer.data)['result']['ticket']
+            valid=json.loads(await self.request(40,dict(op='consume',door=1,bbs='bbs',token=ticket)))
+            self.assertTrue(valid['ok'], 'Full issuer pool must still allow consuming its tickets')
+            checked=json.loads(await self.request(40,dict(op='check',door=1,bbs='bbs',token=valid['result']['lease'])))
+            self.assertTrue(checked['ok'], 'Full issuer pool must still allow live lease checks')
             denied=await self.request(40,dict(op='consume',door=1,bbs='bbs',token='0'*64))
             self.assertIn(b'"ok":false',denied)
             self.assertEqual(len(self.server.clients),1)
@@ -249,6 +255,28 @@ class Protocol(unittest.IsolatedAsyncioTestCase):
         result=await self.request(0,dict(op='open',member=1,door=1,session='capacity',generation=1))
         self.assertIn(b'"ok":true',result)
         self.assertFalse(self.server.clients);self.assertFalse(self.b.tickets)
+    async def test_stalled_consumers_are_bounded_without_starving_issuer(self):
+        self.b.capacity=1
+        ready=asyncio.Event()
+        class BlockedReader:
+            async def readline(self):
+                ready.set()
+                await asyncio.Future()
+        slow=Writer(40)
+        task=asyncio.create_task(self.server.handle(BlockedReader(),slow))
+        await asyncio.wait_for(ready.wait(),2)
+        try:
+            rejected=Writer(40)
+            await self.server.handle(BlockedReader(),rejected)
+            rejected.transport.abort.assert_called_once()
+            self.assertEqual(len(self.server.consumers),1)
+            reader,writer,issuer=await self.live_issuer('reserved-issuer')
+            self.assertTrue(json.loads(writer.data)['ok'])
+            reader.feed_eof();await asyncio.wait_for(issuer,2)
+        finally:
+            task.cancel()
+            with self.assertRaises(asyncio.CancelledError):await task
+        self.assertFalse(self.server.clients or self.server.issuers or self.server.consumers)
     async def test_cancelled_handler_revokes_consumed_lease(self):
         reader,writer,task=await self.live_issuer('cancelled')
         try:

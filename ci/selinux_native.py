@@ -599,6 +599,14 @@ def main():
     parser.parse_args()
     fixture = Fixture()
     try:
+        from ci.selinux_ssh import key_fixture, prepare_client
+        from ci.native_ssh import build_command
+        # Rebuild explicitly: the helper initially builds the non-SSH baseline.
+        # This changes only this run's admitted source copy, never OS packages.
+        build = build_command('rocky')
+        subprocess.run([*build, '-B'], cwd=ROOT, check=True, timeout=300)
+        ssh_python = prepare_client()
+        ssh = key_fixture(fixture)
         core = fixture.directory('core', 'liner_notes_data_t')
         games = fixture.directory('games', 'liner_notes_door_data_t')
         executable = fixture.path / 'runtime'
@@ -616,6 +624,12 @@ def main():
             'from pathlib import Path\n'
             'tty.setraw(0)\n'
             'try:\n'
+            f'    Path({str(ssh["canary"])!r}).read_text()\n'
+            'except PermissionError:\n'
+            '    pass\n'
+            'else:\n'
+            '    raise RuntimeError("Door read SSH host-key label")\n'
+            'try:\n'
             f'    Path({str(secret)!r}).read_text()\n'
             'except PermissionError:\n'
             '    print("CONFINED",os.getpid(),"DENIED\\r\\nKEY> ",end="",flush=True)\n'
@@ -627,6 +641,8 @@ def main():
         accounts = fixture.text('link-accounts', '1 3\n', 'liner_notes_etc_t')
         port = fixture.port('liner_notes_port_t')
         args = ['--telnet', '--menu', '--lang', 'en', '--doors', str(config),
+                '--ssh-port', str(ssh['port']), '--ssh-host-key', str(ssh['host']),
+                '--ssh-member-keys', str(ssh['keys']),
                 '--link-accounts', str(accounts),
                 '--vault-dir', str(vault), '--zmodem-helper', str(helper),
                 '--database-structured', str(core/'notes.sqlite'), str(port), str(core/'notes'), str(core/'members')]
@@ -640,6 +656,10 @@ def main():
             asyncio.run(bbs_probe(port, iteration == 0))
             if iteration == 1:
                 door_probe(port)
+                subprocess.run([str(ssh_python), '-B', str(ROOT/'ci/selinux_ssh.py'),
+                    '--port', str(ssh['port']), '--host', str(ssh['host']),
+                    '--client', str(ssh['client']), '--door'], check=True, timeout=120)
+                fixture.results.append({'ssh': 'password/key, pinned host, articles/mail, UTF-8, exec denial, Door lifecycle and key-label MAC denial'})
                 web_fixture(fixture, port, secret)
                 asyncio.run(link_probe(fixture, port))
                 transfer_probe(fixture, port, marker, binaries)

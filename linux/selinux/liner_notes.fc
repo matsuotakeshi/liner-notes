@@ -11,6 +11,7 @@
 /etc/liner-notes/link.toml -- gen_context(system_u:object_r:liner_notes_link_etc_t,s0)
 /etc/liner-notes/link-peers(/.*)? gen_context(system_u:object_r:liner_notes_link_etc_t,s0)
 /etc/liner-notes/link-secrets(/.*)? gen_context(system_u:object_r:liner_notes_link_secret_t,s0)
+/etc/liner-notes/ssh-host-keys(/.*)? gen_context(system_u:object_r:liner_notes_ssh_secret_t,s0)
 /var/lib/liner-notes(/.*)? gen_context(system_u:object_r:liner_notes_data_t,s0)
 /var/lib/liner-notes/spool(/.*)? gen_context(system_u:object_r:liner_notes_spool_t,s0)
 /var/lib/liner-notes-web(/.*)? gen_context(system_u:object_r:liner_notes_web_data_t,s0)

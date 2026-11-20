@@ -78,13 +78,20 @@ def check_ready(endpoint,uid):
 class Server:
     def __init__(self,broker,*,peer=peer_uid):
         self.broker=broker;self.peer=peer;self.clients=set()
+        # Long-lived issuers must not occupy every short-lived lease-check slot.
+        self.issuers=set();self.consumers=set()
 
     async def handle(self,reader,writer):
-        session=None
+        session=None;pool=None
         try:
             uid=self.peer(writer.get_extra_info('socket'))
             if uid!=0 and uid not in self.broker.consumers:raise Denied('authorization denied')
-            if len(self.clients)>=self.broker.capacity:raise Denied('capacity reached')
+            pool=self.issuers if uid==0 else self.consumers
+            if len(pool)>=self.broker.capacity:
+                # Do not allocate a response/drain timeout for excess sockets.
+                writer.transport.abort()
+                return
+            pool.add(writer)
             self.clients.add(writer)
             while True:
                 # The issuer's socket stays open throughout the Door lifetime.
@@ -105,7 +112,7 @@ class Server:
                 writer.write(json.dumps({'ok':True,'result':result},separators=(',',':')).encode()+b'\n')
                 await asyncio.wait_for(writer.drain(),WRITE_TIMEOUT)
                 if uid!=0:break
-        except (Denied,ValueError,OSError,TimeoutError,asyncio.LimitOverrunError):
+        except (Denied,ValueError,OSError,TimeoutError,RecursionError,asyncio.LimitOverrunError):
             # No exception text, request body, identity or token is logged/reflected.
             # Revoke before attempting to notify a peer that may not read.
             if session:self.broker.close(session)
@@ -115,6 +122,7 @@ class Server:
         finally:
             if session:self.broker.close(session)
             self.clients.discard(writer);writer.close()
+            if pool is not None:pool.discard(writer)
             try:await asyncio.wait_for(writer.wait_closed(),WRITE_TIMEOUT)
             except (OSError,TimeoutError):writer.transport.abort()
 
