@@ -6,7 +6,7 @@ import tempfile
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path[:0] = [str(ROOT / 'ci'), str(ROOT)]
-from selinux_ssh import key_fixture, probe
+from selinux_ssh import key_fixture, probe, check_bootstrap_ssh_audit
 from selinux_native import bbs_probe
 from test_selinux_bootstrap import UnconfinedLinkFixture
 from test_board import Server
@@ -26,7 +26,8 @@ def run(binary):
             probe(keys['port'], keys['host'], keys['client'])
             asyncio.run(bbs_probe(server.port, create=False))
         finally:
-            server.close()
+            server.close(error_check=check_bootstrap_ssh_audit)
+            assert server.proc.returncode == 0, server.proc.returncode
         print('PASS Hosted SSH acceptance client and Telnet coexistence; MAC is NOT tested here')
 
 

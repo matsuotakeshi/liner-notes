@@ -3,6 +3,7 @@
 import argparse
 import hashlib
 import os
+import re
 from pathlib import Path
 import subprocess
 import sys
@@ -10,6 +11,27 @@ import time
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path[:0] = [str(ROOT / 'tests')]
+
+
+def check_bootstrap_ssh_audit(errors):
+    """Require exactly the Hosted probe's failed login and three valid logins.
+
+    Slot reuse is scheduling-dependent; the event sequence and complete line
+    grammar are not. Never accept arbitrary stderr or print a malformed line
+    that might contain credentials.
+    """
+    expected = ['rejected', 'accepted', 'accepted', 'accepted']
+    lines = errors.splitlines()
+    if len(lines) != len(expected):
+        raise AssertionError('SSH audit event count mismatch')
+    statuses = []
+    for line in lines:
+        match = re.fullmatch(r'SSH auth (accepted|rejected) slot=(0|[1-9][0-9]*)', line)
+        if match is None:
+            raise AssertionError('Malformed or unexpected SSH stderr')
+        statuses.append(match.group(1))
+    if statuses != expected:
+        raise AssertionError('SSH audit event sequence mismatch')
 
 
 def prepare_client():

@@ -350,6 +350,6 @@
   "help/en/adminstorage.txt": "ced73fe9634e4e55c7750f59aa7d06c038a8ee87bcc3568154055a7779c06522",
   "ci/native_remote.py": "767e53478dcb3c53a46fb267a7439d6b78fd136c3562841d2f88e31a52009d6d",
   "ci/native_ssh.py": "2be9434bb7a6e2630b4a0983b8568b11ca83bd1a4af0b892f90d7669945f8b5d",
-  "ci/selinux_ssh.py": "7aed5468353b944045d2ae840f4c8f00da57bd10a946546bbece6e0830d24364",
+  "ci/selinux_ssh.py": "c9cfe6811df99bf298c53422aee70b5c908a8d233ccefaaca3fb0a3855777c80",
   ".github/workflows/embedded-ssh-native.yml": "e742c94866abd6b137423f5e7a74e376cc49604b7debfc71babddc57bc755098"
 }

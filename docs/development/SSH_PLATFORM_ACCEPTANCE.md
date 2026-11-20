@@ -132,3 +132,27 @@ root-helper tests 6 passed and 1 POSIX-only skipped; service fixture tests 49 pa
 These are local unit results, not native encrypted/MAC proof. Syntax/diff checks
 passed. Canonical manual: 42 pages, 2,822 links, Markdown/HTML parity, no errors.
 Hosted integration and compiled-policy checks are deferred to this candidate PR.
+
+## Hosted audit-harness correction (2026-11-20)
+
+PR #153 source `6d58303b7c3a1a61efc3c4b3f3c1c69906e7a343`,
+[Rocky SELinux policy run 44687080871](https://github.com/matsuotakeshi/liner-notes/actions/runs/44687080871),
+failed at `Verify fresh-instance bootstrap against the real runtime` during
+`Server.close()`. The encrypted client's password/key, host pinning, article/mail,
+UTF-8 and exec-denial assertions passed, but the shared harness expected empty
+stderr while Core emitted its normal one rejected and three accepted SSH audit
+records. The compiled-policy step did not run; this is not a native AVC result.
+
+The Hosted fixture now explicitly validates those four complete records in order,
+allowing scheduling-dependent connection slot reuse. Missing/extra records,
+malformed lines and appended secrets are rejected without echoing untrusted
+contents. The default shared harness still requires exact expected stderr, its
+shutdown deadline/kill diagnostics are unchanged, and the SSH fixture also
+requires normal exit status. Core logging and policy permissions are unchanged.
+
+Focused Windows tests: `python tests/test_selinux_ssh_audit.py` (4 passed) and
+`python tests/test_server_diagnostics.py` (16 passed). The same tests precede the
+real encrypted fixture in Hosted CI. These local unit checks do not establish
+native encrypted or SELinux Enforcing acceptance; the corrected candidate needs
+its own CI result. Canonical public commands/settings are unchanged by this
+harness correction; the candidate status remains separate from stable 0.74.1.

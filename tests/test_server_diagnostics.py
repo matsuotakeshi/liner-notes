@@ -176,6 +176,29 @@ class DiagnosticsTests(unittest.TestCase):
         evidence = self.shutdown_failure(ps_error=subprocess.TimeoutExpired('ps', 2))
         self.assertEqual(evidence['ps'], 'unavailable')
 
+    def test_explicit_stderr_validator_runs_after_process_wait(self):
+        server = object.__new__(test_board.Server)
+        server.proc = process(stderr='expected audit\n', code=0)
+        server.expected_errors = []
+        def validate(errors):
+            server.proc.terminate.assert_called_once_with()
+            server.proc.wait.assert_called_once_with(timeout=5)
+            self.assertEqual(errors, 'expected audit\n')
+        check = Mock(side_effect=validate)
+        server.close(error_check=check)
+        check.assert_called_once_with('expected audit\n')
+        server.proc.kill.assert_not_called()
+
+    def test_stderr_validator_failure_is_not_swallowed(self):
+        server = object.__new__(test_board.Server)
+        server.proc = process(stderr='wrong audit\n', code=0)
+        server.expected_errors = []
+        check = Mock(side_effect=AssertionError('audit rejected'))
+        with self.assertRaisesRegex(AssertionError, 'audit rejected'):
+            server.close(error_check=check)
+        server.proc.wait.assert_called_once_with(timeout=5)
+        check.assert_called_once_with('wrong audit\n')
+
     def test_normal_shutdown_keeps_stderr_assertion(self):
         server = object.__new__(test_board.Server)
         server.proc = process(stderr='unexpected stderr\n', code=0)

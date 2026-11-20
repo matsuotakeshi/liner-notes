@@ -34,7 +34,7 @@ class Server:
         self.port = int(result[0].split()[-1])
         self.expected_errors = []
 
-    def close(self, crash=False):
+    def close(self, crash=False, *, error_check=None):
         timeout = test_wait_timeout("LINER_TEST_STOP_TIMEOUT", 5)
         if crash:
             self.proc.kill()
@@ -60,7 +60,10 @@ class Server:
                                   'exit_after_kill', self.proc.returncode,
                                   'stderr', self.proc.stderr.read())) from error
         errors = self.proc.stderr.read()
-        assert errors.splitlines() == self.expected_errors, errors
+        if error_check is None:
+            assert errors.splitlines() == self.expected_errors, errors
+        else:
+            error_check(errors)
 
 
 def post(c, title, body, parent=None):

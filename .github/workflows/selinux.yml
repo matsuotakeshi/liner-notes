@@ -14,6 +14,8 @@ on:
       - 'tests/test_door*.py'
       - 'scripts/install-linux.py'
       - 'tests/test_selinux*'
+      - 'tests/test_board.py'
+      - 'tests/test_server_diagnostics.py'
       - '.github/workflows/selinux.yml'
   push:
     branches: [main]
@@ -30,6 +32,8 @@ on:
       - 'tests/test_door*.py'
       - 'scripts/install-linux.py'
       - 'tests/test_selinux*'
+      - 'tests/test_board.py'
+      - 'tests/test_server_diagnostics.py'
       - '.github/workflows/selinux.yml'
   workflow_dispatch:
 permissions:
@@ -55,6 +59,8 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y clang libssl-dev libsqlite3-dev libssh-dev openssh-client python3-venv
+          python3 tests/test_selinux_ssh_audit.py
+          python3 tests/test_server_diagnostics.py
           CC=clang python3 tests/test_door_diagnostics.py
           python3 -m venv build/selinux-bootstrap-venv
           build/selinux-bootstrap-venv/bin/pip install -r link-requirements.txt
