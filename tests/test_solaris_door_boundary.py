@@ -9,7 +9,6 @@ import hashlib
 import json
 import os
 from pathlib import Path
-import shutil
 import stat
 import subprocess
 import sys
@@ -145,6 +144,30 @@ class Boundary(unittest.TestCase):
             with patch.object(fixture.Path, 'lstat', return_value=value):
                 with self.assertRaises(ValueError): fixture.trusted('/fixture')
 
+    def test_system_compiler_allows_packaged_aliases_but_not_private_fixture(self):
+        value = Mock(st_mode=stat.S_IFREG | 0o555, st_uid=0, st_nlink=3)
+        resolved = Path('/usr/gcc/15/bin/gcc')
+        with patch.object(fixture.Path, 'resolve', return_value=resolved) as resolve, \
+             patch.object(fixture.Path, 'lstat', return_value=value):
+            self.assertEqual(fixture.compiler_path(), resolved)
+            resolve.assert_called_once_with(strict=True)
+            with self.assertRaises(ValueError): fixture.trusted(resolved)
+
+    def test_compiler_aliases_keep_owner_write_and_symlink_refusals(self):
+        for mode, uid in ((stat.S_IFREG | 0o775, 0), (stat.S_IFREG | 0o557, 0),
+                          (stat.S_IFREG | 0o555, 1000), (stat.S_IFLNK | 0o555, 0)):
+            value = Mock(st_mode=mode, st_uid=uid, st_nlink=3)
+            with patch.object(fixture.Path, 'resolve', return_value=Path('/compiler')), \
+                 patch.object(fixture.Path, 'lstat', return_value=value):
+                with self.assertRaises(ValueError): fixture.compiler_path()
+
+    def test_writable_compiler_ancestor_still_rejected(self):
+        leaf = Mock(st_mode=stat.S_IFREG | 0o555, st_uid=0, st_nlink=3)
+        parent = Mock(st_mode=stat.S_IFDIR | 0o777, st_uid=0, st_nlink=1)
+        with patch.object(fixture.Path, 'resolve', return_value=Path('/unsafe/gcc')), \
+             patch.object(fixture.Path, 'lstat', side_effect=[leaf, parent]):
+            with self.assertRaises(ValueError): fixture.compiler_path()
+
     def test_timeout_kills_only_owned_process_group_then_reaps(self):
         process = Mock(pid=123, returncode=0)
         process.communicate.side_effect = [subprocess.TimeoutExpired('fixture', 1), ('', '')]
@@ -171,7 +194,9 @@ class Boundary(unittest.TestCase):
         self.assertNotEqual(os.getuid(), 0, 'normal native CI must use its unprivileged account')
         with tempfile.TemporaryDirectory() as temporary:
             binary = Path(temporary)/'probe'
-            subprocess.run([shutil.which('gcc'), '-m64', '-std=c11', '-Wall', '-Wextra', '-Werror',
+            # Exercise the root fixture's exact read-only compiler preflight as
+            # the normal CI user, before any separately approved root execution.
+            subprocess.run([str(fixture.compiler_path()), '-m64', '-std=c11', '-Wall', '-Wextra', '-Werror',
                             str(ROOT/'tests/solaris_door_identity_probe.c'), '-o', str(binary)],
                            check=True, timeout=45)
             result = subprocess.run([str(binary), '--report'], capture_output=True, text=True, check=True, timeout=5)

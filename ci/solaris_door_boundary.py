@@ -50,7 +50,7 @@ def prepare(output, source_sha):
     return output
 
 
-def trusted(path, directory=False):
+def trusted(path, directory=False, private=True):
     path = Path(path)
     for item in (path, *path.parents):
         info = item.lstat()
@@ -59,8 +59,17 @@ def trusted(path, directory=False):
     info = path.lstat()
     if directory:
         if not stat.S_ISDIR(info.st_mode): raise ValueError('Expected directory')
-    elif not stat.S_ISREG(info.st_mode) or info.st_nlink != 1:
+    elif not stat.S_ISREG(info.st_mode) or (private and info.st_nlink != 1):
         raise ValueError('Expected private regular fixture file')
+
+
+def compiler_path():
+    compiler = Path('/usr/bin/gcc').resolve(strict=True)
+    # Solaris's packaged GCC has multiple root-owned aliases of the same inode.
+    # It is a protected system executable, not a disposable private fixture.
+    # Ownership, ancestor trust, no symlinks and no group/other writes still apply.
+    trusted(compiler, private=False)
+    return compiler
 
 
 def verify_bundle():
@@ -183,8 +192,7 @@ def run():
 
 
 def run_locked(source_sha):
-    compiler = Path('/usr/bin/gcc').resolve(strict=True)
-    trusted(compiler)
+    compiler = compiler_path()
     root = Path(tempfile.mkdtemp(prefix='liner-door-boundary-', dir='/var/tmp'))
     paths = []
     report = {'source_sha': source_sha, 'system': platform.platform(), 'directory': str(root),
