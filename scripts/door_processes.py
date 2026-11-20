@@ -43,7 +43,16 @@ def processes(uid, terminate=False, sig=None):
             continue
         handle = None
         try:
-            handle = os.pidfd_open(int(entry.name))
+            try:
+                handle = os.pidfd_open(int(entry.name))
+            except OSError as error:
+                if error.errno == errno.EINVAL:
+                    # A process can disappear between /proc enumeration and
+                    # pidfd acquisition. Only a missing status permits the
+                    # existing FileNotFoundError path below; a present process
+                    # or an unreadable status must still fail closed.
+                    (entry/'status').stat()
+                raise
             status = (entry/'status').read_text()
             values = next(line for line in status.splitlines() if line.startswith('Uid:')).split()[1:]
             if uid not in map(int, values):

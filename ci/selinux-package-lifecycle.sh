@@ -38,11 +38,32 @@ for role in ('broker', 'isolation', 'consumer'):
     nnp = subprocess.check_output(['sesearch', '--allow', '-s', 'init_t',
                                   '-t', domain, '-c', 'process2', '-p', 'nnp_transition'], text=True)
     assert nnp.strip(), (domain, nnp)
+    for permission, expected in [('getattr', True), ('read', True), ('write', True),
+                                  ('connectto', False), ('setopt', False)]:
+        rules=subprocess.check_output(['sesearch','--allow','-s',domain,'-t','init_t',
+                                       '-c','unix_stream_socket','-p',permission],text=True)
+        assert bool(rules.strip()) == expected, (domain,permission,rules)
 for permission, expected in [('getopt', True), ('setopt', False), ('connectto', False)]:
     rules = subprocess.check_output(['sesearch', '--allow', '-s', 'liner_notes_transfer_t',
                                      '-t', 'liner_notes_t', '-c', 'unix_stream_socket',
                                      '-p', permission], text=True)
     assert bool(rules.strip()) == expected, (permission, rules)
+# Process-state enumeration must not imply ptrace, signalling unrelated services
+# or modification of their process-labelled files. Existing BBS-data denial
+# checks below remain mandatory.
+for target, kind, permission, expected in [
+    ('init_t', 'dir', 'search', True),
+    ('init_t', 'file', 'read', True),
+    ('init_t', 'file', 'write', False),
+    ('init_t', 'lnk_file', 'read', False),
+    ('init_t', 'process', 'ptrace', False),
+    ('init_t', 'process', 'signal', False),
+    ('liner_notes_isolation_t', 'capability', 'sys_ptrace', False),
+    ('liner_notes_isolation_t', 'capability', 'sys_admin', False),
+]:
+    rules=subprocess.check_output(['sesearch','--allow','-s','liner_notes_isolation_t',
+                                   '-t',target,'-c',kind,'-p',permission],text=True)
+    assert bool(rules.strip()) == expected, (target,kind,permission,rules)
 for domain, target in [('liner_notes_web_t', 'liner_notes_data_t'),
                        ('liner_notes_web_t', 'liner_notes_link_secret_t'),
                        ('liner_notes_door_t', 'liner_notes_data_t'),

@@ -5,6 +5,14 @@ production. Existing legacy Doors remain the default. Selecting the isolation
 socket routes **all** Doors through separate slot UIDs, including games without
 Broker authentication. MMM and WebUI are outside this change.
 
+The isolation sample is a **system** service and relies on systemd's default
+root identity (`Group=root` remains explicit); the launcher itself rejects a
+non-root UID. Do not add `User=root` on systemd 257: its seccomp/user setup can
+drop CAP_SETUID before exec even when the bounding set contains it. The sample
+does not compensate with ambient capabilities, SYS_ADMIN or SYS_PTRACE. The
+Enforcing fixture checks that game UID is non-root and effective, permitted and
+ambient capability sets are all empty.
+
 ## Installation boundary
 
 RPM/DEB/source installation supplies root-owned, executable entrypoints:
@@ -69,6 +77,22 @@ consumer is unsupported. Game server network/extra dependencies need a reviewed
 local extension; the fixture consumer does not prove arbitrary games run under
 this policy. The existing Door network boolean remains explicit and off by
 default. Kernel UID checks still apply even when a socket label permits access.
+
+The supervisor scans process-labelled `/proc/PID/status` files. The policy grants
+directory search and ordinary file getattr/open/read on the `domain` attribute;
+this is a type-based grant, not a pathname-only SELinux rule. It does not grant
+link reads, writes, ptrace or signalling unrelated service domains. BBS data
+types remain denied. `pidfd_open` EINVAL is ignored only when a subsequent status
+existence check reports disappearance; other errors or a present status still
+fail closed and retain uncertain reservations.
+
+For Broker/isolation/consumer, preserve init-owned journal descriptors across
+exec with fd use and unix-stream getattr/read/write, without connectto. Otherwise
+SELinux can substitute `/null`, making successful stderr writes misleading.
+Acceptance checks actual fixed-marker delivery as well as the write result.
+The CI private diagnostic entry supports `--trace-permissions` for targeted
+investigation; normal acceptance leaves tracing off to preserve supervision
+timing. Trace output still contains only fixed function, source line and errno.
 
 Distribution prefix `/usr` has vendor file contexts. For a custom prefix use
 explicit administrator-local `semanage fcontext` mappings after reviewing each
@@ -473,3 +497,45 @@ file descriptors and exec, confirming PID/flags/arguments, preservation of prior
 log content, and rejection of public files and symlinks. These are not substitutes
 for main-only Enforcing verification. BBS behavior, policy, root helper and
 installed service templates are unchanged; no production operation is required.
+
+## Slot permission location (2026-11-20, CI-only investigation)
+
+Main `3be84ebbf4f98ebd7355c174e8222e7ba4f82349`, native run
+[44657216416](https://github.com/matsuotakeshi/liner-notes/actions/runs/44657216416),
+Artifact 14594308254, now starts the isolation service and captures:
+
+```text
+worker-accepted
+launch-rejected errno=13 phase=slot
+```
+
+The earlier diagnostic `222/STDERR` failure is no longer present. The actual
+request is admitted; access is denied during slot acquisition. This covers file
+open/stat/lock, checking reservation length, scanning existing processes and
+writing/syncing BUSY. Linux process scanning uses pidfd_open and /proc status
+reads. The current evidence does not identify which operation is denied and does
+not justify adding permissions. Journal marker delivery is still unverified.
+
+For the next investigation, the CI entry described above uses `runpy` instead of
+exec to observe Python exception events while running the original isolation
+source. Only exact sibling source filenames and the functions `slot_acquire` and
+`processes` are traced. Only EACCES/EPERM events emit `slot-permission-error` with
+fixed function name, numeric source line and errno. No exception text, file path,
+traceback, local variable, UID, request or token is exported. A denial propagating
+from processes to slot_acquire can produce two records; the inner location is the
+operation of interest. Interpret line numbers against the exact main SHA being
+tested, not a later checkout.
+
+The diagnostic process retains its domain, PID, Python flags and isolation argv.
+Existing stderr/private-file validation, log filtering, journal gate and original
+Door lifecycle tests remain. Trace/argv state is restored on normal completion
+or exceptions; diagnostic write errors do not replace the original denial.
+Unrelated frames and ordinary process-disappearance races are not logged.
+The normal installed entry and all BBS/permission/process-isolation code remain
+unchanged. This is instrumentation, not a repair or a production configuration.
+
+Portable tests exercise actual Python exception events and privacy/failure paths.
+The existing disposable Rocky check runs the instrumented entry as a real child,
+verifies unchanged PID/flags/arguments, and checks two propagated denial locations
+without exposing the synthetic secret. Main-only Enforcing CI must still identify
+the actual denied operation before any corrective policy or code change.

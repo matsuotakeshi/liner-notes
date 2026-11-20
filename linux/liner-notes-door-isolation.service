@@ -6,7 +6,9 @@ Before=liner-notes.service
 
 [Service]
 Type=simple
-User=root
+# A system service defaults to root; the launcher also checks its UID.
+# Do not set User=root: systemd 257's seccomp/user setup can drop CAP_SETUID
+# before exec despite CapabilityBoundingSet. No ambient capabilities are needed.
 Group=root
 WorkingDirectory=/
 RuntimeDirectory=liner-notes-door-isolation

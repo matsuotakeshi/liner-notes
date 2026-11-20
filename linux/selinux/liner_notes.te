@@ -119,6 +119,12 @@ dev_read_urand(liner_notes_domain)
 dev_rw_null(liner_notes_domain)
 kernel_read_system_state(liner_notes_domain)
 logging_send_syslog_msg(liner_notes_domain)
+# systemd opens the journal stream before the domain transition. Without these
+# inherited-FD permissions SELinux substitutes /null at exec: writes appear to
+# succeed but no record reaches the journal. Do not grant connectto or daemon.
+gen_require(`type init_t;')
+allow liner_notes_isolated_service init_t:fd use;
+allow liner_notes_isolated_service init_t:unix_stream_socket { getattr read write };
 corecmd_exec_shell(liner_notes_domain)
 # Preserve the existing domains' interfaces. Do not apply this interface to
 # isolated services: it assigns sys_resource_type as well as file execution.
@@ -349,6 +355,12 @@ read_files_pattern(liner_notes_isolation_t, liner_notes_broker_etc_t, liner_note
 # systemd service also has a matching capability bounding set. No SYS_ADMIN,
 # SYS_PTRACE, network binding or BBS database access for the root supervisor.
 allow liner_notes_isolation_t self:capability { setuid setgid kill chown dac_override fowner };
+# Dedicated slot safety scans /proc/PID/status across process domains. Permit
+# only directory traversal and ordinary status-file reads, not ptrace, signals,
+# writes, links or broad process-management interfaces.
+gen_require(`attribute domain;')
+allow liner_notes_isolation_t domain:dir search;
+allow liner_notes_isolation_t domain:file { getattr open read };
 term_create_pty(liner_notes_isolation_t, liner_notes_devpts_t)
 allow liner_notes_isolation_t liner_notes_devpts_t:chr_file rw_chr_file_perms;
 domtrans_pattern(liner_notes_isolation_t, liner_notes_door_exec_t, liner_notes_door_t)

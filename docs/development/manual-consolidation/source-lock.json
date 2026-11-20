@@ -87,7 +87,7 @@
   "src/locales/ja.def": "3e27b8f8b2968c3a9452d2e5749454fd9e1100d9a961cfd00884a5d33cb2a3a0",
   "src/locales/en.def": "5aa1a21330864f5618a0027fe22753cb01fcb298daa9a0563a43e5de8b8b4a9c",
   "webui/static/app.js": "ff79c5ac310c835df7e13595f2027d4c4ee8e699fc77c5192b102cca33ddba8c",
-  "linux/selinux/liner_notes.te": "43ce8e605b59cb50bc5f402d2151119937976db629fea2850e2623a9d87bc5f2",
+  "linux/selinux/liner_notes.te": "ea3132b671f7b5f65708460716657455ed33aef53b910094bd6466de1673c4e4",
   "linux/selinux/liner_notes.fc": "483da46011c085798591c70d2620cdab445b8a2fc8e862cee76a0981874dc396",
   "linux/selinux/liner-notes-selinux.spec": "e62fd7cfecd5a2ad1a06cd43cbf5dfba5cb794c20279f896e187a482860d36c4",
   "linux/selinux/selinux_labels.py": "d8c3a3664c5781bfe5fa9174fe8369e5c0adba89630d794db9eb8f62af7b521d",
@@ -334,10 +334,10 @@
   "scripts/door_broker_core.py": "94f2f5fa0747236f5d8592b10d63d5bae34767a0401a615de58c6398b712424c",
   "scripts/door_auth_client.py": "c36c345de7b4a6be82067ecb52e4e52e5c0f887e6008840243ca11a22688aa4e",
   "scripts/door_isolation.py": "d15c0999d9affaf00802a8577a2b1782f9e96e1686e43c946e09810c195ec3c1",
-  "scripts/door_processes.py": "b32cb7cff9b6bd5c40154c7a9f258fed826a634954f25f592018569ea26864f1",
+  "scripts/door_processes.py": "ee0dec18ac608994c2ebd685974d1966b72e1b4a5d78ffcd018e0e0ec1398d31",
   "src/door_isolation.inc": "1deafd8a06afcac58b74c8a2f9afa08efef546c15b1eff684d8cfe279336724d",
   "tests/test_door_broker.py": "3b1f82d95f8a2af531e4aa11f7b2483ec57a8aa614b9366f155074336b95c948",
   "tests/test_door_broker_linux.py": "512645115cb8fe6174506d3454bceda8fc1ce93ae41efe62ad49c35b4e02d2e0",
-  "tests/test_door_processes.py": "a4fd59a9fbbb8bf10f94998ccbbcead769bdb8683a361ce00130abc4f178875d",
+  "tests/test_door_processes.py": "623705910a4b49c9a072df61515e06b94d5f279afea3c7be2726dcaab38f9fa5",
   "src/ui_profile.h": "1b4bc8d28ea2cac5eb312f08fb50d24e3aab1a38fe07c128b39ce0f4112d1bc4"
 }

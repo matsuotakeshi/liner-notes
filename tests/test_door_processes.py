@@ -19,6 +19,33 @@ import door_broker
 
 
 class Backend(unittest.TestCase):
+    def test_linux_pidfd_einval_requires_confirmed_disappearance(self):
+        with tempfile.TemporaryDirectory() as directory:
+            entry=Path(directory)/'123';entry.mkdir()
+            with patch.object(dp.sys,'platform','linux'), \
+                 patch.object(dp.Path,'iterdir',return_value=iter([entry])), \
+                 patch.object(dp.os,'pidfd_open',side_effect=OSError(errno.EINVAL,'gone'),create=True), \
+                 patch.object(dp.os,'close') as close:
+                self.assertFalse(dp.processes(65004,sig=9))
+                close.assert_not_called()
+            (entry/'status').write_text('Uid:\t65004\t65004\t65004\t65004\nState:\tS\n')
+            with patch.object(dp.sys,'platform','linux'), \
+                 patch.object(dp.Path,'iterdir',return_value=iter([entry])), \
+                 patch.object(dp.os,'pidfd_open',side_effect=OSError(errno.EINVAL,'present'),create=True):
+                with self.assertRaises(OSError) as error:dp.processes(65004,terminate=True,sig=9)
+                self.assertEqual(error.exception.errno,errno.EINVAL)
+
+    def test_linux_pidfd_errors_and_unverifiable_status_fail_closed(self):
+        from unittest.mock import Mock
+        entry=Mock();entry.name='123';entry.__truediv__=Mock(return_value=Mock())
+        for number in (errno.EACCES,errno.EPERM,errno.EMFILE,errno.EINVAL):
+            status=entry.__truediv__.return_value
+            status.stat.side_effect=PermissionError(errno.EACCES,'cannot verify')
+            with self.subTest(number=number),patch.object(dp.sys,'platform','linux'), \
+                 patch.object(dp.Path,'iterdir',return_value=iter([entry])), \
+                 patch.object(dp.os,'pidfd_open',side_effect=OSError(number,'rejected'),create=True):
+                with self.assertRaises(OSError):dp.processes(65004,terminate=True,sig=9)
+
     def test_freebsd_abi_and_owned_scope_only(self):
         self.assertEqual(ctypes.sizeof(dp.ReaperStatus),80)
         self.assertEqual(ctypes.sizeof(dp.ReaperKill),80)
@@ -94,8 +121,14 @@ class Backend(unittest.TestCase):
                              ['ExecStartPre='+command+' --check-config',
                               'ExecStart='+command])
         for line in ('KillMode=process','SendSIGKILL=no','TimeoutStopSec=infinity',
-                     'StateDirectory=liner-notes-door-isolation','User=root'):
+                     'StateDirectory=liner-notes-door-isolation'):
             self.assertIn(line,isolation)
+        # System services default to root. Explicit User=root with seccomp on
+        # systemd 257 drops CAP_SETUID despite the bounding set. Keep no ambient
+        # grants; the launcher must still refuse non-root execution itself.
+        self.assertFalse(any(line.startswith(('User=', 'AmbientCapabilities='))
+                             for line in isolation.splitlines()))
+        self.assertIn('CAP_SETUID', isolation)
         self.assertIn('User=liner_notes_broker',broker)
         self.assertIn('RestrictAddressFamilies=AF_UNIX',broker)
 
