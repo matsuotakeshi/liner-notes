@@ -11,7 +11,6 @@
     "tests/test_door_processes.py": "2e319ffaf24383d0182ec8d62594fde5117078f051bd35a9dbe7a1c48e11d6c9",
     "tests/test_selinux_door_services.py": "785f4bcf5c086559829257641a142dc0e437630739c90765f8e9b738333b009b"
   },
-  "work": "/var/lib/liner-notes-ci/selinux/direct-proc-trial-tqksvdqk",
   "start": "2026-11-20T11:44:37+0900",
   "scope": "full existing SELinux acceptance with reviewed local candidate overlay",
   "compiled_policy_checks": [
