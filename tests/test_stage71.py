@@ -90,7 +90,7 @@ def database_reader(binary,base):
         read(b,1)
     finally:a.close();b.close();s.close()
     with sqlite3.connect(db) as d:
-        assert d.execute('SELECT version FROM storage_meta').fetchone()==(3,)
+        assert d.execute('SELECT version FROM storage_meta').fetchone()==(5,)
         assert d.execute('SELECT count(*) FROM profile_events').fetchone()[0]>=6
         assert d.execute('SELECT count(*) FROM content_events').fetchone()[0]>=1
         assert d.execute('SELECT count(*) FROM moderation_events').fetchone()[0]==2

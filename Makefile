@@ -635,6 +635,12 @@ test-ssh-sources:
 
 check: test-ssh-sources
 
+.PHONY: test-storage-relations
+check: test-storage-relations
+test-storage-relations: tests/test_storage_relations.c src/storage_records.inc
+	$(CC) $(CPPFLAGS) $(SQLITE_CFLAGS) $(CFLAGS) $(LDFLAGS) -std=c11 -Wall -Wextra -Werror -Isrc tests/test_storage_relations.c -lcrypto $(SQLITE_LIBS) -o test-storage-relations
+	./test-storage-relations
+	$(PYTHON) tests/test_structured_relations.py
 .PHONY: test-ui-selection
 test-ui-selection: runtime
 	$(PYTHON) tests/test_ui_selection.py ./runtime
@@ -652,3 +658,16 @@ test-door-broker:
 	$(PYTHON) tests/test_door_processes.py
 	$(PYTHON) tests/test_door_isolation_admission.py
 	$(PYTHON) tests/test_door_services.py
+
+# Generated schema descriptors and every storage consumer use the same codec.
+runtime dbconvert test-adapters vaultctl test-vault-core test-upload-core test-transfer-connector test-chat test-zhost test-userlog test-stage61-userlog memberctl generate-structured generate-scale generate-members test-storage-relations: src/storage_normalized.inc src/storage_normalized_fields.inc src/storage_vault.inc
+.PHONY: test-storage-normalized
+test-storage-normalized: tests/test_storage_normalized.c src/storage_records.inc src/storage_normalized.inc src/storage_normalized_fields.inc src/storage_vault.inc
+	$(PYTHON) scripts/normalized_fields.py --check
+	$(CC) $(CPPFLAGS) $(SQLITE_CFLAGS) $(CFLAGS) $(LDFLAGS) -std=c11 -Wall -Wextra -Werror -Isrc tests/test_storage_normalized.c -lcrypto $(SQLITE_LIBS) -o test-storage-normalized
+	./test-storage-normalized
+	$(PYTHON) tests/test_storage_normalized.py
+check: test-storage-normalized
+
+# The authoritative codec changed: exercise scale/RSS once in existing check.
+check: test-stage70-scale

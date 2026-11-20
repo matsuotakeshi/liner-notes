@@ -7,4 +7,6 @@ BOARDLOG / BOARDACCESS ボード番号 / FILEAUDIT / FILEHISTORY
 SQLite運用: db-backup / verify / db-restore / db-compact
 旧形式からの移行: db-migrate。旧形式への書き出し: db-export。
 取り消し本文の回収: db-compact --reclaim-withdrawn。元のバックアップは残します。
-全保存領域の整理: --all-stores。詳細と引数はSTAGE67.mdを参照。
+全保存領域の整理: --all-stores。詳細と引数は統合マニュアルの「バックアップと復元」を参照。
+SQLite項目別形式への変換: db-structure。停止後、元DBを残して別コピーへ変換します。
+変換・復元の失敗したコピーは起動せず、新しい出力先で再実行してください。

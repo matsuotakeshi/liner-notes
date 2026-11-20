@@ -101,6 +101,7 @@ bin/liner-notes-check-resume
 %%DATADIR%%/scripts/transfer_spool.py
 %%DATADIR%%/scripts/posix_locks.py
 %%DATADIR%%/scripts/structured_db.py
+%%DATADIR%%/scripts/normalized_fields.py
 @sample %%DATADIR%%/greeting-06.txt.sample
 @sample %%DATADIR%%/greeting-12.txt.sample
 @sample %%DATADIR%%/greeting-18.txt.sample

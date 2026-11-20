@@ -34,7 +34,7 @@ def main(argv=None):
             if not stat.S_ISREG(st.st_mode) or st.st_nlink!=1:raise ValueError('Unsafe database')
             with sqlite3.connect(path.as_uri()+'?mode=ro',uri=True) as db:
                 version=db.execute('SELECT version FROM storage_meta WHERE id=1').fetchone()
-                if version not in ((1,),(2,),(3,)):raise ValueError('Unsupported database schema')
+                if version not in ((1,),(2,),(3,),(4,),(5,)):raise ValueError('Unsupported database schema')
                 result['database']=dict(schema=version[0],supported=True,automatic_conversion=False)
         print(json.dumps(result,ensure_ascii=True,indent=2))
     except (OSError,ValueError,sqlite3.Error) as error:p.exit(1,str(error)+'\n')

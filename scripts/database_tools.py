@@ -33,9 +33,13 @@ def locked(database):
  fd=os.open(str(database)+'.lock',os.O_RDWR|os.O_CREAT|os.O_NOFOLLOW,0o600)
  try:
   fcntl.lockf(fd,fcntl.LOCK_EX|fcntl.LOCK_NB)
-  with sqlite3.connect(database.as_uri()+'?mode=ro',uri=True) as db:
+  with contextlib.closing(sqlite3.connect(database.as_uri()+'?mode=ro',uri=True)) as db:
    maintenance.need(db.execute('pragma integrity_check').fetchall()==[('ok',)],'SQLite integrity check failed')
-   maintenance.need(db.execute('select version from storage_meta where id=1').fetchone() in ((1,),(2,),(3,)),'Unknown storage schema')
+   maintenance.need(db.execute('select version from storage_meta where id=1').fetchone() in ((1,),(2,),(3,),(4,),(5,)),'Unknown storage schema')
+   maintenance.need(not db.execute('pragma foreign_key_check').fetchone(),'SQLite relationship check failed')
+   if db.execute('select version from storage_meta where id=1').fetchone()==(5,):
+    from normalized_fields import validate_relations
+    validate_relations(db)
    yield db
  finally:os.close(fd)
 
@@ -71,7 +75,7 @@ def export_streams(db,destination,board):
   names.append(name)
  features=destination/(maintenance.relative(board)+'.features.sqlite')
  if features.exists():features.unlink()
- with sqlite3.connect(features) as out:
+ with contextlib.closing(sqlite3.connect(features)) as out, out:
   features.chmod(0o600)
   for table,columns in TABLES.items():
    out.execute(f'CREATE TABLE {table}({columns})')
@@ -92,7 +96,22 @@ def export_instance(root,database,board,destination):
  return {'operation':'db-export','directory':str(destination),'streams':len(names)}
 
 def import_copy(root,board,members,database='liner.sqlite',structured=False,tools_dir=None):
- root=Path(root);database=maintenance.relative(database);target=root/database
+ # Publish only a fully verified candidate. A killed/failed conversion cannot
+ # leave a partial DB under the final name. The outer restore marker remains.
+ root=Path(root).resolve();final=root/maintenance.relative(database)
+ maintenance.need(not final.exists() and not final.is_symlink(),'Database output already exists')
+ final.parent.mkdir(parents=True,exist_ok=True,mode=0o700)
+ with tempfile.TemporaryDirectory(prefix='.db-import-',dir=final.parent) as tmp:
+  candidate=Path(tmp)/'candidate.sqlite'
+  result=_import_copy(root,board,members,database,structured,tools_dir,_target=candidate)
+  with candidate.open('r+b') as f:os.fsync(f.fileno())
+  os.link(candidate,final)  # Atomic no-clobber publication on this filesystem.
+  maintenance.sync_directory(final.parent)
+ result['database']=str(final)
+ return result
+
+def _import_copy(root,board,members,database='liner.sqlite',structured=False,tools_dir=None,_target=None):
+ root=Path(root);database=maintenance.relative(database);target=_target or root/database
  maintenance.need(not target.exists(),'Database output already exists')
  files,_=maintenance.inventory(root,allow_incomplete=True)
  if (root/STREAM_LIST).exists():
@@ -120,7 +139,8 @@ def import_copy(root,board,members,database='liner.sqlite',structured=False,tool
    os.link(converted,target);converted.unlink()
  else:
   fd=os.open(target,os.O_WRONLY|os.O_CREAT|os.O_EXCL,0o600);os.close(fd)
- with sqlite3.connect(target) as db:
+ with contextlib.closing(sqlite3.connect(target)) as db:
+  db.execute('PRAGMA foreign_keys=ON')
   if not structured:db.executescript('PRAGMA synchronous=FULL;CREATE TABLE storage_meta(id INTEGER PRIMARY KEY CHECK(id=1),version INTEGER NOT NULL,uuid BLOB NOT NULL);INSERT INTO storage_meta VALUES(1,1,randomblob(16));CREATE TABLE streams(id INTEGER PRIMARY KEY,name TEXT UNIQUE NOT NULL,length INTEGER NOT NULL DEFAULT 0,revision INTEGER NOT NULL DEFAULT 0);CREATE TABLE blocks(stream INTEGER NOT NULL REFERENCES streams(id) ON DELETE CASCADE,number INTEGER NOT NULL,value BLOB NOT NULL CHECK(length(value)=4096),PRIMARY KEY(stream,number)) WITHOUT ROWID;')
   db.execute('CREATE TABLE storage_imports(name TEXT PRIMARY KEY)')
   for name in (() if structured else names):
@@ -131,13 +151,17 @@ def import_copy(root,board,members,database='liner.sqlite',structured=False,tool
     while data:=f.read(BLOCK):db.execute('INSERT INTO blocks VALUES(?,?,?)',(ident,number,data.ljust(BLOCK,b'\0')));number+=1
   features=root/(board+'.features.sqlite')
   with contextlib.ExitStack() as stack:
-   source=stack.enter_context(sqlite3.connect(features.as_uri()+'?mode=ro',uri=True)) if features.exists() else None
+   source=stack.enter_context(contextlib.closing(sqlite3.connect(features.as_uri()+'?mode=ro',uri=True))) if features.exists() else None
    for table,columns in TABLES.items():
     db.execute(f'CREATE TABLE {table}({columns})')
     if source and source.execute("select 1 from sqlite_master where name=? and type='table'",(table,)).fetchone():
      for row in source.execute(f'SELECT * FROM {table}'):db.execute(f'INSERT INTO {table} VALUES({",".join("?" for _ in row)})',row)
   db.execute("INSERT INTO storage_imports VALUES('features')");db.commit()
   maintenance.need(db.execute('pragma integrity_check').fetchone()==('ok',),'Migrated database is invalid')
+  maintenance.need(not db.execute('pragma foreign_key_check').fetchone(),'Migrated relationships are invalid')
+  if structured:
+   from normalized_fields import validate_relations
+   validate_relations(db)
   # Verify every byte against the source, not just row counts.
   for ident,name,length in db.execute('select id,name,length from streams'):
    h=hashlib.sha256();remaining=length
@@ -152,8 +176,15 @@ def import_copy(root,board,members,database='liner.sqlite',structured=False,tool
      n=min(remaining,BLOCK);h.update(data[:n]);remaining-=n
    with (root/name).open('rb') as f:expected=hashlib.file_digest(f,'sha256').digest()
    maintenance.need(remaining==0 and h.digest()==expected,'Migration hash mismatch: '+name)
+  coverage=[]
+  if structured:
+   for kind,count in db.execute('SELECT kind,count(*) FROM record_streams GROUP BY kind ORDER BY kind'):
+    coverage.append({'kind':kind,'streams':count})
+   legacy=db.execute('SELECT count(*) FROM streams WHERE id NOT IN (SELECT stream FROM record_streams)').fetchone()[0]
+  else:legacy=len(names)
+  maintenance.need(db.execute('PRAGMA wal_checkpoint(TRUNCATE)').fetchone()[0]==0,'Candidate checkpoint failed')
  maintenance.sync_directory(target.parent)
- return {'operation':'db-import','database':str(target),'streams':len(names),'layout':'structured' if structured else 'blocks','verified':'SHA-256 of every stream'}
+ return {'operation':'db-import','database':str(target),'streams':len(names),'layout':'structured' if structured else 'blocks','verified':'SHA-256 of every stream; integrity_check; foreign_key_check','typed_streams':coverage,'compatibility_streams':legacy}
 
 def backup(root,database,board,members,archive):
  root=Path(root).resolve();archive=Path(archive).absolute();maintenance.outside(archive,root)
@@ -171,7 +202,7 @@ def restore(archive,destination,compact=False,reclaim=False,all_stores=False,too
   layout=Path(destination)/LAYOUT
   if structured is None:
    schema=json.loads(layout.read_text(encoding='utf8'))['schema'] if layout.exists() else 1
-   maintenance.need(schema in (1,2,3),'Unknown backup storage layout')
+   maintenance.need(schema in (1,2,3,4,5),'Unknown backup storage layout')
    structured=schema>=2
   result['database']=import_copy(Path(destination).resolve(),manifest['board'],manifest['members'],database,structured,tools_dir)
  except Exception:

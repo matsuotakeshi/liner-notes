@@ -43,6 +43,8 @@ with tempfile.TemporaryDirectory(prefix='install-linux-') as tmp:
     wrapper=stage/'usr/local/bin/liner-notes-doctor'
     assert wrapper.is_file() and '--prefix /usr/local' in wrapper.read_text()
     assert (stage/'usr/local/share/liner-notes/scripts/doctor.py').read_bytes()==(ROOT/'scripts/doctor.py').read_bytes()
+    for name in ('normalized_fields.py','structured_db.py','database_tools.py'):
+        assert (stage/'usr/local/share/liner-notes/scripts'/name).read_bytes()==(ROOT/'scripts'/name).read_bytes()
     assert not (stage/'usr/local/bin/liner-notes-ssh').exists(),'FreeBSD-specific Telnet wrapper must not be installed on Linux'
     for p in (stage/'usr/local/bin').glob('*'):
         assert os.access(p,os.X_OK),p

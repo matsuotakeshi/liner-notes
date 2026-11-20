@@ -73,9 +73,11 @@ int storage_init(const char *path) {
     int initial=open(database,O_RDWR|O_CREAT|O_NOFOLLOW,0600);
     if(initial<0 || fchmod(initial,0600)) { if(initial>=0)close(initial);close(owner);owner=-1;return 0; }close(initial);
     sqlite3 *db=NULL;int ok=connection(&db) && sql(db,"PRAGMA journal_mode=WAL;BEGIN IMMEDIATE;CREATE TABLE IF NOT EXISTS storage_meta(id INTEGER PRIMARY KEY CHECK(id=1),version INTEGER NOT NULL,uuid BLOB NOT NULL);INSERT OR IGNORE INTO storage_meta VALUES(1,1,randomblob(16));CREATE TABLE IF NOT EXISTS streams(id INTEGER PRIMARY KEY,name TEXT UNIQUE NOT NULL,length INTEGER NOT NULL DEFAULT 0,revision INTEGER NOT NULL DEFAULT 0);CREATE TABLE IF NOT EXISTS blocks(stream INTEGER NOT NULL REFERENCES streams(id) ON DELETE CASCADE,number INTEGER NOT NULL,value BLOB NOT NULL CHECK(length(value)=4096),PRIMARY KEY(stream,number)) WITHOUT ROWID;COMMIT;");
-    if(ok && structured_requested && is_new)ok=sql(db,"UPDATE storage_meta SET version=3 WHERE id=1");
-    sqlite3_stmt *q=NULL;if(ok) { ok=sqlite3_prepare_v2(db,"SELECT version FROM storage_meta WHERE id=1",-1,&q,NULL)==SQLITE_OK && sqlite3_step(q)==SQLITE_ROW;if(ok) { storage_version=sqlite3_column_int(q,0);ok=(storage_version>=1 && storage_version<=3) && (!structured_requested || storage_version>=2); } }sqlite3_finalize(q);
+    int creating=ok && structured_requested && is_new;
+    if(creating)ok=sql(db,"BEGIN IMMEDIATE;UPDATE storage_meta SET version=5 WHERE id=1");
+    sqlite3_stmt *q=NULL;if(ok) { ok=sqlite3_prepare_v2(db,"SELECT version FROM storage_meta WHERE id=1",-1,&q,NULL)==SQLITE_OK && sqlite3_step(q)==SQLITE_ROW;if(ok) { storage_version=sqlite3_column_int(q,0);ok=(storage_version>=1 && storage_version<=5) && (!structured_requested || storage_version>=2); } }sqlite3_finalize(q);
     if(ok && storage_version>=2)ok=row_schema(db);
+    if(creating) { if(ok)ok=sql(db,"COMMIT");if(!ok)sql(db,"ROLLBACK"); }
     if(db)sqlite3_close(db);
     if(!ok || chmod(database,0600)) { close(owner);owner=-1;database[0]=0;return 0; }
     int d=open(directory,O_RDONLY);ok=d>=0 && fsync(d)==0;if(d>=0)close(d);return ok;
@@ -238,6 +240,7 @@ static int rows_flush(Store *s) {
     sqlite3_int64 saved=s->position;s->position=0;unsigned char magic[8];int ok=storage_read(s->fd,magic,8)==8;s->position=saved;if(!ok)return 0;
     int kind=!memcmp(magic,"RTBOARD4",8)||!memcmp(magic,"RTBOARD5",8)?1:!memcmp(magic,"LNMAIL01",8)?2:!memcmp(magic,"RTMEMB01",8)?3:0;
     if(!kind && storage_version>=3)for(unsigned i=0;i<13;i++)if(!memcmp(magic,event_magics[i],8)) { kind=(int)i+4;break; }
+    if(!kind && storage_version>=5 && !memcmp(magic,"LNVLT001",8))kind=17;
     if(!kind)return !s->kind;
     sqlite3_stmt *q=NULL;if(sqlite3_prepare_v2(s->db,"INSERT INTO record_streams VALUES(?,?,?) ON CONFLICT(stream) DO UPDATE SET magic=excluded.magic",-1,&q,NULL)!=SQLITE_OK)return 0;
     sqlite3_bind_int64(q,1,s->id);sqlite3_bind_int(q,2,kind);sqlite3_bind_blob(q,3,magic,8,SQLITE_STATIC);ok=sqlite3_step(q)==SQLITE_DONE;sqlite3_finalize(q);if(!ok)return 0;

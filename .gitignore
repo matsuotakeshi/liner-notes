@@ -27,3 +27,8 @@
 /test-member-core
 
 /test-mail-core
+
+/test-storage-relations
+/test-storage-relations.exe
+/test-storage-normalized
+/test-storage-normalized.exe
