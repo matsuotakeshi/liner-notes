@@ -64,4 +64,3 @@ Traceback (most recent call last):
     import os,json; a=os.stat('/'); b=os.stat('/lib'); print(json.dumps({'same_directory':(a.st_dev,a.st_ino)==(b.st_dev,b.st_ino)}),flush=True); os.chroot('/lib'); print('UNEXPECTED_CHROOT_SUCCESS',flush=True)
                                                                                                                                                   ~~~~~~~~~^^^^^^^^
 PermissionError: [Errno 1] Insufficient privileges: '/lib'
-
