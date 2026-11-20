@@ -1,5 +1,6 @@
 """Portable tests for the native adapter, not claims of Enforcing execution."""
 import errno
+import json
 import importlib.util
 from pathlib import Path
 import subprocess
@@ -75,7 +76,8 @@ class Units(unittest.TestCase):
         backend.ids={'broker':30,'isolation':0,'consumer':40}
         # readiness's import is local to the native path; provide its public API.
         templates={r:(ROOT/'linux'/('liner-notes-door-'+r+'.service')).read_text() for r in backend.configs}
-        with patch.dict(sys.modules,{'door_broker':Mock()}),patch.object(services.Path,'read_text',autospec=True) as read,patch.object(services,'Process') as proc:
+        with patch.dict(sys.modules,{'door_broker':Mock()}),patch.object(services.Path,'read_text',autospec=True) as read,patch.object(services,'Process') as proc, \
+             patch.object(backend,'diagnostic_path',return_value=Path('/fixture/state/log')):
             proc.return_value.poll.return_value = None
             read.side_effect=lambda path: ('{"socket":"/fixture/socket"}' if path in backend.configs.values()
                                           else templates['broker' if 'broker' in path.name else 'isolation'])
@@ -88,8 +90,11 @@ class Units(unittest.TestCase):
                 self.assertNotIn('ExecStop=',text);self.assertNotIn('ExecStartPost=',text)
                 self.assertEqual('Environment=LINER_DOOR_DIAGNOSTICS=1' in text,role=='isolation')
                 if role=='isolation':
+                    self.assertIn('StandardError=append:'+str(Path('/fixture/state/log')),text)
+                    self.assertNotIn('StandardError=journal',text)
                     for line in ('KillMode=process','SendSIGKILL=no','TimeoutStopSec=infinity'):
                         self.assertIn(line,text)
+                else:self.assertIn('StandardError=journal',text)
 
     def test_launch_diagnostics_are_enabled_only_in_fixture_bbs_unit(self):
         backend = services.Backend.__new__(services.Backend)
@@ -334,6 +339,97 @@ def real_accounts():
             except KeyError: pass
             else: raise AssertionError('Fixture identity survived cleanup')
     print('PASS disposable Rocky fixture NSS identity lifecycle')
+
+
+class JournalProbe(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        spec=importlib.util.spec_from_file_location('journal_probe',ROOT/'ci/selinux_journal_probe.py')
+        cls.probe=importlib.util.module_from_spec(spec);spec.loader.exec_module(cls.probe)
+
+    def test_fixed_write_and_exclusive_result(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path=Path(tmp)/'result'
+            with patch.object(self.probe.os,'write',return_value=len(self.probe.MARKER)) as write:
+                self.probe.record(path)
+            write.assert_called_once_with(2,self.probe.MARKER)
+            self.assertEqual(json.loads(path.read_text()),{'bytes':25,'errno':0})
+            with patch.object(self.probe.os,'write',return_value=25),self.assertRaises(FileExistsError):
+                self.probe.record(path)
+
+    def test_write_denial_records_errno_without_message(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path=Path(tmp)/'result'
+            with patch.object(self.probe.os,'write',side_effect=OSError(errno.EACCES,'private secret')):
+                self.probe.record(path)
+            self.assertEqual(json.loads(path.read_text()),{'bytes':0,'errno':errno.EACCES})
+            self.assertNotIn('private',path.read_text())
+
+    def test_real_child_stderr_write(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path=Path(tmp)/'result'
+            code="import runpy,sys; runpy.run_path(sys.argv[1])['record'](sys.argv[2])"
+            result=subprocess.run([sys.executable,'-E','-s','-B','-c',code,
+                                   str(ROOT/'ci/selinux_journal_probe.py'),str(path)],
+                                  capture_output=True,timeout=5,check=True)
+            self.assertEqual(result.stdout,b'')
+            self.assertEqual(result.stderr,self.probe.MARKER)
+            self.assertEqual(json.loads(path.read_text()),{'bytes':len(self.probe.MARKER),'errno':0})
+
+    def test_journal_failure_cannot_pass_acceptance(self):
+        backend=services.Backend.__new__(services.Backend)
+        for ok in (False,True):
+            backend.journal_ok=ok
+            if ok:backend.assert_journal()
+            else:
+                with self.assertRaisesRegex(AssertionError,'journal'):backend.assert_journal()
+
+    def test_probe_requires_write_success_and_journal_delivery(self):
+        import io
+        for count,number,output,expected in ((25,0,b'LINER_DOOR_JOURNAL_PROBE',True),
+                                            (25,0,b'',False),(0,13,b'',False),(2,0,b'',False)):
+            with self.subTest(count=count,errno=number,output=output),tempfile.TemporaryDirectory() as tmp:
+                backend=services.Backend.__new__(services.Backend);backend.base=Path(tmp)
+                (backend.base/'state').mkdir();(backend.base/'scripts').mkdir()
+                (backend.base/'entry-isolation').write_text('python -E -s -B /fixture/scripts/door_isolation.py "$@"')
+                backend.fixture=Mock(results=[]);backend.label=Mock()
+                process=Mock(returncode=0,stderr=io.BytesIO(output))
+                def start(role,command,domain):
+                    self.assertEqual((role,domain),('isolation','liner_notes_isolation_t'))
+                    Path(command[-1]).write_text(json.dumps({'bytes':count,'errno':number}))
+                    return process
+                backend.unit=Mock(side_effect=start)
+                with patch('builtins.print'):backend.probe_journal()
+                self.assertEqual(backend.journal_ok,expected)
+                process.terminate.assert_called_once();process.wait.assert_called_once_with(10)
+                self.assertIn('selinux_journal_probe.py',(backend.base/'entry-journal-probe').read_text())
+
+    def filtered(self,content,**overrides):
+        info=dict(st_mode=0o100600,st_uid=0,st_nlink=1);info.update(overrides)
+        with tempfile.TemporaryDirectory() as tmp:
+            p=Path(tmp)/'log';p.write_bytes(content)
+            with patch.object(services.os,'fstat',return_value=SimpleNamespace(**info)):
+                return services.private_diagnostics(p)
+
+    def test_private_output_is_bounded_and_allowlisted(self):
+        content=(b'{"event":"launch-rejected","phase":"slot","errno":13,"ticket":"secret","error":"private"}\n'
+                 b'{"event":["secret"]}\n{"event":"secret"}\ntraceback secret\n')
+        self.assertEqual(json.loads(self.filtered(content)),dict(event='launch-rejected',phase='slot',errno=13))
+        self.assertEqual(self.filtered(b'x'*20000),b'DIAGNOSTIC_TRUNCATED\n')
+
+    def test_unsafe_private_files_are_rejected(self):
+        for info in ({'st_uid':123},{'st_mode':0o100644},{'st_nlink':2},{'st_mode':0o040600}):
+            with self.subTest(info=info),self.assertRaisesRegex(ValueError,'unsafe'):
+                self.filtered(b'{}',**info)
+
+    def test_private_capture_survives_fixture_removal(self):
+        p=services.Process.__new__(services.Process)
+        p.name='fixture';p.private_log=Path('/fixture/state/log');p.private_cache=None
+        p.backend=Mock();p.backend.command.return_value=Mock(stdout='journal',returncode=0)
+        with patch.object(services,'private_diagnostics',return_value=b'{"event":"worker-exit","status":1}\n') as read,patch('builtins.print'):
+            self.assertIn(b'worker-exit',p.stderr.read())
+            p.diagnostics()
+            read.assert_called_once()
 
 
 if __name__=='__main__':

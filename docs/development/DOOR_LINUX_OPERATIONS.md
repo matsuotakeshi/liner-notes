@@ -397,3 +397,42 @@ guidance: credentials, capacity, peer/FD checks, protocol, timeouts, revocation
 and cleanup order are unchanged. Their source-lock hashes reflect this review.
 Stable public documentation remains unchanged until these candidate features
 are released. No privileged helper or production configuration changes are needed.
+
+## Journal transport probe (2026-11-20, CI-only investigation)
+
+Main `106bfa215b1243d2677b76862ceb1c6af7e66b1b`, native run
+[44646594220](https://github.com/matsuotakeshi/liner-notes/actions/runs/44646594220),
+Artifact 14589866917, establishes `ERR_PREFIX bytes=3 fds=0 truncated=0 errno=0`.
+The BBS receives a refusal before PTY handoff; increasing the game-prompt timeout
+does not address it. Isolation's journal contains only systemd lifecycle messages,
+not worker events. No refusal cause or SELinux denial is established by this log.
+FreeBSD isolated upgrade run 44648091220 at the same SHA passed.
+
+The next native fixture separates diagnostic delivery from Door admission:
+
+1. A root-owned, CI-only script runs through the same labelled shell/Python
+   entrypoint and `liner_notes_isolation_t` domain with journal stderr. It writes
+   one fixed marker using `os.write(2, ...)`, recording only byte count and numeric
+   errno into a fresh 0600 file in isolated state storage. It never reads a request,
+   credential or environment value. The existing domain check is retained.
+2. After stopping this unique probe unit, compare the write result and the marker
+   in its journal. Missing/partial output or a write error cannot pass the final
+   acceptance gate. Continue collecting the original Door failure when possible.
+3. The subsequent isolation fixture unit sends stderr to a precreated root-owned
+   0600 file labelled `liner_notes_isolation_state_t`. This changes only the test
+   instance's diagnostic destination; shipped service definitions retain journal.
+   All original authentication, refusal, PTY, persistence and crash checks remain.
+4. Capture the file before the test directory is removed, cache it for later
+   teardown, and export at most 16 KiB of input after filtering. Only known event
+   names, fixed phase/reason labels and integer PID/count/status/errno fields are
+   retained. Arbitrary text, exception messages, traceback, paths, requests and
+   tickets are excluded. Nonregular, linked, non-root or public files are rejected.
+
+`DOOR_JOURNAL_PROBE` distinguishes a stderr write failure from journal delivery
+failure; `DOOR_PRIVATE_DIAGNOSTICS` supplies the original launch phase independently.
+This is a diagnostic fixture variant, not evidence that the missing journal or
+Door failure has been fixed. No policy allow rules, host packages, privileged
+helpers, installed services or production data change. Hosted tests cover real
+child stderr writes, injected write rejection, exclusive result creation, private
+log filtering/bounds and the journal failure gate. Native behavior still requires
+reviewed-main CI; do not run this PR on home VMs.

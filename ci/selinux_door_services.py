@@ -11,10 +11,47 @@ import hashlib
 import io
 import json
 import os
+import stat
 from pathlib import Path
 import subprocess
 import sys
 import time
+
+
+def private_diagnostics(path):
+    """Export only the isolation service's bounded, allowlisted diagnostic fields."""
+    events = {'worker-accepted', 'worker-reaped', 'admission-rejected',
+              'admission-unavailable', 'worker-exit', 'door-exit', 'launch-rejected',
+              'launch-failed', 'cleanup-failed', 'worker-failed'}
+    labels = {'phase': {'request', 'slot', 'scope', 'broker', 'ticket-pipe', 'dropfile',
+                       'pty', 'launch', 'handoff', 'running', 'revoke', 'descriptors',
+                       'scope-stop', 'dropfile-remove', 'slot-release', 'connection-close',
+                       'setup', 'supervise'},
+              'reason': {'peer', 'capacity', 'credentials', 'fork'}}
+    flags = os.O_RDONLY | getattr(os, 'O_NOFOLLOW', 0)
+    fd = os.open(path, flags)
+    with os.fdopen(fd, 'rb') as stream:
+        info = os.fstat(stream.fileno())
+        if not stat.S_ISREG(info.st_mode) or info.st_uid != 0 or info.st_mode & 0o077 or info.st_nlink != 1:
+            raise ValueError('unsafe diagnostic file')
+        content = stream.read(16385)
+    output = []
+    for line in content[:16384].splitlines():
+        try:
+            item = json.loads(line)
+        except (ValueError, UnicodeDecodeError):
+            continue
+        if not isinstance(item, dict) or not isinstance(item.get('event'), str) or item['event'] not in events:
+            continue
+        clean = {'event': item['event']}
+        for key in ('worker', 'active', 'status', 'errno'):
+            if type(item.get(key)) is int: clean[key] = item[key]
+        for key, allowed in labels.items():
+            if isinstance(item.get(key), str) and item[key] in allowed: clean[key] = item[key]
+        # Exception names are deliberately omitted: no arbitrary string fields.
+        output.append(json.dumps(clean))
+    if len(content) > 16384: output.append('DIAGNOSTIC_TRUNCATED')
+    return ('\n'.join(output)+'\n').encode() if output else b''
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -122,7 +159,7 @@ class Accounts:
 
 
 class Process:
-    def __init__(self, backend, role, text, domain):
+    def __init__(self, backend, role, text, domain, *, diagnostic=None):
         self.backend = backend
         self.name = backend.fixture.path.name + '-door-' + role + '-' + str(len(backend.units))
         self.file = Path('/run/systemd/system') / (self.name + '.service')
@@ -131,6 +168,8 @@ class Process:
         self.returncode = None
         self.stopper = None
         self.stderr_cache = None
+        self.private_log = diagnostic
+        self.private_cache = None
         if backend.command('systemctl', 'show', self.name, '-p', 'LoadState', '--value').stdout.strip() != 'not-found':
             raise ValueError('Refuse existing unit')
         with self.file.open('x', encoding='utf8') as stream:
@@ -167,6 +206,7 @@ class Process:
         # Capture before unit removal/daemon-reload, even if ExecStartPre fails.
         # Only this unique fixture unit is queried; never export whole journals.
         try:
+            self.capture_private()
             result = self.backend.command('journalctl', '--no-pager', '-u', self.name,
                                           '-n', '40', '-o', 'short-iso', check=False)
             self.stderr_cache = io.BytesIO(result.stdout.encode()[-16384:])
@@ -177,6 +217,15 @@ class Process:
             # Keep the original startup/cleanup exception, not a diagnostic error.
             print('DOOR_UNIT_JOURNAL unavailable: ' + type(error).__name__, flush=True)
 
+    def capture_private(self):
+        if getattr(self, 'private_log', None) is not None and self.private_cache is None:
+            try:
+                self.private_cache = private_diagnostics(self.private_log)
+                print('DOOR_PRIVATE_DIAGNOSTICS ' + self.name + '\n' + self.private_cache.decode(), flush=True)
+            except (OSError, ValueError) as error:
+                self.private_cache = b''
+                print('DOOR_PRIVATE_DIAGNOSTICS unavailable: ' + type(error).__name__, flush=True)
+
     def state(self):
         result = self.backend.command('systemctl', 'show', self.name,
                                       '-p', 'MainPID', '-p', 'ActiveState', '-p', 'ExecMainStatus')
@@ -184,6 +233,9 @@ class Process:
 
     @property
     def stderr(self):
+        self.capture_private()
+        if getattr(self, 'private_cache', None) is not None:
+            return io.BytesIO(self.private_cache)
         if self.stderr_cache is None:
             output = self.backend.command('journalctl', '--no-pager', '-u', self.name, '-n', '40').stdout
             self.stderr_cache = io.BytesIO(output.encode())
@@ -310,6 +362,46 @@ class Backend:
             entry.write_text(script); entry.chmod(0o755)
             self.label(entry, role+'_exec')
         self.ids = {'bbs': BBS, 'broker': BROKER, 'consumer': GAME, 'isolation': 0}
+        self.probe_journal()
+
+    def probe_journal(self):
+        # Same fixed shell/Python entry and SELinux transition as isolation.
+        # Keep journal output here even though the following diagnostic launch
+        # saves stderr privately. A failed journal probe still fails acceptance.
+        script = self.base/'scripts'/'selinux_journal_probe.py'
+        script.write_bytes((ROOT/'ci'/'selinux_journal_probe.py').read_bytes())
+        script.chmod(0o644); self.label(script, 'ro')
+        entry = self.base/'entry-journal-probe'
+        entry.write_text((self.base/'entry-isolation').read_text().replace(
+            'door_isolation.py', 'selinux_journal_probe.py'))
+        entry.chmod(0o755); self.label(entry, 'isolation_exec')
+        result = self.base/'state'/'journal-probe.json'
+        probe = self.unit('isolation', [entry, '--result', result], 'liner_notes_isolation_t')
+        try:
+            until = time.monotonic() + 5
+            while not result.exists() and probe.poll() is None and time.monotonic() < until:
+                time.sleep(.05)
+        finally:
+            probe.terminate(); probe.wait(10)
+        assert probe.returncode == 0, 'journal probe exited abnormally'
+        record = json.loads(result.read_text())
+        if set(record) != {'bytes', 'errno'} or any(type(x) is not int for x in record.values()):
+            raise ValueError('invalid journal probe result')
+        probe.diagnostics()
+        self.journal_ok = (record == {'bytes': 25, 'errno': 0} and
+                           b'LINER_DOOR_JOURNAL_PROBE' in probe.stderr.getvalue())
+        self.fixture.results.append({'door_journal': record, 'verified': self.journal_ok})
+        print('DOOR_JOURNAL_PROBE ' + json.dumps({'write': record, 'verified': self.journal_ok}), flush=True)
+
+    def assert_journal(self):
+        assert self.journal_ok, 'isolation journal write/delivery failed (see DOOR_JOURNAL_PROBE)'
+
+    def diagnostic_path(self):
+        path = self.base/'state'/('diagnostic-'+str(len(self.units))+'.jsonl')
+        fd = os.open(path, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o600)
+        os.close(fd)
+        self.label(path, 'isolation_state')
+        return path
 
     def unit(self, role, command, domain, *, directory=None, output='journal'):
         uid = self.ids[role]
@@ -328,6 +420,7 @@ class Backend:
         template = template.replace('@PREFIX@/libexec/liner-notes/door-'+role, str(self.base/('entry-'+role)))
         template = template.replace('/etc/liner-notes/door-'+role+'.json', str(self.configs[role]))
         lines = []
+        diagnostic = self.diagnostic_path() if role == 'isolation' else None
         for line in template.splitlines():
             if line.startswith(('Requires=', 'After=', 'Before=', 'WantedBy=', 'RuntimeDirectory=',
                                 'RuntimeDirectoryMode=', 'StateDirectory=', 'StateDirectoryMode=', 'ReadWritePaths=')):
@@ -335,12 +428,14 @@ class Backend:
             if line.startswith('User='):line='User='+str(self.ids[role])
             if line.startswith('Group='):line='Group='+str(self.ids[role])
             if line.startswith('SupplementaryGroups='):line='SupplementaryGroups='+str(self.ids['consumer'])
+            if diagnostic is not None and line.startswith('StandardError='):
+                line='StandardError=append:'+str(diagnostic)
             if line == '[Install]':continue
             lines.append(line)
         lines.append('ReadWritePaths='+str(self.base))
         lines.append('RuntimeMaxSec=300')
         if role=='isolation':lines.append('Environment=LINER_DOOR_DIAGNOSTICS=1')
-        process = Process(self, role, '\n'.join(lines)+'\n', 'liner_notes_'+role+'_t')
+        process = Process(self, role, '\n'.join(lines)+'\n', 'liner_notes_'+role+'_t', diagnostic=diagnostic)
         wait_ready(process, json.loads(self.configs[role].read_text())['socket'], self.ids[role])
         return process
 
@@ -394,6 +489,7 @@ def acceptance(fixture, command):
     try:
         backend.accounts.create()
         run(str(ROOT/'runtime'), backend=backend)
+        backend.assert_journal()
         fixture.results.append({'door_broker':'systemd + Enforcing identity/lifecycle/revocation/PTY/persistence/crash refusal'})
     finally:
         backend.close()
