@@ -2,7 +2,8 @@
 import hashlib
 import json
 import os
-from pathlib import Path
+from pathlib import Path, PurePosixPath
+import struct
 import subprocess
 import sys
 import tempfile
@@ -12,6 +13,15 @@ from unittest.mock import Mock, patch
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0,str(ROOT/'ci'))
 import solaris_door_jail as fixture
+
+
+def elf_image(path='/usr/lib/amd64/ld.so.1', count=1):
+    payload = path.encode('ascii') + b'\0'
+    header = b'\x7fELF\x02\x01\x01'+bytes(9)
+    header += struct.pack('<HHIQQQIHHHHHH',2,62,1,0,64,0,0,64,56,count,0,0,0)
+    table = b''.join(struct.pack('<IIQQQQQQ',3,4,64+56*count,0,0,len(payload),len(payload),1)
+                     for _ in range(count))
+    return header+table+payload
 
 
 def matrix():
@@ -82,11 +92,33 @@ class JailFixture(unittest.TestCase):
         self.assertIsNone(fixture.mount_entry('swap /tmp tmpfs rw 0',root))
 
     def test_library_inventory_strict_allowlist(self):
-        paths = fixture.library_paths(' libc.so.1 => /lib/64/libc.so.1\n')
+        interpreter = fixture.elf_interpreter(elf_image())
+        paths = fixture.library_paths(' libc.so.1 => /lib/64/libc.so.1\n',interpreter)
         self.assertEqual(len(paths),2)
+        self.assertIn(PurePosixPath('/usr/lib/amd64/ld.so.1'),paths)
+        self.assertNotIn(PurePosixPath('/lib/amd64/ld.so.1'),paths)
         for text in ('','libc.so.1 => (file not found)', 'libc => /etc/libc.so',
                      'libc => /lib/64/../../etc/passwd','libc => /lib/64/libc.so trailing'):
-            with self.assertRaises(ValueError): fixture.library_paths(text)
+            with self.assertRaises(ValueError): fixture.library_paths(text,interpreter)
+        with self.assertRaises(ValueError): fixture.library_paths('libc => /lib/64/libc.so.1','/tmp/loader')
+
+    def test_exact_elf_interpreter_aliases_are_preserved(self):
+        for prefix in ('/usr/lib/amd64','/usr/lib/64','/lib/amd64','/lib/64'):
+            path = prefix+'/ld.so.1'
+            self.assertEqual(str(fixture.elf_interpreter(elf_image(path))),path)
+
+    def test_malformed_or_unknown_elf_is_refused_before_mount(self):
+        values = [b'',elf_image()[:63],elf_image()[:-1],elf_image('/tmp/loader'),
+                  elf_image('/usr/lib/amd64/../amd64/ld.so.1'),elf_image(count=0),elf_image(count=2),
+                  elf_image('/usr/lib/amd64/ld.so.1\0extra')]
+        for offset, fmt, value in ((4,'B',1),(5,'B',2),(16,'H',1),(18,'H',2),(20,'I',2),
+                                   (32,'Q',2**63),(52,'H',63),(54,'H',55),(56,'H',129),
+                                   (64,'I',1),(72,'Q',2**63),(96,'Q',1)):
+            damaged = bytearray(elf_image()); struct.pack_into('<'+fmt,damaged,offset,value)
+            values.append(bytes(damaged))
+        for value in values:
+            with self.subTest(value=value[:64]):
+                with self.assertRaises(ValueError): fixture.elf_interpreter(value)
 
     def test_success_is_only_credential_namespace_result(self):
         result = fixture.evaluate(matrix())
@@ -146,7 +178,7 @@ class JailFixture(unittest.TestCase):
             def fake_command(args, report, timeout=15):
                 calls.append([str(a).replace(chr(92), '/') for a in args])
                 if Path(args[0]) == Path('/compiler'):
-                    Path(args[-1]).write_text('synthetic')
+                    Path(args[-1]).write_bytes(elf_image())
                     if not mounted: raise subprocess.CalledProcessError(1,args)
                 if str(args[0]).endswith('umount') and unmount_failure:
                     raise subprocess.CalledProcessError(1,args)
@@ -194,6 +226,21 @@ class JailFixture(unittest.TestCase):
                             str(ROOT/'tests/solaris_door_jail_probe.c'),'-o',str(binary)],check=True,timeout=45)
             result = subprocess.run([str(binary),'--observe','/','plain'],timeout=5)
             self.assertEqual(result.returncode,80)
+            interpreter = fixture.elf_interpreter(binary.read_bytes())
+            libraries = subprocess.run(['/usr/bin/ldd',str(binary)],capture_output=True,
+                                       text=True,check=True,timeout=10).stdout
+            self.assertIn(interpreter,fixture.library_paths(libraries,interpreter))
+            print('SOLARIS_JAIL_INTERPRETER '+str(interpreter),flush=True)
+
+            # The reporter protocol and diagnostic channel are independent even
+            # without root. Namespace flags must NOT claim isolation on the host.
+            with subprocess.Popen([str(binary),'--inside'],stdin=subprocess.PIPE,
+                                  stdout=subprocess.PIPE,stderr=subprocess.PIPE) as child:
+                self.assertEqual(child.stdout.read(1),b'R')
+                value = struct.unpack('=iiii',child.stdout.read(16))
+                self.assertEqual(value[1:],(0,1,1))
+                output, errors = child.communicate(b'A',timeout=5)
+                self.assertEqual((child.returncode,output,errors),(0,b'',b''))
 
 
 if __name__ == '__main__': unittest.main()

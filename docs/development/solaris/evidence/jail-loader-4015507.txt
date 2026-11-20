@@ -1,0 +1,8 @@
+{"source_sha": "4015507bffa2fdbb6617bf2f2b98a06d0d3561dc", "source_hash": "96545bf712fe7397c1725c916700d9f5bd9236f836933d0ef10327cd0ec445c3", "directory": "/export/home/ci-test/ci/liner-door-loader-gj2e9bb3"}
+
+Interpreter Section:  .interp
+	/usr/lib/amd64/ld.so.1
+
+	libc.so.1 =>	 /lib/64/libc.so.1
+
+UNPRIVILEGED_REFUSAL 80

@@ -54,6 +54,21 @@ static int transfer(int fd, void *data, size_t length, int writing) {
     return 1;
 }
 
+static void child_error(const char *stage, int code) {
+    int saved = errno;
+    (void)dprintf(2,"JAIL_CHILD stage=%s errno=%d exit=%d\n",stage,saved,code);
+    _exit(code);
+}
+
+static void collect_errors(int fd) {
+    char buffer[4096];
+    ssize_t n;
+    /* Nonblocking channel: bounded diagnostics cannot stall cleanup. */
+    while ((n = read(fd,buffer,sizeof(buffer))) > 0)
+        (void)fwrite(buffer,1,(size_t)n,stderr);
+    close(fd);
+}
+
 static int payload(void) {
     /* It is also safe if a baseline accidentally gives this reporter set-ID:
      * do not open any writable file, signal anything or invoke privileged mode. */
@@ -99,18 +114,22 @@ static int case_name(const char *name) {
 }
 
 static int observe(const char *root, const char *name) {
-    int output[2], ack[2];
-    if (!root_path(root) || !case_name(name) || pipe(output) || pipe(ack)) return 73;
+    int output[2], ack[2], errors[2];
+    if (!root_path(root) || !case_name(name) || pipe(output) || pipe(ack) || pipe(errors)) {
+        (void)fprintf(stderr,"JAIL_PARENT stage=preflight errno=%d\n",errno); return 73;
+    }
+    if (fcntl(errors[0],F_SETFL,O_NONBLOCK) < 0 || fcntl(errors[1],F_SETFL,O_NONBLOCK) < 0) return 73;
     pid_t child = fork();
     if (child < 0) return 74;
     if (child == 0) {
         alarm(5);
         struct rlimit limit = {256,256}, core = {0,0};
-        if (dup2(ack[0], 0) < 0 || dup2(output[1], 1) < 0 || dup2(output[1], 2) < 0) _exit(75);
+        if (dup2(ack[0], 0) < 0 || dup2(output[1], 1) < 0 || dup2(errors[1], 2) < 0) child_error("stdio",75);
         closefrom(3);
-        if (setrlimit(RLIMIT_NOFILE,&limit) || setrlimit(RLIMIT_CORE,&core) ||
-            chdir(root) || chroot(".") || chdir("/") ||
-            setgroups(0,NULL) || setgid(SLOT) || setuid(SLOT) || !basic_limit(1)) _exit(76);
+        if (setrlimit(RLIMIT_NOFILE,&limit) || setrlimit(RLIMIT_CORE,&core)) child_error("limits",76);
+        if (chdir(root) || chroot(".") || chdir("/")) child_error("root",76);
+        if (setgroups(0,NULL) || setgid(SLOT) || setuid(SLOT)) child_error("identity",76);
+        if (!basic_limit(1)) child_error("privileges",76);
         char path[80]; (void)snprintf(path,sizeof(path),"/%s",name);
         char *args[] = {path,"--inside",NULL};
         char *env[] = {"PATH=/", "LC_ALL=C", NULL};
@@ -119,9 +138,9 @@ static int observe(const char *root, const char *name) {
         if (errno == EACCES || errno == EPERM) {
             char denied = 'D'; (void)transfer(1,&denied,1,1); _exit(0);
         }
-        _exit(77);
+        child_error("exec",77);
     }
-    close(output[1]); close(ack[0]);
+    close(output[1]); close(ack[0]); close(errors[1]);
     struct pollfd waiting = {output[0],POLLIN,0};
     char marker = 0; struct observation value = {0,0,0,0};
     int ok = poll(&waiting,1,6000) > 0 && transfer(output[0],&marker,1,0);
@@ -135,13 +154,24 @@ static int observe(const char *root, const char *name) {
         int fd = ok ? open(path,O_RDONLY) : -1;
         ssize_t n = fd >= 0 ? read(fd,&credentials,sizeof(credentials)) : -1;
         if (fd >= 0) close(fd);
+        if (ok && n < (ssize_t)(offsetof(prcred_t,pr_ngroups)+sizeof(credentials.pr_ngroups)))
+            (void)fprintf(stderr,"JAIL_PARENT stage=credentials errno=%d bytes=%ld\n",errno,(long)n);
         ok = ok && n >= (ssize_t)(offsetof(prcred_t,pr_ngroups)+sizeof(credentials.pr_ngroups));
         char proceed = 'A'; if (ok) ok = transfer(ack[1],&proceed,1,1);
     }
     close(ack[1]); close(output[0]);
     if (!ok) (void)kill(child,SIGKILL); /* still our unreaped direct child */
     int status = 0;
-    if (waitpid(child,&status,0) != child || !WIFEXITED(status) || WEXITSTATUS(status)) return 78;
+    pid_t waited;
+    do { waited = waitpid(child,&status,0); } while (waited < 0 && errno == EINTR);
+    collect_errors(errors[0]);
+    if (waited != child || !WIFEXITED(status) || WEXITSTATUS(status)) {
+        (void)fprintf(stderr,"JAIL_PARENT stage=wait reaped=%d exited=%d exit=%d signal=%d marker=%u\n",
+                      waited==child, WIFEXITED(status)!=0,
+                      WIFEXITED(status)?WEXITSTATUS(status):-1,
+                      WIFSIGNALED(status)?WTERMSIG(status):0,(unsigned char)marker);
+        return 78;
+    }
     if (!ok) return 79;
     if (denied) { puts("{\"exec_denied\":true}"); return 0; }
     printf("{\"ruid\":%lu,\"euid\":%lu,\"suid\":%lu,\"rgid\":%lu,\"egid\":%lu,\"sgid\":%lu,"

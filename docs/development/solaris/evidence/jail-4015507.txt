@@ -1,0 +1,130 @@
+{
+  "source_sha": "4015507bffa2fdbb6617bf2f2b98a06d0d3561dc",
+  "bundle_sha256": {
+    "solaris_door_jail.py": "870d8985fd5427e091ce20091ccde87886992d0f6e33cbf5e1dd11005de13663",
+    "solaris_door_boundary.py": "291b5395344fafcffa72f8271533ee9f001aa2df8c0157ace7b9e2bc7627ce0b",
+    "solaris_door_jail_probe.c": "96545bf712fe7397c1725c916700d9f5bd9236f836933d0ef10327cd0ec445c3",
+    "solaris_door_identity_probe.c": "546e8d33dd75f603e12b3d6450df00b9a115eea9e80449c15b9e67af9cefa653"
+  },
+  "system": "SunOS-5.11-i86pc-i386-64bit",
+  "directory": "/var/tmp/liner-door-jail-hi36t1u8",
+  "cases": {},
+  "broker_isolation_verified": false,
+  "door_backend_enabled": false,
+  "lifecycle_verified": false,
+  "cleanup_complete": true,
+  "commands": [
+    {
+      "argv": [
+        "/usr/gcc/15/bin/gcc",
+        "-m64",
+        "-std=c11",
+        "-Wall",
+        "-Wextra",
+        "-Werror",
+        "/opt/liner-notes-ci/door-jail/solaris_door_jail_probe.c",
+        "-o",
+        "/var/tmp/liner-door-jail-hi36t1u8/observer"
+      ],
+      "exit_code": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "/usr/gcc/15/bin/gcc",
+        "-m64",
+        "-std=c11",
+        "-Wall",
+        "-Wextra",
+        "-Werror",
+        "/opt/liner-notes-ci/door-jail/solaris_door_identity_probe.c",
+        "-o",
+        "/var/tmp/liner-door-jail-hi36t1u8/baseline"
+      ],
+      "exit_code": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "/var/tmp/liner-door-jail-hi36t1u8/baseline",
+        "--inventory"
+      ],
+      "exit_code": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "/usr/bin/ldd",
+        "/var/tmp/liner-door-jail-hi36t1u8/observer"
+      ],
+      "exit_code": 0,
+      "stdout": "\tlibc.so.1 =>\t /lib/64/libc.so.1\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "/usr/sbin/mount",
+        "-F",
+        "tmpfs",
+        "-o",
+        "nosuid,size=64m",
+        "swap",
+        "/var/tmp/liner-door-jail-hi36t1u8/root"
+      ],
+      "exit_code": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "/var/tmp/liner-door-jail-hi36t1u8/baseline",
+        "--baseline",
+        "/var/tmp/liner-door-jail-hi36t1u8/control-gid-bbs"
+      ],
+      "exit_code": 0,
+      "stdout": "{\"ruid\":61001,\"euid\":61001,\"suid\":61001,\"rgid\":61001,\"egid\":61002,\"sgid\":61002,\"groups\":0,\"basic_limit\":false}\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "/var/tmp/liner-door-jail-hi36t1u8/observer",
+        "--observe",
+        "/var/tmp/liner-door-jail-hi36t1u8/root",
+        "gid-bbs"
+      ],
+      "exit_code": 78,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "/usr/sbin/umount",
+        "/var/tmp/liner-door-jail-hi36t1u8/root"
+      ],
+      "exit_code": 0,
+      "stdout": "",
+      "stderr": ""
+    }
+  ],
+  "mount_options": [
+    "dev=ffc80003",
+    "nosuid",
+    "size=64m",
+    "xattr"
+  ],
+  "libraries": [
+    {
+      "path": "/lib/64/libc.so.1",
+      "sha256": "23427b483027385ca0fe9ac468bef12bc3c43a24243b70554823ff3082b6891e"
+    },
+    {
+      "path": "/lib/amd64/ld.so.1",
+      "sha256": "ab82cc7e74ffe52182f7e8b5d8c95965a08c7d957c74722dc3258b9924e27b50"
+    }
+  ],
+  "error": "CalledProcessError",
+  "exit_code": 78
+}
