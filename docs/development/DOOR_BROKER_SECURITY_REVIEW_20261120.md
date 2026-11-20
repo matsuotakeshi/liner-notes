@@ -71,3 +71,19 @@ FreeBSD/Linux encrypted SSH results remain separate gates. Solaris isolated
 Broker launch is unsupported and fails closed. AREA-PC88 remains subject to its
 separately pinned integration evidence. No production approval or release is
 implied. See [platform acceptance](SSH_PLATFORM_ACCEPTANCE.md).
+
+## Follow-up review: scoped fix candidate
+
+Branch `feature/broker-lifecycle-solaris`, based on merged PR #153
+`3b6003c25d212b42d0ff17d9c14f9953c3889f72`, addresses the P2 above with
+supervisor-incarnation/slot replay watermarks. The same independent reviewer
+checked the root-only operation, parent-controlled counters, field validation,
+legacy namespace separation, retained public claims, revocation and capacity.
+Five focused scoped-launch tests passed in that review, including 10,000 distinct
+launch/quit IDs. No blocking privilege/replay regression was identified.
+
+The implementing agent's complete Broker suite passed 30 tests. A candidate
+fix is not native acceptance or a release. Review limitations: late workers may
+safely fail due to sequence reordering, and rapid supervisor restarts retain old
+scopes until TTL. The Solaris identity/contract escape barriers remain unresolved;
+[the separate Solaris plan](solaris/BROKER_ISOLATION.md) keeps launch disabled.

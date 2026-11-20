@@ -388,3 +388,28 @@ pending the normal PR/main CI sequence, not inherited from the baseline above.
 
 Reviewed the stable Door and security manual chapters. Only the development
 status summary changes; no released configuration or HELP operation is added.
+
+## Scoped launch replay protection (candidate, 2026-11-20)
+
+The current isolation supervisor uses root-only `open_scoped` with `scope` and
+`sequence` in addition to the existing `member`, `door`, `session`, `generation`.
+Scope is a random supervisor incarnation plus the dedicated slot UID; sequence
+is assigned monotonically by the single-threaded supervisor parent before fork.
+Neither field is accepted from the BBS request. Failed forks leave gaps. Original
+BBS session identity and authentication generation remain in game-facing claims.
+A newer launch must not collide with an active slot; an old close object cannot
+revoke a replacement. Expired records keep the same session-TTL rule.
+
+Replay history is now bounded by incarnation/slot count, not every launch's
+random session ID. Repeated launch/quit no longer consumes global history for
+ordinary users. Rapid supervisor restarts still retain old scopes until TTL, and
+admission/active sessions remain bounded; this is not unlimited capacity. Workers
+which arrive out of sequence may be safely rejected rather than reusing a stale
+sequence. No PID, session ID, member ID or saved game is renumbered.
+
+Upgrade Broker before supervisor, with the existing stop/revoke/restart procedure
+and matching package versions. The new Broker accepts legacy `open` unchanged;
+legacy supervisors retain the old per-session history limitation. A new
+supervisor talking to an old Broker is rejected, never downgraded silently.
+Public consumer `consume`/`check` and claims are unchanged. No service is updated
+by the development tests. See the independent review follow-up.
