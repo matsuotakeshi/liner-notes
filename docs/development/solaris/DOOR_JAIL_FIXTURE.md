@@ -18,7 +18,10 @@ the basic privilege limit. No shell or arbitrary command is accepted.
 The root parent reads the waiting, unreaped child's real/effective/saved IDs and
 group count through `/proc/<child>/cred`. The child receives no `/proc` or contract
 descriptor. It checks absent outside paths, closed inherited descriptors and
-denial of another chroot. It never forks, signals other processes, writes files
+denial of chroot to a distinct, existing `/lib` directory (device/inode checked).
+A no-op `chroot("/")` is not a privilege-denial control. Missing/identical targets
+and errors other than EPERM fail the probe; successful root changes remain a
+failed confinement observation. It never forks, signals other processes, writes files
 or contacts a network. Each child has a five-second deadline. The still-unreaped
 direct-child PID cannot be recycled to an unrelated process.
 
@@ -166,6 +169,40 @@ The correction must pass Hosted CI, merge, and compile on the same main SHA
 before repeating the authorized root experiment. Preserve the installed bundle
 and manifest in a private backup before a hash-checked update; do not overwrite
 the original failure receipts or expand the mount/identity scope.
+
+## Non-root CI failure: no-op root change
+
+On main `2a5525136d395f827801a58f850016a2acf3df02`,
+[Solaris Native CI 44754533467](https://github.com/matsuotakeshi/liner-notes/actions/runs/44754533467)
+compiled the observer and reported the correct `/usr/lib/amd64/ld.so.1` path,
+then failed the non-root reporter assertion: flags `(0, 0, 1, 0)` indicated the
+expected host namespace, closed extra descriptors, but no chroot refusal.
+The expected tuple was `(0, 0, 1, 1)`. Artifact `14640350640`
+(`native-ci-solaris-results`) preserves the failure on this exact source SHA;
+the other ten main workflows succeeded. This is not a passed native acceptance.
+
+The exact main reporter was rebuilt as the existing CI account in
+`/export/home/ci-test/ci/liner-door-loader-a6bpdkah`, under the shared CI lock.
+Both traced and untraced runs reproduced the same flags. `truss -t chroot`
+reported `chroot("/") = 0`. `ppriv -v` showed no `proc_chroot` in the effective,
+permitted or inheritable sets (the limit set still contained it). A separate
+disposable CI-user process confirmed that `/lib` differs from `/` and that
+`chroot("/lib")` fails with EPERM. Neither diagnosis used root, mounted anything,
+changed accounts/services, or ran unreviewed PR code on the VM.
+
+The correction changes the probe to an actual inward root change, after checking
+that `/lib` exists and has a different device/inode pair. The native expected
+denial remains **true**; the JSON acceptance flags, privilege restrictions and
+mount checks are unchanged. If unexpectedly allowed, only the disposable
+reporter's root moves inward; it subsequently writes to its existing pipes and
+exits. Missing directories or unrelated errors cannot stand in for denial.
+
+[Failure and reproduction evidence](evidence/jail-chroot-2a552513.txt) records
+commands, source hashes, results and relevant failure lines. Full downloaded
+Artifact and operator scripts are retained locally under
+`build/solaris-door-jail/failure-2a552513/`. The installed root fixture is still
+the previous `4015507b` bundle; no update or repeat mount test has occurred.
+The corrected native and root tests remain pending CI/review/main integration.
 
 ## Primary OS references
 
