@@ -5,6 +5,11 @@ This is development documentation, not a supported deployment procedure.
 
 ## Current state
 
+A subsequent [nosuid execution-root fixture](DOOR_JAIL_FIXTURE.md) now prepares
+the next credential/namespace experiment. Its mount operation requires separate
+approval and a reviewed-main native build. It does not enable the backend or
+claim descendant/PTY/Broker acceptance.
+
 Broker peer credentials already use `getpeerucred` / `ucred_geteuid` with proper
 freeing. Privileged Door execution remains fail-closed: `door_processes.supported`
 and the C isolation adapter do not enable Solaris. Native PTY support for ordinary

@@ -11,6 +11,9 @@ on:
       - "ci/solaris_ci.py"
       - "ci/*solaris_smf*.py"
       - "tests/test_solaris_smf_ci.py"
+      - "ci/solaris_door_jail.py"
+      - "tests/test_solaris_door_jail.py"
+      - "tests/solaris_door_jail_probe.c"
       - "ci/solaris_door_boundary.py"
       - "tests/test_solaris_door_boundary.py"
       - "tests/solaris_door_identity_probe.c"
@@ -61,6 +64,7 @@ jobs:
       - run: python tests/test_solaris_service.py
       - run: python tests/test_solaris_smf_ci.py
       - run: python tests/test_solaris_door_boundary.py
+      - run: python tests/test_solaris_door_jail.py
       - run: python tests/test_door_lock.py
       - run: python tests/test_posix_locks.py
       - run: python tests/test_resume_receipt.py
