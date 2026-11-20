@@ -8,8 +8,9 @@ This is candidate verification work, not a release or production activation.
 PR #151 head `967684873ea2c7ee4e979a6936b66333d06b409a` passed all 19
 reported checks and was squash-merged into the base above. The previous
 FreeBSD pre-upgrade restore failure was a schema-aware validation defect, not
-a Door/SSH failure. Exact-main isolated upgrade acceptance is still required;
-PR success is not evidence for the resulting main SHA.
+a Door/SSH failure. Exact-main isolated upgrade acceptance run 44683106388 and Release Set run
+44683106213 subsequently passed for that SHA. PR #152 was then merged as
+`ed010ee3c6a7ecbb1b64e694b7839264832fb418`; later evidence must match that SHA.
 
 ## Added checks and execution routes
 
@@ -62,3 +63,21 @@ pending the PR/main CI sequence; full regressions were not duplicated locally.
 
 The stable manual's Door and connection chapters were reviewed. Public text
 keeps stable 0.74.1 separate from these candidates; no HELP command changes.
+
+## Next grouped candidate
+
+[SSH platform/SELinux acceptance](SSH_PLATFORM_ACCEPTANCE.md) records the next
+implementation, its dependency gates and Broker quota correction. Native SSH
+and independent security review remain separate gates, not inferred from older results.
+
+## Verified base after PR #152 merge
+
+All 11 reported main workflows succeeded at
+`ed010ee3c6a7ecbb1b64e694b7839264832fb418`, including
+[FreeBSD isolated upgrade](https://github.com/matsuotakeshi/liner-notes/actions/runs/44685732715),
+[Rocky SELinux](https://github.com/matsuotakeshi/liner-notes/actions/runs/44684400373),
+[Multi-OS](https://github.com/matsuotakeshi/liner-notes/actions/runs/44684400350) and
+[Release Set](https://github.com/matsuotakeshi/liner-notes/actions/runs/44685732682).
+These attest the base's Broker outage/lifecycle cases, not the next candidate's
+SSH labels or libssh-enabled native runs. Later VM dependency changes likewise
+are not retroactively covered by those receipts.

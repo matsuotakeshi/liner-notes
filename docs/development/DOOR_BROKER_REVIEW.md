@@ -1,5 +1,17 @@
 # Door Broker implementation review, 2026-11-19
 
+## 2026-11-20 quota/parser follow-up
+
+Implementer review found that the single socket quota could deny valid lease
+checks when long-lived issuer sockets filled it. Separate bounded issuer and
+consumer pools now preserve both roles; excess sockets abort immediately.
+Capacity-one tests cover valid consume/check, slow-consumer saturation, issuer
+reservation and cleanup. Deep JSON nesting below the line-size limit is also
+rejected through the generic redacted error path rather than escaping the
+handler with a decoder recursion exception. No authentication, UID or token
+validation is relaxed. See [platform/SELinux work](SSH_PLATFORM_ACCEPTANCE.md).
+This is still not an independent security sign-off or host-wide DoS proof.
+
 This is the implementer's review, not an independent security sign-off. The
 initial findings below describe the PR #135 candidate at the time of review;
 later sections record subsequent changes, not retrospective proof for that SHA.

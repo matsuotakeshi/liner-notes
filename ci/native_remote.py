@@ -44,7 +44,11 @@ def unpack(directory, digest, sha):
     (destination / ".ci-source-sha").write_text(sha + "\n", encoding="ascii")
 
 
-def commands_for(target):
+def commands_for(target, suite="core"):
+    if suite == "ssh":
+        return [[sys.executable, "ci/native_ssh.py", "--target", target]]
+    if suite != "core":
+        raise ValueError("Unknown native suite")
     if target == "solaris":
         return [[sys.executable, "ci/solaris_ci.py", "inventory"],
                 [sys.executable, "ci/solaris_ci.py", "test"]]
@@ -156,7 +160,7 @@ def host_lock(path, heartbeat_fd=None, timeout=1200, lease=45, stopped=lambda: F
         yield state
 
 
-def worker(target, sha, timeout, lease):
+def worker(target, sha, timeout, lease, suite="core"):
     if (Path.cwd() / ".ci-source-sha").read_text(encoding="ascii").strip() != sha:
         raise ValueError("Extracted source commit differs")
     verify_os(target)
@@ -179,7 +183,7 @@ def worker(target, sha, timeout, lease):
             print(Path("/etc/os-release").read_text(), flush=True)
             for command in (["python3", "--version"], ["clang", "--version"], ["free", "-h"]):
                 subprocess.run(command, check=True, timeout=15)
-        run_commands(commands_for(target), sys.stdin.fileno(), max(0, deadline-time.monotonic()), lease, lambda: cancelled, state)
+        run_commands(commands_for(target, suite), sys.stdin.fileno(), max(0, deadline-time.monotonic()), lease, lambda: cancelled, state)
 
 
 def main():
@@ -192,17 +196,18 @@ def main():
     run = sub.add_parser("worker")
     run.add_argument("target", choices=["freebsd", "rocky", "ubuntu", "solaris"])
     run.add_argument("sha")
+    run.add_argument("--suite", choices=("core", "ssh"), default="core")
     run.add_argument("--timeout", type=int, default=3300)
     run.add_argument("--lease", type=int, default=45)
     args = parser.parse_args()
     if args.mode == "unpack":
         unpack(args.directory, args.digest, args.sha)
         return 0
-    result = {"target": args.target, "source_sha": args.sha, "status": "failed"}
+    result = {"target": args.target, "source_sha": args.sha, "suite": args.suite, "status": "failed"}
     try:
         if not re.fullmatch(r"[0-9a-f]{40}", args.sha) or not 1 <= args.lease <= 300 or not 1 <= args.timeout <= 3300:
             raise ValueError("Invalid worker limits or commit")
-        worker(args.target, args.sha, args.timeout, args.lease)
+        worker(args.target, args.sha, args.timeout, args.lease, args.suite)
         result["status"] = "passed"
     except Exception as error:
         result["error"] = str(error)

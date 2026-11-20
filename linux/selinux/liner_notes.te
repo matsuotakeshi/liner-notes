@@ -62,6 +62,8 @@ type liner_notes_link_data_t;
 files_type(liner_notes_link_data_t)
 type liner_notes_link_secret_t;
 files_type(liner_notes_link_secret_t)
+type liner_notes_ssh_secret_t;
+files_type(liner_notes_ssh_secret_t)
 type liner_notes_door_data_t;
 files_type(liner_notes_door_data_t)
 type liner_notes_door_drop_t;
@@ -94,6 +96,8 @@ logging_log_file(liner_notes_link_log_t)
 
 type liner_notes_port_t;
 corenet_port(liner_notes_port_t)
+type liner_notes_ssh_port_t;
+corenet_port(liner_notes_ssh_port_t)
 type liner_notes_web_port_t;
 corenet_port(liner_notes_web_port_t)
 type liner_notes_link_port_t;
@@ -145,6 +149,10 @@ read_files_pattern(liner_notes_domain, liner_notes_ro_t, liner_notes_ro_t)
 allow liner_notes_domain liner_notes_etc_t:dir search_dir_perms;
 
 read_files_pattern(liner_notes_t, liner_notes_etc_t, liner_notes_etc_t)
+# Embedded SSH shares the Core domain, never the system sshd domain. Only
+# Core and the offline backup administrator may read dedicated host keys.
+read_files_pattern(liner_notes_t, liner_notes_ssh_secret_t, liner_notes_ssh_secret_t)
+read_files_pattern(liner_notes_admin_t, liner_notes_ssh_secret_t, liner_notes_ssh_secret_t)
 read_files_pattern(liner_notes_web_t, liner_notes_web_etc_t, liner_notes_web_etc_t)
 read_files_pattern(liner_notes_link_t, liner_notes_link_etc_t, liner_notes_link_etc_t)
 manage_dirs_pattern(liner_notes_t, liner_notes_data_t, liner_notes_data_t)
@@ -184,6 +192,7 @@ corenet_tcp_bind_generic_node(liner_notes_t)
 corenet_tcp_bind_generic_node(liner_notes_web_t)
 corenet_tcp_bind_generic_node(liner_notes_link_t)
 allow liner_notes_t liner_notes_port_t:tcp_socket name_bind;
+allow liner_notes_t liner_notes_ssh_port_t:tcp_socket name_bind;
 allow liner_notes_web_t liner_notes_web_port_t:tcp_socket name_bind;
 allow liner_notes_link_t liner_notes_link_port_t:tcp_socket { name_bind name_connect };
 allow { liner_notes_web_t liner_notes_link_t } liner_notes_port_t:tcp_socket name_connect;

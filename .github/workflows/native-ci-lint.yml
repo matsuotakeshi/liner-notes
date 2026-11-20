@@ -29,6 +29,8 @@ on:
       - ".github/workflows/solaris-ssh-test.yml"
       - "ci/native-test-requirements.txt"
       - "tests/test_native_ci.py"
+      - "tests/test_native_ssh.py"
+      - ".github/workflows/embedded-ssh-native.yml"
       - "tests/test_native_lock_wait.py"
       - ".github/workflows/*build-test.yml"
       - ".github/workflows/multi-os-ci.yml"
@@ -49,6 +51,7 @@ jobs:
           python-version: '3.11'
       - run: python -m pip install -r ci/native-test-requirements.txt
       - run: python tests/test_native_ci.py
+      - run: python tests/test_native_ssh.py
       - run: python tests/test_native_lock_wait.py
       - run: python tests/test_freebsd_package_lease.py
       - run: python tests/test_solaris_port.py

@@ -93,13 +93,15 @@ def supervise(command, log, cancelled, timeout=3400):
             # A network failure also expires the remote heartbeat lease.
 
 
-def parse_result(log_path, target, sha):
+def parse_result(log_path, target, sha, suite="core"):
     records = []
     for line in log_path.read_text(encoding="utf8", errors="replace").splitlines():
         if line.startswith(RESULT):
             records.append(json.loads(line[len(RESULT):]))
     if len(records) != 1 or records[0].get("target") != target or records[0].get("source_sha") != sha:
         raise ValueError("Missing, duplicate or mismatched native result")
+    if records[0].get("suite", "core") != suite:
+        raise ValueError("Mismatched native suite")
     if records[0].get("status") != "passed":
         raise RuntimeError(records[0].get("error", "Native suite failed"))
 
@@ -133,9 +135,9 @@ def validate_remote_directory(target, directory):
     return directory
 
 
-def execute_target(target, archive, digest, sha, output, cancelled):
+def execute_target(target, archive, digest, sha, output, cancelled, suite="core"):
     started = time.monotonic()
-    result = {"target": target, "source_sha": sha, "archive_sha256": digest,
+    result = {"target": target, "source_sha": sha, "archive_sha256": digest, "suite": suite,
               "status": "failed", "started_at": timestamp()}
     host, key = TARGETS[target]
     ssh = ["ssh", *ssh_options(key), host]
@@ -166,14 +168,14 @@ def execute_target(target, archive, digest, sha, output, cancelled):
             loader = 'import base64;exec(base64.b64decode("' + encoded + '"))'
             run_setup(ssh + [shlex.join([python, "-c", loader, "unpack", directory, digest, sha])], log, cancelled)
             command = "cd " + shlex.quote(directory + "/source") + " && exec " + shlex.join([
-                python, "ci/native_remote.py", "worker", target, sha])
+                python, "ci/native_remote.py", "worker", target, sha, "--suite", suite])
             result["tests_started_at"] = timestamp()
             code = supervise(ssh + [command], log, cancelled)
             result["tests_finished_at"] = timestamp()
             log.flush()
             if code:
                 raise RuntimeError("Native SSH exited with status " + str(code))
-            parse_result(log_path, target, sha)
+            parse_result(log_path, target, sha, suite)
             result["status"] = "passed"
         except Exception as error:
             result["status"] = "cancelled" if cancelled.is_set() else "failed"
@@ -197,14 +199,15 @@ def run_parallel(targets, task):
     return sorted(results, key=lambda row: row["target"])
 
 
-def all_passed(results, targets, sha):
+def all_passed(results, targets, sha, suite="core"):
     return (len(results) == len(targets) and {r.get("target") for r in results} == set(targets)
-            and all(r.get("status") == "passed" and r.get("source_sha") == sha for r in results))
+            and all(r.get("status") == "passed" and r.get("source_sha") == sha and r.get("suite", "core") == suite for r in results))
 
 
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--target", choices=["all", *TARGETS], default="all")
+    parser.add_argument("--suite", choices=("core", "ssh"), default="core")
     parser.add_argument("--output", required=True, type=Path)
     args = parser.parse_args()
     sha = os.environ.get("GITHUB_SHA", "")
@@ -222,9 +225,9 @@ def main():
         signal.signal(signum, lambda signum, frame: cancelled.set())
     targets = list(DEFAULT_TARGETS) if args.target == "all" else [args.target]
     started = time.monotonic()
-    results = run_parallel(targets, lambda target: execute_target(target, archive, digest, sha, output, cancelled))
-    ok = all_passed(results, targets, sha) and not cancelled.is_set()
-    report = {"source_sha": sha, "archive_sha256": digest, "ok": ok,
+    results = run_parallel(targets, lambda target: execute_target(target, archive, digest, sha, output, cancelled, args.suite))
+    ok = all_passed(results, targets, sha, args.suite) and not cancelled.is_set()
+    report = {"suite": args.suite, "source_sha": sha, "archive_sha256": digest, "ok": ok,
               "targets": targets, "duration_seconds": round(time.monotonic() - started, 3), "results": results}
     (output / "results.json").write_text(json.dumps(report, indent=2) + "\n", encoding="utf8")
     summary = os.environ.get("GITHUB_STEP_SUMMARY")

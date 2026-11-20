@@ -107,3 +107,14 @@ Solaris Native CIの自動実行はmainへのpushごとではなく、毎日1回
 最新結果と実行ステップ・Artifactを確認します。前日の異なるSHAの成功では
 代用できません。リリース候補SHAに成功証跡がない場合は日次実行を待つか、
 mainの手動検証を完了させてください。他OS・パッケージ・Release Setの起動条件は変更しません。
+# Encrypted SSH candidate acceptance
+
+`Embedded SSH Native Acceptance` is a manual, trusted-main-only candidate gate.
+It reuses the existing native coordinator, per-host lock and CI keys. A receipt
+must name `suite: ssh` and the exact SHA; ordinary `core` native success cannot
+attest an encrypted SSH build. The SSH-only run does not repeat full regression.
+Solaris is explicit-only here. See
+[platform prerequisites and scope](docs/development/SSH_PLATFORM_ACCEPTANCE.md).
+Missing libssh is a preparation failure; neither skipping nor OS auto-install is
+permitted. The new native result remains distinct from Hosted client tests and
+Rocky SELinux Enforcing acceptance.

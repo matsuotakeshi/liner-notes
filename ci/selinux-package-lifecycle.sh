@@ -75,6 +75,20 @@ for domain, target in [('liner_notes_web_t', 'liner_notes_data_t'),
     rules = subprocess.check_output(['sesearch', '--allow', '-s', domain,
                                      '-t', target, '-c', 'file', '-p', 'read'], text=True)
     assert not rules.strip(), (domain, target, rules)
+# Inspect the compiled policy, including conditional/broad attribute grants.
+for domain in ('liner_notes_t', 'liner_notes_admin_t', 'liner_notes_web_t',
+               'liner_notes_link_t', 'liner_notes_door_t', 'liner_notes_transfer_t',
+               'liner_notes_broker_t', 'liner_notes_isolation_t', 'liner_notes_consumer_t'):
+    rules = subprocess.check_output(['sesearch', '--allow', '-s', domain,
+                                    '-t', 'liner_notes_ssh_secret_t', '-c', 'file', '-p', 'read'], text=True)
+    assert bool(rules.strip()) == (domain in ('liner_notes_t', 'liner_notes_admin_t')), (domain, rules)
+    rules = subprocess.check_output(['sesearch', '--allow', '-s', domain,
+                                    '-t', 'liner_notes_ssh_port_t', '-c', 'tcp_socket', '-p', 'name_bind'], text=True)
+    assert bool(rules.strip()) == (domain == 'liner_notes_t'), (domain, rules)
+    for permission in ('write', 'create', 'unlink'):
+        rules = subprocess.check_output(['sesearch', '--allow', '-s', domain,
+                                        '-t', 'liner_notes_ssh_secret_t', '-c', 'file', '-p', permission], text=True)
+        assert not rules.strip(), (domain, permission, rules)
 for source, target, expected in [
     ('liner_notes_isolation_t','liner_notes_broker_t',True),
     ('liner_notes_consumer_t','liner_notes_broker_t',True),

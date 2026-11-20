@@ -53,6 +53,15 @@ Doorの外向き通信は既定で無効です。必要な場合だけ `liner_no
 
 ### Enforcing受入CIの準備（検証機専用）
 
+内蔵SSHは次期開発候補です。候補ポリシー0.3.0では、専用ディレクトリ
+`/etc/liner-notes/ssh-host-keys/` を `liner_notes_ssh_secret_t`、専用待受を
+`liner_notes_ssh_port_t` として扱います。鍵の読み取りはBBSとオフライン管理者に限定し、
+書き換え権限は与えません。Web・リンク・Door・Brokerなどへ読み取りを許可しません。
+インストール時に既存sshdの鍵やポート22を変更する処理はありません。
+鍵は所有者・0600権限を保ち、設定のバックアップへ別途含めてください。
+同一UIDの従来型Doorを安全に隔離する機能とは別で、Broker有効時の別UID起動が必要です。
+実接続と拒否をEnforcing上で検査するまで、SSHのSELinux対応完了とは扱いません。
+
 `Rocky SELinux policy` のPRジョブはポリシーのコンパイル、許可ルール、RPMの導入・
 更新・削除とローカルラベル保持を検査します。mainジョブは既存CI専用鍵でRocky検証機へ
 接続し、Telnet、記事、メール、SQLite再起動、Web、署名付きリンク、Door、実ZMODEMと
