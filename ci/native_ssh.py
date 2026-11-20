@@ -24,6 +24,16 @@ def private_solaris_dependency(target):
     return prefix
 
 
+def solaris_stack_runtime(command):
+    """Resolve the selected compiler's 64-bit stack protector runtime."""
+    compiler = shlex.split(next(value[3:] for value in command if value.startswith('CC=')))
+    library = Path(subprocess.check_output(compiler + ['-m64', '-print-file-name=libssp.so'], text=True).strip())
+    if not library.is_absolute() or not library.is_file():
+        raise RuntimeError('Installed Solaris compiler libssp is required; stack protection is not disabled')
+    # Resolve the soname symlink so its actual runtime directory is recorded.
+    return '-lssp -Wl,-R,' + str(library.resolve().parent)
+
+
 def build_command(target):
     pkg = shutil.which('pkg-config')
     if not pkg or subprocess.run([pkg, '--atleast-version=0.10', 'libssh']).returncode:
@@ -33,6 +43,7 @@ def build_command(target):
     if target == 'solaris':
         from solaris_ci import build_arguments
         command = build_arguments()
+        libs += ' ' + solaris_stack_runtime(command)
         # The CI-private shared library is not placed in the OS loader search
         # path. Record runpaths in this disposable executable instead.
         libs += ''.join(' -Wl,-R,' + flag[2:] for flag in shlex.split(libs) if flag.startswith('-L'))
@@ -45,6 +56,23 @@ def build_command(target):
         raise ValueError('Unknown target')
     # A fresh git archive is used; no stale binary built without SSH can pass.
     return command + ['-j2', 'runtime', 'SSH_CFLAGS=-DLINER_SSH ' + cflags, 'SSH_LIBS=' + libs]
+
+
+def install_test_dependencies(target, python):
+    # Solaris's vendor Paramiko omits Ed25519. An explicitly prepared wheel set
+    # can supply upstream support without changing the vendor installation.
+    wheels = Path.home() / 'liner-notes-deps/ssh-client-4.0.0/wheels/requirements.txt'
+    if target == 'solaris' and wheels.is_file():
+        subprocess.run([python, '-m', 'pip', 'install', '--no-index', '--no-deps',
+                        '--ignore-installed', '--require-hashes', '-r', str(wheels)],
+                       check=True, timeout=300)
+    subprocess.run([python, '-m', 'pip', 'install', '--disable-pip-version-check', '--no-cache-dir',
+                    '-r', str(ROOT / 'tests/ssh-requirements.txt')], check=True, timeout=300)
+    subprocess.run([python, '-c',
+                    "import paramiko; assert hasattr(paramiko, 'Ed25519Key') and "
+                    "'ssh-ed25519' in paramiko.Transport._preferred_keys, "
+                    "'SSH test client lacks Ed25519; prepare upstream Paramiko/PyNaCl; do not relax host-key tests'"],
+                   check=True, timeout=30)
 
 
 def main():
@@ -75,8 +103,7 @@ def main():
         creation.append('--system-site-packages')
     subprocess.run(creation + [str(venv)], check=True)
     python = str(venv / 'bin/python')
-    subprocess.run([python, '-m', 'pip', 'install', '--disable-pip-version-check', '--no-cache-dir',
-                    '-r', str(ROOT / 'tests/ssh-requirements.txt')], check=True, timeout=300)
+    install_test_dependencies(args.target, python)
     subprocess.run([python, '-B', 'tests/test_ssh_transport.py', './runtime'], cwd=ROOT, check=True)
 
 

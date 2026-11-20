@@ -91,6 +91,17 @@ class SolarisContracts(unittest.TestCase):
         self.assertIn("CFLAGS=-O2 -g -m64", args)
         self.assertNotIn("-Wno-error", " ".join(args))
 
+    def test_structured_scale_generator_uses_the_selected_make_toolchain(self):
+        makefile=(ROOT/'Makefile').read_text()
+        recipe=makefile.split('generate-structured: tests/generate_structured.c',1)[1].split('\n\n',1)[0]
+        for flag in ('$(CC)','$(CPPFLAGS)','$(CFLAGS)','$(LDFLAGS)','$(SQLITE_CFLAGS)','$(SQLITE_LIBS)','$(LDLIBS)'):
+            self.assertIn(flag,recipe)
+        self.assertIn('test-stage70-scale: all generate-structured',makefile)
+        self.assertIn('tests/test_stage70_scale.py ./runtime ./generate-structured',makefile)
+        script=(ROOT/'tests/test_stage70_scale.py').read_text()
+        self.assertNotIn("['cc'",script)
+        self.assertIn("subprocess.run([generator,",script)
+
     def test_missing_tool_is_explicit_and_never_installs(self):
         with patch.object(solaris_ci.shutil, "which", return_value=None):
             with self.assertRaisesRegex(RuntimeError, "Required installed tool missing"):

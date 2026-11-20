@@ -245,3 +245,10 @@ those five additions. Preparation must acquire the existing native host lock,
 refuse upgrades/removals, and compare complete package inventories afterwards.
 A lock-busy first attempt performed no package changes. The preparation result
 is separate from the eventual same-SHA encrypted native acceptance.
+
+
+The previously pending Solaris runs on `75b85c3` completed with failures; the
+Rocky Enforcing run also failed. The separate causes, direct-server evidence,
+FreeBSD preparation outcome and follow-up gates are recorded in
+[platform failure investigation](PLATFORM_FAILURES_20261120.md). Do not treat
+previous Hosted successes or dependency imports as these native acceptances.

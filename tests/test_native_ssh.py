@@ -69,10 +69,23 @@ class NativeSsh(unittest.TestCase):
         with patch.object(native_ssh.shutil,'which',return_value='pkg-config'), \
              patch.object(native_ssh.subprocess,'run',return_value=Mock(returncode=0)), \
              patch.object(native_ssh.subprocess,'check_output',side_effect=['-I/private/include','-L/private/lib -lssh']), \
-             patch('solaris_ci.build_arguments',return_value=['gmake','CFLAGS=-m64']):
+             patch('solaris_ci.build_arguments',return_value=['gmake','CFLAGS=-m64']), \
+             patch.object(native_ssh,'solaris_stack_runtime',return_value='-lssp -Wl,-R,/gcc/lib'):
             command=native_ssh.build_command('solaris')
         self.assertIn('CFLAGS=-m64',command)
-        self.assertIn('SSH_LIBS=-L/private/lib -lssh -Wl,-R,/private/lib',command)
+        self.assertIn('SSH_LIBS=-L/private/lib -lssh -lssp -Wl,-R,/gcc/lib -Wl,-R,/private/lib',command)
+
+    def test_solaris_stack_protector_runtime_uses_selected_compiler_and_fails_closed(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            lib=Path(temporary)/'libssp.so';lib.touch()
+            with patch.object(native_ssh.subprocess,'check_output',return_value=str(lib)) as query:
+                self.assertEqual(native_ssh.solaris_stack_runtime(['gmake','CC=gcc']),
+                                 '-lssp -Wl,-R,'+str(lib.resolve().parent))
+                self.assertEqual(query.call_args.args[0],['gcc','-m64','-print-file-name=libssp.so'])
+            for value in ('libssp.so',str(Path(temporary)/'missing.so')):
+                with patch.object(native_ssh.subprocess,'check_output',return_value=value):
+                    with self.assertRaisesRegex(RuntimeError,'not disabled'):
+                        native_ssh.solaris_stack_runtime(['gmake','CC=gcc'])
 
     def test_native_os_packages_are_read_only_and_pip_stays_in_venv(self):
         for target in ('freebsd','solaris','ubuntu','rocky'):
@@ -93,7 +106,24 @@ class NativeSsh(unittest.TestCase):
                 self.assertEqual(pip[0],str(Path(temporary)/'.native-ssh-venv/bin/python'))
                 self.assertEqual(pip[1:4],['-m','pip','install'])
                 self.assertEqual(pip[-2:], ['-r', str(Path(temporary)/'tests/ssh-requirements.txt')])
-                self.assertIn('tests/test_ssh_transport.py',commands[3])
+                self.assertIn('Ed25519',commands[3][-1])
+                self.assertIn('tests/test_ssh_transport.py',commands[4])
+
+    def test_solaris_wheel_preparation_is_offline_hashed_and_private(self):
+        with tempfile.TemporaryDirectory() as temporary,patch.object(native_ssh.Path,'home',return_value=Path(temporary)):
+            manifest=Path(temporary)/'liner-notes-deps/ssh-client-4.0.0/wheels/requirements.txt'
+            manifest.parent.mkdir(parents=True);manifest.write_text('fixture')
+            for target,count in [('solaris',3),('freebsd',2),('ubuntu',2)]:
+                with patch.object(native_ssh.subprocess,'run') as run:
+                    native_ssh.install_test_dependencies(target,'/private/venv/bin/python')
+                self.assertEqual(run.call_count,count)
+                commands=[c.args[0] for c in run.call_args_list]
+                self.assertTrue(all(c[0]=='/private/venv/bin/python' for c in commands))
+                if target=='solaris':
+                    for flag in ('--require-hashes','--no-index','--no-deps'):self.assertIn(flag,commands[0])
+                    self.assertEqual(commands[0][-1],str(manifest))
+                self.assertIn('Ed25519',commands[-1][-1])
+                self.assertTrue(all(c.kwargs['check'] for c in run.call_args_list))
 
     def test_missing_libssh_fails_without_installing_or_skipping(self):
         for executable, code in ((None, 0), ('pkg-config', 1)):
