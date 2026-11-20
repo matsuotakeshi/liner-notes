@@ -142,6 +142,8 @@ def _import_copy(root,board,members,database='liner.sqlite',structured=False,too
  with contextlib.closing(sqlite3.connect(target)) as db:
   db.execute('PRAGMA foreign_keys=ON')
   if not structured:db.executescript('PRAGMA synchronous=FULL;CREATE TABLE storage_meta(id INTEGER PRIMARY KEY CHECK(id=1),version INTEGER NOT NULL,uuid BLOB NOT NULL);INSERT INTO storage_meta VALUES(1,1,randomblob(16));CREATE TABLE streams(id INTEGER PRIMARY KEY,name TEXT UNIQUE NOT NULL,length INTEGER NOT NULL DEFAULT 0,revision INTEGER NOT NULL DEFAULT 0);CREATE TABLE blocks(stream INTEGER NOT NULL REFERENCES streams(id) ON DELETE CASCADE,number INTEGER NOT NULL,value BLOB NOT NULL CHECK(length(value)=4096),PRIMARY KEY(stream,number)) WITHOUT ROWID;')
+  schema=db.execute('SELECT version FROM storage_meta WHERE id=1').fetchone()
+  maintenance.need(schema in ((2,),(3,),(4,),(5,)) if structured else schema==(1,),'Unsupported converter storage schema')
   db.execute('CREATE TABLE storage_imports(name TEXT PRIMARY KEY)')
   for name in (() if structured else names):
    path=root/name;maintenance.need(path.is_file() and not path.is_symlink(),'Missing stream: '+name)
@@ -159,7 +161,11 @@ def _import_copy(root,board,members,database='liner.sqlite',structured=False,too
   db.execute("INSERT INTO storage_imports VALUES('features')");db.commit()
   maintenance.need(db.execute('pragma integrity_check').fetchone()==('ok',),'Migrated database is invalid')
   maintenance.need(not db.execute('pragma foreign_key_check').fetchone(),'Migrated relationships are invalid')
-  if structured:
+  # An explicitly selected installed converter may belong to the old package
+  # during pre-upgrade restore verification. Audit the schema it actually wrote;
+  # only schema 5 has normalized attribute tables. Older schemas still undergo
+  # integrity/FK checks and byte-exact reconstruction of every stream below.
+  if schema==(5,):
    from normalized_fields import validate_relations
    validate_relations(db)
   # Verify every byte against the source, not just row counts.
@@ -184,7 +190,7 @@ def _import_copy(root,board,members,database='liner.sqlite',structured=False,too
   else:legacy=len(names)
   maintenance.need(db.execute('PRAGMA wal_checkpoint(TRUNCATE)').fetchone()[0]==0,'Candidate checkpoint failed')
  maintenance.sync_directory(target.parent)
- return {'operation':'db-import','database':str(target),'streams':len(names),'layout':'structured' if structured else 'blocks','verified':'SHA-256 of every stream; integrity_check; foreign_key_check','typed_streams':coverage,'compatibility_streams':legacy}
+ return {'operation':'db-import','database':str(target),'schema':schema[0],'streams':len(names),'layout':'structured' if structured else 'blocks','verified':'SHA-256 of every stream; integrity_check; foreign_key_check','typed_streams':coverage,'compatibility_streams':legacy}
 
 def backup(root,database,board,members,archive):
  root=Path(root).resolve();archive=Path(archive).absolute();maintenance.outside(archive,root)

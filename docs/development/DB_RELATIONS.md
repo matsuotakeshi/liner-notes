@@ -143,3 +143,29 @@ A local full adapter build with Windows/UCRT could not execute because the
 POSIX storage layer requires flock/fcntl/pread and related flags. No portability
 stubs or relaxed build flags were added. Python syntax and whitespace checks
 are local checks; socket and migration acceptance remain Hosted CI gates.
+
+## Old-package converter restore regression (2026-11-20)
+
+PR #134 merged as b7187d9938f9d8bbd238eaa9ce8dcea10f7a985e. Its native
+FreeBSD/Rocky/Ubuntu tests, Linux compatibility, package jobs and Release Set
+passed, but isolated upgrade run 44677431269 failed before installing the new
+package. Authorized read-only inspection of that run's private failure logs
+confirmed `Maintenance failed: no such table: article_format` at the old-package
+`db-restore` call. Source helpers were new, while the explicitly selected installed
+converter was old. The importer incorrectly audited every structured output as 5.
+
+The importer now requires a known output schema, audits normalized relations only
+for 5, and still reconstructs/hashes every stream and checks SQLite integrity/FKs
+for all versions. The receipt records the actual output schema. This does not
+silently upgrade an old converter or accept unknown formats.
+
+The regression uses real C-generated schema 2/3/4/5 fixtures, substituting only
+the external converter process. The original code reproduced the missing-table
+error locally. After correction, all four valid outputs preserve 17 messages,
+attachment bytes/order, UI settings and schema version. Hash mismatches, unknown
+versions, missing attachments and missing schema-5 tables are rejected without
+publishing the final DB or changing input streams (15 cases in total).
+Local targeted suites: 2 structured-relation tests passed; 4 normalization tests
+passed with 1 POSIX-only test deferred to CI. Windows directory fsync is not a
+POSIX durability test. Actual old-package/jail acceptance remains required after
+merge. No root helper, template, service or production data was changed.

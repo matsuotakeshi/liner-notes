@@ -346,6 +346,6 @@
   "src/storage_vault.inc": "16b57c1438c4b1728d7123368d63530ab5e3ded51f6f55f84ed61c111f7d2642",
   "scripts/normalized_fields.py": "9dc608f114d7e79e7cf6c7ac72b2c9bd2dd952c7921278c6315caccfa323286f",
   "scripts/structured_db.py": "17fea547120955b7d3cd3bfc321316f3b3079b658e8a26a3472058058391e44d",
-  "scripts/database_tools.py": "c08e96e3dadf643611f92e02aeddf004f439984f128e93497e7c97ac68b25a27",
+  "scripts/database_tools.py": "979cec5c40ec72a8d1232bac70224d6107622042aa59bd4e3d4bda8c065d036a",
   "help/en/adminstorage.txt": "ced73fe9634e4e55c7750f59aa7d06c038a8ee87bcc3568154055a7779c06522"
 }
