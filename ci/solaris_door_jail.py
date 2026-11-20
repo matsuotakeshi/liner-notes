@@ -15,6 +15,7 @@ import platform
 import re
 import shutil
 import stat
+import struct
 import signal
 import subprocess
 import sys
@@ -84,8 +85,42 @@ def verify_bundle():
     return manifest
 
 
-def library_paths(output):
-    paths = {PurePosixPath('/lib/amd64/ld.so.1')}
+def elf_interpreter(data):
+    """Read the one PT_INTERP from a bounded Solaris AMD64 ELF, not host aliases."""
+    if len(data) < 64 or data[:7] != b'\x7fELF\x02\x01\x01':
+        raise ValueError('Expected little-endian ELF64 executable')
+    header = struct.unpack_from('<HHIQQQIHHHHHH',data,16)
+    kind, machine, version = header[:3]
+    phoff, ehsize, phsize, count = header[4], header[7], header[8], header[9]
+    if (kind not in (2,3) or machine != 62 or version != 1 or ehsize != 64 or
+            phsize != 56 or not 1 <= count <= 128 or phoff < 64 or
+            phoff + phsize*count > len(data)):
+        raise ValueError('Invalid AMD64 ELF program headers')
+    matches = []
+    for index in range(count):
+        segment = struct.unpack_from('<IIQQQQQQ',data,phoff+phsize*index)
+        if segment[0] != 3: continue  # PT_INTERP
+        offset, size = segment[2], segment[5]
+        if not 2 <= size <= 4096 or offset < 64 or offset + size > len(data):
+            raise ValueError('Truncated interpreter segment')
+        value = data[offset:offset+size]
+        if value[-1:] != b'\0' or b'\0' in value[:-1]:
+            raise ValueError('Invalid interpreter terminator')
+        try: path = value[:-1].decode('ascii')
+        except UnicodeDecodeError: raise ValueError('Non-ASCII interpreter path') from None
+        if not re.fullmatch(r'/(?:usr/)?lib/(?:amd64|64)/ld\.so\.1',path):
+            raise ValueError('Interpreter outside fixed Solaris 64-bit loader paths')
+        matches.append(PurePosixPath(path))
+    if len(matches) != 1: raise ValueError('Expected exactly one interpreter')
+    return matches[0]
+
+
+def library_paths(output, interpreter):
+    # Preserve the exact ELF-requested spelling inside chroot, even if the host
+    # resolves /usr/lib and /lib aliases to the same loader inode.
+    if not re.fullmatch(r'/(?:usr/)?lib/(?:amd64|64)/ld\.so\.1',str(interpreter)):
+        raise ValueError('Invalid interpreter path')
+    paths = {PurePosixPath(interpreter)}
     for line in output.splitlines():
         if not line.strip(): continue
         found = re.fullmatch(r'\s*[^\s]+\s+=>\s+(/[^\s]+)\s*', line)
@@ -204,7 +239,11 @@ def run_locked(base, manifest):
             invoke([compiler,'-m64','-std=c11','-Wall','-Wextra','-Werror',INSTALL/source,'-o',destination], timeout=45)
             os.chmod(destination,0o555)
         base.identity_available(); invoke([baseline,'--inventory'])
-        libraries = library_paths(invoke([utilities['ldd'], binary]).stdout)
+        executable = binary.read_bytes()
+        interpreter = elf_interpreter(executable)
+        report['elf_interpreter'] = str(interpreter)
+        report['observer_sha256'] = hashlib.sha256(executable).hexdigest()
+        libraries = library_paths(invoke([utilities['ldd'], binary]).stdout,interpreter)
         if read_mount(root) is not None: raise ValueError('New directory is already mounted')
         mount_requested = True
         invoke([utilities['mount'],'-F','tmpfs','-o','nosuid,size=64m','swap',root])
@@ -237,8 +276,10 @@ def run_locked(base, manifest):
             outside.append(control); inside.append(jailed)
             for source, target in ((baseline,control),(binary,jailed)):
                 shutil.copyfile(source,target); os.chown(target,uid,gid); os.chmod(target,mode)
-            report['cases'][name] = {'baseline':base.parse_report(invoke([baseline,'--baseline',control]).stdout),
-                                     'jailed':json.loads(invoke([binary,'--observe',root,name]).stdout)}
+            # Save the successful control before the observer runs: a later
+            # launch failure must not discard the already obtained evidence.
+            report['cases'][name] = {'baseline':base.parse_report(invoke([baseline,'--baseline',control]).stdout)}
+            report['cases'][name]['jailed'] = json.loads(invoke([binary,'--observe',root,name]).stdout)
         report.update(evaluate(report['cases']))
     except BaseException as error:
         report['error'] = type(error).__name__

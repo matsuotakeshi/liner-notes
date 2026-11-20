@@ -35,6 +35,15 @@ mounts, device nodes, `/proc`, `/system/contract`, shells, passwd database or
 writable slot directory are exposed. Live mount-table options and native statvfs
 must confirm the nosuid barrier; a successful mount command alone is insufficient.
 
+The loader destination is read from the observer's ELF64 AMD64 `PT_INTERP`,
+preserving its exact pathname inside the root. Do not replace it with a host
+alias of the same inode. Invalid/truncated headers, missing or duplicate
+interpreter segments, and paths outside the fixed loader directories are refused
+before mounting. `ldd` supplies dependencies, not a substitute interpreter path.
+The receipt includes the interpreter and observer digest. Child setup/exec
+diagnostics use stderr separately from the observation protocol; failed launches
+retain the child's exit/signal and the successful baseline control.
+
 Portable tests cover refusal, incomplete evidence, tampered bundles, identity
 escapes, dependency paths, failure receipts and failed-unmount preservation.
 Normal Solaris CI additionally compiles the observer with warnings as errors and
@@ -122,8 +131,45 @@ independent safety review remain required before enabling the backend.
 Local/mock checks are not native isolation evidence. Record the future root
 result and exact main SHA here only after executing it.
 
+## First approved execution and loader correction
+
+Source: main `4015507bffa2fdbb6617bf2f2b98a06d0d3561dc` (PR #159).
+All ten Hosted PR workflows passed, and
+[Solaris Native CI 44739519597](https://github.com/matsuotakeshi/liner-notes/actions/runs/44739519597)
+passed on that main SHA before the separately approved root experiment.
+
+The root fixture was installed at `/opt/liner-notes-ci/door-jail`, with its
+checksummed bundle and existing shared lock. The temporary 64MiB nosuid mount
+succeeded. The first `gid-bbs` baseline worked; the jailed observer then returned
+78 without a credential report. This is **incomplete isolation testing**, not a
+passing confinement result or an observed credential escape in the new design.
+
+The exact source was subsequently rebuilt as the CI user in the private directory
+`/export/home/ci-test/ci/liner-door-loader-gj2e9bb3`. Read-only `elfdump -i`
+reported `/usr/lib/amd64/ld.so.1`; `ldd` reported `/lib/64/libc.so.1`. The root
+receipt shows only `/lib/amd64/ld.so.1` had been copied. Thus the required loader
+pathname was absent. The original exit 78 did not expose the child's errno, so
+do not claim this was the only possible startup fault until the corrected test
+actually runs. The new ELF parser and separate diagnostic channel address both
+the confirmed layout defect and the missing evidence.
+
+The root receipt is `/var/tmp/liner-door-jail-hi36t1u8/result.json`. Cleanup
+completed; a separate post-run enumeration found only `plan.json` and
+`result.json`, and no mount at or under that trial's root. No synthetic binaries
+or mounts remain. The approved helper installation remains for reviewed updates.
+
+Persistent repository evidence:
+[root result](evidence/jail-4015507.txt) and
+[non-root loader inspection](evidence/jail-loader-4015507.txt).
+Local full transcript and bundle: `build/solaris-door-jail/approved-4015507bffa2/`.
+The correction must pass Hosted CI, merge, and compile on the same main SHA
+before repeating the authorized root experiment. Preserve the installed bundle
+and manifest in a private backup before a hash-checked update; do not overwrite
+the original failure receipts or expand the mount/identity scope.
+
 ## Primary OS references
 
 - [mount_tmpfs(8)](https://docs.oracle.com/cd/E88353_01/html/E72487/mount-tmpfs-8.html): size and nosuid options; invalid options can be ignored, hence live verification.
 - [exec(2)](https://docs.oracle.com/cd/E88353_01/html/E37841/exec-2.html): set-ID handling and preservation of the process root across exec.
 - [chroot(2)](https://docs.oracle.com/cd/E88353_01/html/E37841/chroot-2.html): outside directory descriptors matter; chroot alone is not claimed as confinement.
+- [Solaris runtime linker](https://docs.oracle.com/en/operating-systems/solaris/oracle-solaris/11.4/linkers-libraries/runtime-linker.html): the kernel uses the interpreter pathname recorded in the executable's program header.
