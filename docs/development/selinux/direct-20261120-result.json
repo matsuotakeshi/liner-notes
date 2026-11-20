@@ -1,0 +1,102 @@
+{
+  "base_sha": "22090f53d016c01041e97e47d44023ab08d743da",
+  "overlay_sha256": "f25c3061023af19ebf1dccfc581a2a888057402fbb3b0f548dbca7221d7fa119",
+  "overlay_files": {
+    "linux/selinux/liner_notes.te": "ea3132b671f7b5f65708460716657455ed33aef53b910094bd6466de1673c4e4",
+    "linux/liner-notes-door-isolation.service": "0d8f2547d3871667c3d4d1b7aec1faf6e4285036691e32243ae77ff668697b81",
+    "scripts/door_processes.py": "ee0dec18ac608994c2ebd685974d1966b72e1b4a5d78ffcd018e0e0ec1398d31",
+    "ci/selinux_door_services.py": "14a4d3148352f9b4610dcca20f0f226a7cd9b87d4d45888d3d66aea8e1e745bf",
+    "ci/selinux_isolation_entry.py": "412143ab8262c1d5beae664acb47c6eb9c58cf2fa5dec4d459367f35898770a3",
+    "ci/selinux-package-lifecycle.sh": "3f4d96c4d65f96b1fd00b632ad0308ae097bf98f783efa833ce4927ed0ae34a2",
+    "tests/test_door_processes.py": "2e319ffaf24383d0182ec8d62594fde5117078f051bd35a9dbe7a1c48e11d6c9",
+    "tests/test_selinux_door_services.py": "785f4bcf5c086559829257641a142dc0e437630739c90765f8e9b738333b009b"
+  },
+  "work": "/var/lib/liner-notes-ci/selinux/direct-proc-trial-tqksvdqk",
+  "start": "2026-11-20T11:44:37+0900",
+  "scope": "full existing SELinux acceptance with reviewed local candidate overlay",
+  "compiled_policy_checks": [
+    {
+      "target": "init_t",
+      "class": "file",
+      "permission": "read",
+      "allowed": true,
+      "expected": true
+    },
+    {
+      "target": "init_t",
+      "class": "file",
+      "permission": "write",
+      "allowed": false,
+      "expected": false
+    },
+    {
+      "target": "init_t",
+      "class": "lnk_file",
+      "permission": "read",
+      "allowed": false,
+      "expected": false
+    },
+    {
+      "target": "init_t",
+      "class": "unix_stream_socket",
+      "permission": "read",
+      "allowed": true,
+      "expected": true
+    },
+    {
+      "target": "init_t",
+      "class": "unix_stream_socket",
+      "permission": "write",
+      "allowed": true,
+      "expected": true
+    },
+    {
+      "target": "init_t",
+      "class": "unix_stream_socket",
+      "permission": "connectto",
+      "allowed": false,
+      "expected": false
+    },
+    {
+      "target": "init_t",
+      "class": "process",
+      "permission": "ptrace",
+      "allowed": false,
+      "expected": false
+    },
+    {
+      "target": "init_t",
+      "class": "process",
+      "permission": "signal",
+      "allowed": false,
+      "expected": false
+    },
+    {
+      "target": "liner_notes_data_t",
+      "class": "file",
+      "permission": "read",
+      "allowed": false,
+      "expected": false
+    },
+    {
+      "target": "liner_notes_isolation_t",
+      "class": "capability",
+      "permission": "sys_ptrace",
+      "allowed": false,
+      "expected": false
+    },
+    {
+      "target": "liner_notes_isolation_t",
+      "class": "capability",
+      "permission": "sys_admin",
+      "allowed": false,
+      "expected": false
+    }
+  ],
+  "acceptance_exit": 0,
+  "cleanup": "test policy removed; no confined processes",
+  "enforcing": "Enforcing",
+  "end": "2026-11-20T11:45:51+0900",
+  "acceptance_log_sha256": "b51309f53e1d02f4048c3d571790f1f169b8b50b10acf5f54c14e607b5716337",
+  "installed_helper_sha256": "8150d379508604d01312ac73c27a112c97e89ea36b2561b19fc3d941e1c227b4"
+}

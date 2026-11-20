@@ -352,7 +352,7 @@ def real_accounts():
             "'flags':[sys.flags.ignore_environment,sys.flags.no_user_site,sys.flags.dont_write_bytecode]}))\n"
             "os.write(2,b'captured\\n')\n")
         log.write_bytes(b'preserved\n');log.chmod(0o600)
-        args=[sys.executable,'-E','-s','-B',str(entry),'--diagnostic',str(log),'--','--config','fixture','--check-config']
+        args=[sys.executable,'-E','-s','-B',str(entry),'--diagnostic',str(log),'--trace-permissions','--','--config','fixture','--check-config']
         child=subprocess.Popen(args,stdout=subprocess.PIPE,stderr=subprocess.PIPE)
         out,err=child.communicate(timeout=5)
         assert child.returncode==0 and not err
@@ -536,7 +536,7 @@ class ConfinedEntry(unittest.TestCase):
 
     def test_original_config_preflight_and_trace_restore(self):
         for tail in ([],['--check-config']):
-            arguments=['entry','--diagnostic','/fixed/log','--','--config','/fixed/config',*tail]
+            arguments=['entry','--diagnostic','/fixed/log','--trace-permissions','--','--config','/fixed/config',*tail]
             previous_trace=sys.gettrace()
             target=str(Path(self.entry.__file__).with_name('door_isolation.py'))
             def execute(path,run_name):
@@ -552,7 +552,7 @@ class ConfinedEntry(unittest.TestCase):
             self.assertIs(sys.gettrace(),previous_trace)
 
     def test_trace_and_argv_restore_on_program_failure(self):
-        arguments=['entry','--diagnostic','/fixed/log','--','--config','/fixed/config']
+        arguments=['entry','--diagnostic','/fixed/log','--trace-permissions','--','--config','/fixed/config']
         previous_trace=sys.gettrace()
         with patch.object(sys,'argv',arguments),patch.object(self.entry,'redirect_stderr'), \
              patch.object(self.entry.runpy,'run_path',side_effect=SystemExit(3)):
@@ -560,6 +560,16 @@ class ConfinedEntry(unittest.TestCase):
             self.assertEqual(error.exception.code,3)
             self.assertIs(sys.argv,arguments)
         self.assertIs(sys.gettrace(),previous_trace)
+
+    def test_normal_acceptance_does_not_enable_trace(self):
+        arguments=['entry','--diagnostic','/fixed/log','--','--config','/fixed/config']
+        previous=sys.gettrace()
+        def execute(path,run_name): self.assertIs(sys.gettrace(),previous)
+        with patch.object(sys,'argv',arguments),patch.object(self.entry,'redirect_stderr'), \
+             patch.object(self.entry,'permission_trace') as trace, \
+             patch.object(self.entry.runpy,'run_path',side_effect=execute):
+            self.entry.main()
+            trace.assert_not_called()
 
     def trace_error(self,filename,function,number,broken_log=False):
         import contextlib,io

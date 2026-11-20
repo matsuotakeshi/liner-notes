@@ -46,6 +46,7 @@ def redirect_stderr(path):
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--diagnostic', required=True)
+    parser.add_argument('--trace-permissions', action='store_true')
     parser.add_argument('arguments', nargs=argparse.REMAINDER)
     args = parser.parse_args()
     if not args.arguments or args.arguments[0] != '--':
@@ -59,7 +60,9 @@ def main():
     previous_argv = sys.argv
     try:
         sys.argv = [str(target), *args.arguments[1:]]
-        sys.settrace(permission_trace())
+        # Explicit diagnostic option: tracing every /proc scan alters timing.
+        # Normal acceptance must exercise production-speed supervision.
+        if args.trace_permissions: sys.settrace(permission_trace())
         runpy.run_path(str(target), run_name='__main__')
     finally:
         sys.settrace(previous_trace)

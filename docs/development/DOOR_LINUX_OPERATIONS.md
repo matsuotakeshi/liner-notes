@@ -5,6 +5,14 @@ production. Existing legacy Doors remain the default. Selecting the isolation
 socket routes **all** Doors through separate slot UIDs, including games without
 Broker authentication. MMM and WebUI are outside this change.
 
+The isolation sample is a **system** service and relies on systemd's default
+root identity (`Group=root` remains explicit); the launcher itself rejects a
+non-root UID. Do not add `User=root` on systemd 257: its seccomp/user setup can
+drop CAP_SETUID before exec even when the bounding set contains it. The sample
+does not compensate with ambient capabilities, SYS_ADMIN or SYS_PTRACE. The
+Enforcing fixture checks that game UID is non-root and effective, permitted and
+ambient capability sets are all empty.
+
 ## Installation boundary
 
 RPM/DEB/source installation supplies root-owned, executable entrypoints:
@@ -69,6 +77,22 @@ consumer is unsupported. Game server network/extra dependencies need a reviewed
 local extension; the fixture consumer does not prove arbitrary games run under
 this policy. The existing Door network boolean remains explicit and off by
 default. Kernel UID checks still apply even when a socket label permits access.
+
+The supervisor scans process-labelled `/proc/PID/status` files. The policy grants
+directory search and ordinary file getattr/open/read on the `domain` attribute;
+this is a type-based grant, not a pathname-only SELinux rule. It does not grant
+link reads, writes, ptrace or signalling unrelated service domains. BBS data
+types remain denied. `pidfd_open` EINVAL is ignored only when a subsequent status
+existence check reports disappearance; other errors or a present status still
+fail closed and retain uncertain reservations.
+
+For Broker/isolation/consumer, preserve init-owned journal descriptors across
+exec with fd use and unix-stream getattr/read/write, without connectto. Otherwise
+SELinux can substitute `/null`, making successful stderr writes misleading.
+Acceptance checks actual fixed-marker delivery as well as the write result.
+The CI private diagnostic entry supports `--trace-permissions` for targeted
+investigation; normal acceptance leaves tracing off to preserve supervision
+timing. Trace output still contains only fixed function, source line and errno.
 
 Distribution prefix `/usr` has vendor file contexts. For a custom prefix use
 explicit administrator-local `semanage fcontext` mappings after reviewing each

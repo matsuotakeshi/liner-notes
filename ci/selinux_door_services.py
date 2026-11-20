@@ -366,6 +366,9 @@ class Backend:
         self.label(secret, 'data')
         game = base/'game'
         probe = ("assert Path('/proc/self/attr/current').read_text().split(':')[2]=='liner_notes_door_t'\n"
+                 +"caps={line.split(':')[0]:line.split(':')[1].strip() for line in Path('/proc/self/status').read_text().splitlines() if line.startswith(('CapEff:','CapPrm:','CapAmb:'))}\n"
+                 +"assert set(caps)=={'CapEff','CapPrm','CapAmb'} and all(int(v,16)==0 for v in caps.values()),caps\n"
+                 +"assert os.getuid()==os.geteuid()!=0\n"
                  +f'try:Path({str(secret)!r}).read_bytes()\n'
                  +'except PermissionError:pass\n'
                  +"else:raise AssertionError('MAC allowed private BBS data')\n")
