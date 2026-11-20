@@ -6,6 +6,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sqlite3.h>
+#include <openssl/evp.h>
 typedef struct Store {
     sqlite3 *db;sqlite3_int64 id,row_at,length;int kind;size_t row_bytes;unsigned char *row_cache;
 } Store;
@@ -42,9 +43,9 @@ static void exercise(int version) {
         sqlite3_backup *copy=sqlite3_backup_init(target,"main",db,"main");assert(copy);
         assert(sqlite3_backup_step(copy,-1)==SQLITE_DONE);assert(sqlite3_backup_finish(copy)==SQLITE_OK);sqlite3_close(target);
     }
-    if(version==4) {
+    if(version>=4) {
         assert(scalar(db,"SELECT count(*) FROM mail_attachments")==136);
-        assert(scalar(db,"SELECT count(*) FROM mail_records WHERE length(attributes)!=48")==0);
+        assert(scalar(db,version>=5?"SELECT count(*) FROM mail_records WHERE length(attributes)!=0":"SELECT count(*) FROM mail_records WHERE length(attributes)!=48")==0);
         assert(!sql(db,"INSERT INTO mail_attachments VALUES(1,999999,0,1)"));
         assert(!sql(db,"INSERT INTO mail_attachments VALUES(1,8,16,1)"));
         assert(!sql(db,"INSERT INTO mail_attachments VALUES(1,8,0,0)"));
@@ -63,5 +64,5 @@ static void exercise(int version) {
 }
 int main(int argc,char **argv) {
     if(argc==2)output_prefix=argv[1];
-    exercise(3);exercise(4);puts("PASS schema 3/4 mail codec: 0..16 attachments, byte-exact roundtrip, constraints, rollback, corruption, cascade");return 0;
+    exercise(2);exercise(3);exercise(4);exercise(5);puts("PASS schema 2/3/4/5 mail codec: 0..16 attachments, byte-exact roundtrip, constraints, rollback, corruption, cascade");return 0;
 }

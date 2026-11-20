@@ -5,14 +5,16 @@
 static int structured_requested,storage_version;
 static const char *row_tables[]={"","article_records","mail_records","member_records",
     "profile_events","board_access_events","download_events","userlog_events","chat_events",
-    "activity_events","board_policy_events","catalog_events","sigop_events","board_move_events","userlog_lock_events","moderation_events","content_events"};
+    "activity_events","board_policy_events","catalog_events","sigop_events","board_move_events","userlog_lock_events","moderation_events","content_events","vault_records"};
 static const char *event_magics[]={"LNPROF01","LNBACC01","LNDOWN01","LNUSER01","LNCHAT01","LNACTV01","LNBDP001","LNCAT001","LNSIG001","LNBMOV01","LNULOCK1","RTMOD001","RTEXTRA1"};
 static uint32_t event_sum(const unsigned char *r,size_t n) { uint32_t h=2166136261u;for(size_t i=0;i<n-4;i++)h=(h^r[i])*16777619u;return h; }
 
 static uint32_t rget(const unsigned char *p) { return (uint32_t)p[0]|((uint32_t)p[1]<<8)|((uint32_t)p[2]<<16)|((uint32_t)p[3]<<24); }
 static void rput(unsigned char *p,uint32_t n) { for(unsigned i=0;i<4;i++)p[i]=(unsigned char)(n>>(8*i)); }
+#include "storage_normalized.inc"
+#include "storage_vault.inc"
 static int row_schema(sqlite3 *db) {
-    char schema[512];snprintf(schema,sizeof(schema),"CREATE TABLE IF NOT EXISTS record_streams(stream INTEGER PRIMARY KEY REFERENCES streams(id) ON DELETE CASCADE,kind INTEGER NOT NULL CHECK(kind BETWEEN 1 AND %u),magic BLOB NOT NULL CHECK(length(magic)=8));",storage_version>=3?16:3);
+    char schema[512];snprintf(schema,sizeof(schema),"CREATE TABLE IF NOT EXISTS record_streams(stream INTEGER PRIMARY KEY REFERENCES streams(id) ON DELETE CASCADE,kind INTEGER NOT NULL CHECK(kind BETWEEN 1 AND %u),magic BLOB NOT NULL CHECK(length(magic)=8));",storage_version>=5?17:storage_version>=3?16:3);
     if(!sql(db,schema))return 0;
     if(storage_version>=3)for(unsigned i=4;i<17;i++) {
         char query[2048];snprintf(query,sizeof(query),
@@ -37,6 +39,7 @@ static int row_schema(sqlite3 *db) {
         "PRIMARY KEY(stream,offset,ordinal),UNIQUE(stream,offset,file_id),"
         "FOREIGN KEY(stream,offset) REFERENCES mail_records(stream,offset) ON DELETE CASCADE) WITHOUT ROWID;"
         "CREATE INDEX IF NOT EXISTS mail_attachments_file ON mail_attachments(file_id,stream,offset);"))return 0;
+    if(storage_version>=5 && (!normal_schema(db) || !vault_row_schema(db)))return 0;
     return 1;
 }
 static int row_kind(Store *s) {
@@ -44,9 +47,10 @@ static int row_kind(Store *s) {
     sqlite3_stmt *q=NULL;int kind=0;
     if(sqlite3_prepare_v2(s->db,"SELECT kind FROM record_streams WHERE stream=?",-1,&q,NULL)!=SQLITE_OK)return -1;
     sqlite3_bind_int64(q,1,s->id);int rc=sqlite3_step(q);if(rc==SQLITE_ROW)kind=sqlite3_column_int(q,0);else if(rc!=SQLITE_DONE)kind=-1;
-    sqlite3_finalize(q);return kind;
+    sqlite3_finalize(q);return kind<0 || kind>(storage_version>=5?17:storage_version>=3?16:3)?-1:kind;
 }
 static size_t row_size(unsigned kind,const unsigned char *r) {
+    if(kind==17)return 640;
     if(kind>=4)return kind==15?32:kind==16?512:4096;
     if(kind==1) { unsigned bl=rget(r+12);return bl>262144?0:(rget(r)&0x80000000u?144+bl:1168); }
     if(kind==2) {
@@ -61,6 +65,7 @@ static size_t row_size(unsigned kind,const unsigned char *r) {
 static int row_load(Store *s,sqlite3_int64 at) {
     if(s->row_cache && at>=s->row_at && at<s->row_at+(sqlite3_int64)s->row_bytes)return 1;
     if(!s->row_cache && !(s->row_cache=malloc(ROW_MAX)))return 0;
+    if(s->kind==17)return vault_row_load(s,at);
     if(s->kind>=4) {
         char query[350];snprintf(query,sizeof(query),"SELECT offset,event_type,sequence,actor_id,target_id,created_at,text,checksum,flags,context_id FROM %s WHERE stream=? AND offset<=? ORDER BY offset DESC LIMIT 1",row_tables[s->kind]);
         sqlite3_stmt *q=NULL;if(sqlite3_prepare_v2(s->db,query,-1,&q,NULL)!=SQLITE_OK)return 0;
@@ -91,9 +96,23 @@ static int row_load(Store *s,sqlite3_int64 at) {
     if(ok) {
         sqlite3_int64 offset=sqlite3_column_int64(q,0);int n=sqlite3_column_int(q,1),an=sqlite3_column_bytes(q,12),tl=sqlite3_column_bytes(q,7),bl=sqlite3_column_bytes(q,8),nl=sqlite3_column_bytes(q,9);
         ok=n>=128 && n<=ROW_MAX && offset<=at && at<offset+n && tl<=80 && bl<=262144 && nl<=32 && an>=0 && an<=256;
+        if(ok && storage_version>=5) {
+            const int columns[]={2,3,4,5,14};
+            for(unsigned i=0;i<sizeof(columns)/sizeof(*columns);i++) {
+                sqlite3_int64 value=sqlite3_column_int64(q,columns[i]);
+                if(sqlite3_column_type(q,columns[i])!=SQLITE_INTEGER || value<0 || value>UINT32_MAX)ok=0;
+            }
+            sqlite3_int64 event=sqlite3_column_int64(q,13);
+            if(offset<8 || sqlite3_column_type(q,6)!=SQLITE_INTEGER || sqlite3_column_int64(q,6)<0 || sqlite3_column_type(q,13)!=SQLITE_INTEGER || event<0 || event>255 || (s->kind==1 && event))ok=0;
+        }
         unsigned char *r=s->row_cache;if(ok) {
             memset(r,0,(size_t)n);const unsigned char *a=sqlite3_column_blob(q,12);
-            unsigned char mail_attr[112];
+            unsigned char mail_attr[112],normalized_attr[128];
+            if(storage_version>=5) {
+                size_t count=0;
+                if(an || sqlite3_column_type(q,12)!=SQLITE_BLOB || !normal_fields(s,offset,sqlite3_column_int(q,13),normalized_attr,&count,0)) { sqlite3_finalize(q);return 0; }
+                a=normalized_attr;an=(int)count;
+            }
             if(storage_version>=4 && s->kind==2) {
                 if(an!=48)ok=0;
                 else {
@@ -132,6 +151,7 @@ static int row_load(Store *s,sqlite3_int64 at) {
                     if(strchr("AJPQ",r[0])) { ok=sqlite3_column_bytes(q,10)==16 && sqlite3_column_bytes(q,11)==32;if(ok) { memcpy(r+40,sqlite3_column_blob(q,10),16);memcpy(r+56,sqlite3_column_blob(q,11),32); } }
                 }
             }
+            if(ok && storage_version>=5)ok=row_size((unsigned)s->kind,r)==(size_t)n && event_sum(r,(size_t)n)==rget(r+n-4);
             if(ok) { s->row_at=offset;s->row_bytes=(size_t)n; }
         }
     }sqlite3_finalize(q);return ok;
@@ -151,6 +171,8 @@ static int row_block(Store *s,sqlite3_int64 number,unsigned char *out) {
     }return 1;
 }
 static int row_insert(Store *s,sqlite3_int64 offset,const unsigned char *r,size_t n) {
+    if(s->kind==17)return vault_row_insert(s,offset,r,n);
+    if(n<32 || n>ROW_MAX || (s->kind<=3 && (n<128 || row_size((unsigned)s->kind,r)!=n)))return 0;
     if(s->kind>=4) {
         unsigned text_size=s->kind==15?0:rget(r+(s->kind==16?16:24));
         unsigned text_at=s->kind==16?20:28,stamp_at=s->kind==15?20:s->kind==16?340:16;
@@ -188,8 +210,9 @@ static int row_insert(Store *s,sqlite3_int64 offset,const unsigned char *r,size_
     sqlite3_stmt *q=NULL;int ok=sqlite3_prepare_v2(s->db,query,-1,&q,NULL)==SQLITE_OK;
     if(ok) {
         sqlite3_bind_int64(q,1,s->id);sqlite3_bind_int64(q,2,offset);sqlite3_bind_int64(q,3,(sqlite3_int64)n);sqlite3_bind_int64(q,4,id);sqlite3_bind_int64(q,5,parent);sqlite3_bind_int64(q,6,actor);sqlite3_bind_int64(q,7,to);sqlite3_bind_int64(q,8,(sqlite3_int64)created);
-        sqlite3_bind_text(q,9,(const char *)title,(int)tl,SQLITE_STATIC);sqlite3_bind_text(q,10,(const char *)body,(int)bl,SQLITE_STATIC);sqlite3_bind_text(q,11,(const char *)login,(int)nl,SQLITE_STATIC);sqlite3_bind_blob(q,12,salt,auth?16:0,SQLITE_STATIC);sqlite3_bind_blob(q,13,hash,auth?32:0,SQLITE_STATIC);sqlite3_bind_blob(q,14,attr,(int)an,SQLITE_STATIC);sqlite3_bind_int(q,15,s->kind==1?0:r[0]);sqlite3_bind_int64(q,16,sender);ok=sqlite3_step(q)==SQLITE_DONE;
+        sqlite3_bind_text(q,9,(const char *)title,(int)tl,SQLITE_STATIC);sqlite3_bind_text(q,10,(const char *)body,(int)bl,SQLITE_STATIC);sqlite3_bind_text(q,11,(const char *)login,(int)nl,SQLITE_STATIC);sqlite3_bind_blob(q,12,salt,auth?16:0,SQLITE_STATIC);sqlite3_bind_blob(q,13,hash,auth?32:0,SQLITE_STATIC);sqlite3_bind_blob(q,14,attr,storage_version>=5?0:(int)an,SQLITE_STATIC);sqlite3_bind_int(q,15,s->kind==1?0:r[0]);sqlite3_bind_int64(q,16,sender);ok=sqlite3_step(q)==SQLITE_DONE;
     }sqlite3_finalize(q);
+    if(ok && storage_version>=5)ok=normal_fields(s,offset,s->kind==1?0:r[0],attr,&an,1);
     if(ok && storage_version>=4 && s->kind==2) {
         unsigned count=(r[0]=='u'||r[0]=='x')?r[2]:(r[0]=='t'||r[0]=='v');
         q=NULL;ok=count<=16 && sqlite3_prepare_v2(s->db,"INSERT INTO mail_attachments VALUES(?,?,?,?)",-1,&q,NULL)==SQLITE_OK;
@@ -198,6 +221,11 @@ static int row_insert(Store *s,sqlite3_int64 offset,const unsigned char *r,size_
             sqlite3_bind_int64(q,4,rget(r+n-4-4*count+4*i));ok=sqlite3_step(q)==SQLITE_DONE;sqlite3_reset(q);sqlite3_clear_bindings(q);
         }
         sqlite3_finalize(q);
+    }
+    if(ok && storage_version>=5) {
+        Store check=*s;check.row_cache=NULL;check.row_bytes=0;
+        ok=row_load(&check,offset) && check.row_bytes==n && !memcmp(check.row_cache,r,n);
+        free(check.row_cache);
     }
     return ok;
 }

@@ -30,7 +30,7 @@ def run(binary):
    cmd(c,'BUFFER');cmd(c,'/M');cmd(c,'/CANCEL')
   finally:c.close();s.close()
   with sqlite3.connect(db) as d:
-   assert d.execute('select version from storage_meta').fetchone()==(4,)
+   assert d.execute('select version from storage_meta').fetchone()==(5,)
    assert d.execute('select title,length(body) from article_records where record_id<=2 order by offset').fetchall()==[('first',12),('large',3002)]
    assert d.execute("select login,length(salt),length(password_hash) from member_records where event_type=65").fetchone()==('alice',16,32)
    assert d.execute('select count(*) from blocks where stream in (select stream from record_streams)').fetchone()==(0,)

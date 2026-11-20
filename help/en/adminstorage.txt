@@ -7,4 +7,6 @@ Stop the BBS and transfer workers before running liner-notes-admin.
 SQLite: db-backup / verify / db-restore / db-compact
 Migration: db-migrate. Portable export: db-export.
 Use db-compact --reclaim-withdrawn to remove withdrawn bodies in a new copy.
---all-stores also compacts other stores. Backups are retained. See STAGE67.md for arguments.
+--all-stores also compacts other stores. Backups are retained. See Backup and recovery in the canonical manual.
+Use db-structure on a stopped instance to create a separate structured copy.
+Keep the source DB. Never start a failed migration/restore; retry to a new destination.
