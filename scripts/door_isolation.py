@@ -118,34 +118,49 @@ def slot_acquire(config,door,level):
         except BaseException:os.close(fd);raise
     raise Rejected('no isolated slot')
 
+class LaunchTiming:
+    """Opt-in numeric phase timing; no policy, request or credential values."""
+    def __init__(self):
+        self.enabled=os.environ.get('LINER_DOOR_DIAGNOSTICS')=='1'
+        self.started=time.monotonic() if self.enabled else None
+
+    def mark(self,phase):
+        if self.enabled:
+            print(json.dumps(dict(event='launch-phase',worker=os.getpid(),phase=phase,
+                                  elapsed_ms=max(0,int((time.monotonic()-self.started)*1000)))),
+                  file=sys.stderr,flush=True)
+        return phase
+
+
 def supervise(config,connection,parent_watch=None):
     slot=None;lock=None;issuer=None;master=None;slave=None;ticket_read=None;pid=None;run=None;scope=None;phase="request"
+    timing=LaunchTiming();timing.mark(phase)
     try:
         connection.settimeout(3);request=read_line(connection);name=request_check(request)
-        phase='slot'
+        phase=timing.mark('slot')
         slot,lock=slot_acquire(config,request['door'],request['level'])
         # This supervisor is trusted, single-threaded, and owns one unique slot UID.
-        phase='scope';scope=Scope(slot['uid'])
+        phase=timing.mark('scope');scope=Scope(slot['uid'])
         token=None
-        phase='broker'
+        phase=timing.mark('broker')
         if slot['auth']:issuer,token=broker_open(config,request,slot)
-        phase='ticket-pipe'
+        phase=timing.mark('ticket-pipe')
         if token:
             ticket_read,ticket_write=os.pipe();os.write(ticket_write,(token+'\n').encode());os.close(ticket_write)
         if slot['drop']:
-            phase='dropfile'
+            phase=timing.mark('dropfile')
             run=Path(config['state_dir'])/('run-'+secrets.token_hex(16));run.mkdir(mode=0o700)
             drop=run/'DORINFO1.DEF'
             drop.write_text('Liner notes\r\nSYSOP\r\n\r\nCOM0\r\n0 BAUD,N,8,1\r\n0\r\nLN%09d\r\n\r\n\r\n1\r\n%d\r\n%d\r\n'%(request['user'],request['level'],(slot['seconds']+59)//60),newline='')
             os.chmod(drop,0o600);os.chown(drop,slot['uid'],slot['gid']);os.chown(run,slot['uid'],slot['gid'])
-        phase='pty'
+        phase=timing.mark('pty')
         master,slave=pty.openpty();fcntl.ioctl(slave,termios_TIOCSWINSZ(),struct.pack('HHHH',request['rows'],request['columns'],0,0))
         env={'PATH':'/usr/local/bin:/usr/bin:/bin','TERM':'xterm','LANG':'C.UTF-8','HOME':slot['cwd'],
              'LINER_USER_ID':str(request['user']),'LINER_USER':name,'LINER_DOOR_ID':str(slot['door']),
              'LINER_DOOR_NODE':str(slot['node']),'LINER_DOOR_DROP_DIR':str(run or ''),
              'COLUMNS':str(request['columns']),'LINES':str(request['rows'])}
         if token:env['LINER_AUTH_FD']='3' # descriptor number only, never the credential
-        phase='launch'
+        phase=timing.mark('launch')
         pid=os.fork()
         if pid==0:
             try:
@@ -163,9 +178,9 @@ def supervise(config,connection,parent_watch=None):
             except BaseException:os._exit(126)
         os.close(slave);slave=None
         if ticket_read is not None:os.close(ticket_read);ticket_read=None
-        phase='handoff'
+        phase=timing.mark('handoff')
         connection.sendmsg([b'OK\n'],[(socket.SOL_SOCKET,socket.SCM_RIGHTS,array.array('i',[master]))]);os.close(master);master=None
-        phase='running'
+        phase=timing.mark('running')
         connection.settimeout(None);until=time.monotonic()+slot['seconds']
         while time.monotonic()<until:
             sockets=[connection]+([issuer] if issuer else [])+([parent_watch] if parent_watch is not None else [])

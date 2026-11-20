@@ -10,7 +10,8 @@ static int record(int f,unsigned char *row,size_t n) { uint32_t h=2166136261u;fo
 int main(int argc,char **argv) {
     if(argc!=5)return 2;
     unsigned count=(unsigned)strtoul(argv[4],NULL,10);if(!count || count>100000)return 2;
-    if(!storage_init_structured(argv[1]))return 1;int board=storage_open(argv[2],O_RDWR,0600),mail=storage_open(argv[3],O_RDWR,0600);if(board<0 || mail<0)return 1;
+    if(!storage_init_structured(argv[1]))return 1;
+    int board=storage_open(argv[2],O_RDWR,0600),mail=storage_open(argv[3],O_RDWR,0600);if(board<0 || mail<0)return 1;
     if(storage_write(board,"RTBOARD4",8)!=8 || storage_sync(board))return 1;
     enum { BODY=4096 };unsigned char row[BODY+144];
     for(unsigned id=1;id<=count;id++) {

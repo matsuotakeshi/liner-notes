@@ -173,8 +173,19 @@ class Backend(unittest.TestCase):
             subprocess.run([compiler,'-m64','-std=c11','-Wall','-Wextra','-Werror',
                             str(ROOT/'tests/solaris_door_contract_probe.c'),'-lcontract','-o',binary],
                            check=True,timeout=30)
-            result=subprocess.run([binary],capture_output=True,text=True,timeout=15,check=True)
+            result=subprocess.run([binary],capture_output=True,text=True,timeout=15)
+            self.assertEqual(result.returncode,0,result.stdout+'\n'+result.stderr)
             self.assertIn('PASS Solaris owned-contract cleanup',result.stdout)
+            self.assertIn('ISOLATION NOT VERIFIED',result.stdout)
+            self.assertFalse(result.stderr,result.stderr)
+            print(result.stdout.strip())
+            # Capability observation, never acceptance of a secure backend:
+            # the harness records whether a nested orphan contract escapes and
+            # uses an independent EOF/deadline watchdog to clean up the probe.
+            result=subprocess.run([binary,'--nested'],capture_output=True,text=True,timeout=15)
+            self.assertEqual(result.returncode,0,result.stdout+'\n'+result.stderr)
+            self.assertRegex(result.stdout,r'OBSERVED nested contract survived outer abandonment: (yes|no)')
+            self.assertIn('not a containment acceptance',result.stdout)
             self.assertIn('ISOLATION NOT VERIFIED',result.stdout)
             self.assertFalse(result.stderr,result.stderr)
             print(result.stdout.strip())

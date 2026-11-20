@@ -15,6 +15,20 @@ with patch.dict(sys.modules, {name:Mock() for name in ('fcntl','pty','resource')
     import door_isolation as isolation
 
 
+class PhaseTiming(unittest.TestCase):
+    def test_disabled_is_silent_and_does_not_sample_clock(self):
+        with patch.dict(os.environ,{'LINER_DOOR_DIAGNOSTICS':'0'}),patch.object(isolation.time,'monotonic') as clock,patch('sys.stderr') as output:
+            self.assertEqual(isolation.LaunchTiming().mark('broker'),'broker')
+            clock.assert_not_called();output.write.assert_not_called()
+
+    def test_elapsed_phase_has_only_pid_label_and_numeric_time(self):
+        output=io.StringIO()
+        with patch.dict(os.environ,{'LINER_DOOR_DIAGNOSTICS':'1'}),patch.object(isolation.time,'monotonic',side_effect=[10,10.25,13]),patch.object(isolation.os,'getpid',return_value=123),contextlib.redirect_stderr(output):
+            timing=isolation.LaunchTiming();timing.mark('slot');timing.mark('handoff')
+        rows=[json.loads(line) for line in output.getvalue().splitlines()]
+        self.assertEqual(rows,[dict(event='launch-phase',worker=123,phase='slot',elapsed_ms=250),dict(event='launch-phase',worker=123,phase='handoff',elapsed_ms=3000)])
+
+
 class ExitWorker(BaseException):pass
 
 

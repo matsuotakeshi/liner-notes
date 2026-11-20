@@ -20,7 +20,7 @@ import time
 
 def private_diagnostics(path):
     """Export only the isolation service's bounded, allowlisted diagnostic fields."""
-    events = {'worker-accepted', 'worker-reaped', 'admission-rejected',
+    events = {'launch-phase', 'worker-accepted', 'worker-reaped', 'admission-rejected',
               'admission-unavailable', 'worker-exit', 'door-exit', 'launch-rejected',
               'launch-failed', 'cleanup-failed', 'worker-failed', 'slot-permission-error'}
     labels = {'phase': {'request', 'slot', 'scope', 'broker', 'ticket-pipe', 'dropfile',
@@ -45,7 +45,7 @@ def private_diagnostics(path):
         if not isinstance(item, dict) or not isinstance(item.get('event'), str) or item['event'] not in events:
             continue
         clean = {'event': item['event']}
-        for key in ('worker', 'active', 'status', 'errno', 'line'):
+        for key in ('worker', 'active', 'status', 'errno', 'line', 'elapsed_ms'):
             if type(item.get(key)) is int: clean[key] = item[key]
         for key, allowed in labels.items():
             if isinstance(item.get(key), str) and item[key] in allowed: clean[key] = item[key]
