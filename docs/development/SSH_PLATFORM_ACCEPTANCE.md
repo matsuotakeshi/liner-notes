@@ -94,7 +94,9 @@ or an unbounded hostile connection flood.
 - Hosted candidate CI, then exact-main native/Enforcing runs and package evidence.
 - FreeBSD/Rocky dependency preparation is recorded below; the protected helper
   was not changed. Ubuntu/Solaris prerequisites are not yet established.
-- Independent security review (implementer review is not independent sign-off).
+- Independent source review completed with an unresolved P2 admission-history
+  exhaustion finding; native attack checks remain pending. See
+  [review and reproduction](DOOR_BROKER_SECURITY_REVIEW_20261120.md).
 - Solaris Broker process-contract/privilege backend: still unsupported and
   fail-closed. Peer-credential tests alone do not establish isolated Door execution.
 - AREA-PC88 results remain those of its previous pinned two-repository test;
