@@ -11,6 +11,19 @@ import sys
 ROOT = Path(__file__).resolve().parents[1]
 
 
+def private_solaris_dependency(target):
+    """Use the explicitly prepared CI-only library without changing host paths."""
+    if target != 'solaris':
+        return None
+    prefix = Path.home() / 'liner-notes-deps/libssh-0.12.2/local'
+    metadata = prefix / 'lib/pkgconfig/libssh.pc'
+    if not metadata.is_file():
+        return None  # ordinary installed-library detection still must succeed
+    previous = os.environ.get('PKG_CONFIG_PATH', '')
+    os.environ['PKG_CONFIG_PATH'] = str(metadata.parent) + (os.pathsep + previous if previous else '')
+    return prefix
+
+
 def build_command(target):
     pkg = shutil.which('pkg-config')
     if not pkg or subprocess.run([pkg, '--atleast-version=0.10', 'libssh']).returncode:
@@ -20,6 +33,9 @@ def build_command(target):
     if target == 'solaris':
         from solaris_ci import build_arguments
         command = build_arguments()
+        # The CI-private shared library is not placed in the OS loader search
+        # path. Record runpaths in this disposable executable instead.
+        libs += ''.join(' -Wl,-R,' + flag[2:] for flag in shlex.split(libs) if flag.startswith('-L'))
     elif target == 'freebsd':
         # The source Makefile uses portable make syntax, including FreeBSD make.
         command = ['make', 'PYTHON=' + sys.executable]
@@ -42,6 +58,9 @@ def main():
     for tool in ('ssh', 'ssh-keygen'):
         if not shutil.which(tool):
             raise RuntimeError('Required installed client missing: ' + tool)
+    prefix = private_solaris_dependency(args.target)
+    if prefix:
+        print("Using CI-private libssh: " + str(prefix), flush=True)
     command = build_command(args.target)
     print('SSH native build: ' + shlex.join(command), flush=True)
     subprocess.run(command, cwd=ROOT, check=True)
@@ -49,7 +68,12 @@ def main():
     venv = ROOT / '.native-ssh-venv'
     if venv.exists():
         raise ValueError('Refuse to reuse an old SSH test environment')
-    subprocess.run([sys.executable, '-m', 'venv', str(venv)], check=True)
+    creation = [sys.executable, '-m', 'venv']
+    if args.target == 'solaris':
+        # Reuse explicitly prepared IPS cryptography/Paramiko builds; a fresh
+        # venv still contains any pip additions, never the system interpreter.
+        creation.append('--system-site-packages')
+    subprocess.run(creation + [str(venv)], check=True)
     python = str(venv / 'bin/python')
     subprocess.run([python, '-m', 'pip', 'install', '--disable-pip-version-check', '--no-cache-dir',
                     '-r', str(ROOT / 'tests/ssh-requirements.txt')], check=True, timeout=300)

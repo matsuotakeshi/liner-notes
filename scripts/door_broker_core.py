@@ -35,6 +35,7 @@ class Session:
     generation: int
     deadline: float
     active: bool=True
+    replay_key: tuple | None=None
 
 class Broker:
     def __init__(self,bbs,consumers,*,clock=time.monotonic,ttl=30,session_ttl=3600,capacity=4096):
@@ -52,17 +53,29 @@ class Broker:
         self.leases={key:value for key,value in self.leases.items() if value[0].active}
         self.generations={key:value for key,value in self.generations.items() if now<value[1]}
 
-    def open(self,member,door,session,generation):
+    def open(self,member,door,session,generation,*,scope=None,sequence=None):
         member=positive(member,999999);door=positive(door,86400);session=identity(session);generation=auth_generation(generation)
         self.sweep()
-        previous=self.generations.get(session)
-        if previous and generation<=previous[0]:raise Denied('stale generation')
-        if session not in self.generations and len(self.generations)>=self.capacity:raise Denied('capacity reached')
-        if not any(door in doors for doors in self.consumers.values()):raise Denied('door not authorized')
+        # Legacy issuers retain session/generation replay semantics. The current
+        # supervisor supplies a stable incarnation+slot scope and a parent-owned
+        # monotonic launch sequence, while public claims keep the BBS identity.
+        if scope is None and sequence is None:
+            replay_key=('legacy',session);version=generation
+        elif scope is not None and sequence is not None:
+            replay_key=('slot',identity(scope));version=positive(sequence)
+        else:raise Denied('invalid replay scope')
+        previous=self.generations.get(replay_key)
+        if previous and version<=previous[0]:raise Denied('stale generation')
+        if replay_key not in self.generations and len(self.generations)>=self.capacity:raise Denied('capacity reached')
         old=self.sessions.get(session)
+        if old and old.replay_key!=replay_key:raise Denied('session scope collision')
+        if any(s.active and s.replay_key==replay_key and s.session!=session for s in self.sessions.values()):raise Denied('slot still active')
+        if old is None and len(self.sessions)>=self.capacity:raise Denied('capacity reached')
+        if not any(door in doors for doors in self.consumers.values()):raise Denied('door not authorized')
         if old:self.close(old)
         active=Session(self.bbs,member,door,session,generation,self.clock()+self.session_ttl)
-        self.sessions[session]=active;self.generations[session]=(generation,active.deadline)
+        active.replay_key=replay_key
+        self.sessions[session]=active;self.generations[replay_key]=(version,active.deadline)
         return active
 
     def close(self,session):

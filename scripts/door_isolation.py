@@ -76,12 +76,15 @@ def config_read(path):
     if used&set(policy['consumers']):raise Rejected('consumer/slot identity collision')
     return config
 
-def broker_open(config,request):
+def broker_open(config,request,slot):
     endpoint=socket.socket(socket.AF_UNIX,socket.SOCK_STREAM);endpoint.settimeout(3)
     try:
         endpoint.connect(config['broker_socket'])
         if peer_uid(endpoint)!=config['broker_uid']:raise Rejected('Broker identity')
-        send(endpoint,dict(op='open',member=request['user'],door=request['door'],session=request['session'],generation=request['generation']))
+        send(endpoint,dict(op='open_scoped',member=request['user'],door=request['door'],
+                           session=request['session'],generation=request['generation'],
+                           scope=config['_incarnation']+'.'+str(slot['uid']),
+                           sequence=config['_launch_sequence']))
         result=read_line(endpoint)
         if not result.get('ok'):raise Rejected('Broker rejected')
         token=result['result']['ticket']
@@ -125,7 +128,7 @@ def supervise(config,connection,parent_watch=None):
         phase='scope';scope=Scope(slot['uid'])
         token=None
         phase='broker'
-        if slot['auth']:issuer,token=broker_open(config,request)
+        if slot['auth']:issuer,token=broker_open(config,request,slot)
         phase='ticket-pipe'
         if token:
             ticket_read,ticket_write=os.pipe();os.write(ticket_write,(token+'\n').encode());os.close(ticket_write)
@@ -224,10 +227,14 @@ def start_worker(config,connection,listener,watch,alive,children):
             parent_event('admission-rejected',reason='peer',active=len(children));return
         if len(children)>=len(config['slots'])+8:
             parent_event('admission-rejected',reason='capacity',active=len(children));return
+        # Allocate before fork in the single-threaded parent; callers cannot
+        # choose/replay these fields. Gaps after failed forks are intentional.
+        config.setdefault('_incarnation',secrets.token_hex(16))
+        config['_launch_sequence']=positive(config.get('_launch_sequence',0)+1)
         phase='fork'
         pid=os.fork()
-    except OSError as error:
-        parent_event('admission-rejected',reason=phase,active=len(children),error=error.errno)
+    except (OSError,ValueError) as error:
+        parent_event('admission-rejected',reason=phase,active=len(children),error=getattr(error,'errno',None))
         print('{"event":"admission-unavailable"}',file=sys.stderr,flush=True)
         return
     if pid==0:

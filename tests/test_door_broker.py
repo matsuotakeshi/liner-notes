@@ -90,6 +90,60 @@ class Load(unittest.TestCase):
         self.assertFalse(b.sessions or b.leases or b.tickets or b.generations)
         b.open(1,1,'fresh-after-expiry',0)
 
+class ScopedLaunches(unittest.TestCase):
+    def setUp(self):
+        self.b=Broker('bbs',{40:[1]},clock=lambda:100,capacity=4)
+
+    def launch(self,n,member=1,scope='incarnation.slot1'):
+        return self.b.open(member,1,'random-launch-'+str(n),0,scope=scope,sequence=n)
+
+    def test_fresh_ids_do_not_exhaust_history_and_other_member_can_launch(self):
+        for n in range(1,10001):
+            session=self.launch(n)
+            ticket=self.b.issue(session)
+            lease=self.b.consume(40,1,'bbs',ticket)['lease']
+            self.b.close(session)
+        self.assertEqual((len(self.b.sessions),len(self.b.generations)),(0,1))
+        with self.assertRaises(Denied):self.b.check(40,1,'bbs',lease)
+        second=self.launch(10001,member=2)
+        result=self.b.consume(40,1,'bbs',self.b.issue(second))
+        self.assertEqual((result['claims']['member'],result['claims']['session'],result['claims']['generation']),
+                         (2,'random-launch-10001',0))
+
+    def test_old_sequence_close_and_token_cannot_affect_new_launch(self):
+        old=self.launch(1);ticket=self.b.issue(old)
+        lease=self.b.consume(40,1,'bbs',ticket)['lease'];self.b.close(old)
+        new=self.launch(2);new_ticket=self.b.issue(new)
+        for n in (1,2):
+            with self.assertRaises(Denied):self.launch(n)
+        self.b.close(old)
+        self.b.consume(40,1,'bbs',new_ticket)
+        with self.assertRaises(Denied):self.b.consume(40,1,'bbs',ticket)
+        with self.assertRaises(Denied):self.b.check(40,1,'bbs',lease)
+
+    def test_busy_slot_cannot_be_reassigned_and_failed_open_does_not_advance(self):
+        old=self.launch(1)
+        with self.assertRaises(Denied):self.launch(2,member=2)
+        self.assertTrue(old.active)
+        self.b.close(old);self.launch(2,member=2)
+
+    def test_invalid_scope_sequence_and_scope_collision(self):
+        for extra in (dict(scope='s'),dict(sequence=1),dict(scope='bad space',sequence=1),
+                      dict(scope='s',sequence=True),dict(scope='s',sequence=0),
+                      dict(scope='s',sequence=2**63)):
+            with self.assertRaises(Denied):self.b.open(1,1,'session',0,**extra)
+        first=self.launch(1)
+        with self.assertRaises(Denied):self.b.open(2,1,first.session,1,scope='other',sequence=1)
+        self.assertTrue(first.active)
+
+    def test_scope_and_legacy_namespaces_and_total_capacity_remain_bounded(self):
+        self.b.open(1,1,'incarnation.slot1',0)
+        self.launch(1)
+        self.launch(2,scope='slot2');self.launch(3,scope='slot3')
+        with self.assertRaises(Denied):self.launch(4,scope='overflow')
+        self.assertEqual(len(self.b.generations),4)
+
+
 class Consumer(unittest.TestCase):
     def test_wrong_socket_peer_receives_no_credential(self):
         connection=Mock();connection.__enter__=Mock(return_value=connection);connection.__exit__=Mock(return_value=False)
@@ -180,6 +234,20 @@ class Protocol(unittest.IsolatedAsyncioTestCase):
         for uid in (20,30,40):
             result=await self.request(uid,request);self.assertIn(b'"ok":false',result);self.assertNotIn(b'ticket',result)
         self.assertFalse(self.b.sessions)
+    async def test_scoped_protocol_reuses_bounded_history_and_rejects_nonissuer(self):
+        self.b.capacity=1
+        for sequence in range(1,21):
+            request=dict(op='open_scoped',member=sequence%2+1,door=1,
+                         session='fresh'+str(sequence),generation=0,scope='boot.slot',sequence=sequence)
+            self.assertIn(b'"ok":false',await self.request(40,request))
+            result=json.loads(await self.request(0,request))
+            self.assertTrue(result['ok'])
+            self.assertIn(b'"ok":false',await self.request(0,request))
+        self.assertEqual(len(self.b.generations),1)
+        self.assertFalse(self.b.sessions or self.b.tickets or self.b.leases)
+        missing=dict(request);del missing['sequence']
+        self.assertIn(b'"ok":false',await self.request(0,missing))
+
     async def test_live_issuer_owns_lease(self):
         reader,writer,task=await self.live_issuer('s')
         token=json.loads(writer.data)['result']['ticket']

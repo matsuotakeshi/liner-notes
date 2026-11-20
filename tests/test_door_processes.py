@@ -161,6 +161,24 @@ class Backend(unittest.TestCase):
                         self.assertEqual(peer_uid(connection),os.geteuid())
                         self.assertEqual(peer_uid(client),os.geteuid())
 
+    @unittest.skipUnless(sys.platform.startswith('sunos'),'native Solaris contract primitives only')
+    def test_native_solaris_contract_and_limit_primitives(self):
+        # No slot UIDs, accounts, installed binaries or services are modified.
+        # This cannot satisfy the full isolated-launch security acceptance gate.
+        import shutil
+        compiler=shutil.which('gcc')
+        self.assertIsNotNone(compiler,'Solaris CI requires its installed C compiler')
+        with tempfile.TemporaryDirectory(prefix='ln-solaris-contract-') as temporary:
+            binary=str(Path(temporary)/'contract-probe')
+            subprocess.run([compiler,'-m64','-std=c11','-Wall','-Wextra','-Werror',
+                            str(ROOT/'tests/solaris_door_contract_probe.c'),'-lcontract','-o',binary],
+                           check=True,timeout=30)
+            result=subprocess.run([binary],capture_output=True,text=True,timeout=15,check=True)
+            self.assertIn('PASS Solaris owned-contract cleanup',result.stdout)
+            self.assertIn('ISOLATION NOT VERIFIED',result.stdout)
+            self.assertFalse(result.stderr,result.stderr)
+            print(result.stdout.strip())
+
     @unittest.skipUnless(sys.platform.startswith('freebsd'),'native FreeBSD reaper')
     def test_native_freebsd_detached_descendants(self):
         # Isolated worker, same unprivileged CI UID. Never signal the caller's UID

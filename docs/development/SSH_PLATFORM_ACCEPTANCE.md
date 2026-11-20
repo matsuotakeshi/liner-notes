@@ -158,3 +158,61 @@ real encrypted fixture in Hosted CI. These local unit checks do not establish
 native encrypted or SELinux Enforcing acceptance; the corrected candidate needs
 its own CI result. Canonical public commands/settings are unchanged by this
 harness correction; the candidate status remains separate from stable 0.74.1.
+
+## Dependency preparation and follow-up (2026-11-20)
+
+PR #153 head `c59f4de557ac4d026bbeb0f70a93f9c9ef2e8dbe` passed all 12
+reported Hosted workflows, including the corrected SSH fixture and compiled
+SELinux policy; merge commit is `3b6003c25d212b42d0ff17d9c14f9953c3889f72`.
+Those PR results are not the merge commit's native results. Embedded SSH Native
+Acceptance was dispatched once on main for FreeBSD/Rocky/Ubuntu after preparation;
+its results must be checked separately without continuous polling.
+
+With explicit per-host permission, Ubuntu added 12 packages (libssh-dev,
+pkg-config and dependencies), with zero existing-package updates/removals.
+libssh is 0.12.2. Package/service restarts were not requested; needrestart was
+suspended. Log: `build/ubuntu-ssh-dependency-preparation.log`.
+
+Solaris's installed publisher exposes libssh2, which is not a substitute for
+libssh's server API. Its approved root transaction added only CMake 3.24.0:
+no existing-package update, boot environment creation or OS/service restart.
+Logs: `build/solaris-cmake-plan.log`, `build/solaris-cmake-install.log`.
+
+As the existing CI account, official libssh 0.12.2 was built successfully with
+GCC/`-m64` into `~/liner-notes-deps/libssh-0.12.2/local`. The installed shared
+library is ELF AMD64 64-bit; pkg-config reports 0.12.2. It is not installed into
+the OS library path. Log: `build/solaris-libssh-build.log`.
+Reproduction: `ci/prepare-solaris-libssh.sh` (manual, non-root, refuses reuse).
+Archive SHA-256: `49560f677d96e3706a904ac2de1116e25f3680937d51e5c92198fcba4a1c1e9f`,
+checked against [FreeBSD Ports distinfo](https://github.com/freebsd/freebsd-ports/blob/main/security/libssh/distinfo)
+and fetched over HTTPS from the official libssh distribution site. The CI
+candidate discovers only this fixed private prefix on Solaris and embeds library
+runpaths in its disposable executable. No shell profile/loader/sshd change occurs.
+Encrypted Solaris BBS acceptance requires merging that CI adaptation and then
+explicitly dispatching `Embedded SSH Native Acceptance` with target `solaris`.
+
+The scoped Broker correction is documented separately; Solaris isolated launch
+remains disabled pending the denial tests described in
+[Broker isolation](solaris/BROKER_ISOLATION.md). Building libssh does not satisfy
+that security gate.
+
+Solaris Paramiko preparation subsequently added the five official IPS packages
+`bcrypt-311`, `bcrypt-313`, `paramiko`, `paramiko-311` and `paramiko-313`, after
+explicit permission for required dependency additions/updates. The actual plan
+and transaction made no existing-package updates/removals. Read-only imports as
+ci-test verified Paramiko 4.0.0, cryptography 46.0.3 and bcrypt 5.0.0 on Python
+3.13. Logs: `build/solaris-paramiko-plan.log`,
+`build/solaris-paramiko-install.log`, `build/solaris-paramiko-verify.log`.
+Solaris native SSH uses a fresh venv with system-site-packages to reuse these
+Solaris builds; pip additions remain in that venv and the existing requirements
+bounds still apply. This dependency import is not encrypted BBS acceptance.
+
+At the final status snapshot, main `3b6003c25d212b42d0ff17d9c14f9953c3889f72`
+passed all 11 completed push/derived workflows, including
+[Multi-OS Native CI](https://github.com/matsuotakeshi/liner-notes/actions/runs/44694428167),
+[FreeBSD isolated upgrade](https://github.com/matsuotakeshi/liner-notes/actions/runs/44694669889)
+and [Release Set](https://github.com/matsuotakeshi/liner-notes/actions/runs/44694669891).
+The separately dispatched
+[Embedded SSH Native Acceptance](https://github.com/matsuotakeshi/liner-notes/actions/runs/44695623639)
+was still running, not passed. These results concern the merge of PR #153,
+not the subsequent lifecycle/Solaris candidate.
