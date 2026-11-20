@@ -10,6 +10,13 @@ freeing. Privileged Door execution remains fail-closed: `door_processes.supporte
 and the C isolation adapter do not enable Solaris. Native PTY support for ordinary
 Doors and working libssh dependencies do not establish this isolation boundary.
 
+The approved root matrix on main `a1dd7130045cd7ee032426476254517dee391f15`
+now demonstrates that a basic privilege limit **does not confine OS identities**:
+all four non-root role setuid cases and all five setgid cases changed effective
+and saved identities. Only the root-setuid case was suppressed. The complete
+[result and cleanup record](DOOR_IDENTITY_FIXTURE.md#completed-root-matrix-identity-confinement-failed)
+is retained. This rules out enabling the current contract/basic-limit approach.
+
 Read-only investigation used the actual VM headers `libcontract.h`,
 `sys/contract/process.h`, `priv.h`, `sys/priv.h` and Solaris's own process(5),
 setpflags(2), ct_ctl_abandon(3CONTRACT) manuals. Source snapshots are in local
@@ -34,26 +41,25 @@ Its explicit output says isolation is NOT verified. The backend is not enabled.
    ownership/inheritance semantics must be tested; simply setting the flag is
    not proof that all descendants remain contained. Include double fork, setsid,
    parent SIGKILL and unrelated-process survival.
-2. Limiting privileges to basic prevents acquisition of privileged operations,
-   but available documentation of root-setuid suppression does not prove refusal
-   of all non-root setuid/setgid credential changes. Test synthetic executables
-   owned by BBS, Broker, consumer and another slot, plus root. UID/GID and saved
-   IDs must remain confined. Do not equate basic privileges with no_new_privs.
+2. The native set-ID matrix has failed identity confinement. Limiting privileges
+   to basic leaves non-root setuid and setgid credential transitions available.
+   A different execution barrier must prevent those effective/saved ID changes;
+   basic privileges must not be used as an equivalent of no_new_privs.
 3. After the barriers are proven, implement the backend and C adapter, then test
    real distinct UIDs, supplementary groups, memory/FD access denial, PTY input,
    resize, ticket lifetime, consumer checks and durable BUSY cleanup on one SHA.
 
-The next privileged fixture must be reviewed on Hosted CI and merged before
-execution on the home VM, use a new fixed disposable directory and collision-
-checked test accounts, and obtain separate permission for its initial helper
-installation. Existing permission to install CMake or the SMF BBS test helper
-is not permission to install this root fixture. No current command relaxes the
-Solaris refusal or installs such a fixture.
+Privileged fixtures require Hosted review/main integration before execution,
+a fixed disposable directory and collision-checked identities. The initial
+credential fixture installation and limited update/run have explicit user
+approval and are complete. That approval does not extend to new mounts, zones,
+accounts, services or sudo policy. The runtime's Solaris refusal is unchanged.
 
 The candidate [credential boundary fixture](DOOR_IDENTITY_FIXTURE.md) now
 implements the executable setuid/setgid controls, real/effective/saved identity
 observations, cleanup and explicit source/approval gates. Its ordinary native CI
-path is non-root; the separately installed root matrix has not yet executed.
+path is non-root; its separately approved root run now supplies the failed
+identity-confinement result described above.
 
 If ordinary host process contracts/privilege sets cannot guarantee these
 properties, select a separately isolated zone with a controlled nosuid execution
@@ -68,8 +74,9 @@ Primary references:
 ## Evidence boundaries
 
 Windows executes portable backend tests; Solaris-only cases are skipped there.
-Same-SHA Solaris native results remain pending. The independent reviewer agreed
-that enabling the backend before these barriers is inappropriate. No real game,
+Main `a1dd7130` passed Solaris Native CI, but its separate root identity matrix
+failed confinement as recorded above. The independent review's requirement to
+prove these barriers before enabling launch is unchanged. No real game,
 production data or host services were changed.
 
 ## Nested-contract observation candidate
@@ -95,4 +102,5 @@ of non-root UID/GID confinement. Current headers provide no directly equivalent
 no_new_privs switch established by this investigation. A reviewed, privileged
 synthetic set-ID fixture or a separately isolated execution environment remains
 necessary before enabling the backend. Read-only source evidence is stored in
-`build/solaris-exec-privileges.txt`; no privileged fixture has been installed.
+`build/solaris-exec-privileges.txt`. The initial observation installed no privileged
+fixture; the later approved root matrix is recorded separately above.

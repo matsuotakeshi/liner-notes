@@ -1,0 +1,264 @@
+{
+  "source_sha": "a1dd7130045cd7ee032426476254517dee391f15",
+  "system": "SunOS-5.11-i86pc-i386-64bit",
+  "directory": "/var/tmp/liner-door-boundary-ydkleqz5",
+  "cases": {
+    "plain": {
+      "baseline": {
+        "ruid": 61001,
+        "euid": 61001,
+        "suid": 61001,
+        "rgid": 61001,
+        "egid": 61001,
+        "sgid": 61001,
+        "groups": 0,
+        "basic_limit": false
+      },
+      "basic": {
+        "ruid": 61001,
+        "euid": 61001,
+        "suid": 61001,
+        "rgid": 61001,
+        "egid": 61001,
+        "sgid": 61001,
+        "groups": 0,
+        "basic_limit": true
+      }
+    },
+    "uid-bbs": {
+      "baseline": {
+        "ruid": 61001,
+        "euid": 61002,
+        "suid": 61002,
+        "rgid": 61001,
+        "egid": 61001,
+        "sgid": 61001,
+        "groups": 0,
+        "basic_limit": false
+      },
+      "basic": {
+        "ruid": 61001,
+        "euid": 61002,
+        "suid": 61002,
+        "rgid": 61001,
+        "egid": 61001,
+        "sgid": 61001,
+        "groups": 0,
+        "basic_limit": true
+      }
+    },
+    "gid-bbs": {
+      "baseline": {
+        "ruid": 61001,
+        "euid": 61001,
+        "suid": 61001,
+        "rgid": 61001,
+        "egid": 61002,
+        "sgid": 61002,
+        "groups": 0,
+        "basic_limit": false
+      },
+      "basic": {
+        "ruid": 61001,
+        "euid": 61001,
+        "suid": 61001,
+        "rgid": 61001,
+        "egid": 61002,
+        "sgid": 61002,
+        "groups": 0,
+        "basic_limit": true
+      }
+    },
+    "uid-broker": {
+      "baseline": {
+        "ruid": 61001,
+        "euid": 61003,
+        "suid": 61003,
+        "rgid": 61001,
+        "egid": 61001,
+        "sgid": 61001,
+        "groups": 0,
+        "basic_limit": false
+      },
+      "basic": {
+        "ruid": 61001,
+        "euid": 61003,
+        "suid": 61003,
+        "rgid": 61001,
+        "egid": 61001,
+        "sgid": 61001,
+        "groups": 0,
+        "basic_limit": true
+      }
+    },
+    "gid-broker": {
+      "baseline": {
+        "ruid": 61001,
+        "euid": 61001,
+        "suid": 61001,
+        "rgid": 61001,
+        "egid": 61003,
+        "sgid": 61003,
+        "groups": 0,
+        "basic_limit": false
+      },
+      "basic": {
+        "ruid": 61001,
+        "euid": 61001,
+        "suid": 61001,
+        "rgid": 61001,
+        "egid": 61003,
+        "sgid": 61003,
+        "groups": 0,
+        "basic_limit": true
+      }
+    },
+    "uid-consumer": {
+      "baseline": {
+        "ruid": 61001,
+        "euid": 61004,
+        "suid": 61004,
+        "rgid": 61001,
+        "egid": 61001,
+        "sgid": 61001,
+        "groups": 0,
+        "basic_limit": false
+      },
+      "basic": {
+        "ruid": 61001,
+        "euid": 61004,
+        "suid": 61004,
+        "rgid": 61001,
+        "egid": 61001,
+        "sgid": 61001,
+        "groups": 0,
+        "basic_limit": true
+      }
+    },
+    "gid-consumer": {
+      "baseline": {
+        "ruid": 61001,
+        "euid": 61001,
+        "suid": 61001,
+        "rgid": 61001,
+        "egid": 61004,
+        "sgid": 61004,
+        "groups": 0,
+        "basic_limit": false
+      },
+      "basic": {
+        "ruid": 61001,
+        "euid": 61001,
+        "suid": 61001,
+        "rgid": 61001,
+        "egid": 61004,
+        "sgid": 61004,
+        "groups": 0,
+        "basic_limit": true
+      }
+    },
+    "uid-other_slot": {
+      "baseline": {
+        "ruid": 61001,
+        "euid": 61005,
+        "suid": 61005,
+        "rgid": 61001,
+        "egid": 61001,
+        "sgid": 61001,
+        "groups": 0,
+        "basic_limit": false
+      },
+      "basic": {
+        "ruid": 61001,
+        "euid": 61005,
+        "suid": 61005,
+        "rgid": 61001,
+        "egid": 61001,
+        "sgid": 61001,
+        "groups": 0,
+        "basic_limit": true
+      }
+    },
+    "gid-other_slot": {
+      "baseline": {
+        "ruid": 61001,
+        "euid": 61001,
+        "suid": 61001,
+        "rgid": 61001,
+        "egid": 61005,
+        "sgid": 61005,
+        "groups": 0,
+        "basic_limit": false
+      },
+      "basic": {
+        "ruid": 61001,
+        "euid": 61001,
+        "suid": 61001,
+        "rgid": 61001,
+        "egid": 61005,
+        "sgid": 61005,
+        "groups": 0,
+        "basic_limit": true
+      }
+    },
+    "uid-root": {
+      "baseline": {
+        "ruid": 61001,
+        "euid": 0,
+        "suid": 0,
+        "rgid": 61001,
+        "egid": 61001,
+        "sgid": 61001,
+        "groups": 0,
+        "basic_limit": false
+      },
+      "basic": {
+        "ruid": 61001,
+        "euid": 61001,
+        "suid": 61001,
+        "rgid": 61001,
+        "egid": 61001,
+        "sgid": 61001,
+        "groups": 0,
+        "basic_limit": true
+      }
+    },
+    "gid-root": {
+      "baseline": {
+        "ruid": 61001,
+        "euid": 61001,
+        "suid": 61001,
+        "rgid": 61001,
+        "egid": 0,
+        "sgid": 0,
+        "groups": 0,
+        "basic_limit": false
+      },
+      "basic": {
+        "ruid": 61001,
+        "euid": 61001,
+        "suid": 61001,
+        "rgid": 61001,
+        "egid": 0,
+        "sgid": 0,
+        "groups": 0,
+        "basic_limit": true
+      }
+    }
+  },
+  "broker_isolation_verified": false,
+  "setid_confined": false,
+  "identity_escapes": [
+    "uid-bbs",
+    "gid-bbs",
+    "uid-broker",
+    "gid-broker",
+    "uid-consumer",
+    "gid-consumer",
+    "uid-other_slot",
+    "gid-other_slot",
+    "gid-root"
+  ],
+  "door_backend_enabled": false,
+  "synthetic_files_removed": true
+}

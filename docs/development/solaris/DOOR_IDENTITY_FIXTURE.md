@@ -193,3 +193,66 @@ account, service, package, mount or sudo rule is part of that continuation.
 Correction local result: 18 tests passed / 1 Solaris-only skip. Native execution
 of the correction and the credential matrix remain pending. Authenticated Door
 launch is still disabled, with no change to its security or acceptance criteria.
+
+## Completed root matrix: identity confinement failed
+
+PR #157 merged as `a1dd7130045cd7ee032426476254517dee391f15`. All eleven main
+workflows succeeded, including [Solaris Native CI 44728758667](https://github.com/matsuotakeshi/liner-notes/actions/runs/44728758667),
+[Release Set 44730263346](https://github.com/matsuotakeshi/liner-notes/actions/runs/44730263346)
+and [FreeBSD isolated upgrade 44730263546](https://github.com/matsuotakeshi/liner-notes/actions/runs/44730263546).
+The updated non-root native test exercised the compiler preflight successfully.
+These CI results do not override the separate privileged finding below.
+
+Within the approved root scope, the old installed hashes were verified under
+the fixture lock and all three old files were backed up to
+`/opt/liner-notes-ci/door-boundary/backup-916ca4b`. Only the fixture source and
+manifest files were atomically replaced from the exact reviewed main bytes.
+The existing lock was retained. New Python SHA-256:
+`291b5395344fafcffa72f8271533ee9f001aa2df8c0157ace7b9e2bc7627ce0b`.
+The C reporter hash remains `546e8d33dd75f603e12b3d6450df00b9a115eea9e80449c15b9e67af9cefa653`.
+
+The fixed `--run` completed all eleven baseline/basic-limit pairs (22 executions)
+and returned **2**, its defined identity-escape result. All baseline controls
+worked; plain basic-limit execution retained slot 61001 with zero supplementary
+groups and the expected privilege limit.
+
+| Synthetic target | setuid with basic limit | setgid with basic limit |
+| --- | --- | --- |
+| BBS, 61002 | Effective and saved UID changed | Effective and saved GID changed |
+| Broker, 61003 | Effective and saved UID changed | Effective and saved GID changed |
+| Consumer, 61004 | Effective and saved UID changed | Effective and saved GID changed |
+| Other slot, 61005 | Effective and saved UID changed | Effective and saved GID changed |
+| root, 0 | UID transition suppressed; remained 61001 | Effective and saved GID became 0 |
+
+The basic privilege limit remained in place throughout. This is **not** evidence
+of gaining unrestricted root privileges; it demonstrates nine identity-boundary
+failures sufficient to reject this design for Broker UID authentication. The
+targets are synthetic numeric identities, not real BBS/Broker/game accounts.
+Solaris authenticated Door execution was never enabled or exposed.
+
+The normalized [JSON evidence](evidence/identity-a1dd713.txt) preserves all
+reported fields. Original server receipt:
+`/var/tmp/liner-door-boundary-ydkleqz5/result.json` (root-only).
+Local source/manifest, execution log and normalized receipt:
+`build/solaris-door-boundary/approved-a1dd713/`.
+The wrapper confirmed `synthetic_files_removed: true` and independently listed
+only `result.json` in the temporary directory. No set-ID executable remains there.
+The inactive root-owned fixture and its backup are retained for reproducibility.
+No accounts, services, packages, mounts, sudo configuration or production data
+were changed.
+
+### Next implementation decision
+
+Do not retry the identical matrix as if this were a transient CI failure, and do
+not weaken its expected identities. A controlled `nosuid` execution filesystem
+with no outside-directory/contract/proc descriptors or namespace access is one
+candidate; a dedicated zone is another. Neither is implemented or approved by
+this evidence. A complete candidate must constrain all executable files and
+credential transitions, nested contract creation and detached descendants, while
+preserving PTY/ticket behavior. A `chroot` alone or an outer NOORPHAN contract is
+not accepted as that boundary. Prepare the concrete implementation, escape tests
+and resource/cleanup plan before requesting any mount/zone provisioning approval.
+
+Only after a candidate passes these barriers should the production supervisor/C
+adapter be enabled and full Broker/PTY/revocation/legacy-Door acceptance run.
+The existing fail-closed Solaris behavior remains the correct runtime result.
