@@ -50,6 +50,11 @@ installation. Existing permission to install CMake or the SMF BBS test helper
 is not permission to install this root fixture. No current command relaxes the
 Solaris refusal or installs such a fixture.
 
+The candidate [credential boundary fixture](DOOR_IDENTITY_FIXTURE.md) now
+implements the executable setuid/setgid controls, real/effective/saved identity
+observations, cleanup and explicit source/approval gates. Its ordinary native CI
+path is non-root; the separately installed root matrix has not yet executed.
+
 If ordinary host process contracts/privilege sets cannot guarantee these
 properties, select a separately isolated zone with a controlled nosuid execution
 filesystem rather than weakening the requirements. Zone provisioning requires
