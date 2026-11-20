@@ -216,3 +216,32 @@ The separately dispatched
 [Embedded SSH Native Acceptance](https://github.com/matsuotakeshi/liner-notes/actions/runs/44695623639)
 was still running, not passed. These results concern the merge of PR #153,
 not the subsequent lifecycle/Solaris candidate.
+
+## PR #154 integration and FreeBSD test dependency correction
+
+PR #154 head `a89e798dc5c4a26ecee591f302075e51d7abfa39` passed its applicable
+Hosted checks and was merged as `75b85c307e540116e4e5666b9557732abc098458`.
+Its policy `native` job is intentionally main-only and skipped on PR; this is
+not evidence of a native run. Solaris encrypted SSH and Solaris Native CI were
+dispatched on that exact main, pending separate results.
+
+The earlier encrypted SSH run
+[44695623639](https://github.com/matsuotakeshi/liner-notes/actions/runs/44695623639)
+finished: Rocky and Ubuntu passed on `3b6003c25d212b42d0ff17d9c14f9953c3889f72`;
+FreeBSD built the SSH runtime but failed before connection tests while pip tried
+to build cryptography 50.0.2's maturin dependency without Rust. Artifact ID:
+`14610749106`. Failure excerpt: `build/ssh-native-44695623639/freebsd.log`.
+This is a test dependency failure, not evidence of an SSH runtime regression.
+
+The follow-up uses `--system-site-packages` for a fresh FreeBSD test venv, as for
+Solaris, to reuse explicitly provisioned OS Python packages. Pip still runs only
+inside the private venv, with the unchanged `paramiko>=3.5,<5` requirement. Linux
+keeps its fully private venv. The test covers all four OS branches. Ordinary CI
+never installs OS packages or silently skips encrypted acceptance.
+
+A read-only FreeBSD plan identified five new packages: py312-paramiko,
+py312-PyNaCl, py312-bcrypt, py312-pyasn1 and py312-wheel. The user authorized only
+those five additions. Preparation must acquire the existing native host lock,
+refuse upgrades/removals, and compare complete package inventories afterwards.
+A lock-busy first attempt performed no package changes. The preparation result
+is separate from the eventual same-SHA encrypted native acceptance.

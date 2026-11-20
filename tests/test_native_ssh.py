@@ -74,8 +74,8 @@ class NativeSsh(unittest.TestCase):
         self.assertIn('CFLAGS=-m64',command)
         self.assertIn('SSH_LIBS=-L/private/lib -lssh -Wl,-R,/private/lib',command)
 
-    def test_solaris_reuses_prepared_python_packages_without_system_pip(self):
-        for target in ('solaris','ubuntu'):
+    def test_native_os_packages_are_read_only_and_pip_stays_in_venv(self):
+        for target in ('freebsd','solaris','ubuntu','rocky'):
             with tempfile.TemporaryDirectory() as temporary, \
                  patch.object(native_ssh,'ROOT',Path(temporary)), \
                  patch.object(native_ssh.sys,'argv',['native_ssh','--target',target]), \
@@ -88,7 +88,7 @@ class NativeSsh(unittest.TestCase):
                 native_ssh.main()
                 commands=[call.args[0] for call in run.call_args_list]
                 venv=commands[1]
-                self.assertEqual('--system-site-packages' in venv,target=='solaris')
+                self.assertEqual('--system-site-packages' in venv,target in ('freebsd','solaris'))
                 pip=commands[2]
                 self.assertEqual(pip[0],str(Path(temporary)/'.native-ssh-venv/bin/python'))
                 self.assertEqual(pip[1:4],['-m','pip','install'])

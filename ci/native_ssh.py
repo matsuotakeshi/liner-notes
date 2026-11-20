@@ -69,8 +69,8 @@ def main():
     if venv.exists():
         raise ValueError('Refuse to reuse an old SSH test environment')
     creation = [sys.executable, '-m', 'venv']
-    if args.target == 'solaris':
-        # Reuse explicitly prepared IPS cryptography/Paramiko builds; a fresh
+    if args.target in ('freebsd', 'solaris'):
+        # Reuse explicitly prepared OS cryptography/Paramiko builds; a fresh
         # venv still contains any pip additions, never the system interpreter.
         creation.append('--system-site-packages')
     subprocess.run(creation + [str(venv)], check=True)

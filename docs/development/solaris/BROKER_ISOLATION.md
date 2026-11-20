@@ -66,3 +66,28 @@ Windows executes portable backend tests; Solaris-only cases are skipped there.
 Same-SHA Solaris native results remain pending. The independent reviewer agreed
 that enabling the backend before these barriers is inappropriate. No real game,
 production data or host services were changed.
+
+## Nested-contract observation candidate
+
+The follow-up probe also accepts `--nested`. After the same basic privilege
+reduction, the synthetic Door opens a second template with no NOORPHAN flag,
+forks a detached child into that new contract, and reports readiness. The
+original harness abandons only its own outer contract and records whether the
+nested child still holds the pipe after 250 ms. Both outcomes are **capability
+observations**, not an isolation acceptance or authorization to enable launch.
+An observed survivor confirms that outer-contract cleanup alone is insufficient.
+
+Cleanup is independent of the mechanism under investigation: only the original
+harness holds a watchdog pipe's write end; the nested child exits on EOF or a
+five-second deadline. The harness closes that pipe, verifies all output writers
+are gone, and reaps its direct child. It neither enumerates/signals unrelated
+PIDs nor changes user accounts or services. Native failures retain stdout/stderr
+in the unittest failure. The current backend still explicitly refuses Solaris.
+
+The VM's exec(2) manual describes set-user-ID/set-group-ID transitions separately
+from privilege-set transformations; basic limit sets are not accepted as proof
+of non-root UID/GID confinement. Current headers provide no directly equivalent
+no_new_privs switch established by this investigation. A reviewed, privileged
+synthetic set-ID fixture or a separately isolated execution environment remains
+necessary before enabling the backend. Read-only source evidence is stored in
+`build/solaris-exec-privileges.txt`; no privileged fixture has been installed.
