@@ -418,10 +418,12 @@ The next native fixture separates diagnostic delivery from Door admission:
 2. After stopping this unique probe unit, compare the write result and the marker
    in its journal. Missing/partial output or a write error cannot pass the final
    acceptance gate. Continue collecting the original Door failure when possible.
-3. The subsequent isolation fixture unit sends stderr to a precreated root-owned
-   0600 file labelled `liner_notes_isolation_state_t`. This changes only the test
-   instance's diagnostic destination; shipped service definitions retain journal.
-   All original authentication, refusal, PTY, persistence and crash checks remain.
+3. The subsequent isolation fixture saves stderr to a precreated root-owned
+   0600 file labelled `liner_notes_isolation_state_t`. The first diagnostic version
+   used systemd's `StandardError=append:`; the follow-up below instead opens it
+   after the isolation domain transition. Only the test instance's diagnostic
+   destination changes; shipped service definitions retain journal. All original
+   authentication, refusal, PTY, persistence and crash checks remain.
 4. Capture the file before the test directory is removed, cache it for later
    teardown, and export at most 16 KiB of input after filtering. Only known event
    names, fixed phase/reason labels and integer PID/count/status/errno fields are
@@ -436,3 +438,38 @@ helpers, installed services or production data change. Hosted tests cover real
 child stderr writes, injected write rejection, exclusive result creation, private
 log filtering/bounds and the journal failure gate. Native behavior still requires
 reviewed-main CI; do not run this PR on home VMs.
+
+## Confined log opening and journal attribution (2026-11-20, CI-only follow-up)
+
+Main `b8d980fba71c6aab3565f10b29ef341924b82b47`, native run
+[44651056683](https://github.com/matsuotakeshi/liner-notes/actions/runs/44651056683),
+Artifact 14592480090, reports a successful 25-byte stderr write but no marker in
+the unit-filtered journal. This proves write success, not journal loss: attribution
+or retrieval may differ. The next isolation launch stops at `222/STDERR` because
+systemd cannot open the diagnostic destination before executing the service.
+This is a new diagnostic-fixture failure, not evidence about the original ERR.
+
+The fixture now retains `StandardError=journal` in the generated unit and calls
+a CI-only Python entry through the same labelled shell/Python transition. Once
+in `liner_notes_isolation_t`, that entry opens the existing log with
+`O_WRONLY|O_APPEND|O_NOFOLLOW`, checks regular-file/root-owner/single-link/private
+mode invariants, redirects fd 2 and execs the unmodified `door_isolation.py` with
+the original `-E -s -B`, config/preflight arguments, environment and PID. It never
+creates or truncates a file. No fallback occurs on open/validation failure.
+The existing isolation-state file permission is used; no permission is added for
+systemd, journald, the BBS or games. This variant remains diagnostic-only.
+
+Journal verification now reads bounded JSON records for this boot and the probe's
+start time, using both the unique unit and its confirmed MainPID. It exports only
+whether the exact fixed marker was found by each query. PID-filtered results must
+also carry that exact PID. Three bounded observations (two 100ms waits) cover log
+ingestion; missing, partial, wrong-PID or failed-query output never passes.
+The write-count/errno and marker-delivery requirements remain mandatory.
+
+Portable tests cover append/no-follow flags, refused files, unchanged exec
+arguments, PID attribution, exact markers, failed queries and delayed delivery.
+The existing disposable Rocky container additionally runs the entry with actual
+file descriptors and exec, confirming PID/flags/arguments, preservation of prior
+log content, and rejection of public files and symlinks. These are not substitutes
+for main-only Enforcing verification. BBS behavior, policy, root helper and
+installed service templates are unchanged; no production operation is required.
