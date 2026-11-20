@@ -339,6 +339,7 @@ class Backend:
             lines.append(line)
         lines.append('ReadWritePaths='+str(self.base))
         lines.append('RuntimeMaxSec=300')
+        if role=='isolation':lines.append('Environment=LINER_DOOR_DIAGNOSTICS=1')
         process = Process(self, role, '\n'.join(lines)+'\n', 'liner_notes_'+role+'_t')
         wait_ready(process, json.loads(self.configs[role].read_text())['socket'], self.ids[role])
         return process

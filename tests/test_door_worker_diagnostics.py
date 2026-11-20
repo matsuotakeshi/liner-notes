@@ -86,4 +86,68 @@ class Diagnostics(unittest.TestCase):
         exit_worker.assert_called_once_with(0);supervise.assert_called_once();self.assertEqual(output,'')
 
 
+class ParentDiagnostics(unittest.TestCase):
+    def setUp(self):
+        env=patch.dict(os.environ,{'LINER_DOOR_DIAGNOSTICS':'1'})
+        env.start();self.addCleanup(env.stop)
+
+    def admission(self,peer,children,pid=200):
+        output=io.StringIO()
+        with patch.object(isolation,'peer_uid',return_value=peer), \
+             patch.object(isolation.os,'fork',return_value=pid,create=True) as fork,contextlib.redirect_stderr(output):
+            isolation.start_worker({'bbs_uid':10,'slots':[{}]},Mock(),Mock(),3,4,children)
+        return fork,[json.loads(line) for line in output.getvalue().splitlines()]
+
+    def test_acceptance_records_only_worker_and_active_count(self):
+        children={100};fork,records=self.admission(10,children)
+        fork.assert_called_once();self.assertEqual(children,{100,200})
+        self.assertEqual(records,[{'event':'worker-accepted','worker':200,'active':2}])
+
+    def test_peer_and_capacity_rejection_do_not_fork(self):
+        for peer,children,reason in [(20,{100},'peer'),(10,set(range(9)),'capacity')]:
+            with self.subTest(reason=reason):
+                before=children.copy();fork,records=self.admission(peer,children)
+                fork.assert_not_called();self.assertEqual(children,before)
+                self.assertEqual(records,[{'event':'admission-rejected','reason':reason,'active':len(before)}])
+
+    def test_fork_failure_omits_error_message(self):
+        output=io.StringIO();children={100}
+        with patch.object(isolation,'peer_uid',return_value=10), \
+             patch.object(isolation.os,'fork',side_effect=OSError(errno.EAGAIN,'private-ticket'),create=True),contextlib.redirect_stderr(output):
+            isolation.start_worker({'bbs_uid':10,'slots':[{}]},Mock(),Mock(),3,4,children)
+        records=[json.loads(line) for line in output.getvalue().splitlines()]
+        self.assertEqual(records[0],dict(event='admission-rejected',reason='fork',active=1,errno=errno.EAGAIN))
+        self.assertNotIn('private',output.getvalue());self.assertEqual(children,{100})
+
+    def test_reaping_correlates_worker_and_exit_or_signal_status(self):
+        for result in (0,1,-9):
+            with self.subTest(result=result):
+                output=io.StringIO();children={200};status=0 if result==0 else 256
+                with patch.object(isolation.os,'waitpid',return_value=(200,status),create=True) as wait, \
+                     patch.object(isolation.os,'WNOHANG',1,create=True), \
+                     patch.object(isolation.os,'waitstatus_to_exitcode',return_value=result,create=True),contextlib.redirect_stderr(output):
+                    isolation.reap_workers(children)
+                wait.assert_called_once_with(200,1);self.assertEqual(children,set())
+                records=[json.loads(line) for line in output.getvalue().splitlines()]
+                self.assertEqual(records[0],dict(event='worker-reaped',worker=200,status=result,active=0))
+                self.assertEqual(len(records),1 if result==0 else 2)
+
+    def test_live_worker_is_not_reported_reaped(self):
+        output=io.StringIO();children={200}
+        with patch.object(isolation.os,'waitpid',return_value=(0,0),create=True), \
+             patch.object(isolation.os,'WNOHANG',1,create=True),contextlib.redirect_stderr(output):
+            isolation.reap_workers(children)
+        self.assertEqual(children,{200});self.assertEqual(output.getvalue(),'')
+
+    def test_opt_out_and_log_failure_do_not_change_acceptance(self):
+        with patch.dict(os.environ,{'LINER_DOOR_DIAGNOSTICS':'0'}):
+            children=set();_,records=self.admission(10,children)
+            self.assertEqual(children,{200});self.assertEqual(records,[])
+        broken=Mock();broken.write.side_effect=OSError('journal blocked')
+        with patch('sys.stderr',broken),patch.object(isolation,'peer_uid',return_value=10), \
+             patch.object(isolation.os,'fork',return_value=200,create=True):
+            children=set();isolation.start_worker({'bbs_uid':10,'slots':[{}]},Mock(),Mock(),3,4,children)
+        self.assertEqual(children,{200})
+
+
 if __name__=='__main__':unittest.main()

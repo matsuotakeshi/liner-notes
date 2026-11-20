@@ -290,7 +290,8 @@ The root cause remains open; this change adds evidence, not a claimed fix.
 
 The opt-in `LINER_DOOR_DIAGNOSTICS=1` environment setting emits
 `DOOR_LAUNCH_FAILURE phase=<fixed-label> errno=<number>` to runtime stderr.
-Only the isolated acceptance BBS unit enables it automatically. Unset, `0`, and
+The isolated acceptance BBS unit enables the client diagnostic automatically;
+the isolation unit also enables the parent events described below. Unset, `0`, and
 other values remain silent. No path, account, member/session ID, request, ticket,
 key or game data is logged. The helper preserves errno and existing user-facing
 responses. Review the phase rather than treating errno 0 (validation failure or
@@ -355,3 +356,44 @@ revocation precedes cleanup, reservation release remains after successful scope
 cleanup, and authentication/ACL/timeouts are unchanged. Updated its source-lock
 and the Makefile lock (one focused test added). Public stable documentation
 remains unchanged; the new diagnostic is a candidate behavior described here.
+
+## Reply classification and parent lifecycle (2026-11-20, candidate only)
+
+At main `f3c0ae3678063ef5130c743b3018a777090826da`, native run
+[44638612062](https://github.com/matsuotakeshi/liner-notes/actions/runs/44638612062),
+Artifact 14586775902, the launch still fails with `isolation-rejected errno=0`.
+No worker exception event establishes the cause. This addition gathers evidence;
+it does not claim that the Door launch failure has been resolved.
+
+With `LINER_DOOR_DIAGNOSTICS=1`, the C client records `DOOR_ISOLATION_REPLY`:
+
+- `OK`: exactly `OK\n` received; descriptor/PTY validation must still pass.
+- `ERR_PREFIX` / `DONE_PREFIX`: the three bytes `ERR` / `DON` respectively.
+  These are prefixes, not proof of a complete `ERR\n` / `DONE\n` frame.
+- `SHORT`: fewer than three bytes; `EOF`: zero bytes; `IO_ERROR`: receive failed.
+- `OTHER`: an unrecognized three-byte reply; its contents are never printed.
+
+The log includes received byte count, descriptor count, truncation flag and
+numeric receive errno. It never includes reply bytes, request data or secrets.
+The client still reads only three bytes, with the same timeout and validation;
+reading five to recognize DONE would incorrectly wait after the valid OK reply.
+
+The isolation parent uses the same opt-in for `worker-accepted`,
+`admission-rejected` and `worker-reaped`. Rejection reasons are fixed labels:
+`peer`, `capacity`, `credentials` or `fork`. Accepted/reaped records include the
+worker PID and active count; reaped status uses exit code or negative signal.
+Correlate PIDs within this service instance. No member/session IDs are logged.
+These records supplement existing exception/nonzero-exit events; the native
+fixture enables them only on its isolation unit, not the broker or consumer.
+Failed optional log writes do not change admission or child tracking.
+
+Focused tests cover reply classification, exact opt-in, errno preservation,
+no payload disclosure, admission decisions, fork failure, live workers and
+normal/error/signal reaping. Existing Hosted CI runs these tests; the actual
+Enforcing Door lifecycle remains a trusted-main native check after merge.
+
+Reviewed the changed isolation client and service against canonical recovery
+guidance: credentials, capacity, peer/FD checks, protocol, timeouts, revocation
+and cleanup order are unchanged. Their source-lock hashes reflect this review.
+Stable public documentation remains unchanged until these candidate features
+are released. No privileged helper or production configuration changes are needed.

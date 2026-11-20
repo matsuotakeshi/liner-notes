@@ -86,6 +86,7 @@ class Units(unittest.TestCase):
                     self.assertIn(line,text)
                 self.assertIn('--check-config',text)
                 self.assertNotIn('ExecStop=',text);self.assertNotIn('ExecStartPost=',text)
+                self.assertEqual('Environment=LINER_DOOR_DIAGNOSTICS=1' in text,role=='isolation')
                 if role=='isolation':
                     for line in ('KillMode=process','SendSIGKILL=no','TimeoutStopSec=infinity'):
                         self.assertIn(line,text)
