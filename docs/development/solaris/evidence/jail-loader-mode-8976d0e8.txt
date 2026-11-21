@@ -1,0 +1,65 @@
+Source SHA: 8976d0e8a74d13804dbac704c794a4eae35f34ae
+Solaris Native CI: https://github.com/matsuotakeshi/liner-notes/actions/runs/44846631533 (success)
+Root trial: observer exit 78, no observation after exec, fixture exit 1.
+Receipt: /var/tmp/liner-door-jail-3a5t44ie/result.json
+Cleanup: no mounts remain; retained plan.json and result.json.
+
+Relevant observer stderr:
+JAIL_PARENT stage=ready poll=1 poll_errno=0 revents=16 received=0 read_errno=0 marker=0
+JAIL_PARENT stage=cleanup-kill result=0 errno=0
+JAIL_PROGRESS stage=close-descriptors
+JAIL_PROGRESS stage=limits
+JAIL_PROGRESS stage=root
+JAIL_PROGRESS stage=groups
+JAIL_PROGRESS stage=gid
+JAIL_PROGRESS stage=uid
+JAIL_PROGRESS stage=privileges
+JAIL_PROGRESS stage=priv-allocate
+JAIL_PROGRESS stage=priv-basicset
+JAIL_PROGRESS stage=priv-flags
+JAIL_PROGRESS stage=priv-inheritable
+JAIL_PROGRESS stage=priv-effective
+JAIL_PROGRESS stage=priv-permitted
+JAIL_PROGRESS stage=priv-limit
+JAIL_PROGRESS stage=priv-query
+JAIL_PROGRESS stage=priv-done
+JAIL_PROGRESS stage=exec
+JAIL_PARENT stage=wait reaped=1 exited=0 exit=-1 signal=9 marker=0
+
+File hashes from the trial:
+execution.log SHA-256: 80884104b78fe64c5479bbde8c3c75e2e8cdc471ea831dfb449ff6c8e6185f6e
+result.json SHA-256: f04ccf739d9ee163912a6c676a54e67c5030ca8a6eb0c63b323a9ba260160bab
+plan.json SHA-256: 33a0cda2356995a810d8de8d4096dcbde382b2e158d1ac3b81de3ee8606737c1
+manifest.json SHA-256: fb728d16da6b7a530653bf1cb52e09177da5d93a773d03059e11c84c0e998078
+gate.json SHA-256: aa0c34f7a432179d033c0a13e132dee48842ff5ca53712bcc7baf021d295f310
+
+The operator process set os.umask(0o077) before launching the installed
+helper. The helper used mkdir(mode=0o755) for the root-owned library
+parents and did not chmod those parents. The recorded interpreter path
+was /usr/lib/amd64/ld.so.1 and ldd resolved libc to /lib/64/libc.so.1.
+
+Separate non-root control on the Solaris CI host: under the shared CI lock,
+create the five path components in a private temporary directory with
+Path.mkdir(mode=0o755) under os.umask(0o077), inspect their stat modes,
+then chmod(0o755) and inspect again. Remove the temporary directory.
+No mount, root execution, or PR code was involved in this control.
+{
+  "system": "SunOS",
+  "uid": 1000,
+  "umask": "0o077",
+  "mkdir_0755": {
+    "usr": "0o700",
+    "usr/lib": "0o700",
+    "usr/lib/amd64": "0o700",
+    "lib": "0o700",
+    "lib/64": "0o700"
+  },
+  "after_chmod_0755": {
+    "usr": "0o755",
+    "usr/lib": "0o755",
+    "usr/lib/amd64": "0o755",
+    "lib": "0o755",
+    "lib/64": "0o755"
+  },
+  "temporary_directory_removed": true
+}
