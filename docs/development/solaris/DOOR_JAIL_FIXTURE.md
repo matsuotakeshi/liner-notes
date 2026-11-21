@@ -202,7 +202,54 @@ commands, source hashes, results and relevant failure lines. Full downloaded
 Artifact and operator scripts are retained locally under
 `build/solaris-door-jail/failure-2a552513/`. The installed root fixture is still
 the previous `4015507b` bundle; no update or repeat mount test has occurred.
-The corrected native and root tests remain pending CI/review/main integration.
+At that point the corrected native and root tests were pending CI/review/main
+integration. The subsequent result is recorded below.
+
+## Corrected loader/native test and unresolved jailed startup
+
+PR #161 merged as `3d644d301448cdbb9c6faae45bf77d871757ef7d`.
+[Solaris Native CI 44766390991](https://github.com/matsuotakeshi/liner-notes/actions/runs/44766390991)
+passed on that exact SHA. This validates the non-root reporter and the genuine
+chroot-denial check, not the root fixture or an authenticated Door backend.
+
+The approved root helper update backed up the original bundle under
+`/opt/liner-notes-ci/door-jail/backup-4015507`, verified the replacement hashes,
+and repeated the bounded 64MiB nosuid experiment. The correct ELF interpreter
+was copied and the first `gid-bbs` control succeeded. The jailed observer still
+exited 78 with `signal=9 marker=0`; no payload observation was received.
+The observer itself sends SIGKILL when protocol processing fails, so signal 9
+alone is **not** evidence of an OOM kill, an external kill, or an isolation
+escape. The exact blocking/failure stage remains unknown.
+
+[Persistent receipt and evidence](evidence/jail-3d644d30.txt) includes hashes,
+the same-SHA CI link, invocation and result. Full local output is retained under
+`build/solaris-door-jail/approved-3d644d301448/`. The remote receipt is
+`/var/tmp/liner-door-jail-2uouf9ep/result.json`. Cleanup completed; post-run
+enumeration found only `plan.json` and `result.json` and no remaining mount.
+
+The next diagnostic revision emits fixed stage markers before descriptor
+closure, limits, chroot, identity/privilege changes, exec and payload checks.
+It uses the existing nonblocking stderr pipe, single best-effort writes and
+preserves errno; it neither adds inherited FDs nor opens files in the payload.
+The parent records poll status/revents, marker read status and its own kill
+attempt separately. Markers indicate **entry**, not successful completion of
+the named operation; missing markers can also mean a dropped diagnostic write.
+Stdout remains the binary observation/acknowledgement protocol. The five-second
+child alarm, six-second initial poll, success criteria and cleanup stay intact.
+
+Portable tests verify that real subprocess diagnostics survive JSON receipt
+serialization without changing success/failure. Non-root Solaris tests verify
+ordered payload markers, rejection of a wrong acknowledgement, unchanged binary
+output and successful completion with a full nonblocking diagnostic pipe.
+Those Solaris-specific tests require same-SHA native CI after merge; local
+portable tests cannot validate the Solaris C code or root experiment.
+
+Resume after Hosted CI/review, merge and successful non-root Solaris CI on the
+new main SHA. Before the next authorized root run, back up and hash-check the
+currently installed **3d644d30** bundle (do not reuse the old 4015507 expected
+hashes/backup destination). Preserve both previous failure receipts. Keep the
+same fixed mount/identity scope and record cleanup independently of trial
+success. Solaris authenticated Door execution remains disabled.
 
 ## Primary OS references
 
