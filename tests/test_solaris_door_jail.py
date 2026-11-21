@@ -165,6 +165,27 @@ class JailFixture(unittest.TestCase):
             self.assertEqual(len(report['commands'][0]['stderr']),65536)
             self.assertTrue(report['commands'][0]['timeout']); kill.assert_called_once_with(234,9)
 
+    def test_real_child_diagnostics_preserved_without_becoming_success(self):
+        # Exercise the actual process/receipt path on Hosted CI as well as local
+        # runs. These are synthetic messages, not a Solaris confinement claim.
+        diagnostics = ('JAIL_PROGRESS stage=exec\n'
+                       'JAIL_PARENT stage=ready poll=0 poll_errno=0 revents=0 received=0 read_errno=0 marker=0\n'
+                       'JAIL_PARENT stage=cleanup-kill result=0 errno=0\n')
+        for code in (0,78):
+            report = {}
+            script = ('import sys; sys.stdout.write(\'{"synthetic":true}\\n\'); '
+                      'sys.stderr.write('+repr(diagnostics)+'); sys.exit('+str(code)+')')
+            if code:
+                with self.assertRaises(subprocess.CalledProcessError):
+                    fixture.command([sys.executable,'-c',script],report)
+            else:
+                result = fixture.command([sys.executable,'-c',script],report)
+                self.assertEqual(json.loads(result.stdout),{'synthetic':True})
+            saved = json.loads(json.dumps(report))['commands'][0]
+            self.assertEqual(saved['exit_code'],code)
+            self.assertEqual(saved['stderr'],diagnostics)
+            self.assertEqual(json.loads(saved['stdout']),{'synthetic':True})
+
     def failed_run(self, mounted=False, unmount_failure=False):
         with tempfile.TemporaryDirectory() as temporary:
             work = Path(temporary)/'private'; work.mkdir()
@@ -244,7 +265,39 @@ class JailFixture(unittest.TestCase):
                 value = struct.unpack('=iiii',child.stdout.read(16))
                 self.assertEqual(value[1:],(0,1,1))
                 output, errors = child.communicate(b'A',timeout=5)
-                self.assertEqual((child.returncode,output,errors),(0,b'',b''))
+                self.assertEqual((child.returncode,output),(0,b''))
+                expected = ['payload-entry','priv-allocate','priv-basicset',
+                            'priv-query','priv-done','payload-namespace',
+                            'payload-descriptors','payload-chroot-target',
+                            'payload-chroot','payload-ready','payload-ack-wait',
+                            'payload-ack-done']
+                self.assertEqual(errors.decode().splitlines(),
+                                 ['JAIL_PROGRESS stage='+stage for stage in expected])
+
+            # Diagnostics cannot turn a bad acknowledgement into success or
+            # contaminate the binary observation protocol on stdout.
+            result = subprocess.run([str(binary),'--inside'],input=b'X',
+                                    capture_output=True,timeout=5)
+            self.assertEqual(result.returncode,72)
+            self.assertEqual(result.stdout[:1],b'R')
+            self.assertEqual(len(result.stdout),17)
+            self.assertIn(b'JAIL_PROGRESS stage=payload-ack-done\n',result.stderr)
+
+            # A saturated diagnostic pipe must not stall the payload. The root
+            # observer also uses O_NONBLOCK on this pipe; no root/mount needed.
+            read_fd, write_fd = os.pipe()
+            try:
+                os.set_blocking(write_fd,False)
+                while True:
+                    try: os.write(write_fd,b'x'*4096)
+                    except BlockingIOError: break
+                result = subprocess.run([str(binary),'--inside'],input=b'A',
+                                        stdout=subprocess.PIPE,stderr=write_fd,timeout=5)
+                self.assertEqual(result.returncode,0)
+                self.assertEqual(result.stdout[:1],b'R')
+                self.assertEqual(struct.unpack('=iiii',result.stdout[1:])[1:],(0,1,1))
+            finally:
+                os.close(write_fd); os.close(read_fd)
 
 
 if __name__ == '__main__': unittest.main()

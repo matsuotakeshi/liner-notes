@@ -1,0 +1,167 @@
+Source SHA: 3d644d301448cdbb9c6faae45bf77d871757ef7d
+Solaris Native CI: https://github.com/matsuotakeshi/liner-notes/actions/runs/44766390991 (success)
+Root fixture: failed; this is NOT a confinement success.
+Invocation: /usr/bin/python3.13 -I /opt/liner-notes-ci/door-jail/solaris_door_jail.py --run-approved
+Receipt: /var/tmp/liner-door-jail-2uouf9ep/result.json
+Previous bundle backup: /opt/liner-notes-ci/door-jail/backup-4015507
+execution.log SHA-256: 0b39b5f194366788abb71b8ffbb7def016b9afb85323abf5280f921b1a1ad4b8
+result.json SHA-256: 3c272b3a8354732b387d7fb4f59d0eb6be161da9eaa8a2ddcaf08b10478a5870
+plan.json SHA-256: e00319b3a240a49abe7d3f1a5d4f16aad2ec51a412efc527343e1c93a126b924
+manifest.json SHA-256: 32b34b928297ba0ec681aaf295eaf4c180aead8e84dd830fb0fe5b69b0b32c17
+
+Captured result (JSON values preserved):
+{
+  "source_sha": "3d644d301448cdbb9c6faae45bf77d871757ef7d",
+  "bundle_sha256": {
+    "solaris_door_jail.py": "4d19ba633507b47e562b08c813516a59c5978c5bdc9a86458b768379b0d338e1",
+    "solaris_door_boundary.py": "291b5395344fafcffa72f8271533ee9f001aa2df8c0157ace7b9e2bc7627ce0b",
+    "solaris_door_jail_probe.c": "6e8c52ace46712b7f31d98d036e761a54fbe29d74f9969620e5f2841ffc02c13",
+    "solaris_door_identity_probe.c": "546e8d33dd75f603e12b3d6450df00b9a115eea9e80449c15b9e67af9cefa653"
+  },
+  "system": "SunOS-5.11-i86pc-i386-64bit",
+  "directory": "/var/tmp/liner-door-jail-2uouf9ep",
+  "cases": {
+    "gid-bbs": {
+      "baseline": {
+        "ruid": 61001,
+        "euid": 61001,
+        "suid": 61001,
+        "rgid": 61001,
+        "egid": 61002,
+        "sgid": 61002,
+        "groups": 0,
+        "basic_limit": false
+      }
+    }
+  },
+  "broker_isolation_verified": false,
+  "door_backend_enabled": false,
+  "lifecycle_verified": false,
+  "cleanup_complete": true,
+  "commands": [
+    {
+      "argv": [
+        "/usr/gcc/15/bin/gcc",
+        "-m64",
+        "-std=c11",
+        "-Wall",
+        "-Wextra",
+        "-Werror",
+        "/opt/liner-notes-ci/door-jail/solaris_door_jail_probe.c",
+        "-o",
+        "/var/tmp/liner-door-jail-2uouf9ep/observer"
+      ],
+      "exit_code": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "/usr/gcc/15/bin/gcc",
+        "-m64",
+        "-std=c11",
+        "-Wall",
+        "-Wextra",
+        "-Werror",
+        "/opt/liner-notes-ci/door-jail/solaris_door_identity_probe.c",
+        "-o",
+        "/var/tmp/liner-door-jail-2uouf9ep/baseline"
+      ],
+      "exit_code": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "/var/tmp/liner-door-jail-2uouf9ep/baseline",
+        "--inventory"
+      ],
+      "exit_code": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "/usr/bin/ldd",
+        "/var/tmp/liner-door-jail-2uouf9ep/observer"
+      ],
+      "exit_code": 0,
+      "stdout": "\tlibc.so.1 =>\t /lib/64/libc.so.1\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "/usr/sbin/mount",
+        "-F",
+        "tmpfs",
+        "-o",
+        "nosuid,size=64m",
+        "swap",
+        "/var/tmp/liner-door-jail-2uouf9ep/root"
+      ],
+      "exit_code": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "/var/tmp/liner-door-jail-2uouf9ep/baseline",
+        "--baseline",
+        "/var/tmp/liner-door-jail-2uouf9ep/control-gid-bbs"
+      ],
+      "exit_code": 0,
+      "stdout": "{\"ruid\":61001,\"euid\":61001,\"suid\":61001,\"rgid\":61001,\"egid\":61002,\"sgid\":61002,\"groups\":0,\"basic_limit\":false}\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "/var/tmp/liner-door-jail-2uouf9ep/observer",
+        "--observe",
+        "/var/tmp/liner-door-jail-2uouf9ep/root",
+        "gid-bbs"
+      ],
+      "exit_code": 78,
+      "stdout": "",
+      "stderr": "JAIL_PARENT stage=wait reaped=1 exited=0 exit=-1 signal=9 marker=0\n"
+    },
+    {
+      "argv": [
+        "/usr/sbin/umount",
+        "/var/tmp/liner-door-jail-2uouf9ep/root"
+      ],
+      "exit_code": 0,
+      "stdout": "",
+      "stderr": ""
+    }
+  ],
+  "elf_interpreter": "/usr/lib/amd64/ld.so.1",
+  "observer_sha256": "64cd89b7c824146285b8f929f68f1ae1bf05e77a1eec82dc0df18c4d388f27bc",
+  "mount_options": [
+    "dev=ffc80004",
+    "nosuid",
+    "size=64m",
+    "xattr"
+  ],
+  "libraries": [
+    {
+      "path": "/lib/64/libc.so.1",
+      "sha256": "23427b483027385ca0fe9ac468bef12bc3c43a24243b70554823ff3082b6891e"
+    },
+    {
+      "path": "/usr/lib/amd64/ld.so.1",
+      "sha256": "ab82cc7e74ffe52182f7e8b5d8c95965a08c7d957c74722dc3258b9924e27b50"
+    }
+  ],
+  "error": "CalledProcessError",
+  "exit_code": 78
+}
+
+Independent post-run enumeration:
+REMAINING_FILES ["plan.json", "result.json"]
+REMAINING_MOUNTS []
+
+Interpretation: first gid-bbs baseline succeeded; observer exited 78 without a ready marker.
+The observer calls kill(child,SIGKILL) on a protocol failure. Signal 9 alone does not establish an OOM or external kill.
+Poll result and last successful startup stage were not logged; cause remains unresolved.
+Resume only after diagnostic PR review/Hosted CI, merge, and same-main-SHA Solaris non-root CI.
+Back up and hash-check the installed 3d644d30 bundle before any approved repeat. Preserve this receipt.

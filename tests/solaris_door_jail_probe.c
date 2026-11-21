@@ -26,20 +26,38 @@
 enum { SLOT = 61001 };
 struct observation { int basic, namespace_closed, descriptors_closed, chroot_denied; };
 
+/* Fixed, short records on the existing nonblocking diagnostic pipe. Never
+ * retry a full pipe or let diagnostics replace the errno under investigation. */
+static void progress(const char *message, size_t length) {
+    int saved = errno;
+    (void)write(2,message,length);
+    errno = saved;
+}
+#define PROGRESS(stage) progress("JAIL_PROGRESS stage=" stage "\n", sizeof("JAIL_PROGRESS stage=" stage "\n")-1)
+
 static int basic_limit(int apply) {
+    PROGRESS("priv-allocate");
     priv_set_t *basic = priv_allocset(), *actual = priv_allocset();
     if (!basic || !actual) return 0;
+    PROGRESS("priv-basicset");
     priv_basicset(basic);
     int ok = 1;
     if (apply) {
+        PROGRESS("priv-flags");
         ok = setpflags(PRIV_PFEXEC, 0) == 0 && setpflags(PRIV_PFEXEC_AUTH, 0) == 0;
+        PROGRESS("priv-inheritable");
         ok = ok && setppriv(PRIV_SET, PRIV_INHERITABLE, basic) == 0;
+        PROGRESS("priv-effective");
         ok = ok && setppriv(PRIV_SET, PRIV_EFFECTIVE, basic) == 0;
+        PROGRESS("priv-permitted");
         ok = ok && setppriv(PRIV_SET, PRIV_PERMITTED, basic) == 0;
+        PROGRESS("priv-limit");
         ok = ok && setppriv(PRIV_SET, PRIV_LIMIT, basic) == 0;
     }
+    PROGRESS("priv-query");
     ok = ok && getppriv(PRIV_LIMIT, actual) == 0 && priv_isequalset(actual, basic);
     priv_freeset(actual); priv_freeset(basic);
+    PROGRESS("priv-done");
     return ok;
 }
 
@@ -73,7 +91,9 @@ static int payload(void) {
     /* It is also safe if a baseline accidentally gives this reporter set-ID:
      * do not open any writable file, signal anything or invoke privileged mode. */
     alarm(5);
+    PROGRESS("payload-entry");
     struct observation value = {basic_limit(0), 1, 1, 0};
+    PROGRESS("payload-namespace");
     const char *paths[] = {"/proc/self/cred", "/system/contract/process/template",
         "/dev/fd/3", "/etc/passwd", "/../../etc/passwd", NULL};
     for (int i = 0; paths[i]; ++i) {
@@ -81,6 +101,7 @@ static int payload(void) {
         if (fd >= 0) { value.namespace_closed = 0; close(fd); }
         else if (errno != ENOENT) value.namespace_closed = 0;
     }
+    PROGRESS("payload-descriptors");
     for (int fd = 3; fd < 256; ++fd) {
         if (fcntl(fd, F_GETFD) >= 0 || errno != EBADF) value.descriptors_closed = 0;
     }
@@ -89,19 +110,25 @@ static int payload(void) {
      * both the host and our minimal loader root. If unexpectedly allowed this
      * only moves inward; the reporter then uses existing pipes and exits. */
     struct stat current, target;
+    PROGRESS("payload-chroot-target");
     if (stat("/",&current) || stat("/lib",&target)) child_error("chroot-target",70);
     if (!S_ISDIR(target.st_mode) ||
         (current.st_dev == target.st_dev && current.st_ino == target.st_ino)) {
         errno = EINVAL; child_error("chroot-target",70);
     }
+    PROGRESS("payload-chroot");
     int changed = chroot("/lib"), change_errno = errno;
     if (changed == -1 && change_errno != EPERM) {
         errno = change_errno; child_error("chroot-denial",70);
     }
     value.chroot_denied = changed == -1 && change_errno == EPERM;
+    PROGRESS("payload-ready");
     char ready = 'R', ack = 0;
     if (!transfer(1, &ready, 1, 1) || !transfer(1, &value, sizeof(value), 1)) return 71;
-    return transfer(0, &ack, 1, 0) && ack == 'A' ? 0 : 72;
+    PROGRESS("payload-ack-wait");
+    int accepted = transfer(0, &ack, 1, 0) && ack == 'A';
+    PROGRESS("payload-ack-done");
+    return accepted ? 0 : 72;
 }
 
 static int root_path(const char *path) {
@@ -138,14 +165,24 @@ static int observe(const char *root, const char *name) {
         alarm(5);
         struct rlimit limit = {256,256}, core = {0,0};
         if (dup2(ack[0], 0) < 0 || dup2(output[1], 1) < 0 || dup2(errors[1], 2) < 0) child_error("stdio",75);
+        PROGRESS("close-descriptors");
         closefrom(3);
+        PROGRESS("limits");
         if (setrlimit(RLIMIT_NOFILE,&limit) || setrlimit(RLIMIT_CORE,&core)) child_error("limits",76);
+        PROGRESS("root");
         if (chdir(root) || chroot(".") || chdir("/")) child_error("root",76);
-        if (setgroups(0,NULL) || setgid(SLOT) || setuid(SLOT)) child_error("identity",76);
+        PROGRESS("groups");
+        if (setgroups(0,NULL)) child_error("groups",76);
+        PROGRESS("gid");
+        if (setgid(SLOT)) child_error("gid",76);
+        PROGRESS("uid");
+        if (setuid(SLOT)) child_error("uid",76);
+        PROGRESS("privileges");
         if (!basic_limit(1)) child_error("privileges",76);
         char path[80]; (void)snprintf(path,sizeof(path),"/%s",name);
         char *args[] = {path,"--inside",NULL};
         char *env[] = {"PATH=/", "LC_ALL=C", NULL};
+        PROGRESS("exec");
         execve(path,args,env);
         /* A denied set-ID exec can be secure, but missing libraries cannot. */
         if (errno == EACCES || errno == EPERM) {
@@ -156,7 +193,14 @@ static int observe(const char *root, const char *name) {
     close(output[1]); close(ack[0]); close(errors[1]);
     struct pollfd waiting = {output[0],POLLIN,0};
     char marker = 0; struct observation value = {0,0,0,0};
-    int ok = poll(&waiting,1,6000) > 0 && transfer(output[0],&marker,1,0);
+    int polled = poll(&waiting,1,6000), poll_errno = polled < 0 ? errno : 0;
+    errno = 0;
+    int received = polled > 0 && transfer(output[0],&marker,1,0);
+    int read_errno = received || polled <= 0 ? 0 : errno;
+    int ok = received;
+    if (!received || (marker != 'R' && marker != 'D'))
+        (void)fprintf(stderr,"JAIL_PARENT stage=ready poll=%d poll_errno=%d revents=%d received=%d read_errno=%d marker=%u\n",
+                      polled,poll_errno,(int)waiting.revents,received,read_errno,(unsigned char)marker);
     int denied = ok && marker == 'D';
     prcred_t credentials; memset(&credentials,0,sizeof(credentials));
     if (!denied) {
@@ -173,7 +217,11 @@ static int observe(const char *root, const char *name) {
         char proceed = 'A'; if (ok) ok = transfer(ack[1],&proceed,1,1);
     }
     close(ack[1]); close(output[0]);
-    if (!ok) (void)kill(child,SIGKILL); /* still our unreaped direct child */
+    if (!ok) {
+        /* Still our unreaped direct child, never a reused/unrelated PID. */
+        int killed = kill(child,SIGKILL), kill_errno = killed < 0 ? errno : 0;
+        (void)fprintf(stderr,"JAIL_PARENT stage=cleanup-kill result=%d errno=%d\n",killed,kill_errno);
+    }
     int status = 0;
     pid_t waited;
     do { waited = waitpid(child,&status,0); } while (waited < 0 && errno == EINTR);
