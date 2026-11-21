@@ -182,6 +182,14 @@ static int observe(const char *root, const char *name) {
         char path[80]; (void)snprintf(path,sizeof(path),"/%s",name);
         char *args[] = {path,"--inside",NULL};
         char *env[] = {"PATH=/", "LC_ALL=C", NULL};
+        for (int fd = 0; fd < 3; ++fd) {
+            int flags = fcntl(fd,F_GETFD);
+            if (flags < 0) child_error("exec-stdio",77);
+            if (flags & FD_CLOEXEC) {
+                errno = EINVAL;
+                child_error("exec-stdio",77);
+            }
+        }
         PROGRESS("exec");
         execve(path,args,env);
         /* A denied set-ID exec can be secure, but missing libraries cannot. */
@@ -216,15 +224,22 @@ static int observe(const char *root, const char *name) {
         ok = ok && n >= (ssize_t)(offsetof(prcred_t,pr_ngroups)+sizeof(credentials.pr_ngroups));
         char proceed = 'A'; if (ok) ok = transfer(ack[1],&proceed,1,1);
     }
-    close(ack[1]); close(output[0]);
+    int status = 0;
+    pid_t waited = 0;
     if (!ok) {
+        /* Preserve an exit already observable on EOF before cleanup signals. */
+        do { waited = waitpid(child,&status,WNOHANG); } while (waited < 0 && errno == EINTR);
+        (void)fprintf(stderr,"JAIL_PARENT stage=pre-cleanup child_exited=%d wait_errno=%d\n",
+                      waited==child,waited < 0 ? errno : 0);
+    }
+    close(ack[1]); close(output[0]);
+    if (!ok && waited == 0) {
         /* Still our unreaped direct child, never a reused/unrelated PID. */
         int killed = kill(child,SIGKILL), kill_errno = killed < 0 ? errno : 0;
         (void)fprintf(stderr,"JAIL_PARENT stage=cleanup-kill result=%d errno=%d\n",killed,kill_errno);
     }
-    int status = 0;
-    pid_t waited;
-    do { waited = waitpid(child,&status,0); } while (waited < 0 && errno == EINTR);
+    if (waited == 0)
+        do { waited = waitpid(child,&status,0); } while (waited < 0 && errno == EINTR);
     collect_errors(errors[0]);
     if (waited != child || !WIFEXITED(status) || WEXITSTATUS(status)) {
         (void)fprintf(stderr,"JAIL_PARENT stage=wait reaped=%d exited=%d exit=%d signal=%d marker=%u\n",

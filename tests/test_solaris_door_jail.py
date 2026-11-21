@@ -3,6 +3,7 @@ import hashlib
 import json
 import os
 from pathlib import Path, PurePosixPath
+import stat
 import struct
 import subprocess
 import sys
@@ -101,6 +102,32 @@ class JailFixture(unittest.TestCase):
                      'libc => /lib/64/../../etc/passwd','libc => /lib/64/libc.so trailing'):
             with self.assertRaises(ValueError): fixture.library_paths(text,interpreter)
         with self.assertRaises(ValueError): fixture.library_paths('libc => /lib/64/libc.so.1','/tmp/loader')
+
+    @unittest.skipUnless(os.name == 'posix','POSIX directory permission semantics')
+    def test_library_directories_are_searchable_under_private_umask(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)/'root'
+            root.mkdir(mode=0o700)
+            directories = []
+            libraries = fixture.library_paths('libc.so.1 => /lib/64/libc.so.1\n',
+                                              PurePosixPath('/usr/lib/amd64/ld.so.1'))
+            prior_mask = os.umask(0o077)
+            try:
+                for library in libraries:
+                    destination = fixture.library_destination(root,library,directories)
+                    self.assertEqual(destination.relative_to(root).as_posix(),str(library)[1:])
+                    destination.write_bytes(b'synthetic')
+                fixture.library_destination(root,libraries[0],directories)
+                private = Path(temporary)/'private'
+                private.mkdir(mode=0o755)
+            finally:
+                os.umask(prior_mask)
+            self.assertEqual(stat.S_IMODE(private.stat().st_mode),0o700)
+            self.assertEqual(stat.S_IMODE(root.stat().st_mode),0o700)
+            self.assertEqual([p.relative_to(root).as_posix() for p in directories],
+                             ['lib','lib/64','usr','usr/lib','usr/lib/amd64'])
+            for directory in directories:
+                self.assertEqual(stat.S_IMODE(directory.stat().st_mode),0o755,directory)
 
     def test_exact_elf_interpreter_aliases_are_preserved(self):
         for prefix in ('/usr/lib/amd64','/usr/lib/64','/lib/amd64','/lib/64'):

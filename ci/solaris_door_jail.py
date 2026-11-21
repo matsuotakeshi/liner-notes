@@ -187,6 +187,23 @@ def read_mount(root):
     return mount_entry(Path('/etc/mnttab').read_text(), root)
 
 
+def library_destination(root, library, directories):
+    # library_paths has already checked the absolute path. Reuse only the
+    # directories created by this run in the private tmpfs.
+    destination = root.joinpath(*library.parts[1:])
+    for directory in reversed(destination.parents):
+        if root not in directory.parents or directory in directories:
+            continue
+        directory.mkdir(mode=0o700)
+        directories.append(directory)
+        # The installer intentionally uses umask 077. Set this explicitly so
+        # the slot can traverse the loader tree but cannot change its contents.
+        directory.chmod(0o755)
+        if stat.S_IMODE(directory.stat().st_mode) != 0o755:
+            raise ValueError('Unexpected loader directory mode')
+    return destination
+
+
 def command(args, report, timeout=15):
     args = [str(a) for a in args]
     entry = {'argv': args}
@@ -255,14 +272,13 @@ def run_locked(base, manifest):
             origin = Path(str(library)).resolve(strict=True); base.trusted(origin, private=False)
             size = origin.stat().st_size; total += size
             if size <= 0 or total > 32*1024*1024: raise ValueError('Library copy budget exceeded')
-            destination = root/str(library).lstrip('/')
-            for directory in reversed(destination.parent.parents):
-                if directory != root and root in directory.parents and not directory.exists():
-                    directory.mkdir(mode=0o755); directories.append(directory)
-            if not destination.parent.exists():
-                destination.parent.mkdir(mode=0o755); directories.append(destination.parent)
+            destination = library_destination(root, library, directories)
             inside.append(destination); shutil.copyfile(origin,destination); os.chmod(destination,0o555)
             report['libraries'].append({'path':str(library),'sha256':hashlib.sha256(destination.read_bytes()).hexdigest()})
+        report['library_directories'] = {
+            '/'+directory.relative_to(root).as_posix(): oct(stat.S_IMODE(directory.stat().st_mode))
+            for directory in directories
+        }
         # Baseline controls need traversal after dropping identity; root retains
         # all write permissions. The unregistered numeric IDs are never reused.
         os.chmod(work,0o711)

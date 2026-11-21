@@ -251,9 +251,40 @@ hashes/backup destination). Preserve both previous failure receipts. Keep the
 same fixed mount/identity scope and record cleanup independently of trial
 success. Solaris authenticated Door execution remains disabled.
 
+## Loader directory permissions
+
+On main `8976d0e8a74d13804dbac704c794a4eae35f34ae`, [Solaris Native CI
+44846631533](https://github.com/matsuotakeshi/liner-notes/actions/runs/44846631533)
+passed. The subsequent root experiment reached the child's `exec` marker but
+received EOF before any payload marker. The observer then sent SIGKILL during
+cleanup. The root receipt is `/var/tmp/liner-door-jail-3a5t44ie/result.json`.
+Unmount and cleanup completed, leaving only the plan and result files.
+
+The installer runs the fixture with `umask 077`. The fixture explicitly set
+modes on the mounted root and copied files but relied on `mkdir(mode=0o755)`
+for the directories between them. A non-root check on the Solaris CI host
+reproduced mode `0700` for every directory in the loader and libc paths. Root
+could copy files into those directories, but the slot identity could not
+traverse them. This establishes a fixture layout defect. The precise kernel
+or loader exit at the original EOF still requires an end-to-end retest.
+
+The fixture now sets and checks mode `0755` on the fresh library directories
+inside the disposable root and saves their modes in the receipt. The installer
+keeps its private mask. The observer also verifies that descriptors 0–2 are
+open and will survive exec. If a child exit is already observable on failure,
+the parent records its status before deciding whether to signal the child.
+Timeouts, mount options, payload checks and identity acceptance are unchanged.
+
+[Failure and mode reproduction evidence](evidence/jail-loader-mode-8976d0e8.txt)
+records the source, CI, receipt hashes and restricted directory check.
+Resume after Hosted CI, review, merge and successful Solaris CI on the new
+main SHA. Preserve and hash-check the installed `8976d0e8` bundle before the
+next scoped root trial. Verify cleanup independently of the result.
+
 ## Primary OS references
 
 - [mount_tmpfs(8)](https://docs.oracle.com/cd/E88353_01/html/E72487/mount-tmpfs-8.html): size and nosuid options; invalid options can be ignored, hence live verification.
 - [exec(2)](https://docs.oracle.com/cd/E88353_01/html/E37841/exec-2.html): set-ID handling and preservation of the process root across exec.
 - [chroot(2)](https://docs.oracle.com/cd/E88353_01/html/E37841/chroot-2.html): outside directory descriptors matter; chroot alone is not claimed as confinement.
 - [Solaris runtime linker](https://docs.oracle.com/en/operating-systems/solaris/oracle-solaris/11.4/linkers-libraries/runtime-linker.html): the kernel uses the interpreter pathname recorded in the executable's program header.
+- [Solaris umask](https://docs.oracle.com/en/operating-systems/solaris/oracle-solaris/11.4/secure-files/default-umask-value.html): mask `077` removes group and other search permissions from new directories.
