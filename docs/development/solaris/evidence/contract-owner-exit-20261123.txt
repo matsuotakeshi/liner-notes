@@ -1,0 +1,47 @@
+Date (JST): 2026-11-23
+Host: Oracle Solaris 11.4 CBE AMD64, non-root CI account (uid 1000).
+Main at time of check: df9e1c345c1ec445d205a654d201886283a42cfc.
+This direct OS check used Solaris system binaries and synthetic test processes.
+The privileged nosuid fixture already verified on that SHA was not used.
+
+Method:
+1. Take the existing Solaris CI-account lock and start a sacrificial Python
+   responder in the harness's existing contract.
+2. Start the bounded test worker under /usr/bin/ctrun -l contract -o noorphan.
+   In the first set its descendant calls setsid. In the second set a child
+   calls setsid, forks again, exits, and is reaped before readiness.
+3. Confirm process relationships, contract membership and distinct session
+   IDs via /usr/bin/ps -p <known PIDs> -o pid= -o ppid= -o sid= -o ctid= -o s=.
+4. Signal SIGKILL only to the harness's own ctrun process. Verify exit -9,
+   EOF on the pipe held by the worker and descendant, and absence of live
+   workload processes in a targeted ps snapshot. Probe the outside responder
+   with ping and require pong and normal exit.
+5. The synthetic workers have an independent 15-second deadline. Cleanup
+   uses owned subprocess handles only. No root, mounts or service changes.
+
+The first diagnostic aborted while parsing a post-exit ps row with a dash
+in a numeric column. The corrected reader accepts missing numeric fields
+only for zombie rows. The first attempt is excluded from the pass count.
+
+detached session
+  Run 1: EOF after 1.2 ms, no live workload rows, responder pong, exit 0.
+  Run 2: EOF after 1.3 ms, no live workload rows, responder pong, exit 0.
+  Run 3: EOF after 1.7 ms, no live workload rows, responder pong, exit 0.
+contract-owner-exit-retry.log SHA-256: c824260e6b073ca8c56535f7929be3d131b217e178e09cd5820c68e2c4e79e23
+observe-contract-owner-exit.py SHA-256: 70fcf051816ff4ca24c0ad32af43b3fdc0d45f246c3a635cf0a55c84a718436f
+
+double fork
+  Run 1: EOF after 1.4 ms, no live workload rows, responder pong, exit 0.
+  Run 2: EOF after 1.3 ms, no live workload rows, responder pong, exit 0.
+  Run 3: EOF after 1.8 ms, no live workload rows, responder pong, exit 0.
+contract-double-fork.log SHA-256: 13efe82ed35c8b3d3e3b0d907863080340b92121a7210c80eb2d0d83f23717af
+observe-contract-double-fork.py SHA-256: 6acf9e7d17e3fb91dc373e8aed453df79b5ef11bd00f41ae590c26ba81e9b51c
+
+Initial parser failure transcript: build/solaris-door-jail/contract-owner-exit.log
+Full transcripts and operator scripts: build/solaris-door-jail/
+
+Scope: OS contract-holder failure and termination of members of the same
+contract, including a separate session and a reparented grandchild. A separate
+control process remained live until asked to exit. This does not establish
+nested-contract containment, integration with the nosuid root, PTY handling,
+Broker revocation, or Solaris backend readiness.
