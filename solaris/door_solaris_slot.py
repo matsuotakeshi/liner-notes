@@ -9,6 +9,7 @@ import re
 import stat
 import subprocess
 import sys
+import time
 
 from door_broker import secure_path
 from posix_locks import file_lock
@@ -61,13 +62,17 @@ class Reservation:
             self._lease.close()
             self._lease = None
 
-    def stop_and_release(self, stop_owned_scope):
+    def stop_and_release(self, stop_owned_scope, *, settle=0):
         """Release only after the owned contract is stopped and the UID is gone."""
         if self._lease is None:
             raise ValueError('Reservation already closed')
         stop_owned_scope()
-        if _active(self.uid):
-            raise SlotBusy('A process still holds the Solaris slot UID')
+        deadline = time.monotonic() + settle
+        while _active(self.uid):
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
+                raise SlotBusy('A process still holds the Solaris slot UID')
+            time.sleep(min(remaining, 0.05))
         os.ftruncate(self._lease.fd,0)
         os.fsync(self._lease.fd)
         self.close()

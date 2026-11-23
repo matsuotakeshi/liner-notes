@@ -1,0 +1,43 @@
+Solaris Door child entry and owned-contract acceptance
+
+Source: main 772d8d77bbf04b4a625fed4e8024b8ffebedc90f (PR #178).
+Host: Oracle Solaris 11.4 CBE AMD64.
+Git archive SHA-256:
+6da6825affef02667ad43ced75a60e8147557c491bdac6241e78c1b12e40c886
+
+The operator verified the archive digest and held the installed fixture lock.
+The first attempt stopped during library placement due to an operator-script
+collection type. The second reached child startup but received no status
+record. A native capability check confirmed that both pipe and pipe2
+report O_RDWR on each descriptor. The child requires a read-only ticket
+descriptor and a write-only status descriptor. Both first mounts were
+unmounted. See Oracle's pipe(2) / pipe2(2) documentation:
+https://docs.oracle.com/cd/E88353_01/html/E37841/pipe2-2.html
+
+The passing attempt used the same exact product source. The operator opened
+separate FIFOs in a private root directory with read-only and write-only
+descriptors and unlinked both names before starting the child. A dedicated
+64MiB nosuid tmpfs held the fixed synthetic program and its trusted runtime
+libraries. The test used UID/GID 61001 without creating an account.
+
+The child signaled PREPARED on the status channel. After exec, the synthetic
+program independently checked the actual real/effective IDs, empty groups,
+reduced privilege sets, controlling terminal, closed extra descriptors, no
+contract or process filesystem path in its root, clean environment and test
+ticket bytes before responding READY. It echoed the new 100x30 terminal size.
+Normal quit ended its contract. A second launch spawned a child in another
+session. After verifying common ownership, the operator killed only the test
+contract holder. Both processes ended and the slot was released and reused.
+The exact tmpfs was unmounted, and the test slot files were removed.
+
+Receipt: /var/db/liner-door-child-xd25_ji0/receipt.json
+{"cleanup":true,"normal_exit":true,"owned_contract_ended":true,"payload_verified":true,"slot_reused":true}
+
+Local operator file SHA-256:
+2f7539bbc0b0f3f978c7ef0137a67483e69c150a7ba3a5b36e83b66309b35eb3
+Local transcript SHA-256:
+f09f3e19dd6e67649da6ea47694ef5422674334b7f50037df41df6748cf1d46a
+
+The test ticket was a fixed synthetic value. Broker service integration,
+real game readiness and the recovery of slots with uncertain ownership
+remain open.

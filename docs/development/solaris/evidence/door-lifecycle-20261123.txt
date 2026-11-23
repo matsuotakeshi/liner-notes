@@ -1,0 +1,28 @@
+Solaris Door owned lifecycle candidate
+
+Base main: 772d8d77bbf04b4a625fed4e8024b8ffebedc90f.
+Host: Oracle Solaris 11.4 CBE AMD64, Python 3.13.
+Account: ci-test. No privileges or services were changed.
+Work directory: /export/home/ci-test/ci/door-lifecycle-XXsW16ob
+Archive SHA-256:
+d01c068ba5ac525eaf20dc115253e93f5be8fd45a5b496a3d01b90593570c822
+
+The archive digest was checked on the VM before extraction. Commands:
+  /usr/bin/python3.13 tests/test_door_solaris_lifecycle.py -v
+  /usr/bin/python3.13 tests/test_door_solaris_slot.py -v
+
+Results: lifecycle 8/8 and slot 3/3. Actual Solaris FIFO endpoints were
+read-only/write-only, close-on-exec and unlinked while open. The remaining
+tests verify startup refusal, the inherited descriptor list, revocation
+before owned stop, retention on a close failure and delayed UID cleanup
+with controlled inputs.
+
+Source SHA-256:
+  solaris/door_solaris_lifecycle.py
+    904ae2b36aa7d6290876375037155ba8b3a8c8f54a97444628f25e405b51d0ea
+  solaris/door_solaris_slot.py
+    affdbc7b7879897e8a85fa1a6168dd9b2fa4951fbfc95f9d1cea15a847894493
+
+The earlier privileged trial on 772d8d7 used an operator script to run
+the child entry and contract. This test did not launch the new supervisor
+against a real Broker or service.
