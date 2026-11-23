@@ -119,8 +119,12 @@ The supervisor must separately confirm the exec result and game readiness
 before handing the PTY to the BBS. The helper is a candidate for integration
 and is neither installed nor enabled. Its root gate and argument rejection
 were verified on a [non-privileged Solaris checkout](evidence/door-child-20261123.txt).
-A reviewed-main privileged trial is still needed to verify execution and
-descriptor closure. The descriptor-based directory change follows
+The [reviewed-main live trial](evidence/door-child-live-772d8d7.txt)
+verified child execution, dropped privileges, descriptor closure, PTY
+resize and slot release after the owned contract ended. Use directional
+FIFO descriptors from a private directory. Solaris anonymous pipes expose
+both ends as `O_RDWR`, which the child entry correctly rejects. The trial
+unlinked each FIFO before spawning the helper. The descriptor-based directory change follows
 [Oracle's C security guidance](https://docs.oracle.com/cd/E37838_01/html/E61050/gnclc.html).
 
 ## Security blockers before backend activation
