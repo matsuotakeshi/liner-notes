@@ -42,7 +42,7 @@ Its explicit output says isolation is NOT verified. The backend is not enabled.
 
 ## Reserved Solaris Door slots
 
-The Solaris slot candidate persists a BUSY marker while it holds the existing
+The candidate in `solaris/door_solaris_slot.py` persists a BUSY marker while it holds the existing
 record-lock lease. It looks for the slot UID in the real, effective and saved
 UID columns of a complete process snapshot. An owner can release its slot
 after stopping the owned contract and confirming no live matching process.

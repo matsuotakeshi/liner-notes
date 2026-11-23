@@ -4,7 +4,8 @@ import sys
 import unittest
 from unittest.mock import Mock, patch
 
-sys.path.insert(0,str(Path(__file__).resolve().parents[1]/'scripts'))
+ROOT = Path(__file__).resolve().parents[1]
+sys.path[:0] = [str(ROOT/'solaris'),str(ROOT/'scripts')]
 import door_solaris_slot as slots
 
 

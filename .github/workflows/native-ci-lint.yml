@@ -14,7 +14,6 @@ on:
       - "ci/solaris_door_jail.py"
       - "tests/test_solaris_door_jail.py"
       - "tests/solaris_door_jail_probe.c"
-      - "scripts/door_solaris_slot.py"
       - "tests/test_door_solaris_slot.py"
       - "ci/solaris_door_boundary.py"
       - "tests/test_solaris_door_boundary.py"
