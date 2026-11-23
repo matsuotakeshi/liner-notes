@@ -47,8 +47,48 @@ class JailFixture(unittest.TestCase):
         value = json.loads(result.stdout)
         self.assertTrue(value['default_read_only'])
         self.assertTrue(value['requires_separate_mount_approval'])
+        self.assertTrue(value['holder_death_requires_explicit_opt_in'])
         self.assertFalse(value['door_backend_enabled'])
         self.assertEqual(value['mount']['options'],'nosuid,size=64m')
+
+    def test_lifecycle_rejects_missing_processes_wrong_contract_and_survivors(self):
+        holder, leader, detached, control = 100, 101, 102, 103
+        ready = b'READY 101 102\n'
+        self.assertEqual(fixture.ready_pids(ready,holder,control),(leader,detached))
+        for bad in (b'READY 100 102\n',b'READY 101 101\n',b'READY 101 102',b'READY -1 102\n'):
+            with self.subTest(bad=bad), self.assertRaises(ValueError):
+                fixture.ready_pids(bad,holder,control)
+
+        before = {
+            holder: dict(status='S',parent=50,session=100,contract=7),
+            leader: dict(status='S',parent=100,session=100,contract=8),
+            detached: dict(status='S',parent=101,session=102,contract=8),
+            control: dict(status='S',parent=50,session=50,contract=7),
+        }
+        self.assertEqual(fixture.verify_membership(before,holder,leader,detached,control),8)
+        wrong_contract = {**before, detached: dict(before[detached],contract=7)}
+        missing_child = {pid:row for pid,row in before.items() if pid != detached}
+        wrong_session = {**before, holder: dict(before[holder],session=50)}
+        for bad in (wrong_contract, missing_child, wrong_session):
+            with self.assertRaises(ValueError):
+                fixture.verify_membership(bad,holder,leader,detached,control)
+        fixture.verify_cleanup({control:before[control]},leader,detached,control,8)
+        fixture.verify_cleanup({control:before[control],detached:{'status':'Z'}},leader,detached,control,8)
+        for bad in ({}, {control:before[control],detached:before[detached]},
+                    {control:dict(before[control],contract=8)}):
+            with self.assertRaises(ValueError):
+                fixture.verify_cleanup(bad,leader,detached,control,8)
+
+    def test_process_snapshot_accepts_missing_ids_only_for_zombies(self):
+        with patch.object(fixture.subprocess,'run') as run:
+            run.return_value = subprocess.CompletedProcess([],0,'102 1 - - Z\n103 50 50 7 S\n','')
+            self.assertEqual(fixture.contract_rows('/usr/bin/ps',(102,103)),{
+                102: {'parent':1,'session':None,'contract':None,'status':'Z'},
+                103: {'parent':50,'session':50,'contract':7,'status':'S'}
+            })
+            run.return_value = subprocess.CompletedProcess([],0,'112 1 102 7 S\n','')
+            with self.assertRaises(ValueError):
+                fixture.contract_rows('/usr/bin/ps',(102,103))
 
     def test_prepare_hashes_all_sources_and_refuses_overwrite(self):
         with tempfile.TemporaryDirectory() as temporary:
@@ -274,6 +314,10 @@ class JailFixture(unittest.TestCase):
                             str(ROOT/'tests/solaris_door_jail_probe.c'),'-o',str(binary)],check=True,timeout=45)
             result = subprocess.run([str(binary),'--observe','/','plain'],timeout=5)
             self.assertEqual(result.returncode,80)
+            result = subprocess.run([str(binary),'--launch-lifecycle','/'],timeout=5)
+            self.assertEqual(result.returncode,80)
+            result = subprocess.run([str(binary),'--inside-lifecycle'],capture_output=True,timeout=5)
+            self.assertEqual((result.returncode,result.stdout),(82,b''))
             interpreter = fixture.elf_interpreter(binary.read_bytes())
             libraries = subprocess.run(['/usr/bin/ldd',str(binary)],capture_output=True,
                                        text=True,check=True,timeout=10).stdout

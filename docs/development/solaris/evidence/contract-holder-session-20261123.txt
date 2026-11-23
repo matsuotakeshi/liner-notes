@@ -1,0 +1,62 @@
+Date (JST): 2026-11-23
+Solaris 11.4 CBE AMD64, existing non-root CI account and shared CI lock.
+Main at time of observation: df9e1c345c1ec445d205a654d201886283a42cfc.
+System control: /usr/bin/ctrun -l contract -o noorphan under start_new_session=True.
+The test signalled only its own holder. The worker and its detached child
+exited, the pipe reached EOF after 1.8 ms, and the outside control
+answered pong and exited 0. Process snapshots were limited to the test PIDs.
+Scope: ordinary system processes outside the fixture root.
+
+{
+  "case": 1,
+  "system": "SunOS",
+  "uid": 1000,
+  "before": {
+    "2859": {
+      "ppid": 2858,
+      "sid": 2858,
+      "contract": 2170,
+      "status": "S"
+    },
+    "2860": {
+      "ppid": 2858,
+      "sid": 2860,
+      "contract": 2170,
+      "status": "S"
+    },
+    "2861": {
+      "ppid": 2860,
+      "sid": 2860,
+      "contract": 2171,
+      "status": "S"
+    },
+    "2862": {
+      "ppid": 2861,
+      "sid": 2862,
+      "contract": 2171,
+      "status": "S"
+    }
+  },
+  "after": {
+    "2859": {
+      "ppid": 2858,
+      "sid": 2858,
+      "contract": 2170,
+      "status": "S"
+    }
+  },
+  "subject": {
+    "holder": 2860,
+    "leader": 2861,
+    "detached": 2862,
+    "neighbor": 2859
+  },
+  "holder_exit": -9,
+  "pipe_eof_ms": 1.8,
+  "neighbor_reply": "pong",
+  "neighbor_exit": 0
+}
+
+Local full records: build/solaris-door-jail/
+contract-holder-session.log SHA-256: 29c5b578da5cfd1c7a9c9cf3a27f81950036e6da81b6f30f9adf732384a5af5e
+observe-contract-holder-session.py SHA-256: a4452b816cb87be9312781d77564b3e209db59ab055e40457f68d372a871840c

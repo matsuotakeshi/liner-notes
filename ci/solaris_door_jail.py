@@ -13,6 +13,7 @@ import os
 from pathlib import Path, PurePosixPath
 import platform
 import re
+import select
 import shutil
 import stat
 import struct
@@ -20,6 +21,7 @@ import signal
 import subprocess
 import sys
 import tempfile
+import time
 
 INSTALL = Path('/opt/liner-notes-ci/door-jail')
 SOURCES = {'solaris_door_jail.py': 'ci/solaris_door_jail.py',
@@ -40,7 +42,8 @@ def plan():
             'mount': {'type': 'tmpfs', 'source': 'swap', 'options': 'nosuid,size=64m'},
             'identities': [SLOT, *[v for v in ROLES.values() if v]],
             'changes_services_accounts_vfstab': False, 'door_backend_enabled': False,
-            'scope': 'credentials and filesystem namespace only; lifecycle/PTY/Broker still pending'}
+            'scope': 'credentials and filesystem namespace; optional synthetic holder-death check',
+            'holder_death_requires_explicit_opt_in': True}
 
 
 def sha_valid(value):
@@ -227,11 +230,122 @@ def command(args, report, timeout=15):
     return subprocess.CompletedProcess(args, process.returncode, output, error)
 
 
-def run_locked(base, manifest):
+def contract_rows(ps, pids):
+    fields = ['pid','ppid','sid','ctid','s']
+    argv = [str(ps),'-p',','.join(map(str,pids))]
+    for field in fields:
+        argv.extend(('-o',field+'='))
+    result = subprocess.run(argv,capture_output=True,text=True,timeout=2,
+                            env={'PATH':'/usr/bin:/usr/sbin','LC_ALL':'C'})
+    if result.returncode not in (0,1) or result.stderr:
+        raise ValueError('Solaris process snapshot failed')
+    rows = {}
+    for line in result.stdout.splitlines():
+        pid, parent, session, contract, status = line.split()
+        if int(pid) not in pids or int(pid) in rows:
+            raise ValueError('Unexpected PID in targeted process snapshot')
+        rows[int(pid)] = {
+            'parent': None if status == 'Z' and parent == '-' else int(parent),
+            'session': None if status == 'Z' and session == '-' else int(session),
+            'contract': None if status == 'Z' and contract == '-' else int(contract),
+            'status': status,
+        }
+    return rows
+
+
+def ready_pids(data, holder, control):
+    match = re.fullmatch(rb'READY ([1-9][0-9]{0,9}) ([1-9][0-9]{0,9})\n',data)
+    if not match:
+        raise ValueError('Missing jailed lifecycle readiness')
+    leader, detached = map(int,match.groups())
+    if len({leader,detached,holder,control}) != 4:
+        raise ValueError('Lifecycle readiness named a duplicate process')
+    return leader, detached
+
+
+def pipe_read(stream, timeout):
+    if not select.select([stream],[],[],timeout)[0]:
+        raise TimeoutError('Lifecycle pipe deadline')
+    return os.read(stream.fileno(),128)
+
+
+def verify_membership(rows, holder, leader, detached, control):
+    if set(rows) != {holder,leader,detached,control} or any(
+            row['status'] == 'Z' for row in rows.values()):
+        raise ValueError('Lifecycle process not live before holder death')
+    contract = rows[leader]['contract']
+    if (not contract or rows[detached]['contract'] != contract or
+            contract in (rows[holder]['contract'],rows[control]['contract']) or
+            rows[holder]['session'] != holder or
+            rows[leader]['parent'] != holder or rows[detached]['parent'] != leader or
+            rows[detached]['session'] != detached or rows[leader]['session'] == detached):
+        raise ValueError('Unexpected contract, parent, or detached session')
+    return contract
+
+
+def verify_cleanup(rows, leader, detached, control, contract):
+    if any(pid in rows and rows[pid]['status'] != 'Z' for pid in (leader,detached)):
+        raise ValueError('A jailed contract member stayed live')
+    if control not in rows or rows[control]['status'] == 'Z' or rows[control]['contract'] == contract:
+        raise ValueError('Outside control did not stay live')
+
+
+def observe_holder_death(utilities, binary, root, report):
+    # Fixed utility and launcher. No caller-controlled command, PID or file.
+    argv = [str(utilities['ctrun']),'-l','contract','-o','noorphan',
+            str(binary),'--launch-lifecycle',str(root)]
+    probe = report['holder_death'] = {'argv': argv, 'confirmed': False}
+    env = {'PATH':'/usr/bin:/usr/sbin','LC_ALL':'C'}
+    with subprocess.Popen([str(utilities['sleep']),'12'], stdin=subprocess.DEVNULL,
+                          stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL,env=env) as control:
+        try:
+            started = time.monotonic()
+            with subprocess.Popen(argv, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE,
+                                  stderr=subprocess.PIPE, env=env, close_fds=True,
+                                  start_new_session=True) as holder:
+                try:
+                    ready = pipe_read(holder.stdout,2)
+                    probe['ready'] = ready.decode('ascii',errors='replace')
+                    leader, detached = ready_pids(ready,holder.pid,control.pid)
+                    rows = probe['before'] = contract_rows(utilities['ps'],(holder.pid,leader,detached,control.pid))
+                    contract = verify_membership(rows,holder.pid,leader,detached,control.pid)
+                    if holder.poll() is not None or time.monotonic()-started >= 3:
+                        raise ValueError('Holder exited or approached independent watchdog deadline')
+                    holder.kill()
+                    probe['exit_code'] = holder.wait(timeout=1)
+                    probe['eof'] = pipe_read(holder.stdout,1) == b''
+                    probe['elapsed_ms'] = round(1000*(time.monotonic()-started),1)
+                    if probe['exit_code'] != -signal.SIGKILL or not probe['eof'] or probe['elapsed_ms'] >= 4500:
+                        raise ValueError('Missing contract-driven EOF before watchdog')
+                    after = probe['after'] = contract_rows(utilities['ps'],(leader,detached,control.pid))
+                    verify_cleanup(after,leader,detached,control.pid,contract)
+                    if control.poll() is not None:
+                        raise ValueError('Outside control exited early')
+                    probe['confirmed'] = True
+                finally:
+                    if holder.poll() is None:
+                        holder.kill()
+                    output, errors = holder.communicate(timeout=6)
+                    probe.update(exit_code=holder.returncode,
+                                 extra_stdout=output[-65536:].decode('ascii',errors='replace'),
+                                 stderr=errors[-65536:].decode('ascii',errors='replace'))
+        finally:
+            if control.poll() is None:
+                control.terminate()
+                try: control.wait(timeout=2)
+                except subprocess.TimeoutExpired:
+                    control.kill()
+                    control.wait(timeout=2)
+
+
+def run_locked(base, manifest, holder_death=False):
     compiler = base.compiler_path()
     # Fixed trusted OS utilities only; never PATH or a caller-selected command.
     utilities = {}
-    for name, location in {'mount':'/usr/sbin/mount', 'umount':'/usr/sbin/umount', 'ldd':'/usr/bin/ldd'}.items():
+    locations = {'mount':'/usr/sbin/mount', 'umount':'/usr/sbin/umount', 'ldd':'/usr/bin/ldd'}
+    if holder_death:
+        locations.update(ctrun='/usr/bin/ctrun', ps='/usr/bin/ps', sleep='/usr/bin/sleep')
+    for name, location in locations.items():
         resolved = Path(location).resolve(strict=True); base.trusted(resolved, private=False)
         utilities[name] = resolved
     work = Path(tempfile.mkdtemp(prefix='liner-door-jail-', dir='/var/tmp'))
@@ -241,7 +355,8 @@ def run_locked(base, manifest):
     report = {'source_sha': manifest['source_sha'], 'bundle_sha256': manifest['sha256'],
               'system': platform.platform(), 'directory': str(work), 'cases': {},
               'broker_isolation_verified': False, 'door_backend_enabled': False,
-              'lifecycle_verified': False, 'cleanup_complete': False}
+              'lifecycle_verified': False, 'cleanup_complete': False,
+              'holder_death_requested': holder_death}
     # Durable breadcrumb before compiling/mounting, even if the supervisor is
     # killed and cannot reach finally. It contains only synthetic test metadata.
     with (work/'plan.json').open('x',encoding='utf-8') as stream:
@@ -297,6 +412,8 @@ def run_locked(base, manifest):
             report['cases'][name] = {'baseline':base.parse_report(invoke([baseline,'--baseline',control]).stdout)}
             report['cases'][name]['jailed'] = json.loads(invoke([binary,'--observe',root,name]).stdout)
         report.update(evaluate(report['cases']))
+        if holder_death and report['credential_namespace_confined']:
+            observe_holder_death(utilities,binary,root,report)
     except BaseException as error:
         report['error'] = type(error).__name__
         if hasattr(error,'returncode'): report['exit_code'] = error.returncode
@@ -329,7 +446,7 @@ def run_locked(base, manifest):
     return report
 
 
-def run():
+def run(holder_death=False):
     if platform.system() != 'SunOS' or os.getuid() != 0 or os.geteuid() != 0:
         raise ValueError('Requires Solaris real/effective root and separate mount approval')
     manifest = verify_bundle()
@@ -350,7 +467,7 @@ def run():
         if not stat.S_ISREG(info.st_mode) or info.st_uid or info.st_nlink != 1 or info.st_mode & 0o077:
             raise ValueError('Untrusted private lock')
         fcntl.flock(lock,fcntl.LOCK_EX | fcntl.LOCK_NB)
-        report = run_locked(base,manifest)
+        report = run_locked(base,manifest,holder_death=holder_death)
     finally:
         os.close(lock)
     return 0 if report['credential_namespace_confined'] else 2
@@ -362,13 +479,14 @@ def main():
     action.add_argument('--plan',action='store_true')
     action.add_argument('--prepare',metavar='NEW_DIRECTORY')
     action.add_argument('--run-approved',action='store_true')
+    action.add_argument('--run-holder-death-approved',action='store_true')
     parser.add_argument('--source-sha')
     args = parser.parse_args()
     if args.prepare: print(prepare(args.prepare,args.source_sha))
-    elif args.run_approved:
+    elif args.run_approved or args.run_holder_death_approved:
         def interrupted(number, frame): raise InterruptedError('Fixture interrupted')
         previous = signal.signal(signal.SIGTERM,interrupted)
-        try: return run()
+        try: return run(holder_death=args.run_holder_death_approved)
         finally: signal.signal(signal.SIGTERM,previous)
     else: print(json.dumps(plan(),indent=2))
     return 0
