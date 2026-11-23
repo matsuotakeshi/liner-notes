@@ -69,7 +69,7 @@ def run(binary):
                 assert 'UI PREF SAVED DEFAULT' in client.cmd('UI RESET')
                 assert rows() == []
         for options in (['--ui-policy', 'OTHER'], ['--ui-default', 'mmm'],
-                        ['--ui-allow', 'rtbbs,mmm'], ['--ui-allow', 'rtbbs,rtbbs']):
+                        ['--ui-allow', 'rtbbs,unknown'], ['--ui-allow', 'rtbbs,rtbbs']):
             result = subprocess.run([binary, *options, '0'], capture_output=True, timeout=10)
             assert result.returncode == 2 and b'invalid UI' in result.stderr, result
     print('PASS public UI policy, own preference/reset, guest choice and restart fallback')

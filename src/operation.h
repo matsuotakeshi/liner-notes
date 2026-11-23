@@ -9,6 +9,7 @@
 #define BOARD_LINK '\x1e'
 /* Internal only: signed SSH key proof verified by the transport, never decoded from text. */
 #define BOARD_SSH_KEY '\x1d'
+#define BOARD_NOTE_VIEW '\x1c'
 #define BOARD_TITLE 80
 #include "content_limits.h"
 #include "mail_attachments.h"
@@ -46,7 +47,7 @@ typedef struct {
 typedef OperationFeedback BoardFeedback;
 typedef struct {
     int kind,state; /* 1=article, 2=mail; article state uses ArticleViewState */
-    uint32_t id,parent,board,sender,recipient;uint64_t at;size_t size;
+    uint32_t id,parent,board,sender,recipient,root;uint64_t at;size_t size;
     char author[33],recipient_name[33],title[81];
 } OperationContent;
 typedef OperationContent BoardContent;

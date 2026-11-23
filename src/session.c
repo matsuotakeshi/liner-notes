@@ -24,6 +24,7 @@ int session_init_ui(Session *s,SessionIO io,unsigned long id,int slot,int boards
     if(!session_ui_config_valid(config) || !io.write)return 0;
     s->ui_binding.config=*config;s->ui_binding.active=config->adapters[config->default_index];
     s->connection.io=io;session_core_init(&s->core,id,slot,boards,members);
+    s->core.login_required=s->ui_binding.active->login_required;
     s->connection.binary_allowed=1;session_dimensions(s,80,24);
     if(!session_ui_allocate(s,config->default_index)) { session_abort(s);return 0; }
     s->ui_binding.active->enter(s,1,menu,language);
@@ -45,8 +46,22 @@ int session_line(Session *s,const char *text,size_t size,uint64_t now) {
     if(!session_ready(s)) return 0;
     if(size>ln_limit("INPUT",INPUT_LINE_MAX) || memchr(text,0,size)) { session_abort(s); return 0; }
     char line[INPUT_LINE_MAX+1]; memcpy(line,text,size); line[size]=0; s->core.now=now;
+    if(size==3 && !memcmp(line,"RAW",3) && session_ui_legacy_connector(s)) {
+        OPENSSL_cleanse(line,sizeof(line));return 1;
+    }
     if(s->ui_binding.active->connector_line(s,line,size)) { OPENSSL_cleanse(line,sizeof(line));return 1; }
     s->ui_binding.active->line(s,line,size); OPENSSL_cleanse(line,sizeof(line)); return 1;
+}
+
+int session_keys(const Session *s) {
+    const SessionUiAdapter *a=s->ui_binding.active;
+    return a && a->keys && a->key && !session_secret(s) && a->keys(s);
+}
+
+void session_key(Session *s,unsigned char key,uint64_t now) {
+    if(!session_ready(s) || !session_keys(s))return;
+    s->core.now=now;
+    s->ui_binding.active->key(s,key);
 }
 
 void session_revoke(Session *s) {

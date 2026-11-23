@@ -338,6 +338,7 @@ static void advance(Connection *c,uint64_t now) {
         unsigned old_width=c->terminal.telnet.width,old_height=c->terminal.telnet.height;
         size_t old_size=c->terminal.size;
         c->terminal.uppercase=session_uppercase(s,c->terminal.line,c->terminal.size);
+        c->terminal.keys=session_keys(s);
         int result=terminal_receive(&c->terminal,c->input[consumed++],session_secret(s));
         if(result>0 || c->terminal.size!=old_size) { connection_input(&c->clock,now); }
         if(c->terminal.mode==TERMINAL_TELNET && (old_width!=c->terminal.telnet.width || old_height!=c->terminal.telnet.height))
@@ -346,7 +347,8 @@ static void advance(Connection *c,uint64_t now) {
         if(session_secret(s) && c->terminal.mode==TERMINAL_TELNET && !telnet_echo(&c->terminal.telnet)) { drop(c); return; }
         if(result>0) {
             s->connection.binary_allowed=terminal_binary_ready(&c->terminal);
-            session_line(s,c->terminal.line,c->terminal.size,now);
+            if(result==TERMINAL_KEY)session_key(s,c->terminal.key,now);
+            else session_line(s,c->terminal.line,c->terminal.size,now);
             terminal_clear(&c->terminal);
             /* Do not accept passwords from Telnet clients declining remote echo. */
             if(session_secret(s) && c->terminal.mode==TERMINAL_TELNET && !telnet_echo(&c->terminal.telnet)) session_abort(s);

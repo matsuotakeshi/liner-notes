@@ -4,6 +4,8 @@
 SessionOperationStatus session_core_submit(SessionCore *s,OperationRequest *q,SessionOperationPort port) {
     if(!s->active || s->closing)return SESSION_OPERATION_INACTIVE;
     if(s->pending || (s->wake && s->now<s->wake))return SESSION_OPERATION_BUSY;
+    if(s->login_required && !s->user && q->op!='a' && q->op!='g' && q->op!=BOARD_SSH_KEY)
+        return SESSION_OPERATION_LOGIN_REQUIRED;
     if((q->op=='a' || q->op=='g' || q->op==BOARD_SSH_KEY) && s->now<s->auth_after)return SESSION_OPERATION_THROTTLED;
     q->structured=s->structured;q->session=s->id;q->slot=s->slot;q->user=s->user;q->user_epoch=s->user_epoch;
     memcpy(q->board_grants,s->board_grants,sizeof(q->board_grants));

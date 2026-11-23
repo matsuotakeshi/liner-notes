@@ -6,8 +6,10 @@
 #include <openssl/crypto.h>
 
 SessionUiConfig session_ui_default(void) {
-    SessionUiConfig config={.count=1,.allowed=1,.policy=SESSION_UI_FIXED};
-    config.adapters[0]=session_ui_rtbbs();return config;
+    SessionUiConfig config={.count=2,.allowed=1,.policy=SESSION_UI_FIXED};
+    config.adapters[0]=session_ui_rtbbs();
+    config.adapters[1]=session_ui_mmm();
+    return config;
 }
 
 int session_ui_configure(SessionUiConfig *config,const char *policy,const char *name,const char *allow) {
@@ -58,6 +60,8 @@ const char *session_ui_name(const Session *s) { return s->ui_binding.active?s->u
 
 SessionUiSelection session_ui_preflight(const Session *s,const char *name) {
     if(!s->ui_binding.active || !name)return SESSION_UI_INVALID;
+    if(s->connection.legacy_connector || (*s->connection.connector_token &&
+        strcmp(name,s->ui_binding.active->name)))return SESSION_UI_DENIED;
     const SessionUiConfig *c=&s->ui_binding.config;
     unsigned i;
     for(i=0;i<c->count;i++)if(!strcmp(name,c->adapters[i]->name))break;
@@ -78,8 +82,28 @@ SessionUiSelection session_ui_select(Session *s,const char *name) {
     SessionUiSnapshot view=session_ui_snapshot(s);
     if(!session_ui_allocate(s,i))return SESSION_UI_INVALID;
     s->ui_binding.active->leave(s);s->ui_binding.active=c->adapters[i];s->ui_binding.state=s->ui_binding.states[i];
+    s->core.login_required=s->ui_binding.active->login_required;
     s->ui_binding.active->enter(s,0,view.menu,view.language);
     return SESSION_UI_SELECTED;
+}
+
+int session_ui_legacy_connector(Session *s) {
+    const SessionUiAdapter *active=s->ui_binding.active;
+    if(!active->login_required || s->core.user || session_secret(s) || !active->can_leave(s))
+        return 0;
+    const SessionUiConfig *c=&s->ui_binding.config;
+    unsigned i=0;
+    while(i<c->count && c->adapters[i]!=session_ui_rtbbs())i++;
+    if(i==c->count || !session_ui_allocate(s,i))return 0;
+    Language language=session_ui_snapshot(s).language;
+    active->leave(s);
+    s->connection.legacy_connector=1;
+    s->ui_binding.active=c->adapters[i];
+    s->ui_binding.state=s->ui_binding.states[i];
+    /* The client protocol keeps the same required authentication as the MMM listener. */
+    s->ui_binding.active->enter(s,0,0,language);
+    session_impl_queue_text(s,"\r\nRAW\r\n");
+    return 1;
 }
 
 static void restore_choice(Session *s) {

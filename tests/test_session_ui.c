@@ -1,4 +1,4 @@
-/* A second adapter exists only in this test. Production registers RTBBS alone. */
+/* A test adapter exercises selection independently of the built-in UIs. */
 #include "session.h"
 #include "session_internal.h"
 #include <assert.h>
@@ -39,7 +39,8 @@ void session_ui_adapter_test(void) {
     Session *s=calloc(1,sizeof(*s));OperationResult *r=calloc(1,sizeof(*r));assert(s && r);
     size_t written=0;SessionIO io={&written,output,NULL,NULL};
     SessionUiConfig c=session_ui_default();
-    assert(c.policy==SESSION_UI_FIXED && c.count==1 && !strcmp(c.adapters[0]->name,"rtbbs"));
+    assert(c.policy==SESSION_UI_FIXED && c.count==2 && c.allowed==1 && !strcmp(c.adapters[0]->name,"rtbbs"));
+    assert(c.adapters[1]==session_ui_mmm());
     assert(session_ui_config_valid(&c));
     SessionUiAdapter alt=*session_ui_rtbbs();alt.name="test-alt";alt.enter=enter;alt.leave=leave;
     alt.line=line;alt.keep_position=prepare;alt.result=result;alt.door_finish=door;alt.tick=tick;alt.uppercase=uppercase;
@@ -56,7 +57,9 @@ void session_ui_adapter_test(void) {
     broken=alt;broken.name="invalid UI";assert(!session_ui_config_valid(&bad));
     assert(!session_init_ui(s,io,500,1,0,0,1,LANGUAGE_EN,&bad));assert(!s->core.active && !written);
     session_init(s,io,500,1,0,0,1,LANGUAGE_EN);
-    assert(!strcmp(session_ui_name(s),"rtbbs") && session_ui_select(s,"mmm")==SESSION_UI_UNKNOWN);
+    assert(!strcmp(session_ui_name(s),"rtbbs"));
+    assert(session_ui_select(s,"mmm")==SESSION_UI_DENIED);
+    assert(session_ui_select(s,"unknown")==SESSION_UI_UNKNOWN);
     session_dispose(s);
     assert(session_init_ui(s,io,500,1,0,0,0,LANGUAGE_EN,&c));
     assert(session_ui_select(s,"test-alt")==SESSION_UI_DENIED);

@@ -26,6 +26,11 @@ int main(void) {
     assert(s.user==7 && s.user_epoch==19 && s.member_level==2 && !strcmp(s.username,"alice") && !s.board_grants[3] && !s.vault_grants[8]);
     r->auth=-1;assert(session_core_complete(&s,r,2300));assert(!s.user);
     q->op='P';strcpy(s.guest_handle,"visitor");assert(session_core_submit(&s,q,port)==SESSION_OPERATION_ACCEPTED);assert(!strcmp(copy->username,"visitor"));
+    s.pending=0;s.login_required=1;
+    unsigned calls=queue.calls;
+    assert(session_core_submit(&s,q,port)==SESSION_OPERATION_LOGIN_REQUIRED && queue.calls==calls && !s.pending);
+    q->op=BOARD_SSH_KEY;s.now=s.auth_after;
+    assert(session_core_submit(&s,q,port)==SESSION_OPERATION_ACCEPTED && queue.calls==calls+1);
     /* Lifecycle and results have the same behavior without a Ui or worker. */
     session_core_init(&s,100,4,1,1);assert(s.active && s.board==1 && !s.user && !s.username[0]);
     memset(r,0,sizeof(*r));r->session=100;r->slot=4;r->sigop=-1;
