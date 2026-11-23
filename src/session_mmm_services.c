@@ -1,3 +1,4 @@
+#define _POSIX_C_SOURCE 200809L
 #include "session_mmm_internal.h"
 #include "mmm_input.h"
 #include "vault_bridge.h"
