@@ -1,4 +1,5 @@
 """Portable guard/evidence tests; never substitutes for approved Solaris root run."""
+import errno
 import hashlib
 import json
 import os
@@ -8,6 +9,7 @@ import struct
 import subprocess
 import sys
 import tempfile
+import time
 import unittest
 from unittest.mock import Mock, patch
 
@@ -304,6 +306,134 @@ class JailFixture(unittest.TestCase):
 
     def test_unmount_failure_preserves_paths_and_records_incomplete_cleanup(self):
         self.failed_run(mounted=True,unmount_failure=True)
+
+    @unittest.skipUnless(sys.platform.startswith('sunos'),'Solaris system contract and PTY only')
+    def test_native_pty_inside_system_contract(self):
+        import fcntl
+        import pty
+        import select
+        import signal
+        import termios
+        self.assertNotEqual(os.getuid(),0)
+        worker = r'''
+import os, signal, sys
+
+os.login_tty(0)
+signal.alarm(12)
+assert os.tcgetpgrp(0) == os.getpgrp()
+signal.signal(signal.SIGWINCH,lambda *_: os.write(1,b"WINCH\n"))
+descendant = 0
+if sys.argv[1] == 'kill':
+    ready, report = os.pipe()
+    descendant = os.fork()
+    if descendant == 0:
+        os.close(ready)
+        signal.alarm(12)
+        os.setsid()
+        os.write(report,b"R")
+        os.close(report)
+        while True: signal.pause()
+    os.close(report)
+    assert os.read(ready,1) == b"R"
+    os.close(ready)
+cols, rows = os.get_terminal_size(0)
+print(f"READY {os.getpid()} {descendant} {cols} {rows}",flush=True)
+for line in sys.stdin:
+    if line.strip() == 'size':
+        cols, rows = os.get_terminal_size(0)
+        print(f"SIZE {cols} {rows}",flush=True)
+    elif line.strip() == 'quit':
+        break
+'''
+
+        # The marker reader is bounded and accepts only complete records from
+        # the synthetic PTY worker. Solaris or the terminal may echo input.
+        def terminal_line(fd, prefix):
+            deadline = time.monotonic()+3
+            buffer = b''
+            while len(buffer)<4096:
+                remaining = deadline-time.monotonic()
+                self.assertTrue(remaining>0 and select.select([fd],[],[],remaining)[0],buffer)
+                data = os.read(fd,512)
+                self.assertTrue(data,buffer)
+                buffer += data
+                for line in buffer.split(b'\n')[:-1]:
+                    if line.startswith(prefix):
+                        return line.rstrip(b'\r')
+            self.fail('Too much synthetic terminal output')
+
+        def terminal_eof(fd, local_echo=b''):
+            deadline = time.monotonic()+3
+            observed = b''
+            while True:
+                remaining = deadline-time.monotonic()
+                self.assertTrue(remaining>0 and select.select([fd],[],[],remaining)[0],
+                                'PTY did not close')
+                try:
+                    chunk = os.read(fd,512)
+                except OSError as error:
+                    self.assertEqual(error.errno,errno.EIO)
+                    chunk = b''
+                if not chunk:
+                    self.assertIn(observed,(b'',local_echo))
+                    return
+                observed += chunk
+                self.assertTrue(local_echo.startswith(observed),observed)
+
+        for mode in ('quit','kill'):
+            with self.subTest(mode=mode), subprocess.Popen(
+                    ['/usr/bin/sleep','14'],stdin=subprocess.DEVNULL,stdout=subprocess.DEVNULL,
+                    stderr=subprocess.DEVNULL) as control:
+                master, slave = pty.openpty()
+                started = time.monotonic()
+                try:
+                    fcntl.ioctl(slave,termios.TIOCSWINSZ,struct.pack('HHHH',24,80,0,0))
+                    argv = ['/usr/bin/ctrun','-l','contract','-o','noorphan',
+                            sys.executable,'-I','-c',worker,mode]
+                    with subprocess.Popen(argv,stdin=slave,stdout=slave,stderr=slave,
+                                          close_fds=True,start_new_session=True) as holder:
+                        os.close(slave)
+                        slave = None
+                        try:
+                            _, leader, detached, columns, rows = terminal_line(master,b'READY ').split()
+                            self.assertEqual((columns,rows),(b'80',b'24'))
+                            leader, detached = int(leader), int(detached)
+                            self.assertNotEqual(leader,holder.pid)
+                            fcntl.ioctl(master,termios.TIOCSWINSZ,struct.pack('HHHH',30,100,0,0))
+                            self.assertEqual(terminal_line(master,b'WINCH'),b'WINCH')
+                            os.write(master,b'size\n')
+                            self.assertEqual(terminal_line(master,b'SIZE '),b'SIZE 100 30')
+                            if mode=='quit':
+                                self.assertEqual(detached,0)
+                                os.write(master,b'quit\n')
+                                self.assertEqual(holder.wait(timeout=3),0)
+                                terminal_eof(master,local_echo=b'quit\r\n')
+                            else:
+                                self.assertEqual(len({holder.pid,leader,detached,control.pid}),4)
+                                before = fixture.contract_rows('/usr/bin/ps',(holder.pid,leader,detached,control.pid))
+                                contract = fixture.verify_membership(before,holder.pid,leader,detached,control.pid)
+                                self.assertEqual(before[leader]['session'],leader)
+                                self.assertLess(time.monotonic()-started,8)
+                                holder.kill()
+                                self.assertEqual(holder.wait(timeout=3),-signal.SIGKILL)
+                                terminal_eof(master)
+                                self.assertLess(time.monotonic()-started,11,
+                                                'PTY closed too late to attribute to the holder')
+                                after = fixture.contract_rows('/usr/bin/ps',(leader,detached,control.pid))
+                                fixture.verify_cleanup(after,leader,detached,control.pid,contract)
+                            self.assertIsNone(control.poll())
+                            print('SOLARIS_PTY_CONTRACT '+mode+' 80x24 -> 100x30 SIGWINCH',flush=True)
+                        finally:
+                            if holder.poll() is None:
+                                holder.kill()
+                                holder.wait(timeout=3)
+                finally:
+                    if slave is not None:
+                        os.close(slave)
+                    os.close(master)
+                    if control.poll() is None:
+                        control.terminate()
+                        control.wait(timeout=3)
 
     @unittest.skipUnless(sys.platform.startswith('sunos'),'Solaris native compilation only, no root/mount')
     def test_native_compiler_and_unprivileged_refusal(self):
