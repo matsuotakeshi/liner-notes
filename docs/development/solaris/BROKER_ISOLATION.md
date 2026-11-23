@@ -65,6 +65,19 @@ The additional socket descriptor is part of the fixed test fixture. The
 BBS service still needs an explicit production transport policy, integrated
 slot cleanup, and validation of the actual launch path before enablement.
 
+## Reserved Solaris Door slots
+
+The candidate in `solaris/door_solaris_slot.py` persists a BUSY marker while it holds the existing
+record-lock lease. It looks for the slot UID in the real, effective and saved
+UID columns of a complete process snapshot. An owner can release its slot
+after stopping the owned contract and confirming no live matching process.
+An incomplete snapshot fails closed. A supervisor crash leaves the marker in
+place even after the record lock disappears and no matching process is visible.
+Any recovery tool must establish the launch scope before it can clear such a
+marker. The [direct Solaris tests](evidence/slot-lifecycle-20261123.txt) exercised
+startup abort, contention, cleanup and crash retention. The candidate is
+available for the Solaris launcher but is not wired into runtime activation.
+
 ## Security blockers before backend activation
 
 1. The OS-only holder-death checks below cover ordinary same-contract

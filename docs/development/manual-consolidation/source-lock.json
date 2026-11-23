@@ -1,6 +1,6 @@
 {
   "LICENSE": "fb981668c18a279e285fc4d83fba1e836cc84dd4daa73c9697d3cfd2d8aca6e0",
-  "Makefile": "a9a1b28283b6616c9f4ff53c413f4ac63174ee43cc491fb3e608df7db1e57b28",
+  "Makefile": "a66456a3db51b3a2658ada1d219da6591ba3de32bb91e6d4ab9ab9d2d4b6e8aa",
   "boards.example.conf": "4bd1a17ecf3966d3829510e8495a1362fb8b922cd754badccc739f5e5ab0bde8",
   "ci/build-freebsd-package.sh": "4e62899471d1f1a6c44e00a783c1aff771332140704ae778da95a95048474108",
   "debian/changelog": "8f3574a094f5a3677a9a7188e530ecdbdc006138b082b57243ca8441c644114d",
@@ -115,7 +115,7 @@
   "ci/freebsd_package_lease.py": "3e9c9cd0ba429b1a16c84a415a74fec57d6573e9c536e4e2a352e84985843712",
   ".github/workflows/freebsd-package.yml": "c6e74f7f1d7b6f21591fc27087ba920055a813dba8d609199b75d3bd0cf2d277",
   "CI_CD.md": "19321bd493f645adc0282a85a922c4c4ae2660d5019a07939ebd129b8ae6266c",
-  ".github/workflows/native-ci-lint.yml": "dc2aac650f238e3b91f0941f8769bf2cd53886dd0033353dd27a8f77eea4328e",
+  ".github/workflows/native-ci-lint.yml": "2c0b079fc7f943f8bdb233fb641c8025a1adbcb3007dd646413abac2a52739b8",
   "scripts/release_manifest.py": "35ea4b812c9ef6a69b09db52ff08dce61e9433d2ffe8b971c97b230f4635c970",
   "scripts/verify_release_set.py": "4322ffce4f92a9625b076435b2d0029d48c68319943fef7b46d5f7ce30d8b890",
   "tests/test_release_manifest.py": "08b5c8cab61c4556d1ac5e6137e252e195c76c0572fd72577bce92a1529b3791",
@@ -355,5 +355,6 @@
   "ci/selinux_ssh.py": "c9cfe6811df99bf298c53422aee70b5c908a8d233ccefaaca3fb0a3855777c80",
   ".github/workflows/embedded-ssh-native.yml": "e742c94866abd6b137423f5e7a74e376cc49604b7debfc71babddc57bc755098",
   "tests/solaris_door_contract_probe.c": "8538ad75303f7b99e6ea8aeb6861a6fea58d34afde6b551698165a3480848564",
-  "ci/prepare-solaris-libssh.sh": "c038d86f0391fa7d02a1f729b8629d54e5896e2beb3ff8a0d41ee2df39805453"
+  "ci/prepare-solaris-libssh.sh": "c038d86f0391fa7d02a1f729b8629d54e5896e2beb3ff8a0d41ee2df39805453",
+  "solaris/door_solaris_slot.py": "9ce657ff076c204633661a01a0f6034a774534fa71098835cfb7a7914bc2397e"
 }

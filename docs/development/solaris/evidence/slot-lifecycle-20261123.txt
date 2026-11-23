@@ -1,0 +1,47 @@
+Date (JST): 2026-11-23
+Host: Oracle Solaris 11.4 CBE AMD64.
+Dependency source: 8e5976fe2e0c128a1300d0a401f244fec8d1c211.
+
+Direct pre-commit trial in a temporary private directory under the existing
+Solaris fixture root. The operator held the shared fixture lock and verified
+that the reserved numeric UID was neither registered nor live. It used the
+unchanged main-branch Broker path guard and Solaris record-lock helper with
+the candidate slot module. No accounts, mounts, services or reboots were used.
+
+An owner acquired a durable BUSY marker. A competing acquisition failed, and
+an abort before launch released the reservation. A synthetic worker then
+entered UID 61001 beneath ctrun -l contract -o noorphan. The release guard
+refused while the worker remained alive. Stopping the owned holder, observing
+EOF and checking the live UID set released the slot and allowed reacquisition.
+
+The operator killed a new, disposable reservation owner. A separate lease
+acquisition proved the record lock was gone and the file still contained BUSY.
+No process held the slot UID. Normal reservation still refused reuse because
+of the durable marker. The trial removed its own temporary directory.
+
+The portable tests also ran on Solaris and verified all UID columns and
+fail-closed behavior when stopping or inspecting the scope fails. This proof
+covers the reservation helper with a synthetic owned contract. Service
+integration and ambiguous-crash recovery are still pending.
+
+Direct output:
+..
+----------------------------------------------------------------------
+Ran 2 tests in 0.001s
+
+OK
+
+{"source_sha": "8e5976fe2e0c128a1300d0a401f244fec8d1c211", "sha256": {"scripts/door_broker.py": "bcd2bb8d54ee0971a71b7e1d1d32e5764dd2130626603f79d5eb68727b4426ae", "scripts/door_broker_core.py": "8fefbfd71c35540e7128027693ad4295fd31e5f067a0c3adf5281e268a87480f", "scripts/posix_locks.py": "657d3bbe77a63e9ee0a2e586f2aa8528ba1401cbbc9f879a0302ab81b1fbcfca", "scripts/door_solaris_slot.py": "9ce657ff076c204633661a01a0f6034a774534fa71098835cfb7a7914bc2397e", "tests/test_door_solaris_slot.py": "9436f1c6cefa0ecfc19ee50c13aa21fea56aa0b49241d08110fe9d5d49805c98"}, "lock_contention_denied": true, "startup_abort_released": true, "live_uid_denied_release": true, "contract_death_released": true, "crash_kept_marker_after_lease_ended": true}
+{"temporary_directory_removed": true}
+
+Local operator script and transcript: build/solaris-door-jail/
+check-slot-lifecycle.py SHA-256: bd06fd9eba29e87165ae7670466b02a489894e8aedbab43519a2d2e7deccffb8
+slot-lifecycle.log SHA-256: 9e1a4120ddc7467f5b736ca206924084a1c6c00fbef0da4235a091e345b003fa
+
+Package-source follow-up: FreeBSD job 137572391257 on PR #174 failed because
+its install rule stages every scripts/*.py file, including the Solaris-only
+candidate. Move the module to solaris/ and adjust the test import. The FreeBSD
+plist comparison passed with 316 files and no package-list change. The
+relocated candidate passed all five lifecycle checks again on Solaris.
+Relocated test receipt: {"contract_death_released": true, "crash_kept_marker_after_lease_ended": true, "live_uid_denied_release": true, "lock_contention_denied": true, "sha256": {"scripts/door_broker.py": "bcd2bb8d54ee0971a71b7e1d1d32e5764dd2130626603f79d5eb68727b4426ae", "scripts/door_broker_core.py": "8fefbfd71c35540e7128027693ad4295fd31e5f067a0c3adf5281e268a87480f", "scripts/posix_locks.py": "657d3bbe77a63e9ee0a2e586f2aa8528ba1401cbbc9f879a0302ab81b1fbcfca", "solaris/door_solaris_slot.py": "9ce657ff076c204633661a01a0f6034a774534fa71098835cfb7a7914bc2397e", "tests/test_door_solaris_slot.py": "628c168ca1bb3eabdf0ebbde2c254b38ec015b2187b14c254295c1b86d268064"}, "source_sha": "8e5976fe2e0c128a1300d0a401f244fec8d1c211", "startup_abort_released": true}
+Local slot-lifecycle-solaris-path.log SHA-256: 869eaa3ff90913e7110cf67d38744cdbc2683105d8cfe04f568e365bfbc71be2
