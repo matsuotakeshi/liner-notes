@@ -131,8 +131,8 @@ unrelated-process safety unverified. PTY/ticket FD handling, real game dependenc
 and data provisioning, Broker revocation/restart, admission-slot reuse and an
 independent safety review remain required before enabling the backend.
 
-Local/mock checks are not native isolation evidence. Record the future root
-result and exact main SHA here only after executing it.
+The completed root matrix and exact source SHA are recorded below. Future
+backend acceptance requires evidence for the remaining gates.
 
 ## First approved execution and loader correction
 
@@ -277,9 +277,28 @@ Timeouts, mount options, payload checks and identity acceptance are unchanged.
 
 [Failure and mode reproduction evidence](evidence/jail-loader-mode-8976d0e8.txt)
 records the source, CI, receipt hashes and restricted directory check.
-Resume after Hosted CI, review, merge and successful Solaris CI on the new
-main SHA. Preserve and hash-check the installed `8976d0e8` bundle before the
-next scoped root trial. Verify cleanup independently of the result.
+
+## Completed root matrix on Solaris
+
+On 2026-11-23, [Solaris Native CI 45088372705](https://github.com/matsuotakeshi/liner-notes/actions/runs/45088372705)
+and the approved root trial passed on main
+`df9e1c345c1ec445d205a654d201886283a42cfc` (PR #163). The helper update
+verified the installed manifest and backed up the `8976d0e8` bundle as
+`/opt/liner-notes-ci/door-jail/backup-8976d0e8`.
+
+Every loader parent had mode `0755`. All eleven cases reached the payload,
+completed the handshake and exited successfully, including the `gid-bbs` case
+that previously received EOF. The set-ID controls changed their effective and
+saved identities as expected. With the nosuid root in place, every real,
+effective and saved UID/GID remained the slot identity. Each case also passed
+the supplementary-group, privilege-limit, namespace, descriptor and genuine
+chroot-denial checks. No set-ID case used the exec-refusal fallback.
+
+The receipt is `/var/tmp/liner-door-jail-w17re_yp/result.json`. Cleanup completed.
+Independent enumeration found no remaining mounts, and only `plan.json` and
+`result.json` remained. The [persistent evidence record](evidence/jail-df9e1c34.txt)
+links CI to the exact source, shows all eleven cases and hashes the retained
+transcript. The remaining process-lifecycle, PTY and Broker gates still apply.
 
 ## Primary OS references
 

@@ -1,0 +1,52 @@
+Date (JST): 2026-11-23
+Source SHA: df9e1c345c1ec445d205a654d201886283a42cfc (merged PR #163)
+Solaris Native CI: https://github.com/matsuotakeshi/liner-notes/actions/runs/45088372705 (success)
+Multi-OS Native CI: https://github.com/matsuotakeshi/liner-notes/actions/runs/44857740888 (success)
+FreeBSD isolated upgrade: https://github.com/matsuotakeshi/liner-notes/actions/runs/44858743784 (success)
+Release Set Verification: https://github.com/matsuotakeshi/liner-notes/actions/runs/44858743822 (success)
+GitHub reported all 12 runs on this SHA completed successfully, including two Solaris runs.
+
+Host platform: SunOS-5.11-i86pc-i386-64bit
+Root receipt: /var/tmp/liner-door-jail-w17re_yp/result.json
+Invocation: /usr/bin/python3.13 -I /opt/liner-notes-ci/door-jail/solaris_door_jail.py --run-approved
+Installed bundle backup: /opt/liner-notes-ci/door-jail/backup-8976d0e8
+Mount request: swap tmpfs, nosuid,size=64m
+Runtime interpreter: /usr/lib/amd64/ld.so.1
+Observer SHA-256: 578c51ae7609e35e3ed753ed0889f15bd23fbf12c43d3172eb9b05823df3a3ae
+Verified library directory modes: {"/lib": "0o755", "/lib/64": "0o755", "/usr": "0o755", "/usr/lib": "0o755", "/usr/lib/amd64": "0o755"}
+
+Case              Control eff/saved UID  Control eff/saved GID  Jailed UID/GID (all 6)
+gid-bbs           61001/61001            61002/61002            61001
+gid-broker        61001/61001            61003/61003            61001
+gid-consumer      61001/61001            61004/61004            61001
+gid-other_slot    61001/61001            61005/61005            61001
+gid-root          61001/61001            0/0                    61001
+plain             61001/61001            61001/61001            61001
+uid-bbs           61002/61002            61001/61001            61001
+uid-broker        61003/61003            61001/61001            61001
+uid-consumer      61004/61004            61001/61001            61001
+uid-other_slot    61005/61005            61001/61001            61001
+uid-root          0/0                    61001/61001            61001
+
+All 11 observers reached payload-entry and payload-ack-done and exited 0.
+All jailed rows reported zero supplementary groups. The basic privilege limit,
+closed namespace, closed extra descriptors, and actual chroot denial checks
+passed in all 11 rows. No set-ID case needed the exec-refusal fallback.
+The same fixture case that received EOF on 8976d0e8 now completes its handshake.
+
+FIXTURE_EXIT 0
+REMAINING_FILES ["plan.json", "result.json"]
+REMAINING_MOUNTS []
+cleanup_complete=true
+credential_namespace_confined=true
+failed_cases=[]
+broker_isolation_verified=false
+door_backend_enabled=false
+lifecycle_verified=false
+
+Local full transcript and receipts: build/solaris-door-jail/approved-df9e1c345c1e/
+execution.log SHA-256: 702a152952a160424fdbddf631edff8bb9f3f31b58475df73fff784bcdb1c35b
+result.json SHA-256: 317b0dd3afa4b8b8715a333192182c8c2a1160e13d2fb3342e46a55a136e36ec
+plan.json SHA-256: 039c1e08c3efc82c3cce1fb8dd3c6ce0844214afb1dc99f802c3bdd532232525
+manifest.json SHA-256: 007b404848777168e98894d3b8e9efa578f9c9bd9900b1a9b89b9dd2e582b8eb
+gate.json SHA-256: 1f8056171be361196ba5adbf280da7b62540e305ef53e9a4b4bb519dac693746

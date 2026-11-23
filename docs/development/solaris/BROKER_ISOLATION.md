@@ -1,14 +1,14 @@
 # Solaris Broker isolation: implementation gates
 
-Date: 2026-11-20. Target: Oracle Solaris 11.4 CBE AMD64.
+Date: 2026-11-23. Target: Oracle Solaris 11.4 CBE AMD64.
 This is development documentation, not a supported deployment procedure.
 
 ## Current state
 
-A subsequent [nosuid execution-root fixture](DOOR_JAIL_FIXTURE.md) now prepares
-the next credential/namespace experiment. Its mount operation requires separate
-approval and a reviewed-main native build. It does not enable the backend or
-claim descendant/PTY/Broker acceptance.
+The approved [nosuid execution-root fixture](DOOR_JAIL_FIXTURE.md#completed-root-matrix-on-solaris)
+passed all eleven credential and filesystem namespace cases on main
+`df9e1c345c1ec445d205a654d201886283a42cfc`. The backend remains gated on
+descendant cleanup, PTY and Broker acceptance.
 
 Broker peer credentials already use `getpeerucred` / `ucred_geteuid` with proper
 freeing. Privileged Door execution remains fail-closed: `door_processes.supported`
@@ -46,10 +46,10 @@ Its explicit output says isolation is NOT verified. The backend is not enabled.
    ownership/inheritance semantics must be tested; simply setting the flag is
    not proof that all descendants remain contained. Include double fork, setsid,
    parent SIGKILL and unrelated-process survival.
-2. The native set-ID matrix has failed identity confinement. Limiting privileges
-   to basic leaves non-root setuid and setgid credential transitions available.
-   A different execution barrier must prevent those effective/saved ID changes;
-   basic privileges must not be used as an equivalent of no_new_privs.
+2. The basic-privilege-only matrix failed identity confinement. The additional
+   nosuid execution root retained the expected identities in the synthetic
+   matrix. A backend candidate must enforce this barrier for every launch and
+   verify equivalent behavior with its actual program and data layout.
 3. After the barriers are proven, implement the backend and C adapter, then test
    real distinct UIDs, supplementary groups, memory/FD access denial, PTY input,
    resize, ticket lifetime, consumer checks and durable BUSY cleanup on one SHA.
@@ -106,6 +106,6 @@ from privilege-set transformations; basic limit sets are not accepted as proof
 of non-root UID/GID confinement. Current headers provide no directly equivalent
 no_new_privs switch established by this investigation. A reviewed, privileged
 synthetic set-ID fixture or a separately isolated execution environment remains
-necessary before enabling the backend. Read-only source evidence is stored in
-`build/solaris-exec-privileges.txt`. The initial observation installed no privileged
-fixture; the later approved root matrix is recorded separately above.
+necessary before enabling the backend. The completed root matrix covers the
+synthetic set-ID check. Runtime launch and process-lifecycle work remain.
+Read-only source evidence is stored in `build/solaris-exec-privileges.txt`.
