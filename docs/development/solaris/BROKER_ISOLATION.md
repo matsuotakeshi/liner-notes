@@ -84,6 +84,17 @@ failed confinement as recorded above. The independent review's requirement to
 prove these barriers before enabling launch is unchanged. No real game,
 production data or host services were changed.
 
+## Native PTY descriptor handoff
+
+The C receiver for the isolation supervisor's reply is shared by the active
+Linux and FreeBSD adapter and a native Solaris test. On Solaris, the test
+received a real PTY master with atomic close-on-exec, changed its window
+size, and read slave output. It also checked that rejected replies and
+unexpected descriptors leave no received descriptors open. The
+[direct test record](evidence/pty-handoff-20261123.txt) identifies the tested
+source files and observed results. The Solaris service launcher still
+requires the full isolation boundary before activation.
+
 ## Nested-contract observation candidate
 
 The follow-up probe also accepts `--nested`. After the same basic privilege

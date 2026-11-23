@@ -649,7 +649,7 @@ test-ui-selection: runtime
 	$(PYTHON) tests/test_ui_selection.py ./runtime
 check: test-ui-selection
 # All Door launch paths rebuild when the opt-in isolation adapter changes.
-runtime: src/door_isolation.inc
+runtime: src/door_isolation.inc src/door_handoff.inc
 runtime: src/door_diagnostics.h
 
 .PHONY: test-door-broker
