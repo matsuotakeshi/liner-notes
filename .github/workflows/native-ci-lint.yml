@@ -18,6 +18,7 @@ on:
       - "src/door_service_client.inc"
       - "tests/door_handoff_probe.c"
       - "tests/door_service_client_probe.c"
+      - "tests/solaris_door_auth_transport_probe.c"
       - "ci/solaris_door_boundary.py"
       - "tests/test_solaris_door_boundary.py"
       - "tests/solaris_door_identity_probe.c"
