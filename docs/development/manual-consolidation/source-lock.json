@@ -364,7 +364,7 @@
   "solaris/liner-notes-door-isolation.xml": "21c09c7e58a2dfca7d87782e72da4963be32ae07202271c008234e765df65cbd",
   "solaris/door-isolation.example.json": "778640d0b0f373f6842d71cf9ae7cd80875769616527a067485fac8bd44f1d49",
   "tests/test_door_solaris_supervisor.py": "5d96c39fcfe23b8c9c3b6730ccab531c4c6f8ef62674df3c92a4cb90dad48393",
-  "tests/solaris_auth_door_menu.py": "06e49cd96af541dee91e563ffdd9c6ef9a841cdf6eb4c36ad33f6db0f576064c",
+  "tests/solaris_auth_door_menu.py": "b8337836228720e072bbdfb99aa9b06ff5fcb0fdbfecf37aacf718d9bea2a004",
   "tests/solaris_auth_door_probe.c": "0b1f559d13c6782ce010d08214f0a01311a22de4d21997f17151b46b4ecd6c63",
   "tests/solaris_auth_door_consumer.py": "4d2f02fe47a0176d7fe51d70c367eb14013facb4bcac8be916d2cfa7d86cafb2",
   "tests/test_door_solaris_slot.py": "92c533d7e951bd1ca93d6b434069ddcc67a16d19a46cb5471ff79f1c4e14c317"

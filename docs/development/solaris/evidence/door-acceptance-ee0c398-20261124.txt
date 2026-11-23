@@ -1,0 +1,43 @@
+Solaris authenticated Door final acceptance, 2026-11-24 JST
+
+Reviewed main: ee0c398cacd328e2153bd59ca3a48add8b1a743a
+Host: Oracle Solaris 11.4 CBE x86-64, Python 3.13.9
+Nonprivileged build: /export/home/ci-test/ci/auth-door-fixed-XXCvzFTb
+Root-owned source: /var/db/ln-door-reviewed-XXxh4fLa
+Isolated acceptance: /var/db/ln-door-bbs-cn06vemo
+
+SHA-256 checked before executing the reviewed source:
+  source archive           6917d0106623538ebe01f00b2729276d328ea42c7c134080db529538139aed3f
+  runtime                  ad6a9ff5187852eabea66cfe1e6fd7907f84663739fcdf3080e8043658cc1428
+  liner-notes-door-lock     7328681a8bc45eca9677e43b6a5687eff49f27d0c97da823a9ded9c939e7e74d
+  Solaris Door child       8ef20ce18e1899b066fc3983f34986fb3f78123f391be2e79b4ac102c87651de
+
+Results from receipt.json, in order:
+  quit         Telnet menu launch, Broker consumption, NAWS to 100x30,
+               return to BBS, lease revocation and empty slot.
+  disconnect   Reused the slot, launched and resized. The peer went
+               away, the lease was revoked and the slot became empty.
+  withheld     The synthetic game printed a ready line without Broker
+               consumption. The supervisor reached its readiness
+               timeout. No game output reached Telnet.
+  broker-down  After stopping the test Broker, the BBS refused launch.
+
+For both refusal cases the client verified the Game unavailable response
+and used L to list the games. The previous probe wrongly required the
+list to be included in the same response. The corrected probe was
+staged separately and ran only under the disposable non-root BBS UID.
+The reviewed main runtime, supervisor, slot code, Broker, consumer and
+root fixture remained unchanged. Probe SHA-256:
+b8337836228720e072bbdfb99aa9b06ff5fcb0fdbfecf37aacf718d9bea2a004
+
+The fixture stopped the supervisor and removed the mount. A separate
+read-only check confirmed an empty slot marker, absent supervisor and
+Broker sockets, no fixture mount and no surviving fixture UID processes.
+The retained supervisor log contains only the expected broker TimeoutError
+and launch FileNotFoundError from the two denial cases. Both positive
+consumer logs contain LEASE REVOKED, and the withholding log contains
+TICKET WITHHELD.
+
+SMF start/stop and temporary service removal were exercised separately on
+6b899b5c36e0. See door-main-smf-20261124.txt for that receipt. This is the
+controlled Solaris acceptance, not a production activation or boot test.

@@ -42,8 +42,9 @@ def accept(runtime, endpoint, mode):
                     assert b"3: Solaris auth fixture" in client.cmd("GAME", b"0:main] > ")
                     if mode == "denied":
                         reply = client.cmd("3", b"0:main] > ")
-                        assert b"AUTH LIVE" not in reply
-                        assert b"3: Solaris auth fixture" in reply
+                        assert b"AUTH LIVE" not in reply, reply
+                        assert b"Game unavailable." in reply, reply
+                        assert b"3: Solaris auth fixture" in client.cmd("L", b"0:main] > ")
                     else:
                         client.send(b"3\r\n")
                         client.until(b"AUTH LIVE")
