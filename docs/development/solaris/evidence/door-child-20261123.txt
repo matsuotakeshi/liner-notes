@@ -1,0 +1,28 @@
+Solaris Door child entry candidate
+
+Base main: 92bee15f3f29d2f11a2d7b54064e920c18b72cad (PR #177).
+Host: Oracle Solaris 11.4.90.212.0 AMD64, Python 3.13.9.
+Account: ci-test, no privilege elevation.
+Work directory: /export/home/ci-test/ci/door-child-XXoGJAFb
+Source archive SHA-256:
+84c7d7a668f6320fe149b62f91187df62ff84455c8e3e91909ce06120bd61dbc
+
+The VM verified the archive digest before extracting it. Command:
+  /usr/bin/python3.13 tests/test_solaris_door_jail.py JailFixture.test_native_door_child_compiler_and_refusal -v
+
+Result: successful strict 64-bit native compile and link, four invalid
+argument checks and non-root refusal. All five cases produced empty
+stdout and stderr. A separate live pipe inspection confirmed that the
+two ends of a pipe share a device/inode identity and independent pipes
+have distinct identities.
+
+Source SHA-256:
+  solaris/door_solaris_child.c
+    3e1094a004035977720571c6b713894f9198b1bdb6dea9ea68e1229f3db3e84e
+  tests/test_solaris_door_jail.py
+    1a5099913403312c1853aadad7cad680741490d69c33d09ecf7cb651ecaca799
+
+No mount, service, UID switch or Door application was used. Test the
+actual child boundary and PTY after this source has been reviewed and
+merged. In particular, confirm the executed process's identities,
+privilege sets, inherited descriptors and program readiness.

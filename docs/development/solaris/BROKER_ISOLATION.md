@@ -101,6 +101,28 @@ record the tested source bytes. The latter confirmed admission, contention,
 safe startup abort, and BUSY retention on the fixture's disposable nosuid
 tmpfs. The actual game launch and owned-contract cleanup remain pending.
 
+## Child entry candidate
+
+The supervisor's dedicated child entry in `solaris/door_solaris_child.c`
+accepts the admitted root, a PTY slave, a ticket pipe and a status pipe.
+It rechecks root ownership and the descriptor's nosuid flag, enters that
+directory by descriptor and accepts only the root-owned `/door` program.
+The child receives its own UID/GID and drops supplementary groups. The
+limited basic privilege set excludes Internet socket creation and visibility
+or control of other sessions. The PTY occupies standard input and output,
+the ticket remains on FD 3, and FD 4 closes on exec. All higher descriptors
+are closed before exec, including any host or process contract handles.
+
+The root supervisor must own the process contract and supply the arguments
+from its trusted configuration. PREPARED marks the configured boundary.
+The supervisor must separately confirm the exec result and game readiness
+before handing the PTY to the BBS. The helper is a candidate for integration
+and is neither installed nor enabled. Its root gate and argument rejection
+were verified on a [non-privileged Solaris checkout](evidence/door-child-20261123.txt).
+A reviewed-main privileged trial is still needed to verify execution and
+descriptor closure. The descriptor-based directory change follows
+[Oracle's C security guidance](https://docs.oracle.com/cd/E37838_01/html/E61050/gnclc.html).
+
 ## Security blockers before backend activation
 
 1. The OS-only holder-death checks below cover ordinary same-contract

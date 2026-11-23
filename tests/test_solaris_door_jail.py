@@ -562,5 +562,22 @@ for line in sys.stdin:
                     result = subprocess.run([str(binary),*arguments],capture_output=True,timeout=5)
                     self.assertEqual((result.returncode,result.stdout,result.stderr),(expected,b'',b''))
 
+    @unittest.skipUnless(sys.platform.startswith('sunos'), 'Solaris child compiler and refusal')
+    def test_native_door_child_compiler_and_refusal(self):
+        self.assertNotEqual(os.getuid(), 0)
+        with tempfile.TemporaryDirectory(prefix='ln-door-child-') as temporary:
+            binary = Path(temporary) / 'door-child'
+            subprocess.run(['/usr/bin/gcc', '-m64', '-std=c11', '-Wall', '-Wextra', '-Werror',
+                            str(ROOT / 'solaris/door_solaris_child.c'), '-o', str(binary)],
+                           check=True, timeout=45)
+            for args, code in (([], 64), (['0','3','4','5','6'], 64),
+                               (['61001','3','4','3','6'], 64),
+                               (['61001','2','4','5','6'], 64),
+                               (['61001','3','4','5','6'], 77)):
+                with self.subTest(args=args):
+                    result = subprocess.run([str(binary), *args], capture_output=True, timeout=5)
+                    self.assertEqual((result.returncode, result.stdout, result.stderr),
+                                     (code, b'', b''))
+
 
 if __name__ == '__main__': unittest.main()
