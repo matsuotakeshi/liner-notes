@@ -334,7 +334,7 @@
   "scripts/door_broker.py": "65bd7cc7f4727b6ee0a223b95fd53bbc30aa06d96a868bb8506d07098a6ba1ea",
   "scripts/door_broker_core.py": "5cf6455da47aa21deca605adbf845cc5f5bce24077d9f1c8b074a315612b25df",
   "scripts/door_auth_client.py": "c36c345de7b4a6be82067ecb52e4e52e5c0f887e6008840243ca11a22688aa4e",
-  "scripts/door_isolation.py": "4c7b72c192d53a64e1d3e00db43d43fc6145084044008c568433d9731a26892e",
+  "scripts/door_isolation.py": "3e8c5fc1865a2e701b2258cf1ff2d8a88986f2114901e74547cb731e1f1340f4",
   "scripts/door_processes.py": "ee0dec18ac608994c2ebd685974d1966b72e1b4a5d78ffcd018e0e0ec1398d31",
   "src/door_handoff.inc": "964fd31e748c3352de1b6a02aa0f146981086b62fbe328ee8bfb9e9aa6f94631",
   "src/door_isolation.inc": "0c044ca70c5ee368d5d7d5fff743d78738d2162b6c4fda0b9c565ba7731c3bbf",

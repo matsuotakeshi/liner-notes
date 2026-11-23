@@ -32,3 +32,10 @@ actual SMF service activation are pending.
 
 Local canonical manual validation passed 42 pages, 2,822 local links
 and Markdown/HTML parity.
+
+PR #181 follow-up: resolve the default launch handler at call time so
+the Linux/FreeBSD worker diagnostic tests can substitute the failing
+handler. On Solaris, the corrected scripts/door_isolation.py had SHA-256
+3e8c5fc1865a2e701b2258cf1ff2d8a88986f2114901e74547cb731e1f1340f4.
+In the separate worker-fix directory, worker diagnostics (14), worker
+admission (10), Solaris supervisor (2) and handoff (6) all passed.
