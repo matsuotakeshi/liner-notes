@@ -1,0 +1,27 @@
+Solaris Door admission candidate, 2026-11-23
+
+Base main: 856627e82520252e605fba6885bfe78859327907 (PR #175).
+Host: SunOS 5.11 11.4.90.212.0, Python 3.13.9.
+Scope: direct non-privileged run on the Solaris validation VM as ci-test.
+Work directory: /export/home/ci-test/ci/door-admission-XXA4lJ7d
+Source archive SHA-256:
+5ee67f438e0ead1b1f35f290e3184aec8f468b930b114ef47dd1f3385d2cec09
+
+The archive hash was checked on the VM before extraction. Commands run
+from the private extracted directory:
+  /usr/bin/python3.13 tests/test_door_solaris_admission.py -v
+  /usr/bin/python3.13 tests/test_door_solaris_slot.py -v
+
+Results: admission 6/6; slot 2/2. The live mount table was read by the
+native refusal test. The admission tests also checked descriptor identity
+and cleanup ordering with controlled inputs.
+
+Source SHA-256:
+  solaris/door_solaris_admission.py
+    4d7f90f6941e67c1a9afe20abb72e1597deefe5019a9369cf84f2ce7abd6d685
+  tests/test_door_solaris_admission.py
+    f41038c0e692a86b5e14ea94aecb4f6209610f1b41087671e7bbde20c77998f5
+
+No new mount, privileged supervisor, slot UID or production game was
+started. A positive admission with a live nosuid execution root remains
+a privileged fixture acceptance step.
