@@ -23,7 +23,8 @@ def private_diagnostics(path):
     events = {'launch-phase', 'worker-accepted', 'worker-reaped', 'admission-rejected',
               'admission-unavailable', 'worker-exit', 'door-exit', 'launch-rejected',
               'launch-failed', 'cleanup-failed', 'worker-failed', 'slot-permission-error'}
-    labels = {'phase': {'request', 'slot', 'scope', 'broker', 'ticket-pipe', 'dropfile',
+    labels = {'phase': {'request', 'slot', 'slot-uid-scan', 'slot-marker-write',
+                       'slot-marker-sync', 'scope', 'broker', 'ticket-pipe', 'dropfile',
                        'pty', 'launch', 'handoff', 'running', 'revoke', 'descriptors',
                        'scope-stop', 'dropfile-remove', 'slot-release', 'connection-close',
                        'setup', 'supervise'},

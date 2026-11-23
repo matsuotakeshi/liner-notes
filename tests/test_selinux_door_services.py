@@ -487,9 +487,14 @@ class JournalProbe(unittest.TestCase):
                          {'event':'slot-permission-error','function':'processes','line':44,'errno':13})
 
     def test_phase_timing_exports_no_arbitrary_context(self):
-        item=dict(event='launch-phase',phase='handoff',worker=12,elapsed_ms=3100,ticket='secret',config='/private')
-        self.assertEqual(json.loads(self.filtered(json.dumps(item).encode())),
-                         dict(event='launch-phase',phase='handoff',worker=12,elapsed_ms=3100))
+        for phase in ('slot-uid-scan', 'slot-marker-write', 'slot-marker-sync', 'handoff'):
+            with self.subTest(phase=phase):
+                item=dict(event='launch-phase',phase=phase,worker=12,elapsed_ms=3100)
+                payload=dict(item,ticket='secret',config='/private')
+                self.assertEqual(json.loads(self.filtered(json.dumps(payload).encode())),item)
+        item=dict(event='launch-phase',worker=12,elapsed_ms=3100)
+        payload=dict(item,phase='private-phase')
+        self.assertEqual(json.loads(self.filtered(json.dumps(payload).encode())),item)
 
     def test_unsafe_private_files_are_rejected(self):
         for info in ({'st_uid':123},{'st_mode':0o100644},{'st_nlink':2},{'st_mode':0o040600}):
