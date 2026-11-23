@@ -51,8 +51,10 @@ When that ownership cannot be established, retain the reservation.
 ## Isolated BBS acceptance
 
 After review and merge, build from that exact main SHA on the Solaris test
-host. Copy the verified source and binaries into a protected root-owned
-tree that the fixture UIDs can traverse and read. Include a
+host. Copy the verified source, `runtime`, `liner-notes-door-lock` and
+`liner-notes-solaris-door-child` into a protected root-owned tree that the
+fixture UIDs can traverse and read. Keep the binaries in the same
+directory. Include a
 `.ci-source-sha` marker with the full SHA. Use the existing
 `/opt/liner-notes-ci/door-boundary/fixture.lock` to serialize with the
 boundary fixture. From the verified tree, an authorized operator runs:
@@ -82,3 +84,5 @@ released features.
 
 See the [direct Solaris test record](evidence/door-supervisor-20261124.txt)
 for the candidate build, worker shutdown and staged manifest checks.
+See the [reviewed-main acceptance record](evidence/door-main-smf-20261124.txt)
+for native SMF start/stop and the remaining BBS cleanup regression.

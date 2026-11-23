@@ -1,0 +1,52 @@
+Solaris authenticated Door and SMF acceptance, 2026-11-24 JST
+
+Reviewed main: 6b899b5c36e06a3fdf42550fc026bda4c1c995a0
+Host: Oracle Solaris 11.4 CBE AMD64, Python 3.13.9.
+Nonprivileged build: /export/home/ci-test/ci/auth-door-main-XXDMmjfa
+Root-owned copy: /var/db/ln-door-reviewed-XXUa_MHc
+The source archive and copied binaries were checked before execution.
+
+  source archive           f392552c61587217c67b0008f0ff93597f29280f70fad186a08544dfc65ce74b
+  runtime                  ac731f30317c699d5f7fa5a532e6f3d26a6f0033ed8de453f436033c8a236859
+  liner-notes-door-lock     4f54df19ef96b7b962f54ceedbd5dc98dc330194f511ff8051db10dc99027e66
+  Solaris Door child       e2e05ee6ab62e1f0053f2ef8be5710407ffff3575a0109bacb255a5270cf4503
+
+SMF acceptance passed two cycles with the reviewed start method and
+manifest. A temporary copy of the manifest pointed to the test policy
+and launcher. After import, its persistent default was disabled. Each
+transient enable reached online with a root-owned mode-0660 Unix socket;
+each disable returned the instance to disabled and removed the socket.
+The manifest was removed from the test host. The receipt and service
+log are /var/db/ln-door-smf-_nsltajl/receipt.json and smf.log.
+
+BBS acceptance used ci/solaris_door_bbs_acceptance.py --run-approved
+with the reviewed source SHA. The first run stopped before BBS startup
+because the staged runtime needed its adjacent liner-notes-door-lock.
+With the lock helper present, actual Telnet menu launch, Broker
+consumption, NAWS to 100x30, normal return and revocation were observed.
+Disconnect also revoked the lease. During the post-quit UID check,
+the native ps output included a row '0     0     ? Z', which the parser
+rejected before checking that the process was a zombie. On a retry that
+waited for a complete snapshot in the test controller only, the quit
+case returned the slot and the next launch used it. The slot was then
+retained after disconnect, with launch-rejected at cleanup (OSError).
+The supervisor and Broker implementation were unmodified in those runs.
+The tmpfs mounts were removed. The stopped-state BUSY marker and logs
+were retained for inspection in the disposable directory.
+
+  /var/db/ln-door-bbs-m93y87_i/receipt.json     parser failure
+  /var/db/ln-door-bbs-7pv2kct3/receipt.json     quit passed; disconnect cleanup retained slot
+  /var/db/ln-door-bbs-7pv2kct3/supervisor.log   cleanup error
+  /var/db/ln-door-bbs-7pv2kct3/disconnect-consumer.log  lease revoked
+
+Follow-up candidate admits the native '?' placeholder in zombie rows
+only. A live row with an unknown UID still prevents release. The fixture
+preflight now verifies the lock helper as well. The candidate was tested
+as ci-test in auth-door-main-XXDMmjfa/slot-check. Slot tests (3), owned
+lifecycle (8), admission (6), and the fixture's read-only plan passed.
+The revised door_solaris_slot.py SHA-256:
+e85999e163b749a76bb247bef025a9618d89e701118d869905b5235144d046f9
+
+The full privileged fixture must be rerun on reviewed main with the fix.
+The withheld-ticket and stopped-Broker cases were not reached in the
+original acceptance. SMF boot persistence was outside this test.

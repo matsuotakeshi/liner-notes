@@ -356,15 +356,16 @@
   ".github/workflows/embedded-ssh-native.yml": "e742c94866abd6b137423f5e7a74e376cc49604b7debfc71babddc57bc755098",
   "tests/solaris_door_contract_probe.c": "8538ad75303f7b99e6ea8aeb6861a6fea58d34afde6b551698165a3480848564",
   "ci/prepare-solaris-libssh.sh": "c038d86f0391fa7d02a1f729b8629d54e5896e2beb3ff8a0d41ee2df39805453",
-  "solaris/door_solaris_slot.py": "affdbc7b7879897e8a85fa1a6168dd9b2fa4951fbfc95f9d1cea15a847894493",
+  "solaris/door_solaris_slot.py": "e85999e163b749a76bb247bef025a9618d89e701118d869905b5235144d046f9",
   "solaris/door_solaris_service.py": "85851eb1dd7b1f30f143e5b3c17061c833a51e686aa45c94e19a18ce8398aa2b",
   "tests/test_door_solaris_service.py": "ec64df069e1b191f0d0b05102e92e9f029f37864f76ca923483795959b6a563d",
-  "ci/solaris_door_bbs_acceptance.py": "312b8befff1693a3c05f1c8dd8987d71d54f8a4934b1cf319a6e2a40df6084ac",
+  "ci/solaris_door_bbs_acceptance.py": "fe9b5e6a044e53377e10379fdb5ea442c8f647fbc7d31ff27dcfbfc1cca6b3fd",
   "solaris/door_solaris_supervisor.py": "14f3ffc4ebadd277afc6c108fc16a85ab1a60bca8c211750b464a82962ccefa7",
   "solaris/liner-notes-door-isolation.xml": "21c09c7e58a2dfca7d87782e72da4963be32ae07202271c008234e765df65cbd",
   "solaris/door-isolation.example.json": "778640d0b0f373f6842d71cf9ae7cd80875769616527a067485fac8bd44f1d49",
   "tests/test_door_solaris_supervisor.py": "5d96c39fcfe23b8c9c3b6730ccab531c4c6f8ef62674df3c92a4cb90dad48393",
   "tests/solaris_auth_door_menu.py": "06e49cd96af541dee91e563ffdd9c6ef9a841cdf6eb4c36ad33f6db0f576064c",
   "tests/solaris_auth_door_probe.c": "0b1f559d13c6782ce010d08214f0a01311a22de4d21997f17151b46b4ecd6c63",
-  "tests/solaris_auth_door_consumer.py": "4d2f02fe47a0176d7fe51d70c367eb14013facb4bcac8be916d2cfa7d86cafb2"
+  "tests/solaris_auth_door_consumer.py": "4d2f02fe47a0176d7fe51d70c367eb14013facb4bcac8be916d2cfa7d86cafb2",
+  "tests/test_door_solaris_slot.py": "92c533d7e951bd1ca93d6b434069ddcc67a16d19a46cb5471ff79f1c4e14c317"
 }
