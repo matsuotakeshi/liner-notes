@@ -81,14 +81,22 @@ def launch_prepared(root, state_dir, uid, helper, columns, rows, open_broker):
     open_broker. The caller must separately confirm game readiness and watch
     the BBS and Broker connections before relaying the PTY.
     """
+    with admit(root, state_dir, uid) as (root_fd, slot):
+        with launch_reserved(root_fd, slot, state_dir, helper, columns, rows, open_broker) as door:
+            yield door
+
+
+@contextmanager
+def launch_reserved(root_fd, slot, state_dir, helper, columns, rows, open_broker):
+    """Launch with a reservation whose lifetime is owned by the caller."""
     import fcntl
     import pty
     import termios
 
-    executable = secure_path(helper, 0)
-    with admit(root, state_dir, uid) as (root_fd, slot), ExitStack() as parent:
+    with ExitStack() as parent:
         holder = issuer = None
         try:
+            executable = secure_path(helper, 0)
             issuer, token = open_broker()
             if not isinstance(token, str) or not re.fullmatch(r"[0-9a-f]{64}", token):
                 raise ValueError("Invalid Door Broker reply")
@@ -111,7 +119,7 @@ def launch_prepared(root, state_dir, uid, helper, columns, rows, open_broker):
                 parent.callback(os.close, status)
                 inherited.callback(os.close, child_status)
                 argv = ("/usr/bin/ctrun", "-l", "contract", "-o", "noorphan",
-                        str(executable), str(uid), str(root_fd), str(slave),
+                        str(executable), str(slot.uid), str(root_fd), str(slave),
                         str(ticket), str(child_status))
                 holder = subprocess.Popen(
                     argv, stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,

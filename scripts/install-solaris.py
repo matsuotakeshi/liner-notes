@@ -11,7 +11,7 @@ import tempfile
 ROOT = Path(__file__).resolve().parents[1]
 
 
-def install(destdir, prefix="/opt/liner-notes", python="/usr/bin/python3.11"):
+def install(destdir, prefix="/opt/liner-notes", python="/usr/bin/python3.11", *, door_isolation=False):
     # A mandatory non-root staging area prevents implicit live deployment.
     requested = Path(destdir).absolute()
     # Inspect the original spelling before resolve() removes symlink ancestors.
@@ -26,6 +26,8 @@ def install(destdir, prefix="/opt/liner-notes", python="/usr/bin/python3.11"):
             raise ValueError("Use absolute target paths without whitespace or parent traversal")
     share = prefix + "/share/liner-notes"
     config = "/etc/liner-notes"
+    if door_isolation and not (ROOT / "liner-notes-solaris-door-child").is_file():
+        raise ValueError("Build the Solaris Door child helper before opt-in staging")
 
     def directory(path):
         if path.exists():
@@ -111,6 +113,23 @@ def install(destdir, prefix="/opt/liner-notes", python="/usr/bin/python3.11"):
     put(config + "/solaris.json", (json.dumps(launch, indent=2) + "\n").encode(), 0o640, sample=True)
     xml = (ROOT / "solaris/liner-notes.xml").read_text(encoding="utf8").replace("@PREFIX@", prefix)
     put(prefix + "/share/smf/liner-notes.xml", xml.encode(), sample=True)
+    if door_isolation:
+        package = prefix + "/libexec/liner-notes-door"
+        for name in ("door_broker.py", "door_broker_core.py", "door_isolation.py",
+                     "door_processes.py", "posix_locks.py"):
+            put(package + "/" + name, (ROOT / "scripts" / name).read_bytes())
+        for source in (ROOT / "solaris").glob("door_solaris_*.py"):
+            put(package + "/" + source.name, source.read_bytes())
+        entry = shlex.quote(package + "/door_solaris_supervisor.py")
+        command = "#!/bin/sh\nexec " + shlex.quote(python) + " -E -s -S -B " + entry + ' "$@"\n'
+        put(prefix + "/libexec/liner-notes-door-isolation", command.encode(), 0o755)
+        put(prefix + "/libexec/liner-notes-solaris-door-child",
+            (ROOT / "liner-notes-solaris-door-child").read_bytes(), 0o755)
+        candidate_xml = (ROOT / "solaris/liner-notes-door-isolation.xml").read_text(encoding="utf8")
+        put(prefix + "/share/smf/liner-notes-door-isolation.xml",
+            candidate_xml.replace("@PREFIX@", prefix).encode())
+        put(config + "/solaris-door-isolation.json.sample",
+            (ROOT / "solaris/door-isolation.example.json").read_bytes(), 0o600)
     manual = ROOT / "docs/manual"
     manifest = json.loads((manual / "manifest.json").read_text(encoding="utf8"))
     for page in manifest["pages"]:
@@ -125,8 +144,10 @@ if __name__ == "__main__":
     parser.add_argument("--destdir", required=True)
     parser.add_argument("--prefix", default="/opt/liner-notes")
     parser.add_argument("--python", default="/usr/bin/python3.11")
+    parser.add_argument("--with-door-isolation", action="store_true",
+                        help="stage the disabled Solaris authenticated Door candidate")
     args = parser.parse_args()
     try:
-        install(args.destdir, args.prefix, args.python)
+        install(args.destdir, args.prefix, args.python, door_isolation=args.with_door_isolation)
     except (OSError, ValueError) as error:
         parser.exit(1, str(error) + "\n")

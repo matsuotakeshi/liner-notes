@@ -1,0 +1,17 @@
+{
+  "bbs_uid": 61002,
+  "socket": "/var/opt/liner-notes-door/isolation.sock",
+  "socket_gid": 61002,
+  "broker_config": "/etc/liner-notes/door-broker.json",
+  "state_dir": "/var/opt/liner-notes-door/state",
+  "slots": [
+    {
+      "door": 3,
+      "uid": 61001,
+      "level": 0,
+      "seconds": 30,
+      "root": "/var/opt/liner-notes-door/roots/door-3-slot-1",
+      "helper": "/opt/liner-notes/libexec/liner-notes-solaris-door-child"
+    }
+  ]
+}

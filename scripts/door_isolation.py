@@ -239,7 +239,7 @@ def accept_connection(listener):
         return None
 
 
-def start_worker(config,connection,listener,watch,alive,children):
+def start_worker(config,connection,listener,watch,alive,children,*,handler=None):
     # Reject only this request on credential/fork failure. Existing worker
     # watch pipes and reservations belong to already-running Doors.
     phase='credentials'
@@ -263,7 +263,10 @@ def start_worker(config,connection,listener,watch,alive,children):
         try:
             listener.close();os.close(alive)
             signal.signal(signal.SIGTERM,signal.SIG_IGN);signal.signal(signal.SIGINT,signal.SIG_IGN)
-            phase='supervise';supervise(config,connection,watch)
+            phase='supervise'
+            if handler is None:
+                handler=supervise
+            handler(config,connection,watch)
         except BaseException as error:
             status=1;failure_event('worker-failed',phase,error)
         finally:os._exit(status)

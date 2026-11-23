@@ -12,6 +12,8 @@ on:
       - "ci/*solaris_smf*.py"
       - "tests/test_solaris_smf_ci.py"
       - "ci/solaris_door_jail.py"
+      - "ci/solaris_door_bbs_acceptance.py"
+      - "tests/solaris_auth_door_*"
       - "tests/test_solaris_door_jail.py"
       - "tests/solaris_door_jail_probe.c"
       - "src/door_handoff.inc"
@@ -22,6 +24,7 @@ on:
       - "tests/test_door_solaris_admission.py"
       - "tests/test_door_solaris_lifecycle.py"
       - "tests/test_door_solaris_service.py"
+      - "tests/test_door_solaris_supervisor.py"
       - "tests/test_door_solaris_slot.py"
       - "ci/solaris_door_boundary.py"
       - "tests/test_solaris_door_boundary.py"
@@ -77,6 +80,10 @@ jobs:
       - run: python tests/test_door_solaris_admission.py
       - run: python tests/test_door_solaris_lifecycle.py
       - run: python tests/test_door_solaris_service.py
+      - run: python tests/test_door_solaris_supervisor.py
+      - run: |
+          python -m py_compile tests/solaris_auth_door_menu.py tests/solaris_auth_door_consumer.py
+          python ci/solaris_door_bbs_acceptance.py
       - run: python tests/test_door_solaris_slot.py
       - run: python tests/test_door_lock.py
       - run: python tests/test_posix_locks.py

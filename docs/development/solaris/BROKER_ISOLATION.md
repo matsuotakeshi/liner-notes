@@ -302,6 +302,13 @@ The [direct Solaris record](evidence/door-bbs-handoff-20261124.txt) includes
 the real Unix-socket PTY exchange, both C client build modes and a normal
 Door Telnet regression using the full candidate BBS binary.
 
+## Supervisor candidate
+
+The next candidate adds a socket listener, explicit slot policy, guarded
+worker shutdown and a disabled SMF definition. See the
+[staging and acceptance procedure](DOOR_SUPERVISOR.md). Authenticated
+launches still require the separate development runtime.
+
 The VM's exec(2) manual describes set-user-ID/set-group-ID transitions separately
 from privilege-set transformations; basic limit sets are not accepted as proof
 of non-root UID/GID confinement. Current headers provide no directly equivalent
