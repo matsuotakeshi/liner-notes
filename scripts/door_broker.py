@@ -102,13 +102,17 @@ class Server:
                 if not isinstance(request,dict):raise Denied('invalid request')
                 op=request.get('op')
                 if uid==0:
-                    fields={'op','member','door','session','generation'}
-                    scoped=op=='open_scoped'
-                    if scoped:fields|={'scope','sequence'}
-                    if op not in ('open','open_scoped') or session is not None or set(request)!=fields:raise Denied('invalid issuer request')
-                    extra=dict(scope=request['scope'],sequence=request['sequence']) if scoped else {}
-                    session=self.broker.open(request['member'],request['door'],request['session'],request['generation'],**extra)
-                    result={'ticket':self.broker.issue(session),'expires_in':self.broker.ttl}
+                    if op=='ready':
+                        if session is None or set(request)!={'op'}:raise Denied('invalid issuer request')
+                        result={'consumed':self.broker.ready(session)}
+                    else:
+                        fields={'op','member','door','session','generation'}
+                        scoped=op=='open_scoped'
+                        if scoped:fields|={'scope','sequence'}
+                        if op not in ('open','open_scoped') or session is not None or set(request)!=fields:raise Denied('invalid issuer request')
+                        extra=dict(scope=request['scope'],sequence=request['sequence']) if scoped else {}
+                        session=self.broker.open(request['member'],request['door'],request['session'],request['generation'],**extra)
+                        result={'ticket':self.broker.issue(session),'expires_in':self.broker.ttl}
                 else:
                     if op not in ('consume','check') or set(request)!={'op','door','bbs','token'}:raise Denied('invalid consumer request')
                     positive(request['door'],86400);identity(request['bbs'])

@@ -1,0 +1,37 @@
+Solaris Broker-confirmed BBS handoff candidate
+
+Base main: b7083ddf0d45a5fc332cd70c3d47ca1e0b87d7cf.
+Host: Oracle Solaris 11.4 CBE AMD64, Python 3.13.9.
+Account: ci-test. All runs used a private scratch directory.
+Work directory: /export/home/ci-test/ci/door-handoff-XXbhJOQc
+Archive SHA-256, matched before extraction:
+a647e4420d504b65c0c4bb751b3a976f02ee63a7e3e3695707e8352f39d21955
+
+  /usr/bin/python3.13 tests/test_door_solaris_service.py -v
+  /usr/bin/python3.13 tests/test_door_broker.py
+
+Results: 5/5 handoff checks, 32/32 Broker regressions. The handoff check
+sent a real PTY over a Solaris Unix socket and read data sent through its
+slave. The worker's launch and identity dependencies were controlled in
+that test. It does not require a privileged supervisor. The Broker suite
+also ran its Solaris ticket FD, one-use and issuer EOF revocation probe.
+
+  /usr/bin/gcc -O2 -g -m64 -I/usr/openssl/3/include -std=c11 \
+    -Wall -Wextra -Werror -c src/doors.c -o doors-default.o
+  /usr/bin/gcc -O2 -g -m64 -DLINER_TEST_SOLARIS_DOOR=1 \
+    -I/usr/openssl/3/include -std=c11 -Wall -Wextra -Werror \
+    -c src/doors.c -o doors-candidate.o
+  /usr/bin/gmake CC=/usr/bin/gcc CFLAGS="-O2 -g -m64" \
+    CPPFLAGS="-D__EXTENSIONS__=1 -DLINER_TEST_SOLARIS_DOOR=1 -I/usr/openssl/3/include" \
+    LDFLAGS="-L/usr/openssl/3/lib/amd64 -Wl,-R,/usr/openssl/3/lib/amd64" \
+    PTY_LIBS= LDLIBS="-lsocket -lnsl" SQLITE_CFLAGS= SQLITE_LIBS=-lsqlite3 runtime
+  /usr/bin/python3.13 tests/test_doors_generic.py ./runtime
+
+Results: both C client variants compiled. The candidate runtime linked and
+passed the ordinary Door Telnet regression, including DORINFO, slot sharing,
+undelayed keys, timeout, crash, escape, disconnect and descendant cleanup.
+The build transcript is runtime-build.log in the work directory. The
+privileged authenticated BBS launch and the SMF service are still pending.
+
+Local canonical manual check passed 42 pages, 2,822 local links and
+Markdown/HTML parity.

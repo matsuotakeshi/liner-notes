@@ -36,6 +36,7 @@ class Session:
     deadline: float
     active: bool=True
     replay_key: tuple | None=None
+    consumed: bool=False
 
 class Broker:
     def __init__(self,bbs,consumers,*,clock=time.monotonic,ttl=30,session_ttl=3600,capacity=4096):
@@ -89,9 +90,17 @@ class Broker:
         if not session.active or self.sessions.get(session.session) is not session:raise Denied('inactive session')
         # One unconsumed ticket per session; repeated issuance invalidates the old one.
         self.tickets={key:value for key,value in self.tickets.items() if value[0] is not session}
+        session.consumed=False
         token=secrets.token_hex(32)
         self.tickets[digest(token)]=(session,min(self.clock()+self.ttl,session.deadline),secrets.token_hex(16))
         return token
+
+    def ready(self,session):
+        """Only the issuer owning this session may ask if its ticket was consumed."""
+        if (not session.active or self.sessions.get(session.session) is not session or
+            self.clock()>=session.deadline):
+            raise Denied('inactive session')
+        return session.consumed
 
     def authorize_consumer(self,uid,door,bbs):
         if bbs!=self.bbs or door not in self.consumers.get(uid,()):raise Denied('authorization denied')
@@ -108,6 +117,7 @@ class Broker:
         if len(self.leases)>=self.capacity:raise Denied('capacity reached')
         session,_,ticket_id=self.tickets.pop(key)
         lease=secrets.token_hex(32);self.leases[digest(lease)]=(session,uid,ticket_id)
+        session.consumed=True
         return dict(lease=lease,claims=self.claims(session,ticket_id))
 
     def check(self,uid,door,bbs,lease):

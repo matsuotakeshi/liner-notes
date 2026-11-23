@@ -282,6 +282,26 @@ are gone, and reaps its direct child. It neither enumerates/signals unrelated
 PIDs nor changes user accounts or services. Native failures retain stdout/stderr
 in the unittest failure. The current backend still explicitly refuses Solaris.
 
+## Broker-confirmed BBS handoff
+
+The Solaris per-connection worker takes a slot already selected by a trusted
+supervisor, checks the BBS socket peer UID and launch policy, and waits for
+boundary preparation. It then asks the Broker for `{"op":"ready"}` on the
+same privileged issuer socket that opened the session. Only an approved
+consumer of that session's ticket can complete readiness. The response contains
+only the boolean `consumed`. A child status EOF or text written to the PTY has
+no effect on this decision.
+
+The worker sends the PTY over the BBS Unix socket after that acknowledgement.
+It watches the session, issuer and process contract during execution and
+uses the existing contract cleanup and reservation rules. Closing the issuer
+revokes the ticket and any lease. The BBS client is available on Solaris only
+in builds with `-DLINER_TEST_SOLARIS_DOOR=1`. A persistent supervisor, SMF
+installation and privileged end-to-end BBS validation remain integration work.
+The [direct Solaris record](evidence/door-bbs-handoff-20261124.txt) includes
+the real Unix-socket PTY exchange, both C client build modes and a normal
+Door Telnet regression using the full candidate BBS binary.
+
 The VM's exec(2) manual describes set-user-ID/set-group-ID transitions separately
 from privilege-set transformations; basic limit sets are not accepted as proof
 of non-root UID/GID confinement. Current headers provide no directly equivalent

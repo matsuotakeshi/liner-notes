@@ -256,6 +256,37 @@ class Protocol(unittest.IsolatedAsyncioTestCase):
         reader.feed_eof();await task
         check=await self.request(40,dict(op='check',door=1,bbs='bbs',token=result['lease']))
         self.assertIn(b'"ok":false',check)
+
+    async def test_readiness_is_bound_to_the_live_issuer_session(self):
+        reader,writer,task=await self.live_issuer('readiness')
+
+        async def ready():
+            count=len(writer.data.splitlines())
+            reader.feed_data(b'{"op":"ready"}\n')
+            async def response():
+                while len(writer.data.splitlines())==count:
+                    await asyncio.sleep(0)
+                return json.loads(writer.data.splitlines()[-1])
+            return await asyncio.wait_for(response(),5)
+
+        try:
+            self.assertEqual(await ready(),{'ok':True,'result':{'consumed':False}})
+            other=self.b.open(2,1,'another',0)
+            self.b.consume(40,1,'bbs',self.b.issue(other))
+            self.assertEqual(await ready(),{'ok':True,'result':{'consumed':False}})
+            token=json.loads(writer.data.splitlines()[0])['result']['ticket']
+            self.b.consume(40,1,'bbs',token)
+            self.assertEqual(await ready(),{'ok':True,'result':{'consumed':True}})
+            for uid in (0,20,40):
+                self.assertFalse(json.loads(await self.request(uid,{'op':'ready'}))['ok'])
+            reader.feed_data(b'{"op":"ready","session":"another"}\n')
+            await asyncio.wait_for(task,5)
+            self.assertFalse(json.loads(writer.data.splitlines()[-1])['ok'])
+        finally:
+            reader.feed_eof()
+            await asyncio.wait_for(task,5)
+        self.assertNotIn('readiness',self.b.sessions)
+        self.assertIn('another',self.b.sessions)
     async def test_concurrent_consumers_have_one_winner(self):
         reader,writer,task=await self.live_issuer('race')
         try:
