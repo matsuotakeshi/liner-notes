@@ -18,6 +18,8 @@ on:
       - "src/door_service_client.inc"
       - "tests/door_handoff_probe.c"
       - "tests/door_service_client_probe.c"
+      - "tests/solaris_door_auth_transport_probe.c"
+      - "tests/test_door_solaris_slot.py"
       - "ci/solaris_door_boundary.py"
       - "tests/test_solaris_door_boundary.py"
       - "tests/solaris_door_identity_probe.c"
@@ -69,6 +71,7 @@ jobs:
       - run: python tests/test_solaris_smf_ci.py
       - run: python tests/test_solaris_door_boundary.py
       - run: python tests/test_solaris_door_jail.py
+      - run: python tests/test_door_solaris_slot.py
       - run: python tests/test_door_lock.py
       - run: python tests/test_posix_locks.py
       - run: python tests/test_resume_receipt.py

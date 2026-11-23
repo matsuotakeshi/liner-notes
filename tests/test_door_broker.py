@@ -381,4 +381,130 @@ class Protocol(unittest.IsolatedAsyncioTestCase):
         result=await self.request(0,dict(op='open',member=1,door=1,session='recovered',generation=0))
         self.assertIn(b'"ok":true',result)
 
+@unittest.skipUnless(sys.platform.startswith('sunos'),'Solaris UNIX peer, PTY and process contract')
+class SolarisTicketPTY(unittest.IsolatedAsyncioTestCase):
+    async def test_ticket_pipe_to_pty_then_issuer_disconnect(self):
+        import contextlib
+        import os
+        import pty
+        import select
+        import signal
+        import socket
+        import subprocess
+        import tempfile
+        import time
+
+        uid = os.getuid()
+        self.assertGreater(uid,0)
+        worker = r'''
+import os, signal, sys
+
+sys.path.insert(0,sys.argv[1])
+from door_auth_client import AuthorizationError, DoorAuthorization
+
+signal.alarm(12)
+os.login_tty(0)
+fd = int(os.environ.pop("LINER_AUTH_FD"))
+with os.fdopen(fd,"rb") as ticket_pipe:
+    line = ticket_pipe.read(512)
+    assert line.endswith(b"\n") and line.count(b"\n") == 1
+token = line[:-1].decode("ascii")
+# Only a descriptor number was supplied through the environment.
+assert token and all(token not in value for value in os.environ.values())
+lease = DoorAuthorization(sys.argv[2],bbs="solaris-fixture",door=1,
+                          ticket=token,broker_uid=os.getuid())
+assert lease.authorize(7)["member"] == 7
+print("LEASE LIVE",flush=True)
+for raw in sys.stdin:
+    if raw.strip() == "check":
+        try:
+            lease.authorize(7)
+        except AuthorizationError:
+            print("LEASE REVOKED",flush=True)
+        else:
+            print("LEASE LIVE",flush=True)
+    elif raw.strip() == "quit":
+        break
+'''
+        root = Path(__file__).resolve().parents[1]
+        broker = Broker('solaris-fixture',{uid:[1]})
+        consumer = Server(broker)
+        # Only the test-owned socket pair gets an injected issuer identity.
+        # Real peer lookup is used on both sides of the consumer connection.
+        issuer = Server(broker,peer=lambda _:0)
+        issuer_end, operator_end = socket.socketpair()
+        reader, writer = await asyncio.open_connection(sock=issuer_end)
+        issuer_task = asyncio.create_task(issuer.handle(reader,writer))
+        operator_reader, operator = await asyncio.open_connection(sock=operator_end)
+
+        def line_from_pty(fd, expected, token):
+            deadline = time.monotonic()+3
+            output = b''
+            while len(output)<4096:
+                remaining = deadline-time.monotonic()
+                if remaining<=0 or not select.select([fd],[],[],remaining)[0]:
+                    break
+                chunk = os.read(fd,512)
+                if not chunk:break
+                output += chunk
+                self.assertTrue(token not in output,'Credential appeared on the PTY')
+                if expected in output.replace(b'\r\n',b'\n').split(b'\n')[:-1]:
+                    return
+            self.fail('Expected synthetic lease status did not arrive on the PTY')
+
+        try:
+            with tempfile.TemporaryDirectory(prefix='ln-door-broker-') as temporary:
+                endpoint = str(Path(temporary)/'broker.sock')
+                listener = await asyncio.start_unix_server(consumer.handle,path=endpoint)
+                async with listener:
+                    operator.write(b'{"op":"open","member":7,"door":1,"session":"pty-test","generation":0}\n')
+                    await operator.drain()
+                    issued = json.loads(await asyncio.wait_for(operator_reader.readline(),3))
+                    self.assertIs(issued.get('ok'),True)
+                    ticket = issued['result']['ticket']
+                    encoded = ticket.encode('ascii')
+                    with contextlib.ExitStack() as cleanup:
+                        master, slave = pty.openpty()
+                        cleanup.callback(os.close,master)
+                        try:
+                            ticket_read, ticket_write = os.pipe()
+                            try:
+                                try:
+                                    os.write(ticket_write,encoded+b'\n')
+                                finally:
+                                    os.close(ticket_write)
+                                argv = ['/usr/bin/ctrun','-l','contract','-o','noorphan',
+                                        sys.executable,'-I','-c',worker,str(root/'scripts'),endpoint]
+                                process = subprocess.Popen(
+                                    argv,stdin=slave,stdout=slave,stderr=slave,pass_fds=(ticket_read,),
+                                    start_new_session=True,env={'PATH':'/usr/bin','LC_ALL':'C',
+                                                                'LINER_AUTH_FD':str(ticket_read)})
+                            finally:
+                                os.close(ticket_read)
+                        finally:
+                            os.close(slave)
+                        try:
+                            await asyncio.to_thread(line_from_pty,master,b'LEASE LIVE',encoded)
+                            with self.assertRaises(AuthorizationError):
+                                await asyncio.to_thread(door_auth_client.request,endpoint,'consume',
+                                                        bbs='solaris-fixture',door=1,token=ticket,
+                                                        broker_uid=uid)
+                            operator.close()
+                            await asyncio.wait_for(issuer_task,3)
+                            self.assertFalse(broker.leases or broker.sessions or broker.tickets)
+                            os.write(master,b'check\n')
+                            await asyncio.to_thread(line_from_pty,master,b'LEASE REVOKED',encoded)
+                            os.write(master,b'quit\n')
+                            self.assertEqual(await asyncio.to_thread(process.wait,3),0)
+                        finally:
+                            if process.poll() is None:
+                                process.send_signal(signal.SIGKILL)
+                                await asyncio.to_thread(process.wait,3)
+        finally:
+            operator.close()
+            await asyncio.wait_for(issuer_task,3)
+            await operator.wait_closed()
+        print('SOLARIS_BROKER_PTY ticket FD, one-use, issuer EOF revocation',flush=True)
+
+
 if __name__=='__main__':unittest.main()
