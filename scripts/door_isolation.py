@@ -101,7 +101,8 @@ def request_check(request):
     if not name or len(name.encode())>32 or any(ord(c)<32 or ord(c)==127 for c in name):raise Rejected('name')
     return name
 
-def slot_acquire(config,door,level):
+def slot_acquire(config,door,level,*,timing=None):
+    timing=timing if timing is not None else LaunchTiming()
     for slot in config['slots']:
         if slot['door']!=door or level<slot['level']:continue
         fd=os.open(str(Path(config['state_dir'])/('slot-'+str(slot['uid']))),os.O_CREAT|os.O_RDWR|os.O_NOFOLLOW,0o600)
@@ -112,8 +113,13 @@ def slot_acquire(config,door,level):
         try:
             # Read reservation only after taking the lock; an earlier fstat can
             # predate another worker's crash and otherwise reuse a dirty slot.
-            if os.fstat(fd).st_size or processes(slot['uid']):os.close(fd);continue
-            os.write(fd,b'BUSY\n');os.fsync(fd)
+            if os.fstat(fd).st_size:os.close(fd);continue
+            timing.mark('slot-uid-scan')
+            if processes(slot['uid']):os.close(fd);continue
+            timing.mark('slot-marker-write')
+            os.write(fd,b'BUSY\n')
+            timing.mark('slot-marker-sync')
+            os.fsync(fd)
             return slot,fd
         except BaseException:os.close(fd);raise
     raise Rejected('no isolated slot')
@@ -138,7 +144,7 @@ def supervise(config,connection,parent_watch=None):
     try:
         connection.settimeout(3);request=read_line(connection);name=request_check(request)
         phase=timing.mark('slot')
-        slot,lock=slot_acquire(config,request['door'],request['level'])
+        slot,lock=slot_acquire(config,request['door'],request['level'],timing=timing)
         # This supervisor is trusted, single-threaded, and owns one unique slot UID.
         phase=timing.mark('scope');scope=Scope(slot['uid'])
         token=None
