@@ -1,0 +1,40 @@
+Date (JST): 2026-11-23
+Source: 8e5976fe2e0c128a1300d0a401f244fec8d1c211 (merged PR #165)
+Hosted PR checks: 20 succeeded for d3aa10ca5c4d7b6674089215594beb2285782ce9.
+Native preflight: compiled that exact main on Solaris using the existing
+non-root CI account. Both targeted tests passed (compiler and refusal, plus
+library directory modes). The temporary source directory was removed.
+Solaris Native CI: https://github.com/matsuotakeshi/liner-notes/actions/runs/45112490673
+The Actions run was still queued when the direct experiment was authorized
+and performed. Keep its result separate from this direct observation.
+
+Invocation: /usr/bin/python3.13 -I /opt/liner-notes-ci/door-jail/solaris_door_jail.py --run-holder-death-approved
+Previous bundle backed up at /opt/liner-notes-ci/door-jail/backup-df9e1c34.
+Receipt: /var/tmp/liner-door-jail-1jkodtuf/result.json
+Credential/namespace matrix: 11 passed.
+Holder-death observation: confirmed. SIGKILL status -9, pipe EOF
+12.4 ms after starting the holder (including startup).
+The two workload PIDs were gone when sampled after the signal.
+The outside control was alive in a different contract.
+
+ready: "READY 2957 2958\n"
+before: {"2955": {"contract": 2177, "parent": 2905, "session": 2904, "status": "S"}, "2956": {"contract": 2177, "parent": 2905, "session": 2956, "status": "S"}, "2957": {"contract": 2178, "parent": 2956, "session": 2956, "status": "S"}, "2958": {"contract": 2178, "parent": 2957, "session": 2958, "status": "S"}}
+after: {"2955": {"contract": 2177, "parent": 2905, "session": 2904, "status": "S"}}
+
+FIXTURE_EXIT 0
+REMAINING_FILES ["plan.json", "result.json"]
+REMAINING_MOUNTS []
+cleanup_complete=true
+
+This result covers a synthetic child in a detached session using the same
+fixture root and shared setup. It leaves double fork inside that root,
+additional-contract boundaries, the service launcher, PTY and Broker
+acceptance pending. The full lifecycle flag remains false.
+
+Local full records: build/solaris-door-jail/approved-8e5976fe2e0c/
+execution.log SHA-256: 53f9909ea6534ba209038d82615dc1987270b2be11e7a9c9badcf2c736d650ee
+result.json SHA-256: 049711136528bf78597aab1a26417b24c390f431dd532af97ddc7eda028691c5
+plan.json SHA-256: ff35194e43bfc3ac968c9e51b742f1a0bacddccd5fcf3cf884dd7d60cd5bb1fb
+manifest.json SHA-256: 8f99667de14f48acc7679050bd34f71ef13daefde99390e349a90ac09053034f
+gate.json SHA-256: 12590eadb684dca3b330f32c400ae6288ef08f8326d698492f1181c6945b16ac
+nonroot-preflight.log SHA-256: 32e132dd7e19c472ca15953da88e7106bfa71f90e7814c8bc827ba5d947a8418

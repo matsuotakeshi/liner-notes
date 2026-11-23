@@ -304,9 +304,11 @@ transcript. The remaining process-lifecycle, PTY and Broker gates still apply.
 
 ## Opt-in synthetic holder-death trial
 
-After review, same-SHA Solaris Native CI and explicit approval for this
-additional privileged trial, use the existing private bundle and lock.
-Hash-check and back up the installed bundle before updating it. Execute:
+Use reviewed main with successful PR checks and an exact-SHA Solaris
+non-root build and refusal check. Keep Solaris Native CI running and track its
+result separately from operator experiments. For the authorized test host, use
+the existing private bundle and lock. Hash-check and back up the installed
+bundle before updating it. Execute:
 
 ```sh
 /usr/bin/python3.13 -I /opt/liner-notes-ci/door-jail/solaris_door_jail.py --run-holder-death-approved
@@ -335,6 +337,16 @@ the descendant. This control used system utilities and synthetic processes
 outside the execution root. See the [control evidence](evidence/contract-holder-session-20261123.txt).
 Hosted tests exercise result rejection, and normal Solaris CI compiles the
 probe and checks non-root refusal. The opt-in privileged trial runs separately.
+
+On 2026-11-23 the combined trial passed on main
+`8e5976fe2e0c128a1300d0a401f244fec8d1c211` (PR #165). All eleven
+credential cases passed. On holder death, both the jailed launcher and
+its detached child disappeared from the process snapshot while the control
+in the other contract stayed live. The fixture unmounted the temporary
+filesystem and left only the plan and result receipts. The system CI run
+was queued at launch, so the direct trial used a separate exact-SHA native
+preflight. The [evidence record](evidence/holder-death-8e5976fe.txt) links
+the source, Actions run, native preflight and trial receipt hashes.
 
 ## Primary OS references
 
