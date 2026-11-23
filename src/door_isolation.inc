@@ -4,6 +4,7 @@
 #include <sys/un.h>
 #include <sys/time.h>
 #include <openssl/rand.h>
+#include "door_handoff.inc"
 static char isolation_socket[100];
 int doors_isolation_config(const char *path) {
     if(!path || path[0]!='/' || strlen(path)>=sizeof(isolation_socket))return 0;
@@ -34,21 +35,12 @@ static Door *isolated_start(const DoorSpec *g,unsigned level,uint32_t user,const
     if(n<0 || n>=(int)sizeof(request)) { door_launch_diagnostic("isolation-encode",0);close(fd);return NULL; }
     size_t sent=0;
     while(sent<(size_t)n) { ssize_t count=send(fd,request+sent,(size_t)n-sent,MSG_NOSIGNAL);if(count<0 && errno==EINTR)continue;if(count<=0) { door_launch_diagnostic("isolation-send",errno);close(fd);return NULL; }sent+=(size_t)count; }
-    char reply[3];struct iovec data={reply,sizeof(reply)};
-    union { struct cmsghdr align;char bytes[CMSG_SPACE(sizeof(int)*4)]; } control;
-    memset(&control,0,sizeof(control));struct msghdr message={0};message.msg_iov=&data;message.msg_iovlen=1;message.msg_control=control.bytes;message.msg_controllen=sizeof(control.bytes);
-    ssize_t received=recvmsg(fd,&message,MSG_CMSG_CLOEXEC|MSG_WAITALL);int receive_error=received<0?errno:0;int master=-1,count=0;
-    for(struct cmsghdr *c=CMSG_FIRSTHDR(&message);c;c=CMSG_NXTHDR(&message,c)) {
-        if(c->cmsg_level==SOL_SOCKET && c->cmsg_type==SCM_RIGHTS && c->cmsg_len>=CMSG_LEN(0)) {
-            size_t size=c->cmsg_len-CMSG_LEN(0);int *fds=(int *)CMSG_DATA(c);
-            for(size_t i=0;i<size/sizeof(int);i++) { if(count++==0)master=fds[i];else close(fds[i]); }
-        }
-    }
-    door_reply_diagnostic(reply,(long)received,count,message.msg_flags&(MSG_CTRUNC|MSG_TRUNC),receive_error);
-    if(received!=3 || memcmp(reply,"OK\n",3) || count!=1 || !isatty(master) || (message.msg_flags&(MSG_CTRUNC|MSG_TRUNC))) {
-        const char *phase=received!=3?"isolation-receive":memcmp(reply,"OK\n",3)?"isolation-rejected":count!=1?"isolation-fd-count":(message.msg_flags&(MSG_CTRUNC|MSG_TRUNC))?"isolation-truncated":"isolation-pty";
-        door_launch_diagnostic(phase,received<0?receive_error:0);
-        if(master>=0) { close(master); }close(fd);return NULL;
+    DoorHandoff handoff;
+    int master=door_receive_pty(fd,&handoff);
+    door_reply_diagnostic(handoff.reply,(long)handoff.received,handoff.count,handoff.flags,handoff.error);
+    if(master<0) {
+        door_launch_diagnostic(handoff.failure,handoff.error);
+        close(fd);return NULL;
     }
     Door *d=calloc(1,sizeof(*d));if(!d) { door_launch_diagnostic("isolation-allocation",errno);close(master);close(fd);return NULL; }
     d->fd=master;d->remote=fd;d->lock=-1;d->until=now+(uint64_t)g->seconds*1000;

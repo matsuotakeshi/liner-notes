@@ -3,6 +3,7 @@ import hashlib
 import json
 import os
 from pathlib import Path, PurePosixPath
+import shlex
 import stat
 import struct
 import subprocess
@@ -304,6 +305,23 @@ class JailFixture(unittest.TestCase):
 
     def test_unmount_failure_preserves_paths_and_records_incomplete_cleanup(self):
         self.failed_run(mounted=True,unmount_failure=True)
+
+    @unittest.skipUnless(sys.platform.startswith(('linux','freebsd','sunos')),
+                         'native UNIX descriptor passing')
+    def test_native_pty_descriptor_handoff(self):
+        solaris = sys.platform.startswith('sunos')
+        compiler = shlex.split(os.environ.get('CC','/usr/bin/gcc' if solaris else 'cc'))
+        libraries = ['-lsocket','-lnsl'] if solaris else ['-lutil']
+        with tempfile.TemporaryDirectory(prefix='ln-door-handoff-') as temporary:
+            binary = Path(temporary)/'probe'
+            subprocess.run([*compiler,'-std=c11','-Wall','-Wextra','-Werror',
+                            str(ROOT/'tests/door_handoff_probe.c'),'-o',str(binary),*libraries],
+                           check=True,timeout=45)
+            result = subprocess.run([str(binary)],capture_output=True,text=True,timeout=10)
+            self.assertEqual(result.returncode,0,result.stderr)
+            self.assertIn('PASS C PTY handoff',result.stdout)
+            self.assertFalse(result.stderr,result.stderr)
+            print(result.stdout.strip(),flush=True)
 
     @unittest.skipUnless(sys.platform.startswith('sunos'),'Solaris native compilation only, no root/mount')
     def test_native_compiler_and_unprivileged_refusal(self):

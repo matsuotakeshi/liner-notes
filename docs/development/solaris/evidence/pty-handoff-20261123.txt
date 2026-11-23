@@ -1,0 +1,41 @@
+Date (JST): 2026-11-23
+Main used for unchanged dependencies: 8e5976fe2e0c128a1300d0a401f244fec8d1c211.
+Direct pre-commit run, existing non-root accounts and isolated temporary copies.
+Entry point: tests/test_solaris_door_jail.py JailFixture.test_native_pty_descriptor_handoff
+
+The test builds the same C receiver used by the Linux/FreeBSD runtime against
+native socket and PTY APIs. The positive case passes one PTY master with
+SCM_RIGHTS, checks atomic FD_CLOEXEC, resizes the PTY and reads output from
+its slave. It rejects missing/extra rights, an oversized ancillary message,
+a truncated/rejected reply and a non-terminal descriptor. The descriptor
+count matches its pre-receive value after every case.
+
+The Solaris and Linux cases passed. The Solaris test exercises a socketpair
+and the shared receiver. Activation of the Solaris service launcher and
+its end-to-end authenticated Door session remain separate work.
+
+Solaris 11.4 CBE AMD64 direct output:
+{"sha": "8e5976fe2e0c128a1300d0a401f244fec8d1c211", "sha256": {"ci/solaris_door_jail.py": "cea586383033237f652dc31fd1331ca931925a82b8a9141385ed46f1dc307b54", "tests/test_solaris_door_jail.py": "73b13a6b009e8bd604f2059262b6f83670911e8d12509a9028234a4d0794b1c5", "tests/door_handoff_probe.c": "5c86050c76d1f836c0ec7c7df95ad72fab29597b493ef96e272e8c041ebb96d7", "src/door_handoff.inc": "964fd31e748c3352de1b6a02aa0f146981086b62fbe328ee8bfb9e9aa6f94631"}, "uid": 1000}
+PASS C PTY handoff: atomic CLOEXEC, resize, output, invalid replies and descriptor cleanup
+.
+----------------------------------------------------------------------
+Ran 1 test in 0.236s
+
+OK
+
+{"temporary_directory_removed": true, "exit": 0}
+Transcript SHA-256: 8fbd7136bad74be71600993905e6a3970a55bf769de7baf311506df2db86602e
+
+Linux direct output:
+{"sha": "8e5976fe2e0c128a1300d0a401f244fec8d1c211", "sha256": {"ci/solaris_door_jail.py": "cea586383033237f652dc31fd1331ca931925a82b8a9141385ed46f1dc307b54", "tests/test_solaris_door_jail.py": "73b13a6b009e8bd604f2059262b6f83670911e8d12509a9028234a4d0794b1c5", "tests/door_handoff_probe.c": "5c86050c76d1f836c0ec7c7df95ad72fab29597b493ef96e272e8c041ebb96d7", "src/door_handoff.inc": "964fd31e748c3352de1b6a02aa0f146981086b62fbe328ee8bfb9e9aa6f94631"}, "uid": 1001}
+PASS C PTY handoff: atomic CLOEXEC, resize, output, invalid replies and descriptor cleanup
+.
+----------------------------------------------------------------------
+Ran 1 test in 0.219s
+
+OK
+
+{"temporary_directory_removed": true, "exit": 0}
+Transcript SHA-256: 53a7167861921ef26bbdd7522b9d40dfb835edf8be1e99b5ecd43a614fde1ddd
+
+Local full transcripts: build/solaris-door-jail/
