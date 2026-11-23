@@ -40,6 +40,19 @@ Deadlines and nonzero exits make failures visible. The existing native `make
 check` runs this after main integration; PR/Windows cannot claim it passed.
 Its explicit output says isolation is NOT verified. The backend is not enabled.
 
+## Reserved Solaris Door slots
+
+The Solaris slot candidate persists a BUSY marker while it holds the existing
+record-lock lease. It looks for the slot UID in the real, effective and saved
+UID columns of a complete process snapshot. An owner can release its slot
+after stopping the owned contract and confirming no live matching process.
+An incomplete snapshot fails closed. A supervisor crash leaves the marker in
+place even after the record lock disappears and no matching process is visible.
+Any recovery tool must establish the launch scope before it can clear such a
+marker. The [direct Solaris tests](evidence/slot-lifecycle-20261123.txt) exercised
+startup abort, contention, cleanup and crash retention. The candidate is
+available for the Solaris launcher but is not wired into runtime activation.
+
 ## Security blockers before backend activation
 
 1. A malicious Door may create nested/new contracts. NOORPHAN's kill scope and
