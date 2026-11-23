@@ -1,0 +1,33 @@
+Date (JST): 2026-11-23
+Main under test: 8e5976fe2e0c128a1300d0a401f244fec8d1c211.
+Solaris Native CI: https://github.com/matsuotakeshi/liner-notes/actions/runs/45112490673
+Failed job: 137487822025. Artifact: 14790967562.
+Artifact SHA-256: 974307f6b8173261826441cb52767d7fa8b437b25f634734953ce2e65292bab5
+
+The build, Door and the preceding mail ZMODEM transfer passed. The separate
+batch/resume test timed out after requesting private-mail resumption. Runtime
+stderr reported ZMODEM failure: NO_PENDING. CI therefore marked ZMODEM
+incomplete. The result does not invalidate the separate holder-death trial.
+
+Direct reproduction attempt, using only the existing CI account and an
+isolated data directory. Runtime, vaultctl and lrzsz came from the preserved
+same-main CI build. The original Door resize test and the original full
+batch/resume test both passed when run directly. The CI failure did not
+reproduce. Code inspection found two timing assumptions in only the private
+mail case: the number of transmitted bytes stood in for received bytes and a
+fixed sleep stood in for completed disconnect cleanup. NO_PENDING alone
+cannot distinguish their effects.
+
+A disposable copy of the corrected test waited for nonempty receiver staging
+before closing TCP, then verified the retained partial and waited for the
+existing lease to be released. It left 65,520 bytes of the 131,072-byte
+private file and passed resumption, exact-size/SHA-256 checks and spool
+cleanup. No source on the VM, services, firmware or production data changed.
+The test copy was removed. Limits and product transfer timeouts stay the same.
+
+Verified test SHA-256: 958c096eb505e61e337756df366e0a7d4213e9838adca01ac93cf1cf2e8c4064
+Direct baseline and candidate transcripts are local under build/solaris-door-jail/failure-8e5976fe/.
+direct-baseline.log SHA-256: fdd12e946998e0977e0b2d2afe8e506e01190d5b36a60b6acdad32a2a1bbfae2
+direct-candidate.log SHA-256: 1aec96d9641e55b0a1c57824edb399bc09a3cab427e31bf7caaf3ddd3036d0f7
+
+The fixed test still needs its normal PR and subsequent native CI results.
