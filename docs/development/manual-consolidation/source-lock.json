@@ -370,7 +370,7 @@
   "tests/test_door_solaris_slot.py": "92c533d7e951bd1ca93d6b434069ddcc67a16d19a46cb5471ff79f1c4e14c317",
   "src/mmm_input.c": "f1dc9a40bea68eb5ebbeb3d33b15b9bd6b3c2623bd1eb92ddf24c581cdd790f4",
   "src/mmm_input.h": "ca5e47223c848b23570f9073aa61ff6bf0b1ce10eeb42875d8f10195fe734647",
-  "src/session_mmm.c": "2fdb4e3e1df0a14527438d0c28e30e0f8290ec1bc6068ce795153d21c826ed08",
+  "src/session_mmm.c": "5278145ba08dc99ef50f1b4fea0bb96344c23be4a6faba36f66512dcdd128f2c",
   "tests/test_mmm_input.c": "1e95deaea5ceb9fe7ea2a3ffd1860758f0571f0645544aceb307627d1c6cbcfb",
   "tests/test_mmm_ui.py": "aa6be7f1496bafb1dbe355526795e260bdc25125619ac8f9d23d1c0d19db9512"
 }

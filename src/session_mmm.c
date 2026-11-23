@@ -358,8 +358,10 @@ static void choose_profile(Session *s,char *arg) {
     const char *name=reset?c->adapters[c->default_index]->name:arg;
     SessionUiSelection result=session_ui_choose(s,name);
     if(result==SESSION_UI_SELECTED || result==SESSION_UI_UNCHANGED) {
-        if(s->core.user && !session_ui_save_choice(s,reset?"":name))
-            session_impl_queue_text(s,"ERR could not save UI preference\r\n");
+        if(s->core.user && !session_ui_save_choice(s,reset?"":name)) {
+            session_impl_queue_text(s,message_text(session_ui_snapshot(s).language,MSG_ERR_SETTINGS_STORAGE));
+            session_impl_queue_text(s,"\r\n");
+        }
     } else say(s,"UI selection unavailable here.\r\n","ここではUIを切り替えられません。\r\n");
 }
 
