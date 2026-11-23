@@ -95,9 +95,11 @@ verify its process scope before clearing the reservation. The descriptor
 is available for entering the checked root in a future child launcher.
 The launch candidate does not open a socket or start a process yet.
 Supervisor integration still requires reviewing process and descriptor
-boundaries in the child and verifying a real nosuid mount on Solaris.
-The [direct test record](evidence/door-admission-20261123.txt) covers the
-non-privileged Solaris regression and identifies the tested source bytes.
+boundaries in the child. The [non-privileged regression](evidence/door-admission-20261123.txt)
+and the [live mount trial](evidence/door-admission-live-ddc71f0.txt)
+record the tested source bytes. The latter confirmed admission, contention,
+safe startup abort, and BUSY retention on the fixture's disposable nosuid
+tmpfs. The actual game launch and owned-contract cleanup remain pending.
 
 ## Security blockers before backend activation
 

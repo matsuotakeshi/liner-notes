@@ -1,0 +1,32 @@
+Solaris Door live mount acceptance
+
+Source: main ddc71f0b303c5d763b24c826dbabc0edde69d847 (PR #176).
+The preceding main SHA 856627e82520 passed Solaris Native CI:
+https://github.com/matsuotakeshi/liner-notes/actions/runs/45170052038
+Host: Oracle Solaris 11.4 CBE AMD64, Python 3.13.
+Source archive: exact Git objects for the Solaris admission and reservation
+modules, the Broker path guard and its dependency, and the POSIX lock helper.
+Archive SHA-256: 25a403e9c6a446c58046ce5c3174c9fbd91243449da865e934ee4c637471ffcd
+
+The operator verified the archive digest on the test VM, held the installed
+credential fixture's shared lock, and used an unregistered numeric fixture
+UID under a fresh root-owned directory. The module refused the ordinary
+directory before creating a reservation. The operator mounted a 64MiB
+tmpfs with nosuid; the live options included nosuid and the returned root
+descriptor had ST_NOSUID and close-on-exec. The first admission created a
+BUSY marker and rejected a competing reservation. Explicit startup abort
+after verifying no process held the slot UID cleared the marker. Exiting a
+second admission without confirmed cleanup left the marker and prevented
+reentry. No Door process was launched.
+
+The operator unmounted that exact tmpfs, verified its disappearance and
+removed the disposable execution directory and slot files. The test
+receipt and source snapshot remain under the root-only work directory.
+
+Receipt: /var/db/liner-door-admission-24075g1r/receipt.json
+{"ambiguous_cleanup_kept_busy":true,"descriptor_flags":6,"mount_options":"nosuid,xattr,size=64m,dev=ffc8000b","root_descriptor_closed":true,"unmounted":true,"unmounted_root_denied_without_marker":true,"verified_mount_and_slot_release":true}
+
+Local operator file SHA-256:
+acaa3896890f659c72b291926f24cccfbe8d261906185f707ff3cecd30705acc
+Local transcript SHA-256:
+8f8dc23b0550a507f012cee7cb17e3cbc3fd06e4d372bdd65e4c2bb45127f15a
