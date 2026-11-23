@@ -1,7 +1,7 @@
 """One authenticated BBS handoff for the Solaris startup service candidate."""
 
 import array
-from contextlib import suppress
+from contextlib import ExitStack, suppress
 import os
 import select
 import socket
@@ -9,7 +9,9 @@ import time
 
 from door_broker import peer_uid
 from door_isolation import broker_open, failure_event, read_line, request_check, send
-from door_solaris_lifecycle import launch_prepared
+from door_solaris_admission import admit
+from door_solaris_lifecycle import launch_reserved
+from door_solaris_slot import SlotBusy
 
 
 class DoorWatch:
@@ -54,8 +56,21 @@ def wait_for_consumer(watch, deadline):
     raise OSError("Solaris Door closed before consumer readiness")
 
 
-def serve_launch(config, slot, connection, parent_watch=None):
-    """Relay one launch using the supervisor's already selected trusted slot."""
+def select_slot(config, request, reservations):
+    for slot in config["slots"]:
+        if slot["door"] != request["door"] or slot["level"] > request["level"]:
+            continue
+        try:
+            root_fd, lease = reservations.enter_context(
+                admit(slot["root"], config["state_dir"], slot["uid"]))
+        except SlotBusy:
+            continue
+        return slot, root_fd, lease
+    raise SlotBusy("No eligible Solaris Door slot")
+
+
+def serve_launch(config, connection, parent_watch=None):
+    """Relay one authenticated launch using a slot from the trusted policy."""
     handed_off = False
     phase = "request"
     try:
@@ -63,16 +78,14 @@ def serve_launch(config, slot, connection, parent_watch=None):
             raise ValueError("Solaris Door BBS identity mismatch")
         request = read_line(connection)
         request_check(request)
-        if request["door"] != slot["door"] or request["level"] < slot["level"]:
-            raise ValueError("Solaris Door slot policy")
-
-        def issue():
-            return broker_open(config, request, slot)
-
         deadline = time.monotonic() + 8
-        phase = "launch"
-        with launch_prepared(slot["root"], config["state_dir"], slot["uid"],
-                             slot["helper"], request["columns"], request["rows"], issue) as door:
+        phase = "slot"
+        with ExitStack() as reservations:
+            slot, root_fd, lease = select_slot(config, request, reservations)
+            phase = "launch"
+            door = reservations.enter_context(launch_reserved(
+                root_fd, lease, config["state_dir"], slot["helper"],
+                request["columns"], request["rows"], lambda: broker_open(config, request, slot)))
             watch = DoorWatch(door, connection, parent_watch)
             phase = "broker"
             wait_for_consumer(watch, deadline)

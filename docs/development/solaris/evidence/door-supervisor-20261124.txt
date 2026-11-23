@@ -1,0 +1,34 @@
+Solaris authenticated Door supervisor candidate
+
+Base main: 48458a8ff5fe6be7cbf06d04c53538f2c1549aa1.
+Host: Oracle Solaris 11.4 CBE AMD64, Python 3.13, nonprivileged ci-test.
+Work directory: /export/home/ci-test/ci/door-supervisor-XX1MJC2d/stage-build
+Source overlay SHA-256:
+c7ae76defbe5138afdf364f64e5988212e07ff2ff50a13489f8ea557b104e2e0
+
+The overlay was applied to a Git archive of the base main. The following
+checks passed on Solaris:
+
+  python3.13 tests/test_door_solaris_supervisor.py (2)
+  python3.13 tests/test_door_solaris_service.py (6)
+  python3.13 tests/test_door_solaris_lifecycle.py (8)
+  python3.13 tests/test_door_isolation_admission.py (10)
+
+The supervisor test used a live Unix socket and forked worker. It
+observed the worker stop notification and listener cleanup on SIGTERM.
+The acceptance driver's read-only plan ran and its Python sources
+compiled. The synthetic game and restricted child helper compiled at
+-Wall -Wextra -Werror. The candidate BBS runtime and tools built with
+-DLINER_TEST_SOLARIS_DOOR=1; the compiler log is build.log.
+
+  python3.13 scripts/install-solaris.py --destdir stage \
+    --python /usr/bin/python3.13 --with-door-isolation
+  svccfg validate stage/opt/liner-notes/share/smf/liner-notes-door-isolation.xml
+  python3.13 tests/test_doors_generic.py ./runtime
+
+Results: opt-in stage, SMF manifest validation and ordinary Telnet Door
+regression passed. The root-backed BBS/Broker/isolated game scenario and
+actual SMF service activation are pending.
+
+Local canonical manual validation passed 42 pages, 2,822 local links
+and Markdown/HTML parity.

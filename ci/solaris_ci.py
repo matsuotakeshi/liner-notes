@@ -106,6 +106,11 @@ def test():
         run([sys.executable, "tests/test_solaris_service.py"])
         run([sys.executable, "scripts/install-solaris.py", "--destdir", "build/solaris-stage", "--python", sys.executable])
         run(["/usr/sbin/svccfg", "validate", "build/solaris-stage/opt/liner-notes/share/smf/liner-notes.xml"])
+        run(flags + ["liner-notes-solaris-door-child"])
+        run([sys.executable, "scripts/install-solaris.py", "--destdir", "build/solaris-stage",
+             "--python", sys.executable, "--with-door-isolation"])
+        run(["/usr/sbin/svccfg", "validate",
+             "build/solaris-stage/opt/liner-notes/share/smf/liner-notes-door-isolation.xml"])
         capabilities["smf_manifest"] = "passed"
         # Explicitly prepared fixed-target helper only. No sudo fallback, host
         # installation or authorization changes are performed by ordinary CI.

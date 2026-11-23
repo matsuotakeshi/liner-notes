@@ -1,7 +1,7 @@
 """Test the authenticated handoff without enabling or starting a service."""
 
 import array
-from contextlib import contextmanager
+from contextlib import ExitStack, contextmanager, nullcontext
 import os
 from pathlib import Path
 import select
@@ -19,6 +19,23 @@ if os.name == "posix":
 
 @unittest.skipUnless(os.name == "posix", "Unix socket and PTY handoff")
 class SolarisService(unittest.TestCase):
+    def test_busy_slot_can_be_skipped_before_launch(self):
+        slots = [dict(door=3, level=4, uid=1, root="/restricted"),
+                 dict(door=3, level=2, uid=2, root="/busy"),
+                 dict(door=3, level=2, uid=3, root="/available")]
+        config = dict(slots=slots, state_dir="/state")
+        request = dict(door=3, level=2)
+        with (
+            ExitStack() as stack,
+            patch.object(service, "admit", side_effect=[
+                service.SlotBusy("already in use"), nullcontext((5, "lease")),
+            ]) as admit,
+        ):
+            self.assertEqual(service.select_slot(config, request, stack), (slots[2], 5, "lease"))
+            self.assertEqual(admit.call_args_list, [
+                call("/busy", "/state", 2), call("/available", "/state", 3),
+            ])
+
     def test_consumer_poll_requires_a_boolean_success_on_its_issuer(self):
         issuer = Mock()
         watch = Mock(door=SimpleNamespace(issuer=issuer))
@@ -71,8 +88,8 @@ class SolarisService(unittest.TestCase):
             service.DoorWatch(door, Mock(), None).ended(0)
 
     def test_only_the_trusted_bbs_and_a_ready_consumer_receive_the_pty(self):
-        config = {"bbs_uid": 61002, "state_dir": "/state"}
         slot = dict(uid=61001, door=3, level=2, seconds=30, root="/root", helper="/helper")
+        config = {"bbs_uid": 61002, "state_dir": "/state", "slots": [slot]}
         request = dict(door=3, level=2, user=7, columns=80, rows=24,
                        namehex="74657374", session="s", generation=0)
 
@@ -99,12 +116,13 @@ class SolarisService(unittest.TestCase):
                 with (
                     patch.object(service, "peer_uid", return_value=peer),
                     patch.object(service, "read_line", return_value=request) as read,
-                    patch.object(service, "launch_prepared", launch),
+                    patch.object(service, "admit", return_value=nullcontext((4, "lease"))),
+                    patch.object(service, "launch_reserved", launch),
                     patch.object(service, "DoorWatch", log.watch),
                     patch.object(service, "wait_for_consumer", side_effect=ready_check),
                     patch.object(service, "failure_event"),
                 ):
-                    self.assertEqual(service.serve_launch(config, slot, connection),
+                    self.assertEqual(service.serve_launch(config, connection),
                                      peer == 61002 and ready)
                 if peer == 61002 and ready:
                     frames, rights = connection.sendmsg.call_args.args
@@ -135,8 +153,8 @@ class SolarisService(unittest.TestCase):
             finally:
                 os.close(worker_master)
 
-        config = {"bbs_uid": 61002, "state_dir": "/state"}
         slot = dict(uid=61001, door=3, level=2, seconds=30, root="/root", helper="/helper")
+        config = {"bbs_uid": 61002, "state_dir": "/state", "slots": [slot]}
         request = dict(door=3, level=2, user=7, columns=80, rows=24,
                        namehex="74657374", session="s", generation=0)
         server, client = socket.socketpair()
@@ -144,12 +162,13 @@ class SolarisService(unittest.TestCase):
             server, client,
             patch.object(service, "peer_uid", return_value=61002),
             patch.object(service, "read_line", return_value=request),
-            patch.object(service, "launch_prepared", launch),
+            patch.object(service, "admit", return_value=nullcontext((4, "lease"))),
+            patch.object(service, "launch_reserved", launch),
             patch.object(service, "DoorWatch", return_value=Mock(ended=Mock(return_value=True))),
             patch.object(service, "wait_for_consumer"),
         ):
             client.settimeout(2)
-            self.assertTrue(service.serve_launch(config, slot, server))
+            self.assertTrue(service.serve_launch(config, server))
             fds = array.array("i")
             data, rights, flags, _ = client.recvmsg(3, socket.CMSG_SPACE(fds.itemsize),
                                                     socket.MSG_WAITALL)

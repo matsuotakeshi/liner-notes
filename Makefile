@@ -21,6 +21,10 @@ all: runtime vaultctl memberctl dbconvert liner-notes-door-lock
 liner-notes-door-lock: src/door_lock_helper.c
 	$(CC) $(CPPFLAGS) $(CFLAGS) $(LDFLAGS) -std=c11 -Wall -Wextra -Werror src/door_lock_helper.c -o liner-notes-door-lock
 
+# Explicit Solaris candidate target, excluded from ordinary builds.
+liner-notes-solaris-door-child: solaris/door_solaris_child.c
+	$(CC) $(CPPFLAGS) $(CFLAGS) $(LDFLAGS) -std=c11 -Wall -Wextra -Werror solaris/door_solaris_child.c -o $@
+
 runtime: liner-notes-door-lock
 
 test-doctor:
@@ -210,6 +214,7 @@ test-legacy-transfers: runtime vaultctl
 	$(PYTHON) tests/test_stage61_transfer_menu.py ./runtime ./vaultctl $(LRZ) $(LSZ)
 
 clean:
+	rm -f liner-notes-solaris-door-child
 	rm -f test-session-ui-lifecycle test-session-core test-session-policy-core test-form-flow-core test-message-flow-core test-list-navigation-core test-mail-navigation-core test-preference-core test-traversal-core test-batch-core test-editor-interface test-connector-protocol test-terminal-policy test-connector-core test-notification-core test-connection-core test-chat-core test-door-core test-editor-core test-link-core test-authentication-core test-vault-management-core test-vault-query-core test-download-core test-download-store test-activity-core test-activity-store test-catalog-group-core test-catalog-group-store test-board-topology-core test-catalog-policy-core test-catalog-core test-member-settings-store test-mail-core test-member-core test-article-core liner-notes-door-lock runtime vaultctl memberctl dbconvert generate-structured generate-scale generate-members test-adapters test-chat test-vault-core test-upload-core test-transfer-connector test-userlog test-stage61-userlog test-zhost
 
 memberctl: src/db_index.h src/memberctl.c src/members.c src/members.h src/app_limits.h src/store_limits.h
@@ -662,6 +667,7 @@ test-door-broker:
 	$(PYTHON) tests/test_door_solaris_admission.py
 	$(PYTHON) tests/test_door_solaris_lifecycle.py
 	$(PYTHON) tests/test_door_solaris_service.py
+	$(PYTHON) tests/test_door_solaris_supervisor.py
 	$(PYTHON) tests/test_door_solaris_slot.py
 	$(PYTHON) tests/test_solaris_door_boundary.py
 	$(PYTHON) tests/test_solaris_door_jail.py
