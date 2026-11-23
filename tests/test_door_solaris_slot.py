@@ -38,5 +38,24 @@ class SolarisSlot(unittest.TestCase):
                 reservation.close()
                 lease.close.assert_called_once()
 
+    def test_owned_stop_waits_for_the_last_slot_uid_to_disappear(self):
+        lease = Mock(fd=9)
+        stop = Mock()
+        reservation = slots.Reservation(lease,61001)
+        with (
+            patch.object(slots, '_active', side_effect=[True,False]) as snapshot,
+            patch.object(slots.time, 'monotonic', side_effect=[10,10.01]),
+            patch.object(slots.time, 'sleep') as sleep,
+            patch.object(slots.os, 'ftruncate') as truncate,
+            patch.object(slots.os, 'fsync') as sync,
+        ):
+            reservation.stop_and_release(stop, settle=2)
+        stop.assert_called_once()
+        self.assertEqual(snapshot.call_count,2)
+        sleep.assert_called_once_with(0.05)
+        truncate.assert_called_once_with(9,0)
+        sync.assert_called_once_with(9)
+        lease.close.assert_called_once()
+
 
 if __name__=='__main__':unittest.main()

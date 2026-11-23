@@ -660,6 +660,7 @@ test-door-broker:
 	$(PYTHON) tests/test_door_broker.py
 	$(PYTHON) tests/test_door_processes.py
 	$(PYTHON) tests/test_door_solaris_admission.py
+	$(PYTHON) tests/test_door_solaris_lifecycle.py
 	$(PYTHON) tests/test_door_solaris_slot.py
 	$(PYTHON) tests/test_solaris_door_boundary.py
 	$(PYTHON) tests/test_solaris_door_jail.py

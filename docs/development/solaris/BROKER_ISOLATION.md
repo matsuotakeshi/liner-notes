@@ -127,6 +127,28 @@ both ends as `O_RDWR`, which the child entry correctly rejects. The trial
 unlinked each FIFO before spawning the helper. The descriptor-based directory change follows
 [Oracle's C security guidance](https://docs.oracle.com/cd/E37838_01/html/E61050/gnclc.html).
 
+## Contract owner candidate
+
+`solaris/door_solaris_lifecycle.py` joins admission, temporary directional
+FIFOs, the child entry and an owned NOORPHAN contract. The caller supplies
+the trusted helper path and opens an issuer connection to the Broker
+after acquiring the slot. The token is written to the FIFO before launch
+and its writer is closed. The four child descriptors are the exact ones
+needed by the entry helper. The supervisor receives PREPARED over a
+separate channel with an eight-second deadline. Only the supervisor
+receives the PTY at this point. It must confirm game readiness separately
+and monitor the BBS and issuer sockets before and during relay.
+
+Leaving the scope closes the issuer first, stops and reaps its own
+contract holder, and waits briefly for the dedicated UID to disappear
+before clearing BUSY. A failed issuer close, stop or UID inspection
+retains the reservation. A crashed supervisor can lose authoritative
+ownership. Its BUSY marker still requires recovery inspection.
+The [non-privileged Solaris check](evidence/door-lifecycle-20261123.txt)
+used actual FIFO endpoints and checked the lifecycle with controlled
+Broker and contract responses. Integration into the regular service and
+a reviewed-main trial with the actual contract owner remain pending.
+
 ## Security blockers before backend activation
 
 1. The OS-only holder-death checks below cover ordinary same-contract
