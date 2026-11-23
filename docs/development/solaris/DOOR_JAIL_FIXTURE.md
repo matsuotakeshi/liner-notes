@@ -125,11 +125,13 @@ Removing the new installed bundle must not remove the prior fixture/shared lock.
 
 ## Remaining gates
 
-Even a passing matrix leaves owned process-contract cleanup, nested-contract
-creation after exec, detached/double-fork descendants, supervisor death and
-unrelated-process safety unverified. PTY/ticket FD handling, real game dependency
-and data provisioning, Broker revocation/restart, admission-slot reuse and an
-independent safety review remain required before enabling the backend.
+A separate [non-root Solaris check](BROKER_ISOLATION.md#non-root-holder-death-check)
+confirmed ordinary same-contract cleanup when a disposable system contract
+holder died, including detached and double-forked descendants. Repeat the
+lifecycle checks with the real launcher and this execution root. Control of
+additional contracts after exec, PTY/ticket FD handling, real game dependencies
+and data, Broker revocation/restart, admission-slot reuse and independent safety
+review remain required before enabling the backend.
 
 The completed root matrix and exact source SHA are recorded below. Future
 backend acceptance requires evidence for the remaining gates.

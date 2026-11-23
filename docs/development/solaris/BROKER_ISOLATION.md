@@ -42,10 +42,10 @@ Its explicit output says isolation is NOT verified. The backend is not enabled.
 
 ## Security blockers before backend activation
 
-1. A malicious Door may create nested/new contracts. NOORPHAN's kill scope and
-   ownership/inheritance semantics must be tested; simply setting the flag is
-   not proof that all descendants remain contained. Include double fork, setsid,
-   parent SIGKILL and unrelated-process survival.
+1. The OS-only holder-death checks below cover ordinary same-contract
+   descendants. Verify those cases again with the actual launcher and isolated
+   execution root. Establish a boundary against creation of additional
+   contracts before relying on owner exit to contain the full process tree.
 2. The basic-privilege-only matrix failed identity confinement. The additional
    nosuid execution root retained the expected identities in the synthetic
    matrix. A backend candidate must enforce this barrier for every launch and
@@ -83,6 +83,22 @@ Main `a1dd7130` passed Solaris Native CI, but its separate root identity matrix
 failed confinement as recorded above. The independent review's requirement to
 prove these barriers before enabling launch is unchanged. No real game,
 production data or host services were changed.
+
+## Non-root holder-death check
+
+On 2026-11-23, a direct Solaris check used `ctrun` with the `noorphan`
+option. The test confirmed contract membership and session IDs before sending
+SIGKILL to its own disposable contract holder. In three runs the workload
+included a descendant that called `setsid`. In three more runs it included a
+double-forked descendant whose intermediate process had exited and been reaped.
+All six runs reached EOF within two milliseconds and had no live workload
+processes in the subsequent targeted process check. In every run a separate
+control process in another contract continued to respond and exited normally.
+
+This measured the system primitive without root. The corresponding launcher
+test inside the nosuid root and the boundary against additional contracts
+remain open. See the [procedure and evidence](evidence/contract-owner-exit-20261123.txt)
+and [Oracle's ctrun reference](https://docs.oracle.com/cd/E19082-01/819-2239/6n4hsf6h3/index.html).
 
 ## Nested-contract observation candidate
 
