@@ -1,0 +1,35 @@
+Date (JST): 2026-11-23
+Host: Oracle Solaris 11.4 CBE AMD64, existing non-root CI account (UID 1000).
+Main dependency source: 8e5976fe2e0c128a1300d0a401f244fec8d1c211.
+Direct pre-commit run under the existing native CI lock in a disposable work directory.
+/usr/bin/python3.13 -I tests/test_door_broker.py SolarisTicketPTY.test_ticket_pipe_to_pty_then_issuer_disconnect
+
+The OS process contract preserved the ticket pipe across exec while the worker
+used a controlling PTY. The token was never passed through the environment or
+printed to the terminal. The authenticated consumer received the expected
+member identity and a second consume was denied. Closing the issuer channel
+revoked the lease, removed the session and caused the running PTY worker's next
+check to be denied. The worker quit with exit 0 and the test directory was removed.
+
+The private socket pair injects the issuer UID to run without root. The
+consumer listener and client use real Solaris UNIX peer UID checks. Both run
+under the CI UID, outside chroot. Separate UIDs, the service launcher and
+isolated Door operation remain distinct acceptance cases. This transcript
+contains synthetic status labels and file hashes only.
+
+Original direct output:
+{"sha": "8e5976fe2e0c128a1300d0a401f244fec8d1c211", "sha256": {"scripts/door_broker.py": "bcd2bb8d54ee0971a71b7e1d1d32e5764dd2130626603f79d5eb68727b4426ae", "scripts/door_broker_core.py": "8fefbfd71c35540e7128027693ad4295fd31e5f067a0c3adf5281e268a87480f", "scripts/door_auth_client.py": "c36c345de7b4a6be82067ecb52e4e52e5c0f887e6008840243ca11a22688aa4e", "tests/test_door_broker.py": "04d9c97c1faeed8324f96ac60f5d7b1d9382c0c1b89659f839e8a5f2a7ac4327"}, "uid": 1000}
+SOLARIS_BROKER_PTY ticket FD, one-use, issuer EOF revocation
+.
+----------------------------------------------------------------------
+Ran 1 test in 0.148s
+
+OK
+
+{"temporary_directory_removed": true, "exit": 0}
+Local full transcript: build/solaris-door-jail/broker-pty-ticket-candidate.log
+Transcript SHA-256: d055c60b74e2a5eeaa67851a22ef628fcc082865611af1eed641223fd3a06cee
+
+A follow-up run of Core, the live issuer lease test and the new PTY test
+passed all 10 tests on the same Solaris host with identical source hashes.
+broker-pty-related.log SHA-256: 655805703d9e0ce20ae773a1cbfa081102501604961fc6fdfc89a6dd828654a1

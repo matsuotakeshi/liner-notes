@@ -84,6 +84,17 @@ failed confinement as recorded above. The independent review's requirement to
 prove these barriers before enabling launch is unchanged. No real game,
 production data or host services were changed.
 
+## PTY ticket delivery and revocation
+
+The [ticket delivery regression](evidence/broker-pty-ticket-20261123.txt)
+uses a real UNIX socket consumer and Broker on the Solaris test host. A
+synthetic PTY worker under `ctrun` receives a ticket only through an inherited
+pipe, consumes it once and verifies that the lease is revoked after the
+issuer connection closes. A private socket pair injects the issuer identity
+to run the test without root. The consumer and Broker validate each other's
+actual OS peer UID. Connecting this path to the authenticated launcher,
+distinct service UIDs and the execution root remains pending.
+
 ## Nested-contract observation candidate
 
 The follow-up probe also accepts `--nested`. After the same basic privilege
