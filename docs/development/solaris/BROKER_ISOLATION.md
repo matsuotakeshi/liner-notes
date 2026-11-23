@@ -126,6 +126,21 @@ test inside the nosuid root and the boundary against additional contracts
 remain open. See the [procedure and evidence](evidence/contract-owner-exit-20261123.txt)
 and [Oracle's ctrun reference](https://docs.oracle.com/cd/E19082-01/819-2239/6n4hsf6h3/index.html).
 
+## PTY inside a system process contract
+
+The native regression starts a synthetic terminal worker under a Solaris
+`noorphan` process contract. It uses a real controlling PTY and requires the
+foreground group to receive SIGWINCH when its window changes from 80×24 to
+100×30. It verifies input and output after the resize and requires PTY closure
+on both normal exit and forced termination of the holder. The forced case
+also checks that a child in another session ends while a control in another
+contract stays alive.
+
+The [Solaris direct test record](evidence/contract-pty-20261123.txt) covers
+the initial native run of this regression. Connecting the PTY and ticket
+transport to the authenticated launcher inside the execution root remains
+pending.
+
 ## Nested-contract observation candidate
 
 The follow-up probe also accepts `--nested`. After the same basic privilege

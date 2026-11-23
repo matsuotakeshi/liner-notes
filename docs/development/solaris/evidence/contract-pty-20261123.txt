@@ -1,0 +1,31 @@
+Date (JST): 2026-11-23
+Host: Oracle Solaris 11.4 CBE AMD64, non-root CI account (UID 1000).
+Main dependency source: 8e5976fe2e0c128a1300d0a401f244fec8d1c211.
+Direct pre-commit run, limited to the candidate test file. The source was
+placed in a disposable work directory under the existing native CI lock.
+/usr/bin/python3.13 -I tests/test_solaris_door_jail.py JailFixture.test_native_pty_inside_system_contract
+
+Both modes confirmed the controlling terminal and foreground group, initial
+size 80x24, SIGWINCH, updated size 100x30, terminal input and output, and PTY
+closure. Normal quit returned 0. Forced holder death returned -SIGKILL. The
+targeted process check found no live workload processes, including the child
+with its own session, and the outside control was still running. The test
+removed its temporary directory.
+
+This native regression uses ctrun and the OS PTY API outside chroot. The
+actual authenticated launcher, ticket delivery, and Broker revocation remain
+pending. It does not alter services or mount an execution root.
+
+Original direct output:
+{"sha": "8e5976fe2e0c128a1300d0a401f244fec8d1c211", "sha256": {"ci/solaris_door_jail.py": "cea586383033237f652dc31fd1331ca931925a82b8a9141385ed46f1dc307b54", "tests/test_solaris_door_jail.py": "579d0f1fb3419b0efb36b28cb1e9b9a98158361a8f9362b8ddff3413c5c829e1"}, "uid": 1000}
+SOLARIS_PTY_CONTRACT quit 80x24 -> 100x30 SIGWINCH
+SOLARIS_PTY_CONTRACT kill 80x24 -> 100x30 SIGWINCH
+.
+----------------------------------------------------------------------
+Ran 1 test in 0.085s
+
+OK
+
+{"temporary_directory_removed": true, "exit": 0}
+Local full transcript: build/solaris-door-jail/contract-pty-candidate.log
+Transcript SHA-256: 875c78e4ec04d7b3db251d373b7608eaf2363508dfc23a105e137979bdc12551
