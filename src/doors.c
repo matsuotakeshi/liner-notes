@@ -94,8 +94,9 @@ static int door_paths_valid(void *context,const DoorSpec *game) {
 int doors_config(const char *path) {
     return door_config_load(&catalog,path,door_paths_valid,NULL);
 }
+void doors_listing(unsigned level,DoorListing *listing) { door_core_list(&catalog,level,listing); }
 void doors_list(unsigned level,char *out,size_t size) {
-    DoorListing listing;door_core_list(&catalog,level,&listing);
+    DoorListing listing;doors_listing(level,&listing);
     door_protocol_list(&listing,out,size);
 }
 Door *door_start(unsigned id,unsigned level,uint32_t user,const char *name,unsigned columns,unsigned rows,uint64_t now,unsigned long session,uint32_t epoch) {
@@ -171,6 +172,7 @@ void door_stop(Door *d) {
 int doors_isolation_config(const char *p) { (void)p;return 0; }
 int doors_config(const char *p) { return !p; }
 void doors_list(unsigned l,char *s,size_t n) { (void)l;snprintf(s,n,"GAMES\r\nEND GAMES\r\n"); }
+void doors_listing(unsigned level,DoorListing *listing) { (void)level;listing->count=0; }
 Door *door_start(unsigned i,unsigned l,uint32_t u,const char *s,unsigned c,unsigned r,uint64_t t,unsigned long session,uint32_t epoch) { (void)session;(void)epoch;(void)i;(void)l;(void)u;(void)s;(void)c;(void)r;(void)t;return NULL; }
 int door_input(Door *d,unsigned char b) { (void)d;(void)b;return 0; }
 int door_room(Door *d) { (void)d;return 0; }

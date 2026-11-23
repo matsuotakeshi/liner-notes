@@ -91,6 +91,8 @@ static void privacy_and_preferences(void) {
     assert(chat_core_join_config(&first,1,1,"alice","Alice",notify,&alice,&prefs));
     assert(chat_core_say(&first,1,"public shares rate",2200)==-1);
     assert(chat_core_say(&first,1,"public",2500)==1);assert(store.writes==1);
+    assert(chat_core_private(&first,1,2,"private shares rate",2600)==-1);
+    assert(chat_core_private(&first,2,1,"independent sender",2600)==1);
     for(unsigned i=0;i<first.history_count;i++)assert(first.history[i].kind!='I' && first.history[i].kind!='O');
     chat_core_leave(&first,1);assert(chat_core_target(&first,1,2)); /* outside room still registered */
     chat_core_disconnect(&first,2);assert(!chat_core_target(&first,1,2));

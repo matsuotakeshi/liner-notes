@@ -8,13 +8,21 @@ static const struct {
 } commands[] = {
     {"login","login [id]",MMM_LOGIN,0},
     {"register","register id",MMM_REGISTER,0},
-    {"off","off",MMM_OFF,0},
+    {"off","off [-n]",MMM_OFF,0},
     {"ui","ui [rtbbs|mmm|reset]",MMM_UI,0},
     {"logout","logout",MMM_LOGOUT,1},
     {"notes","notes",MMM_NOTES,1},
     {"go","go board",MMM_GO,1},
     {"open","open [-i] [-bNUMBER] [board]",MMM_OPEN,1},
-    {"post","post [board]",MMM_POST,1}
+    {"post","post [board]",MMM_POST,1},
+    {"mail","mail",MMM_MAIL,1},
+    {"filer","filer [board]",MMM_FILER,1},
+    {"chat","chat",MMM_CHAT,1},
+    {"term","term",MMM_TERM,1},
+    {"profile","profile [id]",MMM_PROFILE,1},
+    {"games","games",MMM_GAMES,1},
+    {"new","new [-n]",MMM_NEW,1},
+    {"setsequencer","setsequencer [YYYY-MM-DD|reset]",MMM_SEQUENCER,1}
 };
 
 static int space(char ch) { return ch==' ' || ch=='\t'; }

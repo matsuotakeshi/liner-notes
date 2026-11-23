@@ -173,7 +173,13 @@ static void notify_all(MessageId id,uint32_t number,const char *body) {
 }
 static void service_result(BoardResult *r) {
     if(r->service_action=='J') {
-        if(!r->service_number) { doors_list(r->service_next,r->text,sizeof(r->text));return; }
+        if(!r->service_number) {
+            if(r->structured) {
+                DoorListing listing={0};doors_listing(r->service_next,&listing);
+                OPERATION_PAGE(r,DOORS,doors,listing);
+            }
+            doors_list(r->service_next,r->text,sizeof(r->text));return;
+        }
         if(r->slot<0 || r->slot>=SLOTS) return;
         Connection *c=&connections[r->slot];Session *s=&c->app;
         if(c->fd==INVALID || s->core.id!=r->session || !s->core.user || s->core.closing || !s->connection.binary_allowed || c->door) { door_launch_diagnostic("session-admission",0);(r->feedback.failed=1,strcpy(r->text,"ERR game unavailable\r\n"));return; }

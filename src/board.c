@@ -488,10 +488,26 @@ static int extra_text(const char *text,size_t max,int empty) {
 }
 static void post_result(ArticleOutcome result,BoardResult *r);
 
+static void member_result(MemberOutcome result,BoardResult *r);
 static void note_view(const BoardRequest *q,BoardResult *r) {
     ArticleActor actor={q->user,q->user_epoch,q->board_grants};
     ArticleOutcome result;
-    if(q->action=='B') {
+    if(q->action=='C' || q->action=='K' || q->action=='T') {
+        MemberActor member={q->user,q->user_epoch};
+        MemberCheckWindow window;
+        MemberOutcome status=q->action=='C'?member_core_check_begin(&member,MEMBER_CHECK_MMM,"",&window):
+            q->action=='T'?member_core_mmm_set(&member,q->until):
+            member_core_check_commit(&member,MEMBER_CHECK_MMM,"",q->until);
+        if(status!=MEMBER_CORE_OK)member_result(status,r);
+        else if(q->action=='C') { r->since=window.since;r->until=window.until; }
+        else { r->feedback.checkpoint_saved=1;r->since=q->until; }
+        return;
+    }
+    if(q->action=='S') {
+        ArticlePage page;
+        result=article_news(&actor,q->board,ARTICLE_ALL,q->cursor,q->since,q->until,&page);
+        if(result==ARTICLE_OK)OPERATION_PAGE(r,ARTICLES,articles,page);
+    } else if(q->action=='B') {
         ArticleBoardsPage page;
         result=article_board_children(&actor,q->number,q->cursor,&page);
         if(result==ARTICLE_OK)OPERATION_PAGE(r,BOARDS,boards,page);
@@ -508,7 +524,6 @@ static void note_view(const BoardRequest *q,BoardResult *r) {
     if(result!=ARTICLE_OK)post_result(result,r);
 }
 
-static void member_result(MemberOutcome result,BoardResult *r);
 static void extra_execute(const BoardRequest *q,BoardResult *r) {
     if(q->action==1 || q->action==2) {
         ArticleActor actor={q->user,q->user_epoch,q->board_grants};
