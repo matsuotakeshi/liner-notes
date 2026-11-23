@@ -146,8 +146,12 @@ retains the reservation. A crashed supervisor can lose authoritative
 ownership. Its BUSY marker still requires recovery inspection.
 The [non-privileged Solaris check](evidence/door-lifecycle-20261123.txt)
 used actual FIFO endpoints and checked the lifecycle with controlled
-Broker and contract responses. Integration into the regular service and
-a reviewed-main trial with the actual contract owner remain pending.
+Broker and contract responses. The [reviewed-main integration trial](evidence/door-lifecycle-broker-b7083dd.txt)
+used the actual contract owner, Broker process and distinct UIDs. The
+coordinator confirmed the synthetic game's readiness before handing off
+the PTY. Disconnect revoked the lease and freed the slot. The Unix
+socket and game-ready marker were fixture policy. The regular BBS
+service, actual game configuration and stale scope recovery remain open.
 
 ## Security blockers before backend activation
 
