@@ -78,6 +78,27 @@ marker. The [direct Solaris tests](evidence/slot-lifecycle-20261123.txt) exercis
 startup abort, contention, cleanup and crash retention. The candidate is
 available for the Solaris launcher but is not wired into runtime activation.
 
+## Launch admission candidate
+
+`solaris/door_solaris_admission.py` gives the launch owner a checked execution
+root descriptor and the slot reservation. It uses the existing root-owned
+path validation, then opens the directory with no symlink following and
+close-on-exec. The live mount table must identify one exact swap/tmpfs mount
+with set-ID execution and device-file access disabled. Any submount blocks admission,
+including a mount of the contract filesystem. The kernel nosuid flag on the
+open descriptor and a final directory identity check are also required.
+These checks precede the durable slot reservation.
+
+An interrupted owner closes the descriptor and releases the record lock,
+leaving the BUSY marker for cleanup. The owner must explicitly stop and
+verify its process scope before clearing the reservation. The descriptor
+is available for entering the checked root in a future child launcher.
+The launch candidate does not open a socket or start a process yet.
+Supervisor integration still requires reviewing process and descriptor
+boundaries in the child and verifying a real nosuid mount on Solaris.
+The [direct test record](evidence/door-admission-20261123.txt) covers the
+non-privileged Solaris regression and identifies the tested source bytes.
+
 ## Security blockers before backend activation
 
 1. The OS-only holder-death checks below cover ordinary same-contract
