@@ -1,5 +1,6 @@
 /* Optional local isolation service. All launches use it when configured. */
-#if defined(__linux__) || defined(__FreeBSD__)
+#if defined(__linux__) || defined(__FreeBSD__) || (defined(__sun) && defined(LINER_TEST_SOLARIS_DOOR))
+#define LINER_DOOR_ISOLATION_CLIENT 1
 #include "door_service_client.inc"
 static char isolation_socket[100];
 int doors_isolation_config(const char *path) {
@@ -26,10 +27,11 @@ static int isolation_enabled(void) { return 0; }
 static Door *isolated_start(const DoorSpec *g,unsigned l,uint32_t u,const char *n,unsigned c,unsigned r,uint64_t t,unsigned long s,uint32_t epoch) { (void)s;(void)epoch;(void)g;(void)l;(void)u;(void)n;(void)c;(void)r;(void)t;return NULL; }
 #endif
 static int isolated_done(Door *d) {
-#if defined(__linux__) || defined(__FreeBSD__)
+#ifdef LINER_DOOR_ISOLATION_CLIENT
     char state[32];ssize_t n=recv(d->remote,state,sizeof(state),MSG_DONTWAIT);
     return n>=0 || (errno!=EAGAIN && errno!=EINTR);
 #else
     (void)d;return 1;
 #endif
 }
+#undef LINER_DOOR_ISOLATION_CLIENT

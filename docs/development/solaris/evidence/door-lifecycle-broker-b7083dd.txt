@@ -1,0 +1,41 @@
+Solaris Door owned lifecycle with the real Broker
+
+Source: main b7083ddf0d45a5fc332cd70c3d47ca1e0b87d7cf (PR #179).
+Host: Oracle Solaris 11.4 CBE AMD64.
+Exact Git archive SHA-256:
+3591d1a6ddade7d070d7796c315d339d4bf9bf8fda6c66125f174f6f0544302b
+
+The operator verified the archive before extracting and held the
+existing root fixture lock. Four collision-checked numeric IDs were used
+without creating accounts: slot 61001, BBS client 61002, Broker 61003,
+consumer 61004. Root mounted one private 64MiB nosuid tmpfs and installed
+only a fixed synthetic program and its verified libraries there.
+
+The production Broker executable validated its configuration and started
+its UNIX listener. The shared C BBS client validated the root launcher
+peer and sent its normal request. The root fixture checked BBS peer UID and
+request fields, then called launch_prepared using the normal Broker issuing
+request. The jailed app read the one-use ticket from FD 3 and sent it via
+a UNIX socket on the same tmpfs to the approved consumer. The consumer
+authenticated the slot peer, consumed the credential and verified member 7.
+The coordinator observed game readiness before passing the actual PTY via
+SCM_RIGHTS. The C BBS client changed the window from 80x24 to 100x30 and
+received the new dimensions from the isolated game.
+
+Half-closing the BBS connection exited the launch scope. The consumer's
+next lease checks were denied and the C client received DONE. The same UID
+slot could be safely reserved again. The test stopped the owned processes,
+removed the fixture sockets and unmounted the exact temporary file system.
+No credential was logged or relayed over the user's PTY.
+
+Receipt: /var/db/ln-door-broker-0feca_jc/receipt.json
+{"approved_consumer_live":true,"bbs_terminal_handoff_and_resize":true,"cleanup":true,"lease_revoked":true,"prepared":true,"slot_reused":true}
+
+Local operator file SHA-256:
+c63f7eb4f3e96545f15c0eb833fb91aa47c7d7cf0e7326054b3199885a5bd843
+Local transcript SHA-256:
+f1c1534ed00a35dbd6fe89edd03ed4b1918c2e0923a70c9c1058806be0370aef
+
+The test used a fixed coordinator and synthetic game. It did not enable a
+BBS service, install SMF definitions, promote the synthetic game-ready
+protocol to production, or exercise recovery after loss of the owner.

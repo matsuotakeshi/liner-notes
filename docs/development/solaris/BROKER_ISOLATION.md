@@ -146,8 +146,12 @@ retains the reservation. A crashed supervisor can lose authoritative
 ownership. Its BUSY marker still requires recovery inspection.
 The [non-privileged Solaris check](evidence/door-lifecycle-20261123.txt)
 used actual FIFO endpoints and checked the lifecycle with controlled
-Broker and contract responses. Integration into the regular service and
-a reviewed-main trial with the actual contract owner remain pending.
+Broker and contract responses. The [reviewed-main integration trial](evidence/door-lifecycle-broker-b7083dd.txt)
+used the actual contract owner, Broker process and distinct UIDs. The
+coordinator confirmed the synthetic game's readiness before handing off
+the PTY. Disconnect revoked the lease and freed the slot. The Unix
+socket and game-ready marker were fixture policy. The regular BBS
+service, actual game configuration and stale scope recovery remain open.
 
 ## Security blockers before backend activation
 
@@ -277,6 +281,26 @@ five-second deadline. The harness closes that pipe, verifies all output writers
 are gone, and reaps its direct child. It neither enumerates/signals unrelated
 PIDs nor changes user accounts or services. Native failures retain stdout/stderr
 in the unittest failure. The current backend still explicitly refuses Solaris.
+
+## Broker-confirmed BBS handoff
+
+The Solaris per-connection worker takes a slot already selected by a trusted
+supervisor, checks the BBS socket peer UID and launch policy, and waits for
+boundary preparation. It then asks the Broker for `{"op":"ready"}` on the
+same privileged issuer socket that opened the session. Only an approved
+consumer of that session's ticket can complete readiness. The response contains
+only the boolean `consumed`. A child status EOF or text written to the PTY has
+no effect on this decision.
+
+The worker sends the PTY over the BBS Unix socket after that acknowledgement.
+It watches the session, issuer and process contract during execution and
+uses the existing contract cleanup and reservation rules. Closing the issuer
+revokes the ticket and any lease. The BBS client is available on Solaris only
+in builds with `-DLINER_TEST_SOLARIS_DOOR=1`. A persistent supervisor, SMF
+installation and privileged end-to-end BBS validation remain integration work.
+The [direct Solaris record](evidence/door-bbs-handoff-20261124.txt) includes
+the real Unix-socket PTY exchange, both C client build modes and a normal
+Door Telnet regression using the full candidate BBS binary.
 
 The VM's exec(2) manual describes set-user-ID/set-group-ID transitions separately
 from privilege-set transformations; basic limit sets are not accepted as proof
