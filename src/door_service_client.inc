@@ -50,6 +50,13 @@ static int door_service_failed(int fd, const char *phase, int problem) {
     return -1;
 }
 
+static int door_service_deadlines(int fd) {
+    /* The supervisor validates and syncs its durable reservation before reply. */
+    const struct timeval request={3,0}, reply={10,0};
+    if(setsockopt(fd,SOL_SOCKET,SO_SNDTIMEO,&request,sizeof(request)))return -1;
+    return setsockopt(fd,SOL_SOCKET,SO_RCVTIMEO,&reply,sizeof(reply));
+}
+
 /* Success returns the PTY and transfers the still-open service socket.
  * Failure closes both; identifying the service precedes writing BBS fields.
  */
@@ -63,9 +70,7 @@ static int door_service_start(const char *path,const DoorServiceRequest *request
     if(fd<0)return door_service_failed(-1,"isolation-socket",errno);
     address.sun_family=AF_UNIX;
     strcpy(address.sun_path,path);
-    struct timeval limit={3,0};
-    setsockopt(fd,SOL_SOCKET,SO_RCVTIMEO,&limit,sizeof(limit));
-    setsockopt(fd,SOL_SOCKET,SO_SNDTIMEO,&limit,sizeof(limit));
+    if(door_service_deadlines(fd))return door_service_failed(fd,"isolation-timeout",errno);
     if(connect(fd,(struct sockaddr *)&address,sizeof(address)))
         return door_service_failed(fd,"isolation-connect",errno);
     uid_t uid;
