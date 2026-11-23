@@ -3,6 +3,8 @@ import errno
 import os
 from pathlib import Path
 import sys
+from tempfile import TemporaryDirectory
+from types import SimpleNamespace
 import unittest
 from unittest.mock import Mock,patch
 
@@ -57,6 +59,37 @@ class Admission(unittest.TestCase):
             isolation.broker_open(config,request,{'uid':50})
         self.assertEqual(send.call_args.args[1],dict(op='open_scoped',member=1,door=2,
                          session='bbs-session',generation=0,scope='trusted-boot.50',sequence=9))
+
+    def test_slot_diagnostics_separate_uid_check_from_durable_marker(self):
+        slot = dict(door=1, level=0, uid=os.getuid())
+        phases = []
+        with TemporaryDirectory() as directory:
+            marker = Path(directory) / ('slot-' + str(slot['uid']))
+            config = dict(slots=[slot], state_dir=directory)
+            timing = Mock()
+            timing.mark.side_effect = phases.append
+            stat_fd = os.fstat
+
+            def root_owned(fd):
+                info = stat_fd(fd)
+                return SimpleNamespace(st_mode=info.st_mode, st_uid=0,
+                                       st_nlink=info.st_nlink, st_size=info.st_size)
+
+            def unused(uid):
+                self.assertEqual(phases, ['slot-uid-scan'])
+                self.assertEqual(uid, slot['uid'])
+                self.assertEqual(marker.read_bytes(), b'')
+                return False
+
+            with patch.object(isolation, 'processes', side_effect=unused), \
+                 patch.object(isolation.os, 'fstat', side_effect=root_owned):
+                selected, fd = isolation.slot_acquire(config, 1, 0, timing=timing)
+                try:
+                    self.assertIs(selected, slot)
+                    self.assertEqual(marker.read_bytes(), b'BUSY\n')
+                finally:
+                    os.close(fd)
+        self.assertEqual(phases, ['slot-uid-scan', 'slot-marker-write', 'slot-marker-sync'])
 
     def test_fork_failure_preserves_existing_workers_then_recovers(self):
         config={'bbs_uid':10,'slots':[{}]};children={101};connection=Mock();listener=Mock()

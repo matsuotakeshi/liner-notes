@@ -77,6 +77,36 @@ int main(int argc,char **argv) {
                 self.assertEqual(self.execute(self.reply,enabled,'private-ticket',3,0).stderr,'')
 
     @unittest.skipUnless(sys.platform.startswith(('linux','freebsd')), 'Unix isolation client only')
+    def test_handoff_wait_has_its_own_bounded_receive_timeout(self):
+        binary = self.compile('door-timeouts', '''
+#define _GNU_SOURCE
+#ifdef __FreeBSD__
+#define __BSD_VISIBLE 1
+#endif
+#include "door_service_client.inc"
+
+static int check_timeout(int fd, int option, long seconds) {
+    struct timeval value={0};
+    socklen_t size=sizeof(value);
+    return getsockopt(fd,SOL_SOCKET,option,&value,&size)==0 &&
+           size==sizeof(value) && value.tv_sec==seconds && value.tv_usec==0;
+}
+
+int main(void) {
+    (void)door_service_start;
+    int sockets[2];
+    if(socketpair(AF_UNIX,SOCK_STREAM,0,sockets))return 1;
+    if(door_service_deadlines(sockets[0]))return 2;
+    if(!check_timeout(sockets[0],SO_SNDTIMEO,3))return 3;
+    if(!check_timeout(sockets[0],SO_RCVTIMEO,10))return 4;
+    close(sockets[0]);
+    close(sockets[1]);
+    return door_service_deadlines(-1)==-1 && errno==EBADF?0:5;
+}
+''', ('-lcrypto',))
+        self.assertEqual(self.execute(binary, None).stderr, '')
+
+    @unittest.skipUnless(sys.platform.startswith(('linux','freebsd')), 'Unix isolation client only')
     def test_real_isolation_connect_failure_is_private_and_default_silent(self):
         binary = self.compile('isolation', '''
 #define _GNU_SOURCE
