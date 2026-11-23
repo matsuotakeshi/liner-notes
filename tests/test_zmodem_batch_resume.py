@@ -10,7 +10,7 @@ from test_zmodem_menu import transfer
 from transfer_connectors import LineConnector
 from posix_locks import file_lock
 
-def interrupt(c,sender,source,name,cut=1400000):
+def interrupt(c,sender,source,name,cut=1400000,spool=None):
  left,right=socket.socketpair();proc=subprocess.Popen([sender,'--binary','--quiet','--escape','--syslog=off','--']+([name] if isinstance(name,str) else name),cwd=source,stdin=right,stdout=right,stderr=subprocess.DEVNULL);right.close()
  pending=bytearray(c.buf);c.buf=b'';sent=0;deadline=time.monotonic()+20;left.setblocking(False)
  try:
@@ -23,6 +23,17 @@ def interrupt(c,sender,source,name,cut=1400000):
    if left in reads:
     data=left.recv(min(8192,cut-sent));assert data;c.send(data.replace(b'\xff',b'\xff\xff'));sent+=len(data)
    if c.sock in reads:c.receive();pending.extend(c.buf);c.buf=b''
+  if spool is not None:
+   # Sender bytes can still be buffered by TCP or the relay. Wait until the
+   # receiver has actually staged part of this file before forcing the cut.
+   while True:
+    partials=list(spool.glob('pending-*/data/'+name))
+    try:
+     if len(partials)==1 and partials[0].stat().st_size>1024:break
+    except FileNotFoundError:pass
+    remaining=deadline-time.monotonic()
+    assert remaining>0,f'receiver did not stage {name} before disconnect'
+    time.sleep(min(.05,remaining))
   c.close()  # Actual TCP interruption while the runtime helper owns the wire.
  finally:
   left.close();proc.terminate();proc.wait(timeout=5)
@@ -119,8 +130,12 @@ def run(binary,ctl,receiver,sender):
    assert (stage/'safe.bin').read_bytes()==replacement
    # Private mail uses its own identity/storage namespace on the same account.
    private=bytes(range(256))*512;(source/'private.bin').write_bytes(private)
-   c.cmd('ZMAILUPLOAD private resume',b'1 GiB.\r\n');interrupt(c,sender,source,'private.bin',cut=90000)
-   time.sleep(1.5);c=Telnet(s.port);c.until();c.cmd('LOGIN alice',b'> ');c.cmd(PASSWORD)
+   c.cmd('ZMAILUPLOAD private resume',b'1 GiB.\r\n')
+   interrupt(c,sender,source,'private.bin',cut=90000,spool=spool)
+   private_partial,=wait_for_partials(spool,['private.bin'])
+   retained_private=private_partial.stat().st_size
+   assert 1024<retained_private<len(private),retained_private
+   c=Telnet(s.port);c.until();c.cmd('LOGIN alice',b'> ');c.cmd(PASSWORD)
    c.cmd('ZMAILRESUME private resume',b'1 GiB.\r\n')
    code,out,err=transfer(c,sender,['--','private.bin'],source);assert code==0 and b'Private mail file #1 ready' in out,(code,out,err)
    from transfer_connectors import MailConnector
@@ -128,6 +143,6 @@ def run(binary,ctl,receiver,sender):
    try:assert private_api.info(1)==(len(private),hashlib.sha256(private).hexdigest())
    finally:private_api.close()
    assert not spool_contents(spool)
-   print(f'PASS: real Telnet batch upload/board ACL/description; TCP cut retained {retained} bytes; resumed upload wire {sent[0]} < full payload {len(payload)}; SHA-256 matches; batch/download/private-mail resume, path rejection and changed-prefix restart')
+   print(f'PASS: real Telnet batch upload/board ACL/description; TCP cut retained {retained} bytes; resumed upload wire {sent[0]} < full payload {len(payload)}; SHA-256 matches; batch/download/private-mail resume ({retained_private} private bytes retained), path rejection and changed-prefix restart')
   finally:c.close();api.close();s.close()
 if __name__=='__main__':run(*sys.argv[1:])
