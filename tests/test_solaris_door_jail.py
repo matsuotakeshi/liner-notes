@@ -389,4 +389,34 @@ class JailFixture(unittest.TestCase):
                 os.close(write_fd); os.close(read_fd)
 
 
+    @unittest.skipUnless(sys.platform.startswith('sunos'),'Solaris UNIX peer credentials')
+    def test_native_door_client_rejects_nonroot_launcher(self):
+        import socket
+        self.assertNotEqual(os.getuid(),0)
+        with tempfile.TemporaryDirectory(prefix='ln-door-client-') as temporary:
+            binary = Path(temporary)/'probe'
+            endpoint = str(Path(temporary)/'service')
+            subprocess.run(['/usr/bin/gcc','-m64','-std=c11','-Wall','-Wextra','-Werror',
+                            '-I/usr/openssl/3/include',str(ROOT/'tests/door_service_client_probe.c'),
+                            '-L/usr/openssl/3/lib/amd64','-Wl,-R,/usr/openssl/3/lib/amd64',
+                            '-lcrypto','-lsocket','-lnsl','-o',str(binary)],check=True,timeout=45)
+            with socket.socket(socket.AF_UNIX,socket.SOCK_STREAM) as listener:
+                listener.bind(endpoint)
+                listener.listen(1)
+                listener.settimeout(3)
+                with subprocess.Popen([str(binary),endpoint,'deny'],stdout=subprocess.PIPE,
+                                      stderr=subprocess.PIPE) as probe:
+                    try:
+                        connection,_ = listener.accept()
+                        with connection:
+                            connection.settimeout(3)
+                            self.assertEqual(connection.recv(1),b'','Request reached a non-root peer')
+                        output, errors = probe.communicate(timeout=3)
+                        self.assertEqual((probe.returncode,output,errors),(0,b'DENIED non-root launcher\n',b''))
+                    finally:
+                        if probe.poll() is None:
+                            probe.kill()
+                            probe.wait(timeout=3)
+
+
 if __name__ == '__main__': unittest.main()
