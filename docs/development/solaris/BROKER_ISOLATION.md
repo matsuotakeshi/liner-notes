@@ -95,6 +95,21 @@ unexpected descriptors leave no received descriptors open. The
 source files and observed results. The Solaris service launcher still
 requires the full isolation boundary before activation.
 
+## BBS C client in the Solaris fixture
+
+The BBS isolation client shares request encoding, peer validation and PTY
+receipt across the active Linux/FreeBSD adapter and a Solaris regression.
+The [direct Solaris record](evidence/door-client-transport-20261123.txt) covers
+both refusal of a non-root service before sending any launch data and a
+successful request from a non-root BBS identity to a temporary root service.
+The latter returned the PTY of the isolated synthetic Door. The client
+resized it, observed authorization and later revocation, then received the
+service completion message.
+
+The root endpoint is a fixed test coordinator. The active Solaris backend
+still needs its own service launcher, recovery rules and real game transport
+acceptance.
+
 ## Nested-contract observation candidate
 
 The follow-up probe also accepts `--nested`. After the same basic privilege

@@ -1,0 +1,67 @@
+Date (JST): 2026-11-23
+Host: Oracle Solaris 11.4 CBE AMD64.
+Trusted fixture/Broker base: 8e5976fe2e0c128a1300d0a401f244fec8d1c211.
+PTY receiver dependency: e95d45ea9a270753fd4fb3064d77a111e1a91f9b (PR #171).
+Synthetic Door probe: 75587e97938de9311b1d8c4b3266358d0ab6897a (PR #172).
+
+Both tests were run on the Solaris verification host before commit. The shared
+C transport compiles with OpenSSL and native UNIX sockets. The non-root listener
+received EOF with zero request bytes. The C client reported denial using the
+Solaris peer UID. The first attempt stopped at compilation because the private
+transfer omitted an existing header. The final staged files match the successful independent run.
+
+The integrated trial used the shared private fixture lock and collision-checked
+UIDs, one disposable 64MiB nosuid root, and the fixed Broker/consumer fixture.
+A synthetic BBS process (61002) used the exact C code called by the existing
+Linux/FreeBSD adapter. It admitted the root socket peer and generated the real
+request format with the expected fields. The root coordinator authenticated the
+BBS peer, returned the already authenticated synthetic Door's master PTY using
+SCM_RIGHTS, and held the service connection. The C client resized 80x24 to 100x30
+and performed live and post-revocation checks over the PTY. It then requested quit,
+closed its service write side and received DONE. The Broker continued to accept
+requests. Both isolated test processes exited 0. The mount and sockets were
+removed and the private directory retains plan.json and result.json.
+
+The Solaris endpoint is a fixed test coordinator, separate from the operating
+system service and shipped BBS adapter selection. The production Solaris
+launcher, admission recovery and real game path still require implementation
+and acceptance. No permanent service or host account was installed.
+
+Root observation:
+{
+  "source_sha": "8e5976fe2e0c128a1300d0a401f244fec8d1c211",
+  "probe_sha256": "9f3b525599ca85d406bc033b96e8fd074e04fc1da58a44f505b2b73a1be94a62",
+  "root": "/var/tmp/liner-door-jail-b0sbnjc8/root",
+  "client_source_sha256": {
+    "tests/door_service_client_probe.c": "a0e7d052732982b6beb26a5f8806ae3044c726929e4dd19e878f5e50c56a8d81",
+    "src/door_service_client.inc": "71df3039ced76ec2a3cb5ad7308c417bcf3a7993feffebcaf41512241c5de9ac",
+    "src/door_diagnostics.h": "cf574d822574079ba9d8dd585c907a7bcf63eef401a9dea4486ce79d5c0fd86b",
+    "src/door_handoff.inc": "964fd31e748c3352de1b6a02aa0f146981086b62fbe328ee8bfb9e9aa6f94631"
+  },
+  "client_request_verified": true,
+  "client_uid": 61002,
+  "pty_live": true,
+  "pty_resize": true,
+  "issuer_eof_revoked": true,
+  "broker_healthy_after_revocation": true,
+  "consumer_exit": 0,
+  "holder_exit": 0,
+  "cleanup_complete": true,
+  "retained": "/var/tmp/liner-door-jail-b0sbnjc8"
+}
+
+Non-root acceptance:
+{"sha": "8e5976fe2e0c128a1300d0a401f244fec8d1c211", "sha256": {"ci/solaris_door_jail.py": "cea586383033237f652dc31fd1331ca931925a82b8a9141385ed46f1dc307b54", "tests/test_solaris_door_jail.py": "bf683cd2394a659909f8e323affc2667a9bac62076238d37857a1eddaccca936", "src/door_diagnostics.h": "cf574d822574079ba9d8dd585c907a7bcf63eef401a9dea4486ce79d5c0fd86b", "tests/door_service_client_probe.c": "a0e7d052732982b6beb26a5f8806ae3044c726929e4dd19e878f5e50c56a8d81", "src/door_service_client.inc": "71df3039ced76ec2a3cb5ad7308c417bcf3a7993feffebcaf41512241c5de9ac", "src/door_handoff.inc": "964fd31e748c3352de1b6a02aa0f146981086b62fbe328ee8bfb9e9aa6f94631"}, "uid": 1000}
+.
+----------------------------------------------------------------------
+Ran 1 test in 0.177s
+
+OK
+
+{"temporary_directory_removed": true, "exit": 0}
+
+Local operator scripts and transcripts: build/solaris-door-jail/
+door-client-integrated.log SHA-256: 52f86d735f89bbffda412187249356aecbbb84a0dc10dc0356c33de2ed316b6a
+door-client-nonroot-final.log SHA-256: 8948b763f0a98df9ee5f316cb86c82bfe09a05bd09a431a84cc62bb7fb17f483
+check-door-client-integrated.py SHA-256: 70b05254cc3c4517693a267d923e09a892f996374eafe5081a3cd6dd58e9d09d
+check-door-client-nonroot.py SHA-256: b840fbaf8ac51ab59fdc4ed64a459f6ca4c28bbc160b6d5633087534e20b3223
