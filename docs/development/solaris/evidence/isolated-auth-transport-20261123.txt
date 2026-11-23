@@ -1,0 +1,59 @@
+Date (JST): 2026-11-23
+Host: Oracle Solaris 11.4 CBE AMD64.
+Trusted fixture and Broker/consumer source: 8e5976fe2e0c128a1300d0a401f244fec8d1c211.
+
+Direct pre-commit test. Verified the installed fixture manifest, took its shared
+lock and checked the reserved numeric identities for collisions. Compiled the
+fixed candidate with the existing Solaris fixture C helpers. Mounted one 64MiB
+nosuid tmpfs under a new /var/tmp/liner-door-jail-* directory and staged the
+program and verified system dependencies. Started the fixed launcher under
+ctrun -l contract -o noorphan with a real controlling PTY.
+
+The candidate entered the root, changed to UID/GID 61001, closed unrelated
+FDs and checked the privilege limit and chroot denial. The issuer supplied a
+synthetic one-use ticket through FD 3. The program used one preconnected UNIX
+socket on FD 4 to forward it to the external consumer UID 61004. The consumer
+used real peer UID verification with the main Broker handler on UID 61003.
+Credential bytes did not appear on the terminal or in the saved transcript.
+
+The terminal reported AUTH LIVE, 80x24 and 100x30 in sequence. A second live
+check succeeded. After issuer EOF it reported AUTH REVOKED. The launcher and
+consumer exited 0 after quit, and a new issuer request showed the Broker
+was still responsive. The root was unmounted, and the private trial directory
+retains only plan.json and result.json. The trial did not install a service.
+
+The candidate also compiled without root at strict warning levels and rejected
+both the opt-in entry and the payload under the ordinary CI account. Normal CI
+can run that refusal check. This fixed synthetic trial does not exercise the
+BBS service launcher, admission-slot reuse or an actual game's transport
+configuration. The additional socket is specific to the fixture.
+
+Direct privileged receipt:
+{
+  "source_sha": "8e5976fe2e0c128a1300d0a401f244fec8d1c211",
+  "probe_sha256": "9f3b525599ca85d406bc033b96e8fd074e04fc1da58a44f505b2b73a1be94a62",
+  "root": "/var/tmp/liner-door-jail-kth5hafn/root",
+  "pty_live": true,
+  "pty_resize": true,
+  "issuer_eof_revoked": true,
+  "broker_healthy_after_revocation": true,
+  "consumer_exit": 0,
+  "holder_exit": 0,
+  "cleanup_complete": true,
+  "retained": "/var/tmp/liner-door-jail-kth5hafn"
+}
+
+Non-root compile/refusal output:
+{"sha": "8e5976fe2e0c128a1300d0a401f244fec8d1c211", "sha256": {"ci/solaris_door_jail.py": "cea586383033237f652dc31fd1331ca931925a82b8a9141385ed46f1dc307b54", "tests/test_solaris_door_jail.py": "220625a0bfb94dd843186f22b3c0a3915691689eec94e7564913e3f5fea88c35", "tests/solaris_door_jail_probe.c": "58a22d7d8b01a7ad9f9c962860e29e6c9a37ce92a2295fc79eb00cd04137362a", "tests/solaris_door_auth_transport_probe.c": "9f3b525599ca85d406bc033b96e8fd074e04fc1da58a44f505b2b73a1be94a62"}, "uid": 1000}
+.
+----------------------------------------------------------------------
+Ran 1 test in 0.121s
+
+OK
+
+{"temporary_directory_removed": true, "exit": 0}
+
+Local operator script and transcripts: build/solaris-door-jail/
+check-isolated-auth-transport-final.py SHA-256: 54f1e260e66a2214857bc4bbed33b0d041c2761298356a3ff01cb526c7b8ed1e
+isolated-auth-transport.log SHA-256: 671ee8e632b48943fbeadc47bfde0c9ecd5615b9baa4b2d19baa74196f62d5f6
+auth-transport-nonroot.log SHA-256: 299e2b53b78abd9c7deacff598caf1c44845b7e189eaa3ac212136472b45cf71

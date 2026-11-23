@@ -371,4 +371,18 @@ class JailFixture(unittest.TestCase):
                 os.close(write_fd); os.close(read_fd)
 
 
+    @unittest.skipUnless(sys.platform.startswith('sunos'),'Solaris native compile and refusal')
+    def test_native_auth_transport_compiler_and_refusal(self):
+        self.assertNotEqual(os.getuid(),0)
+        with tempfile.TemporaryDirectory(prefix='ln-auth-transport-') as temporary:
+            binary = Path(temporary)/'auth-probe'
+            subprocess.run(['/usr/bin/gcc','-m64','-std=c11','-Wall','-Wextra','-Werror',
+                            str(ROOT/'tests/solaris_door_auth_transport_probe.c'),'-o',str(binary),
+                            '-lsocket','-lnsl'],check=True,timeout=45)
+            for arguments, expected in ((['--launch','/','3','4'],80),(['--inside'],90)):
+                with self.subTest(arguments=arguments):
+                    result = subprocess.run([str(binary),*arguments],capture_output=True,timeout=5)
+                    self.assertEqual((result.returncode,result.stdout,result.stderr),(expected,b'',b''))
+
+
 if __name__ == '__main__': unittest.main()

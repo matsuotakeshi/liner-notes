@@ -40,6 +40,20 @@ Deadlines and nonzero exits make failures visible. The existing native `make
 check` runs this after main integration; PR/Windows cannot claim it passed.
 Its explicit output says isolation is NOT verified. The backend is not enabled.
 
+## Authentication transport inside the Solaris execution root
+
+The [integrated synthetic run](evidence/isolated-auth-transport-20261123.txt)
+joins the existing nosuid execution root, an actual controlling PTY, and
+the Broker on distinct UIDs. The jailed program reads its one-use ticket
+from FD 3 and forwards it to the authorized external consumer over one
+preconnected local socket. It has no Broker socket path inside the root.
+The PTY carries status and user input. The consumer denied the next check
+after issuer EOF, and the Broker then accepted a fresh issuer request.
+
+The additional socket descriptor is part of the fixed test fixture. The
+BBS service still needs an explicit production transport policy, integrated
+slot cleanup, and validation of the actual launch path before enablement.
+
 ## Security blockers before backend activation
 
 1. A malicious Door may create nested/new contracts. NOORPHAN's kill scope and
