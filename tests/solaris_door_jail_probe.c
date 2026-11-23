@@ -1,5 +1,6 @@
 /* Synthetic, root-gated credential/namespace fixture. NOT a Door backend.
- * No arbitrary commands, forks in the payload, networking, or file writes.
+ * No arbitrary commands, networking, or file writes. The opt-in lifecycle
+ * payload adds one bounded synthetic descendant after checking the boundary.
  * The root observer reads credentials while its unreaped child waits on a pipe;
  * /proc and contract descriptors are NEVER inherited into the execution root.
  */
@@ -87,7 +88,7 @@ static void collect_errors(int fd) {
     close(fd);
 }
 
-static int payload(void) {
+static struct observation inspect_payload(void) {
     /* It is also safe if a baseline accidentally gives this reporter set-ID:
      * do not open any writable file, signal anything or invoke privileged mode. */
     alarm(5);
@@ -122,6 +123,11 @@ static int payload(void) {
         errno = change_errno; child_error("chroot-denial",70);
     }
     value.chroot_denied = changed == -1 && change_errno == EPERM;
+    return value;
+}
+
+static int payload(void) {
+    struct observation value = inspect_payload();
     PROGRESS("payload-ready");
     char ready = 'R', ack = 0;
     if (!transfer(1, &ready, 1, 1) || !transfer(1, &value, sizeof(value), 1)) return 71;
@@ -153,6 +159,63 @@ static int case_name(const char *name) {
         !strcmp(role,"consumer") || !strcmp(role,"other_slot");
 }
 
+/* Both fixtures execute the same fixed launcher setup. Return only if exec
+ * failed, with errno left intact for the caller's verdict. */
+static void execute_in_root(const char *root, const char *name, char *mode) {
+    struct rlimit limit = {256,256}, core = {0,0};
+    PROGRESS("close-descriptors");
+    closefrom(3);
+    PROGRESS("limits");
+    if (setrlimit(RLIMIT_NOFILE,&limit) || setrlimit(RLIMIT_CORE,&core)) child_error("limits",76);
+    PROGRESS("root");
+    if (chdir(root) || chroot(".") || chdir("/")) child_error("root",76);
+    PROGRESS("groups");
+    if (setgroups(0,NULL)) child_error("groups",76);
+    PROGRESS("gid");
+    if (setgid(SLOT)) child_error("gid",76);
+    PROGRESS("uid");
+    if (setuid(SLOT)) child_error("uid",76);
+    PROGRESS("privileges");
+    if (!basic_limit(1)) child_error("privileges",76);
+    char path[80]; (void)snprintf(path,sizeof(path),"/%s",name);
+    char *args[] = {path,mode,NULL};
+    char *env[] = {"PATH=/", "LC_ALL=C", NULL};
+    for (int fd = 0; fd < 3; ++fd) {
+        int flags = fcntl(fd,F_GETFD);
+        if (flags < 0) child_error("exec-stdio",77);
+        if (flags & FD_CLOEXEC) {
+            errno = EINVAL;
+            child_error("exec-stdio",77);
+        }
+    }
+    PROGRESS("exec");
+    execve(path,args,env);
+}
+
+/* A synthetic member of the system-owned test contract. The direct child
+ * holds stdout while a descendant in a separate session holds its other
+ * copy. Each process has an independent deadline, including after fork. */
+static int lifecycle_payload(void) {
+    if (getuid() != SLOT || geteuid() != SLOT || getgid() != SLOT || getegid() != SLOT ||
+        getgroups(0,NULL) != 0) return 82;
+    struct observation value = inspect_payload();
+    if (!value.basic || !value.namespace_closed || !value.descriptors_closed ||
+        !value.chroot_denied) return 82;
+    pid_t leader = getpid();
+    pid_t descendant = fork();
+    if (descendant < 0) child_error("lifecycle-fork",83);
+    if (descendant == 0) {
+        alarm(5);
+        if (setsid() < 0) child_error("lifecycle-session",83);
+        char ready[96];
+        int length = snprintf(ready,sizeof(ready),"READY %ld %ld\n",
+                              (long)leader,(long)getpid());
+        if (length <= 0 || (size_t)length >= sizeof(ready) ||
+            !transfer(1,ready,(size_t)length,1)) child_error("lifecycle-ready",83);
+    }
+    for (;;) pause();
+}
+
 static int observe(const char *root, const char *name) {
     int output[2], ack[2], errors[2];
     if (!root_path(root) || !case_name(name) || pipe(output) || pipe(ack) || pipe(errors)) {
@@ -163,35 +226,8 @@ static int observe(const char *root, const char *name) {
     if (child < 0) return 74;
     if (child == 0) {
         alarm(5);
-        struct rlimit limit = {256,256}, core = {0,0};
         if (dup2(ack[0], 0) < 0 || dup2(output[1], 1) < 0 || dup2(errors[1], 2) < 0) child_error("stdio",75);
-        PROGRESS("close-descriptors");
-        closefrom(3);
-        PROGRESS("limits");
-        if (setrlimit(RLIMIT_NOFILE,&limit) || setrlimit(RLIMIT_CORE,&core)) child_error("limits",76);
-        PROGRESS("root");
-        if (chdir(root) || chroot(".") || chdir("/")) child_error("root",76);
-        PROGRESS("groups");
-        if (setgroups(0,NULL)) child_error("groups",76);
-        PROGRESS("gid");
-        if (setgid(SLOT)) child_error("gid",76);
-        PROGRESS("uid");
-        if (setuid(SLOT)) child_error("uid",76);
-        PROGRESS("privileges");
-        if (!basic_limit(1)) child_error("privileges",76);
-        char path[80]; (void)snprintf(path,sizeof(path),"/%s",name);
-        char *args[] = {path,"--inside",NULL};
-        char *env[] = {"PATH=/", "LC_ALL=C", NULL};
-        for (int fd = 0; fd < 3; ++fd) {
-            int flags = fcntl(fd,F_GETFD);
-            if (flags < 0) child_error("exec-stdio",77);
-            if (flags & FD_CLOEXEC) {
-                errno = EINVAL;
-                child_error("exec-stdio",77);
-            }
-        }
-        PROGRESS("exec");
-        execve(path,args,env);
+        execute_in_root(root,name,"--inside");
         /* A denied set-ID exec can be secure, but missing libraries cannot. */
         if (errno == EACCES || errno == EPERM) {
             char denied = 'D'; (void)transfer(1,&denied,1,1); _exit(0);
@@ -261,7 +297,14 @@ static int observe(const char *root, const char *name) {
 
 int main(int argc,char **argv) {
     if (argc == 2 && !strcmp(argv[1],"--inside")) return payload();
+    if (argc == 2 && !strcmp(argv[1],"--inside-lifecycle")) return lifecycle_payload();
     if (getuid() != 0 || geteuid() != 0) return 80;
+    if (argc == 3 && !strcmp(argv[1],"--launch-lifecycle")) {
+        if (!root_path(argv[2])) return 73;
+        alarm(5);
+        execute_in_root(argv[2],"plain","--inside-lifecycle");
+        child_error("lifecycle-exec",77);
+    }
     if (argc != 4 || strcmp(argv[1],"--observe")) return 81;
     signal(SIGPIPE,SIG_IGN);
     return observe(argv[2],argv[3]);

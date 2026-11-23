@@ -125,11 +125,11 @@ Removing the new installed bundle must not remove the prior fixture/shared lock.
 
 ## Remaining gates
 
-Even a passing matrix leaves owned process-contract cleanup, nested-contract
-creation after exec, detached/double-fork descendants, supervisor death and
-unrelated-process safety unverified. PTY/ticket FD handling, real game dependency
-and data provisioning, Broker revocation/restart, admission-slot reuse and an
-independent safety review remain required before enabling the backend.
+The separate synthetic holder-death check below combines the execution root
+with the Solaris contract primitive. Further coverage is needed for double-fork
+descendants inside this root, additional-contract creation, PTY/ticket FDs,
+game dependencies, Broker revocation/restart, admission-slot reuse and
+independent safety review.
 
 Local/mock checks are not native isolation evidence. Record the future root
 result and exact main SHA here only after executing it.
@@ -281,6 +281,40 @@ Resume after Hosted CI, review, merge and successful Solaris CI on the new
 main SHA. Preserve and hash-check the installed `8976d0e8` bundle before the
 next scoped root trial. Verify cleanup independently of the result.
 
+## Opt-in synthetic holder-death trial
+
+After review, same-SHA Solaris Native CI and explicit approval for this
+additional privileged trial, use the existing private bundle and lock.
+Hash-check and back up the installed bundle before updating it. Execute:
+
+```sh
+/usr/bin/python3.13 -I /opt/liner-notes-ci/door-jail/solaris_door_jail.py --run-holder-death-approved
+```
+
+The normal `--run-approved` path still runs only the eleven-case matrix.
+The added mode uses that same mount and runs the new step only after the
+matrix passes. The host starts the fixed launcher under
+`ctrun -l contract -o noorphan` in a separate session. The launcher enters
+the same root, drops to the reserved slot and execs the fixed `plain` probe.
+The probe checks the privilege limit, closed descriptors, absent host paths
+and chroot denial before creating a single descendant in its own session.
+Both holders of the output pipe have independent five-second alarms.
+
+The test verifies process relationships and contract membership before
+signalling its own `ctrun` subprocess. It requires SIGKILL status and EOF
+within the independent alarm deadline, no live workload processes, and a
+still-running control in another contract. The receipt records samples before
+and after the signal, output and cleanup. Control and holder are scoped
+subprocess handles. Process snapshots are observation only. Cleanup uses the
+existing exact-path unmount and trial-file removal.
+
+The Solaris CI account directly confirmed the prerequisite for the new
+orchestration, with the holder in its own session and a separate session for
+the descendant. This control used system utilities and synthetic processes
+outside the execution root. See the [control evidence](evidence/contract-holder-session-20261123.txt).
+Hosted tests exercise result rejection, and normal Solaris CI compiles the
+probe and checks non-root refusal. The opt-in privileged trial runs separately.
+
 ## Primary OS references
 
 - [mount_tmpfs(8)](https://docs.oracle.com/cd/E88353_01/html/E72487/mount-tmpfs-8.html): size and nosuid options; invalid options can be ignored, hence live verification.
@@ -288,3 +322,4 @@ next scoped root trial. Verify cleanup independently of the result.
 - [chroot(2)](https://docs.oracle.com/cd/E88353_01/html/E37841/chroot-2.html): outside directory descriptors matter; chroot alone is not claimed as confinement.
 - [Solaris runtime linker](https://docs.oracle.com/en/operating-systems/solaris/oracle-solaris/11.4/linkers-libraries/runtime-linker.html): the kernel uses the interpreter pathname recorded in the executable's program header.
 - [Solaris umask](https://docs.oracle.com/en/operating-systems/solaris/oracle-solaris/11.4/secure-files/default-umask-value.html): mask `077` removes group and other search permissions from new directories.
+- [Solaris ctrun](https://docs.oracle.com/cd/E19082-01/819-2239/6n4hsf6h3/index.html): the noorphan option ties the contract lifetime to its holder.
