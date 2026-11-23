@@ -63,7 +63,7 @@ def verify_source(sha):
         trusted(ROOT / directory)
         for path in (ROOT / directory).glob("*.py"):
             trusted(path)
-    for name in (".ci-source-sha", "runtime", "tests/solaris_auth_door_probe.c",
+    for name in (".ci-source-sha", "runtime", "liner-notes-door-lock", "tests/solaris_auth_door_probe.c",
                  "liner-notes-solaris-door-child"):
         trusted(ROOT / name)
     if (ROOT / ".ci-source-sha").read_text().strip() != sha:

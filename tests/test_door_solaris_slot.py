@@ -13,8 +13,8 @@ class SolarisSlot(unittest.TestCase):
     def test_snapshot_detects_all_three_uid_fields(self):
         for row in ('61001 0 0 S','0 61001 0 S','0 0 61001 S'):
             self.assertTrue(slots.snapshot_contains('0 0 0 S\n'+row+'\n',61001))
-        self.assertFalse(slots.snapshot_contains('0 0 0 S\n61001 - - Z\n',61001))
-        for rows in ('','61001 0 0 S\n0 0 - S','bad output','0 0 0'):
+        self.assertFalse(slots.snapshot_contains('0 0 0 S\n61001 - - Z\n0 0 ? Z\n',61001))
+        for rows in ('','61001 0 0 S\n0 0 - S','0 0 ? S','bad output','0 0 0'):
             with self.subTest(rows=rows),self.assertRaises(OSError):
                 slots.snapshot_contains(rows,61001)
 

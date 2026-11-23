@@ -20,7 +20,7 @@ class SlotBusy(ValueError):
 
 
 _PS = ('/usr/bin/ps', '-e', '-o', 'uid=', '-o', 'ruid=', '-o', 'suid=', '-o', 's=')
-_ROW = re.compile(r'([0-9]+|-) +([0-9]+|-) +([0-9]+|-) +([A-Z])')
+_ROW = re.compile(r'([0-9]+|[-?]) +([0-9]+|[-?]) +([0-9]+|[-?]) +([A-Z])')
 
 
 def snapshot_contains(output, uid):
@@ -34,9 +34,10 @@ def snapshot_contains(output, uid):
             raise OSError('Incomplete Solaris UID snapshot')
         effective, real, saved, state = match.groups()
         if state == 'Z':
+            # ps can print '?' for the saved UID of a zombie.
             continue
         ids = (effective,real,saved)
-        if '-' in ids:
+        if '-' in ids or '?' in ids:
             raise OSError('Solaris live UID not visible')
         if str(uid) in ids:
             found = True
