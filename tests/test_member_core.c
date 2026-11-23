@@ -35,6 +35,11 @@ int member_settings_repository_check_save(uint32_t user,unsigned kind,const char
     if(stamp>settings_stamp)settings_stamp=stamp;
     settings_writes++;return 1;
 }
+int member_settings_repository_mmm_set(uint32_t user,uint64_t stamp) {
+    settings_user=user;settings_kind=MEMBER_CHECK_MMM;
+    if(!settings_save_ok)return 0;
+    settings_stamp=stamp;settings_writes++;return 1;
+}
 int members_rtbbs_policy;
 static const char *profile_values[15][PROFILE_BUFFER+1];
 static unsigned profile_access[15][PROFILE_FIELDS],profile_read_count,profile_match_count,profile_admin_calls;
@@ -1741,7 +1746,8 @@ static void checkpoint_validation(void) {
         assert(member_core_check_commit(&actor,MEMBER_CHECK_ARTICLES,invalid[i],0)==MEMBER_CORE_INVALID);
     }
     assert(member_core_check_begin(&actor,MEMBER_CHECK_MAIL,"private",&out)==MEMBER_CORE_INVALID);
-    assert(member_core_check_begin(&actor,(MemberCheckKind)3,"",&out)==MEMBER_CORE_INVALID);
+    assert(member_core_check_begin(&actor,(MemberCheckKind)(MEMBER_CHECK_MMM+1),"",&out)==MEMBER_CORE_INVALID);
+    assert(member_core_check_begin(&actor,MEMBER_CHECK_MMM,"2:0",&out)==MEMBER_CORE_INVALID);
     assert(member_core_check_begin(&actor,MEMBER_CHECK_FILES,NULL,&out)==MEMBER_CORE_INVALID);
     assert(member_core_check_begin(&actor,MEMBER_CHECK_FILES,"a|b",&out)==MEMBER_CORE_INVALID);
     assert(member_core_check_begin(&actor,MEMBER_CHECK_FILES,"a\nb",&out)==MEMBER_CORE_INVALID);
@@ -1752,7 +1758,11 @@ static void checkpoint_validation(void) {
     assert(member_core_check_commit(&actor,MEMBER_CHECK_MAIL,"",1001)==MEMBER_CORE_INVALID);
     assert(member_core_check_commit(&actor,MEMBER_CHECK_MAIL,"",UINT64_MAX)==MEMBER_CORE_INVALID);
     assert(member_core_check_begin(&actor,MEMBER_CHECK_MAIL,"",NULL)==MEMBER_CORE_INVALID);
-    assert(!settings_writes);puts("PASS: checkpoint key/enum/path/timestamp bounds before persistence");
+    assert(!settings_writes);
+    assert(member_core_check_begin(&actor,MEMBER_CHECK_MMM,"",&out)==MEMBER_CORE_OK);
+    assert(member_core_mmm_set(&actor,0)==MEMBER_CORE_OK && !settings_stamp);
+    assert(member_core_mmm_set(&actor,1001)==MEMBER_CORE_INVALID && !settings_stamp && settings_writes==1);
+    puts("PASS: checkpoint key/enum/path/timestamp bounds and explicit adjustment of the MMM cursor");
 }
 static void reading_settings_authority(void) {
     for(unsigned i=0;i<7;i++) {
@@ -1767,6 +1777,7 @@ static void reading_settings_authority(void) {
         MemberCheckWindow window;MemberMenuMode mode=MEMBER_MENU_EXPERT;
         assert(member_core_check_begin(&actor,MEMBER_CHECK_MAIL,"",&window)==want);cleared(&window,sizeof(window));
         assert(member_core_check_commit(&actor,MEMBER_CHECK_MAIL,"",100)==want);
+        assert(member_core_mmm_set(&actor,100)==want);
         assert(member_core_menu_get(&actor,&mode)==want && mode==0);
         assert(member_core_menu_save(&actor,MEMBER_MENU_BEGINNER)==want);
         char ui_name[32];assert(member_core_ui_get(&actor,ui_name)==want && !*ui_name);

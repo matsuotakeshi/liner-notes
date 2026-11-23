@@ -17,6 +17,11 @@ static int sink(void *ctx,const unsigned char *data,size_t size) {
 
 int main(void) {
     assert(parse("notes",0).command==MMM_UNKNOWN);
+    assert(parse("mail",0).command==MMM_UNKNOWN);
+    assert(parse("filer",0).command==MMM_UNKNOWN);
+    assert(parse("new",1).command==MMM_NEW);
+    assert(parse("se",1).command==MMM_SEQUENCER);
+    assert(parse("fi Manual/Downloads",1).command==MMM_FILER);
     assert(parse("  12  ",1).number==12);
     assert(parse("lo",1).command==MMM_AMBIGUOUS);
     assert(parse("login",1).command==MMM_LOGIN);

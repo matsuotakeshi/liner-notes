@@ -4,6 +4,7 @@
 #include "mail_core.h"
 #include "member_core.h"
 #include "vault_query_core.h"
+#include "door_core.h"
 /* Bounded, owned results copied only after Core authorization. No display-text
  * parsing, pointers into repositories, or extra unbounded body allocation. */
 typedef enum { OPERATION_PAGE_NONE,
@@ -23,7 +24,8 @@ typedef enum { OPERATION_PAGE_NONE,
     OPERATION_PAGE_FILE_BOARDS,
     OPERATION_PAGE_FILE_CATEGORIES,
     OPERATION_PAGE_FILE_CHILDREN,
-    OPERATION_PAGE_FILE_AUDIT
+    OPERATION_PAGE_FILE_AUDIT,
+    OPERATION_PAGE_DOORS
 } OperationPageKind;
 typedef struct {
     OperationPageKind kind;
@@ -45,6 +47,7 @@ typedef struct {
         VaultQueryCategories file_categories;
         VaultQueryChildren file_children;
         VaultQueryAudit file_audit;
+        DoorListing doors;
     } data;
 } OperationPage;
 /* Producer adapters opt in through the request, preserving legacy output. */

@@ -1,4 +1,4 @@
-SESSION_SOURCES= src/session.c src/session_ui.c src/session_rtbbs.c src/session_mmm.c src/mmm_input.c src/session_auth.c src/session_board.c src/session_chat.c src/session_classic.c src/session_commands.c src/session_connector.c src/session_editor.c src/session_extended.c src/session_mail.c src/session_members.c src/session_menu.c src/session_output.c src/session_parse.c src/session_reading.c src/session_results.c src/session_services.c src/session_settings.c src/session_transfer.c src/session_vault.c
+SESSION_SOURCES= src/session.c src/session_ui.c src/session_rtbbs.c src/session_mmm.c src/session_mmm_services.c src/mmm_input.c src/session_auth.c src/session_board.c src/session_chat.c src/session_classic.c src/session_commands.c src/session_connector.c src/session_editor.c src/session_extended.c src/session_mail.c src/session_members.c src/session_menu.c src/session_output.c src/session_parse.c src/session_reading.c src/session_results.c src/session_services.c src/session_settings.c src/session_transfer.c src/session_vault.c
 
 CC?=cc
 PYTHON?=python3
@@ -628,6 +628,7 @@ check: test-session-core
 
 # Shared data contracts are independent of the worker lifecycle.
 runtime test-adapters test-session-core: src/operation.h src/operation_pages.h
+runtime test-adapters: src/session_mmm_internal.h
 
 runtime test-adapters: src/session_ui.h src/session_state.h src/session_io.h
 
@@ -693,6 +694,11 @@ runtime test-adapters: src/mmm_input.h
 test-mmm-ui: runtime
 	$(PYTHON) tests/test_mmm_ui.py ./runtime
 check: test-mmm-ui
+
+.PHONY: test-mmm-services
+test-mmm-services: runtime vaultctl
+	$(PYTHON) tests/test_mmm_services.py ./runtime ./vaultctl
+check: test-mmm-services
 
 .PHONY: test-mmm-input
 test-mmm-input: tests/test_mmm_input.c src/mmm_input.c src/mmm_input.h src/editor_core.c src/terminal.c src/telnet.c

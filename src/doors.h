@@ -2,11 +2,13 @@
 #define LINER_DOORS_H
 #include <stdint.h>
 #include <stddef.h>
+#include "door_core.h"
 typedef struct Door Door;
 /* Opt-in isolation is mandatory for every Door once configured. Linux candidate. */
 int doors_isolation_config(const char *);
 int doors_config(const char *);
 void doors_list(unsigned,char *,size_t);
+void doors_listing(unsigned,DoorListing *);
 Door *door_start(unsigned,unsigned,uint32_t,const char *,unsigned,unsigned,uint64_t,unsigned long,uint32_t);
 int door_input(Door *,unsigned char);
 int door_room(Door *);
