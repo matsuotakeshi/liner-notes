@@ -141,6 +141,17 @@ the initial native run of this regression. Connecting the PTY and ticket
 transport to the authenticated launcher inside the execution root remains
 pending.
 
+## PTY ticket delivery and revocation
+
+The [ticket delivery regression](evidence/broker-pty-ticket-20261123.txt)
+uses a real UNIX socket consumer and Broker on the Solaris test host. A
+synthetic PTY worker under `ctrun` receives a ticket only through an inherited
+pipe, consumes it once and verifies that the lease is revoked after the
+issuer connection closes. A private socket pair injects the issuer identity
+to run the test without root. The consumer and Broker validate each other's
+actual OS peer UID. Connecting this path to the authenticated launcher,
+distinct service UIDs and the execution root remains pending.
+
 ## Nested-contract observation candidate
 
 The follow-up probe also accepts `--nested`. After the same basic privilege
