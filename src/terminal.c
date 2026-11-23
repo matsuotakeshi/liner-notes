@@ -34,15 +34,16 @@ static int erase(Terminal *t,int echo) {
 int terminal_receive(Terminal *t,unsigned char byte,int secret) {
     int event=TN_DATA;
     if(t->mode==TERMINAL_TELNET) { event=telnet_receive(&t->telnet,byte,&byte); if(event<=0) return event; }
-    if(t->mode==TERMINAL_RAW) {
+    if(t->mode==TERMINAL_RAW && !t->keys) {
         if(byte=='\n') { if(t->size && t->line[t->size-1]=='\r') t->line[--t->size]=0; return 1; }
         if(!byte || t->size>=INPUT_LINE_MAX+1 || (t->size==INPUT_LINE_MAX && byte!='\r')) return -1;
         t->line[t->size++]=(char)byte; return 0;
     }
     int echo=!secret && (t->mode==TERMINAL_PLAIN || telnet_echo(&t->telnet));
-    if(event==TN_ERASE) return erase(t,echo)?0:-1;
-    if(event==TN_KILL || byte==21) { while(t->size) if(!erase(t,echo)) return -1; return 0; }
     if(t->after_cr) { t->after_cr=0; if(byte=='\n' || byte==0) return 0; }
+    if(t->keys && event==TN_ERASE)byte=8;
+    else if(event==TN_ERASE)return erase(t,echo)?0:-1;
+    if(event==TN_KILL || byte==21) { while(t->size) if(!erase(t,echo)) return -1; return 0; }
     /* Ignore bounded ANSI cursor-key sequences, never turn them into commands. */
     if(t->escape) {
         if(++t->escape_size>32) return -1;
@@ -51,6 +52,12 @@ int terminal_receive(Terminal *t,unsigned char byte,int secret) {
         return 0;
     }
     if(byte==27) { t->escape=1; t->escape_size=0; return 0; }
+    if(t->keys) {
+        if(!byte || byte>=128)return 0;
+        t->key=byte;
+        t->after_cr=byte=='\r';
+        return TERMINAL_KEY;
+    }
     if(byte==8 || byte==127) return erase(t,echo)?0:-1;
     if(byte=='\r' || byte=='\n') {
         t->after_cr=byte=='\r';

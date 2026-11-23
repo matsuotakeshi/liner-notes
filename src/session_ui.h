@@ -20,6 +20,9 @@ typedef enum { SESSION_NOTICE_DOOR,SESSION_NOTICE_PROGRESS,SESSION_NOTICE_TIME_W
 typedef struct {
     const char *name;
     size_t state_size; /* zero-initialized private bytes; cleared before free */
+    int login_required;
+    int (*keys)(const Session *);
+    void (*key)(Session *,unsigned char);
     SessionUiSnapshot (*snapshot)(const Session *);
     /* reason: 0 disconnect, 1 revoke, 2 discard inactive state; notify only on revoke. */
     void (*cleanup)(Session *,int reason,int notify);
@@ -75,10 +78,12 @@ typedef enum { SESSION_UI_SELECTED,SESSION_UI_UNCHANGED,SESSION_UI_UNKNOWN,
     SESSION_UI_DENIED,SESSION_UI_BUSY,SESSION_UI_INVALID } SessionUiSelection;
 
 const SessionUiAdapter *session_ui_rtbbs(void);
+const SessionUiAdapter *session_ui_mmm(void);
 SessionUiConfig session_ui_default(void);
 int session_ui_configure(SessionUiConfig *,const char *,const char *,const char *);
 SessionUiSelection session_ui_preflight(const Session *,const char *);
 SessionUiSelection session_ui_choose(Session *,const char *);
+int session_ui_legacy_connector(Session *);
 int session_ui_save_choice(Session *,const char *);
 /* Config is copied; immutable adapters and their names must outlive the Session.
  * Registration/configuration is administrator-side C API, never client input.

@@ -1,4 +1,5 @@
 #include "editor_core.h"
+#include <stdlib.h>
 #include <string.h>
 #include <openssl/crypto.h>
 
@@ -111,4 +112,53 @@ EditorOutcome editor_apply(EditorDocument *d,EditorOperation op,uint32_t first,u
     save(d);memmove(d->body+begin+add,d->body+begin+old,info.bytes-begin-old+1);
     if(op!=EDITOR_DELETE) { memcpy(d->body+begin,text,n);memcpy(d->body+begin+n,"\r\n",2); }
     clear_tail(d,info.bytes-old+add);return EDITOR_OK;
+}
+
+static int append_text(char *out,size_t *used,const char *text,size_t size) {
+    if(size>CONTENT_BODY-*used)return 0;
+    memcpy(out+*used,text,size);
+    *used+=size;
+    return 1;
+}
+
+EditorOutcome editor_transform(EditorDocument *d,uint32_t first,uint32_t last,
+                               int complement,const char *needle,const char *replacement) {
+    EditorInfo info;
+    EditorOutcome result=editor_inspect(d,&info);
+    if(result!=EDITOR_OK)return result;
+    if(!first || first>last || last>info.lines)return EDITOR_LINE;
+    if(needle && (!*needle || !text_valid(needle) || !text_valid(replacement)))
+        return EDITOR_CONTROL;
+    char *staged=malloc(CONTENT_BODY+1);
+    if(!staged)return EDITOR_LIMIT;
+    EditorSpan line;
+    size_t cursor=0,used=0;
+    for(uint32_t n=1;n<=info.lines;n++) {
+        editor_next_line(d->body,info.bytes,&cursor,&line);
+        int selected=(n>=first && n<=last)!=!!complement;
+        if(selected && !needle)continue;
+        size_t start=0,search=0;
+        EditorMatch match;
+        while(selected && editor_find_next(&line,needle,&search,&match)>0) {
+            if(!append_text(staged,&used,line.text+start,match.offset-start) ||
+               !append_text(staged,&used,replacement,strlen(replacement))) {
+                result=EDITOR_LIMIT;
+                goto done;
+            }
+            start=match.offset+match.size;
+        }
+        if(!append_text(staged,&used,line.text+start,line.size+2-start)) {
+            result=EDITOR_LIMIT;
+            goto done;
+        }
+    }
+    if(used!=info.bytes || memcmp(staged,d->body,used)) {
+        save(d);
+        memcpy(d->body,staged,used);
+        clear_tail(d,used);
+    }
+done:
+    OPENSSL_cleanse(staged,used);
+    free(staged);
+    return result;
 }

@@ -59,6 +59,10 @@ static const SessionUiAdapter adapter={
     .emit=text,.prompt=simple,.menu=menu,.help=text,.uppercase=upper,.tick=tick,.door_finish=simple
 };
 const SessionUiAdapter *session_ui_rtbbs(void) { return &adapter; }
+const SessionUiAdapter *session_ui_mmm(void) {
+    static SessionUiAdapter second;
+    second=adapter;second.name="mmm";return &second;
+}
 int board_submit(const BoardRequest *q) { assert(q->user==12 && q->user_epoch==3 && q->session==77 && q->slot==2);requests++;return 1; }
 
 int main(void) {

@@ -338,7 +338,8 @@ static void display_article(const BoardRequest *q,uint32_t id,BoardResult *r,int
         r->selected=view.id;
         if(view.state==ARTICLE_VISIBLE) { r->feedback.article_access='R';r->feedback.article_access_id=view.id; }
         if(q->structured) { r->content.kind=1;r->content.state=view.state;r->content.id=view.id;r->content.parent=view.parent;r->content.board=view.board;
-            r->content.size=view.body_size;snprintf(r->content.author,sizeof(r->content.author),"%s",view.author);snprintf(r->content.title,sizeof(r->content.title),"%s",view.title); }
+            r->content.size=view.body_size;r->content.root=view.root;r->content.at=view.created;
+            snprintf(r->content.author,sizeof(r->content.author),"%s",view.author);snprintf(r->content.title,sizeof(r->content.title),"%s",view.title); }
         if(view.state==ARTICLE_WITHDRAWN)
             snprintf(r->text,sizeof(r->text),"WITHDRAWN %u PARENT %u\r\n",view.id,view.parent);
         else if(view.state==ARTICLE_CONCEALED)
@@ -486,6 +487,26 @@ static int extra_text(const char *text,size_t max,int empty) {
     return 1;
 }
 static void post_result(ArticleOutcome result,BoardResult *r);
+
+static void note_view(const BoardRequest *q,BoardResult *r) {
+    ArticleActor actor={q->user,q->user_epoch,q->board_grants};
+    ArticleOutcome result;
+    if(q->action=='B') {
+        ArticleBoardsPage page;
+        result=article_board_children(&actor,q->number,q->cursor,&page);
+        if(result==ARTICLE_OK)OPERATION_PAGE(r,BOARDS,boards,page);
+    } else if(q->action=='N') {
+        uint32_t id;
+        result=article_board_named(&actor,q->title,&id);
+        if(result==ARTICLE_OK)r->service_number=id;
+    } else {
+        ArticlePage page;
+        result=article_browse_notes(&actor,q->board,q->number,q->cursor,q->descending,
+                                    q->notes_unread,*q->title?q->title:NULL,&page);
+        if(result==ARTICLE_OK)OPERATION_PAGE(r,ARTICLES,articles,page);
+    }
+    if(result!=ARTICLE_OK)post_result(result,r);
+}
 
 static void member_result(MemberOutcome result,BoardResult *r);
 static void extra_execute(const BoardRequest *q,BoardResult *r) {
@@ -1005,6 +1026,7 @@ static void execute(const BoardRequest *q,BoardResult *r) {
         r->revoked=1; (r->feedback.failed=1,strcpy(r->text,"ERR session revoked\r\n")); return;
     }
     if(q->op=='}') { advanced_execute(q,r);return; }
+    if(q->op==BOARD_NOTE_VIEW) { note_view(q,r);return; }
     if(q->op==BOARD_LINK) { link_execute(q,r);return; }
     if(q->op==BOARD_MEMBER_LIFECYCLE) {
         MemberActor actor={q->user,q->user_epoch};MemberChange change;
@@ -1318,7 +1340,9 @@ static void execute(const BoardRequest *q,BoardResult *r) {
         if(result!=ARTICLE_OK) { post_result(result,r);return; }
         if(entry.password_board && q->action=='t')(r->feedback.failed=1,strcpy(r->text,"ERR try later\r\n"));
         else if(entry.password_board) { r->service_action='1';r->service_number=entry.id;r->board_grant=entry.password_board;strcpy(r->text,"BOARD PASSWORD\r\n"); }
-        else { r->board=entry.id;if(entry.menu)r->service_action='7';snprintf(r->text,sizeof(r->text),"BOARD %u %.80s\r\n",entry.id,entry.title); }
+        else { r->board=entry.id;if(entry.menu)r->service_action='7';
+            if(q->structured)snprintf(r->service_text,sizeof(r->service_text),"%s",entry.title);
+            snprintf(r->text,sizeof(r->text),"BOARD %u %.80s\r\n",entry.id,entry.title); }
         return;
     }
     if(!catalog_read(q->board,q->user)) { (r->feedback.failed=1,strcpy(r->text,"ERR board unavailable\r\n")); return; }

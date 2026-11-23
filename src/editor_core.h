@@ -26,5 +26,9 @@ int editor_next_line(const char *body,size_t bytes,size_t *cursor,EditorSpan *);
  * cursor is a byte offset; 1=match, 0=end, -1=invalid/empty query. */
 int editor_find_next(const EditorSpan *,const char *query,size_t *cursor,EditorMatch *);
 EditorOutcome editor_apply(EditorDocument *,EditorOperation,uint32_t first,uint32_t last,const char *text);
+/* Literal replacement is confined to each selected line. A NULL needle
+ * deletes the selected lines. The full change is one undoable edit. */
+EditorOutcome editor_transform(EditorDocument *,uint32_t first,uint32_t last,
+                               int complement,const char *needle,const char *replacement);
 void editor_discard_undo(EditorDocument *);
 #endif

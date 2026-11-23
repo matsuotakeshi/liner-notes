@@ -39,7 +39,7 @@ void session_ui_adapter_test(void) {
     Session *s=calloc(1,sizeof(*s));OperationResult *r=calloc(1,sizeof(*r));assert(s && r);
     size_t written=0;SessionIO io={&written,output,NULL,NULL};
     SessionUiConfig c=session_ui_default();
-    assert(c.policy==SESSION_UI_FIXED && c.count==1 && !strcmp(c.adapters[0]->name,"rtbbs"));
+    assert(c.policy==SESSION_UI_FIXED && c.count==2 && c.allowed==1 && !strcmp(c.adapters[0]->name,"rtbbs"));
     assert(session_ui_config_valid(&c));
     SessionUiAdapter alt=*session_ui_rtbbs();alt.name="test-alt";alt.enter=enter;alt.leave=leave;
     alt.line=line;alt.keep_position=prepare;alt.result=result;alt.door_finish=door;alt.tick=tick;alt.uppercase=uppercase;
