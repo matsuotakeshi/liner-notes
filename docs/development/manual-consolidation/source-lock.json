@@ -324,7 +324,7 @@
   "src/session_ui.h": "700f176c15c60ff7eebfb6162ef99a4d8b9b1da7487f56075d7d55e6314cb823",
   "src/session_ui.c": "ac5deb71bc68f0c1a6c1b7a46189d6c16f98251bfb510d6b9ac3c739a16f1212",
   "src/session_rtbbs.c": "a637cc2462ddb202f1e569c73a23bc35ad46cd3560766c6fab97c69014e656d6",
-  "tests/test_session_ui.c": "c24b50412bfa400f50707fec17454ea28327e0d0b19c10ca41eaf08022f3eac7",
+  "tests/test_session_ui.c": "3fbf0f4b85dd761028b1d3990c20d84410b15ea69dc1b092e0eb57d32650736b",
   "src/session_io.h": "4634484351f318237fa51364d555f786947c8b1ae324648ae5c1ad1cdc034558",
   "tests/test_session_ui_lifecycle.c": "68fc6896d18eae90f55c942da7b322a1810d864b7af0a156d924c53afdbaf47a",
   "src/ssh_transport.c": "ea316c594fcd1ed2e737232bd1209f668badfc0304ebccb90cb924a53eea0be5",
