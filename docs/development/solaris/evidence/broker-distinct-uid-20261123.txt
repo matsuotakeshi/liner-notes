@@ -1,0 +1,54 @@
+Date (JST): 2026-11-23
+Host: Oracle Solaris 11.4 CBE AMD64.
+Source SHA: 8e5976fe2e0c128a1300d0a401f244fec8d1c211.
+
+Direct experiment with existing Solaris test host authorization. It reused
+the shared fixture lock and checked account, group and process collisions
+before starting. No accounts were created. It copied only the three trusted
+main Broker/consumer modules to root-owned read-only files in a disposable
+directory. The test listener was a group-restricted UNIX socket. The child
+processes shared the synthetic socket group for this trial, so a missing
+filesystem permission could not account for Broker denials.
+
+Broker UID 61003 used the production Server handler and real peer_uid lookup.
+The issuer connected as UID 0. UID 61001 received the explicit Broker denial.
+UID 61005 was registered for a different Door and was denied on Door 1. The
+approved consumer UID 61004 consumed the one-use ticket and received member 7.
+Replay was denied and a lease check succeeded before issuer EOF. The issuer
+half-closed its socket and observed the server close, then the same consumer
+was denied on its next lease check. The client verified the Broker UID on each
+operation. The harness preserved only status flags and source hashes.
+
+An initial startup attempt found that Python import requires a readable module
+directory. The passing run used a read-only module subdirectory. The private
+socket permissions and UID checks were preserved. The test stopped its own
+Broker process and removed the temporary directory, including its socket.
+No mount, service installation, registered account or production data was used.
+
+The listener calls the existing Server directly. This evidence covers peer
+credentials and the Broker authorization protocol outside chroot. It does not
+validate the production serve configuration, the actual isolated Door launcher,
+PTY operation with distinct UIDs, or complete service integration.
+
+Observed result:
+{
+  "main_sha": "8e5976fe2e0c128a1300d0a401f244fec8d1c211",
+  "source_sha256": {
+    "door_broker.py": "bcd2bb8d54ee0971a71b7e1d1d32e5764dd2130626603f79d5eb68727b4426ae",
+    "door_broker_core.py": "8fefbfd71c35540e7128027693ad4295fd31e5f067a0c3adf5281e268a87480f",
+    "door_auth_client.py": "c36c345de7b4a6be82067ecb52e4e52e5c0f887e6008840243ca11a22688aa4e"
+  },
+  "broker_uid": 61003,
+  "consumer_uid": 61004,
+  "door_uid_rejected": true,
+  "wrong_consumer_rejected": true,
+  "correct_consumer": true,
+  "replay_rejected": true,
+  "issuer_eof_revoked_lease": true
+}
+{"temporary_directory_removed": true}
+
+Local operator script and transcript: build/solaris-door-jail/
+check-broker-distinct-uid-final.py SHA-256: 66e7c568e358d98f4e9a09f64822c538d809d37ac37c46e526bf9480a47008ec
+broker-distinct-uid-final.log SHA-256: f78b697f49e3feff5a73be0d81bd99b669a6a6bcabe6a45649757d5b4dff64d8
+broker-distinct-uid-retry.log SHA-256: e4193a4df95bc647d25c4958e8b1df8f730c015eba8414e192975c04e69418a4

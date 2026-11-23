@@ -40,6 +40,17 @@ Deadlines and nonzero exits make failures visible. The existing native `make
 check` runs this after main integration; PR/Windows cannot claim it passed.
 Its explicit output says isolation is NOT verified. The backend is not enabled.
 
+## Broker peer identities on Solaris
+
+The isolated [distinct-UID socket experiment](evidence/broker-distinct-uid-20261123.txt)
+used the main-branch Broker and consumer modules with real UNIX peer
+credentials. The issuer, Broker, approved consumer and synthetic Door ran
+under different UIDs. The approved consumer could use its ticket once.
+The Door and a consumer registered for a different game were denied, and
+issuer EOF revoked the live lease. The direct experiment used a temporary
+listener outside chroot. Service installation and the authenticated Door
+launcher integrated with PTY and Broker still require acceptance.
+
 ## Security blockers before backend activation
 
 1. The OS-only holder-death checks below cover ordinary same-contract
