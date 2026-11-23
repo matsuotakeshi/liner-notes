@@ -96,11 +96,15 @@ def run(binary, vaultctl):
                 bob.cmd("4", CHAT)
                 assert b"hello room" in alice.cmd("hello room", CHAT)
                 assert b"alice: hello room" in bob.until(CHAT)
-                online = alice.cmd("/who", CHAT)
-                match = re.search(rb"(\d+)  bob", online)
+                # Public and private messages share a per-connection rate limit.
+                # Use the other sender and require a receipt, not the Telnet echo.
+                online = bob.cmd("/who", CHAT)
+                match = re.search(rb"(\d+)  alice", online)
                 assert match, online
-                assert b"hidden note" in alice.cmd(b"/wire " + match[1] + b" hidden note", CHAT)
-                assert b"hidden note" in bob.until(CHAT)
+                sent = bob.cmd(b"/wire " + match[1] + b" hidden note", CHAT)
+                assert b"[to " + match[1] + b" alice] hidden note" in sent, sent
+                received = alice.until(CHAT)
+                assert re.search(rb"\[wire \d+ bob\] hidden note", received), received
                 alice.cmd("/leave", MAIN)
                 bob.cmd("/leave", MAIN)
 

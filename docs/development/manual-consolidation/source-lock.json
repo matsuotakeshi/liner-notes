@@ -219,7 +219,7 @@
   "src/chat_core.c": "ac12c21caf73ab469241a62bb28dfb802ced4a80fa373f97e5f5af8c8c819272",
   "src/chat_core.h": "7346acdc39a89e8261f5c013ef451d7d5cd1adf4e34eb466e84c3477715f2c4d",
   "src/chat_types.h": "4dd2500e8aa8a528788c8a16a69b5413f231b976a8a689562e3f5f1dd9aa9a49",
-  "tests/test_chat_core.c": "869f1ed4cb68e46cee2f2af61cda9cbdb3b7f76466414c224d47e493249477a0",
+  "tests/test_chat_core.c": "9b78de7f8819269ebe8066c4b14851bfeef3b4b320148c4b7f7b99fc82d3c228",
   "tests/test_chat_core.py": "d0cddb08b7d6a321f0f2b89d73012935c3848ce7ee03b3cf2644ee1b8fcea723",
   "help/en/chat.txt": "92b1bb856a98e35dec1c84dec797691e8f66e57b0f0d3f853fd8346c40f615de",
   "src/connection_core.c": "030bac5d986e74536e2d3efeb98f8adbb97d55441f2c4c8844ebdbbc4fb749c8",
@@ -375,5 +375,5 @@
   "tests/test_mmm_ui.py": "aa6be7f1496bafb1dbe355526795e260bdc25125619ac8f9d23d1c0d19db9512",
   "src/session_mmm_internal.h": "29ee32255bc270ee3f0ba1a292ecc24ceaccb790dceb623b8a441a48bc838049",
   "src/session_mmm_services.c": "2b3a3190aa64b73f1cecc8a5a128bbfb864f58ae788940dfdac9eba15b0f0d69",
-  "tests/test_mmm_services.py": "66a917c9e54fc487432d23116db90f7aa5742a8b04218dc98a33855d3bc07bdf"
+  "tests/test_mmm_services.py": "3fb1f4b91c88399ccd9266c237cc53ad7423952709a1440bf70e091c086e2954"
 }
