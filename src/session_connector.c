@@ -57,6 +57,7 @@ static ClassicInput classic_input_state(const Session *s) {
 }
 
 int session_rtbbs_uppercase(const Session *s,const char *line,size_t size) {
+    if(s->connection.connector_token[0] && size>=10 && !memcmp(line,"CONNECTOR ",10))return 0;
     ClassicInput state=classic_input_state(s);return classic_input_uppercase(&state,line,size);
 }
 
@@ -89,8 +90,22 @@ static void connector_link(Session *s,char *line) {
 
 int session_impl_connector_line(Session *s,char *line,size_t size) {
     ConnectorEnvelope envelope=connector_envelope(line,size,s->connection.connector_token);
+    if(s->connection.connector_block.data && s->connection.connector_block.kind==CONNECTOR_UPDATE_BLOCK &&
+       envelope.kind!=CONNECTOR_DATA) {
+        connector_block_clear(&s->connection.connector_block);
+        session_abort(s);
+        return 1;
+    }
     if(*s->connection.connector_token && link_wire_command(line)) { connector_link(s,line);return 1; }
     if(envelope.kind==CONNECTOR_VIEW) { session_impl_web_view(s,envelope.payload);return 1; }
+    if(envelope.kind==CONNECTOR_UPDATE) {
+        const char *end;uint32_t n;
+        if(s->connection.connector_block.data || rtbbs(s)->presentation.ui.enabled ||
+           !session_impl_number_arg(envelope.payload,&n,&end) || *end ||
+           connector_block_begin(&s->connection.connector_block,CONNECTOR_UPDATE_BLOCK,n,s->core.now)<1)
+            session_abort(s);
+        return 1;
+    }
     if(envelope.kind==CONNECTOR_LINKBLOCK) {
         const char *end;uint32_t n;connector_block_clear(&s->connection.connector_block);
         if(!s->core.user || rtbbs(s)->editor.editing || session_secret(s) || rtbbs(s)->conversation.chatting || rtbbs(s)->conversation.gather.mode || !board_link_enabled(s->core.board,s->core.user) || !session_impl_number_arg(envelope.payload,&n,&end) || *end || !n || n>CONNECTOR_LINK_BLOCK_MAX) { session_impl_queue_text(s,"ERR link syntax\r\n");return 1; }
@@ -117,10 +132,14 @@ int session_impl_connector_line(Session *s,char *line,size_t size) {
         int received=connector_block_append(&s->connection.connector_block,envelope.payload,n);
         if(received<0) { session_impl_queue_text(s,"ERR vault syntax\r\n");return 1; }
         if(received>0) {
+            size_t size=s->connection.connector_block.size;
             ConnectorBlockKind kind;char *session_impl_command=connector_block_take(&s->connection.connector_block,&kind);
             if(kind==CONNECTOR_LINK_BLOCK && !strncmp(session_impl_command,"LINKAPPLY ",10))connector_link(s,session_impl_command);
             else if(kind==CONNECTOR_FILE_BLOCK && ((!rtbbs(s)->editor.editing && !strncmp(session_impl_command,"FILEPUTBLOCK ",13)) || !strncmp(session_impl_command,"MFILEPUTBLOCK ",14)))connector_transfer(s,session_impl_command);
-            else session_impl_queue_text(s,"ERR vault syntax\r\n");
+            else if(kind==CONNECTOR_UPDATE_BLOCK) {
+                session_impl_web_update(s,session_impl_command);
+                OPENSSL_cleanse(session_impl_command,size);
+            } else session_impl_queue_text(s,"ERR vault syntax\r\n");
             free(session_impl_command);
         }return 1;
     }
@@ -136,6 +155,7 @@ int session_impl_connector_line(Session *s,char *line,size_t size) {
         char out[2048];
         ConnectorState state={
             .connection=s->core.id,.user=s->core.user,.username=s->core.user?s->core.username:"",
+            .input_limit=(unsigned)ln_limit("INPUT",INPUT_LINE_MAX),
             .board=s->core.board,.article=s->core.current,.admin=!!rtbbs(s)->presentation.ui.admin,.sigop=!!rtbbs(s)->presentation.ui.sigop,.level=s->core.member_level,
             .editing=rtbbs(s)->editor.editing,.editor_kind=(unsigned char)rtbbs(s)->editor.draft.op,.secret=session_secret(s),.password_mode=rtbbs(s)->auth.password_mode,
             .mail=rtbbs(s)->mail_state.mail_mode,.mail_current=rtbbs(s)->mail_state.mail.current,.chat=rtbbs(s)->conversation.chatting,.talk=rtbbs(s)->conversation.outside_talk,

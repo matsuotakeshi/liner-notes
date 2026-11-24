@@ -72,19 +72,27 @@ async def exercise(bbs,tmp):
         r=await a.post(base+'input',json={'line':'PING'},headers={'X-CSRF-Token':'bad'});assert r.status==403
         r=await outsider.post(base+'action',json={'action':'admin.level','values':{'user':'1','level':'5'},'confirmed':True});assert r.status==409
         content='/CANCEL\n.\n<script>alert(1)</script>\n日本語の本文'
-        r=await post(a,'compose',{'kind':'article','title':'Web article','body':content});assert 'SAVED 1' in r['text'],r
+        r=await post(a,'compose',{'kind':'article','title':'Web article','body':content});assert r['mutation']==dict(ok=True,id=1,revision=0,audit_failed=False),r
         r=await post(b,'query',{'kind':'notes'});assert r['data']['notes'][0]['title']=='Web article',r
         r=await post(b,'query',{'kind':'read','id':1});assert r['data']['article']['body']==content.replace('\n','\r\n')+'\r\n',r
         await post(a,'action',{'action':'settings.editor','values':{'value':'LINE'}})
-        r=await post(a,'compose',{'kind':'article','title':'Large draft','body':'\n'.join(['x'*4094]*64),'draft':True});assert 'DRAFT STORED' in r['text'] and not r['state']['editing'],r['text']
+        r=await post(a,'compose',{'kind':'article','title':'Large draft','body':'\n'.join(['x'*4094]*64),'draft':True});assert r['mutation']['ok'] and r['mutation']['revision'] and not r['state']['editing'],r['text']
         r=await post(a,'action',{'action':'board.resume','values':{}});assert len(r['preview'])>262144 and r['state']['editing'],r
-        r=await post(a,'compose',{'kind':'editing','title':'Resumed','body':'line editor /CANCEL\n.'});assert 'SAVED 2' in r['text'],r
-        r=await post(a,'gather',{'body':'Web Gather\n日本語の伝言'});assert 'GATHER SAVED' in r['text'],r
+        r=await post(a,'compose',{'kind':'editing','title':'Invalid','body':'\x85'});assert not r['mutation']['ok'] and r['state']['editing'],r
+        preserved=await post(a,'input',{'line':'/PREVIEW'});assert 'Large draft' in preserved['text'] and 'x'*4094 in preserved['text'],preserved['text'][:150]
+        r=await post(a,'compose',{'kind':'editing','title':'Resumed','body':'line editor /CANCEL\n.'});assert r['mutation']['ok'] and r['mutation']['id']==2,r
+        r=await post(b,'compose',{'kind':'article','board':1,'parent':1,'title':'Reply','body':'literal /CANCEL'});assert r['mutation']['id']==3,r
+        r=await post(b,'action',{'action':'board.retitle','values':{'id':'3','text':'Retitled'}});assert r['mutation']['ok'],r
+        r=await post(outsider,'action',{'action':'board.withdraw','values':{'id':'3'},'confirmed':True});assert not r['mutation']['ok'],r
+        r=await post(b,'action',{'action':'board.seen','values':{'id':'3'}});assert r['mutation']['ok'],r
+        r=await post(a,'gather',{'body':'Web Gather\n日本語の伝言'});assert r['mutation']['ok'] and 'GATHER SAVED' in r['text'],r
         r=await post(b,'gather',{});assert '日本語の伝言' in r['text'],r
         payload=bytes(range(256))*13+b'\x00\xff';digest=hashlib.sha256(payload).hexdigest();enc=lambda x:base64.b64encode(x.encode()).decode()
         headers={'X-File-Name':enc('日本語.bin'),'X-File-Description':enc('Web test'),'X-File-Board':'-'}
         r=await a.post(base+'upload',data=payload,headers=headers);assert r.status==200,await r.text();v=await r.json();fid=v['id'];assert v['sha256']==digest
         r=await post(a,'query',{'kind':'files'});assert r['data']['files'][0]['name']=='日本語.bin',r
+        r=await post(a,'action',{'action':'file.desc','values':{'id':str(fid),'text':'更新した説明'}});assert r['mutation']['ok'],r
+        r=await post(outsider,'action',{'action':'file.desc','values':{'id':str(fid),'text':'Unauthorized'}});assert not r['mutation']['ok'],r
         r=await b.post(base+'download',json={'id':fid});assert r.status==200,await r.text();assert await r.read()==payload
         r=await post(a,'download-ticket',{'id':fid,'name':'日本語.bin'});url=origin+r['url']
         denied=await outsider.get(url);assert denied.status==404
@@ -92,12 +100,23 @@ async def exercise(bbs,tmp):
         again=await a.get(url);assert again.status==404
         r=await a.post(base+'upload?kind=mail',data=payload,headers=headers);assert r.status==200,await r.text();attachment=(await r.json())['id']
         r=await outsider.post(base+'download',json={'kind':'mail','id':attachment});assert r.status==409,await r.text()
-        r=await post(a,'compose',{'kind':'mail','title':'private','recipient':'bob','body':'私信本文','attachments':[attachment]});assert 'MAIL SENT 1' in r['text'],r
+        r=await post(outsider,'compose',{'kind':'mail','title':'Forbidden','recipient':'bob','body':'private','attachments':[attachment]});assert not r['mutation']['ok'],r
+        r=await post(a,'compose',{'kind':'mail','title':'private','recipient':'bob','body':'私信本文','attachments':[attachment]});assert r['mutation']['ok'] and r['mutation']['id']==1,r
         r=await post(b,'query',{'kind':'mail'});assert r['data']['mail'][0]['title']=='private',r
         r=await post(b,'query',{'kind':'mail_read','id':1});assert r['data']['message']['body']=='私信本文\r\n',r
         assert r['data']['message']['attachments']==[{'id':attachment,'size':len(payload),'name':'日本語.bin'}],r
         denied=await post(outsider,'query',{'kind':'mail_read','id':1})
         assert 'message' not in denied['data'] and '私信本文' not in denied['text'],denied
+        r=await post(outsider,'compose',{'kind':'reply_mail','parent':1,'title':'Forbidden','body':'reply'});assert not r['mutation']['ok'],r
+        r=await post(b,'compose',{'kind':'reply_mail','parent':1,'title':'Reply draft','body':'返事','draft':True});assert r['mutation']['ok'] and r['mutation']['revision'],r
+        r=await post(b,'action',{'action':'mail.resume','values':{}});assert r['state']['editing'] and 'Reply draft' in r['preview'],r
+        r=await post(b,'compose',{'kind':'editing','title':'Reply sent','body':'返事の本文'});assert r['mutation']['ok'] and r['mutation']['id']==2 and not r['state']['editing'],r
+        r=await post(a,'query',{'kind':'mail_read','id':2});assert r['data']['message']['parent']==1 and r['data']['message']['body']=='返事の本文\r\n',r
+        r=await post(outsider,'action',{'action':'mail.delete','values':{'id':'2'},'confirmed':True});assert not r['mutation']['ok'],r
+        r=await post(a,'action',{'action':'mail.delete','values':{'id':'2'},'confirmed':True});assert r['mutation']['ok'] and not r['state']['confirmation'],r
+        r=await post(a,'action',{'action':'chat.open','values':{}});assert r['state']['chat'],r
+        r=await post(a,'chat',{'body':'/LEAVE is text'});assert r['mutation']['ok'] and r['state']['chat'] and '/LEAVE is text' in r['text'],r
+        r=await post(a,'action',{'action':'chat.exit','values':{}});assert not r['state']['chat'],r
         r=await b.post(base+'download',json={'kind':'mail','id':attachment});assert r.status==200,await r.text();assert await r.read()==payload
         r=await outsider.post(base+'download',json={'kind':'mail','id':attachment});assert r.status==409,await r.text()
         # Resume a partially written core upload; HTTP must validate the original bytes.

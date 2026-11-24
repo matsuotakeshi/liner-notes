@@ -1,4 +1,5 @@
 """Declarative Web forms. Commands execute as the current BBS member, never SYSOP impersonation."""
+import re
 from .bridge import BridgeError
 
 COMMANDS = {}
@@ -217,7 +218,7 @@ def visible(item, state):
     return role == 'guest' or bool(state.get('user')) and (role == 'member' or state.get('admin') or role == 'manager' and state.get('sigop') or role=='vault_manager' and state.get('vault_sigop'))
 
 
-def build_action(key, values, state, confirmed=False):
+def action_arguments(key, values, state, confirmed=False):
     if not isinstance(key,str) or not isinstance(values,dict):raise BridgeError('Invalid action')
     item = COMMANDS.get(key)
     if not item or not visible(item,state): raise BridgeError('This operation is not available for this account')
@@ -229,4 +230,67 @@ def build_action(key, values, state, confirmed=False):
             raise BridgeError('Invalid field value')
         if '|' in item['command'] and '|' in value: raise BridgeError('A field cannot contain |')
         args[field['name']] = value
+    return args, item
+
+
+def build_action(key, values, state, confirmed=False):
+    args, item = action_arguments(key, values, state, confirmed)
     return item['command'].format(**args).rstrip(), item
+
+
+# Fields for the connector's named, typed operations. Other entries are
+# terminal navigation, dialogues, or existing dedicated transfer operations.
+CORE_UPDATES = {
+    'board.seen': ('id',), 'board.unseen': ('id',),
+    'board.retitle': ('id', None, None, 'text'), 'board.withdraw': ('id',),
+    'board.draft_delete': ('revision',), 'board.get': ('id',),
+    'admin.hide': ('id',), 'admin.restore': ('id',), 'admin.author': ('id', 'user'),
+    'admin.move': ('id', 'target'), 'admin.move_branch': ('id', 'target'),
+    'admin.board_delete': ('id',), 'admin.board_delete_tree': ('id',),
+    'admin.board_guest': ('id', None, None, 'value'), 'admin.sigop_group': ('id', 'group'),
+    'admin.board_set': (), 'admin.board_options': ('id',),
+    'admin.board_pass_clear': ('id',), 'admin.board_group': ('id', 'source', None, 'target'),
+    'admin.sigop': ('id', None, None, 'user'),
+    'admin.approve': ('user',), 'admin.level': ('user', None, None, 'level'),
+    'admin.group': ('user', 'group'), 'admin.ungroup': ('user', 'group'),
+    'admin.group_move': ('source', 'target'), 'admin.reject': ('user',),
+    'admin.application_delete': ('user',), 'admin.delete_user': ('user',),
+    'admin.suspend': ('user',), 'admin.resume': ('user',),
+    'mail.delete': ('id',), 'mail.draft_delete': ('revision',), 'mail.drop': ('id',), 'mail.get': ('id',),
+    'mail.notify': (None, None, None, 'value'),
+    'file.desc': ('id', None, None, 'text'), 'file.rename': ('id', None, None, 'text'),
+    'file.category': ('id', None, None, 'path'), 'file.ascii': ('id', None, None, 'value'),
+    'file.copy': ('id', None, None, 'path'), 'file.delete': ('id',), 'file.hide': ('id',),
+    'file.restore': ('id',), 'admin.file_owner': ('id', 'user'),
+    'admin.file_name': (None, None, 'path', 'text'), 'admin.file_board': (),
+    'admin.file_options': (None, None, 'path'), 'admin.file_pass_clear': (None, None, 'path'),
+    'admin.file_sigop': (None, None, 'path', 'user'),
+    'profile.set': (None, None, 'field', 'text'), 'profile.visibility': (None, None, 'field', 'value'),
+    'admin.profile': ('user', None, 'field', 'text'), 'profile.handle': (None, None, None, 'text'),
+    'admin.application_set': ('user', None, 'field', 'text'),
+    'settings.buffer_clear': (), 'settings.save': (),
+}
+
+
+def core_update(key, args):
+    names = CORE_UPDATES[key]
+    values = {field: args[name] for field, name in zip(('id', 'arg', 'title', 'body'), names) if name}
+    for field in ('id', 'arg'):
+        if field in values:
+            if not re.fullmatch(r'[0-9]{1,10}', values[field]) or int(values[field])>0xffffffff:
+                raise BridgeError('Invalid number')
+            values[field] = int(values[field])
+    if key in ('mail.notify', 'file.ascii', 'admin.board_guest', 'profile.visibility'):
+        values['body'] = values['body'].upper()
+    # The domain's configuration parsers consume existing board specifications.
+    if key == 'admin.board_set':
+        values['body'] = '|'.join(args[field] for field in ('id', 'parent', 'read', 'write', 'title', 'description'))
+    elif key == 'admin.file_board':
+        values['body'] = '|'.join(args[field] for field in ('path', 'read', 'write'))
+    elif key == 'admin.board_options':
+        values['body'] = ' '.join((args['kind'].upper(), *(args[field] for field in ('order', 'count', 'bytes', 'keep'))))
+    elif key == 'admin.file_options':
+        values['body'] = ' '.join((args['kind'].upper(), args['order'], args['keep']))
+    elif key in ('admin.sigop', 'admin.file_sigop') and values['body'].upper() == 'NONE':
+        values['body'] = '0'
+    return values

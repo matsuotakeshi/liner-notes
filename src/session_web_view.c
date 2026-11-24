@@ -201,6 +201,19 @@ static int request(OperationRequest *q,const char *kind,uint32_t id,uint32_t cur
     return 1;
 }
 
+int session_impl_web_idle(Session *s,int editing,int chatting) {
+    SessionRtbbsState *ui=rtbbs(s);
+    return !ui->presentation.ui.enabled && !session_secret(s) &&
+        !!ui->editor.editing==editing && !ui->auth.application.step &&
+        !ui->presentation.classic_input && !ui->presentation.ui.input &&
+        !ui->mail_state.mail_input && !ui->mail_state.mail.delete_id &&
+        !ui->conversation.memo_input && !ui->conversation.talk_select &&
+        !!ui->conversation.chatting==chatting && (chatting || !ui->conversation.outside_talk) &&
+        !ui->conversation.gather.mode && !s->connection.binary &&
+        !s->connection.zmodem && !s->connection.door &&
+        !s->connection.connector_literal && !s->connection.connector_block.data;
+}
+
 void session_impl_web_view(Session *s,const char *payload) {
     char nonce[33],kind[16],number[11],start[11];
     int used=0;
@@ -208,13 +221,7 @@ void session_impl_web_view(Session *s,const char *payload) {
        strlen(nonce)!=32 || !used || (payload[used] && payload[used]!=' '))
         return;
     SessionResultView empty={.status=SESSION_RESULT_FAILED};
-    SessionRtbbsState *ui=rtbbs(s);
-    if(ui->presentation.ui.enabled || session_secret(s) || ui->editor.editing ||
-       ui->auth.application.step || ui->presentation.classic_input || ui->presentation.ui.input ||
-       ui->mail_state.mail_input || ui->mail_state.mail.delete_id || ui->conversation.memo_input ||
-       ui->conversation.talk_select || ui->conversation.chatting || ui->conversation.outside_talk ||
-       ui->conversation.gather.mode || s->connection.binary || s->connection.zmodem || s->connection.door ||
-       s->connection.connector_literal || s->connection.connector_block.data) {
+    if(!session_impl_web_idle(s,0,0)) {
         reply(s,nonce,"ERR connector busy\r\n",empty);return;
     }
     const char *path=payload+used+(payload[used]!=0);

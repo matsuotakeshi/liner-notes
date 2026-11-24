@@ -5,7 +5,7 @@
 /* Pure wire adapters: recognizing a token does NOT authorize an operation. */
 typedef enum { CONNECTOR_NONE, CONNECTOR_OPEN, CONNECTOR_SYNC,
     CONNECTOR_LITERAL, CONNECTOR_BLOCK, CONNECTOR_LINKBLOCK,
-    CONNECTOR_DATA, CONNECTOR_TRANSFER, CONNECTOR_VIEW } ConnectorEnvelopeKind;
+    CONNECTOR_DATA, CONNECTOR_TRANSFER, CONNECTOR_VIEW, CONNECTOR_UPDATE } ConnectorEnvelopeKind;
 typedef struct {
     ConnectorEnvelopeKind kind;
     const char *payload;size_t size; /* borrows input until it is modified */
@@ -26,7 +26,7 @@ int link_wire_parse(char *,LinkWireRequest *,char *,size_t);
 
 typedef struct {
     unsigned long connection;
-    unsigned user,board,article,level,editor_kind,mail_current,confirmation;
+    unsigned user,board,article,level,editor_kind,mail_current,confirmation,input_limit;
     const char *username; /* validated BBS login name; borrowed for format call */
     int admin,sigop,editing,secret,password_mode,mail,chat,talk,pager,gather,
         input,binary,door,members,feature_mail,feature_chat,feature_vault;

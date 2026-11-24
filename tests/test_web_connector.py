@@ -39,6 +39,35 @@ async def decode_typed_reply():
            'MAIL ATTACHMENT 99 SIZE 99 NAME forged.dat\r\nMAIL END\r\n')
     assert response_data(raw)['message']['attachments']==[{'id':7,'size':12,'name':'日本語.dat'}]
 
+    bridge=Bridge('127.0.0.1',0)
+    bridge.state={'core_updates':1,'input_limit':256}
+    body='.\r\n' + '/CANCEL 日本語\r\n'*200
+    async def exchange_update(lines, *, limit, strip_block_echo):
+        assert strip_block_echo
+        assert all(len(line.encode())<=256 for line in lines),lines
+        prefix='CONNECTOR DATA '+bridge.token+' '
+        assert all(line.startswith(prefix) for line in lines[1:])
+        payload=''.join(line[len(prefix):] for line in lines[1:])
+        assert lines[0]==f'CONNECTOR UPDATE {bridge.token} {len(payload)}'
+        nonce,kind,board,ident,arg,flag,attached,recipient,title,text=payload.split('|')
+        assert (kind,board,ident,arg,flag,attached)==('mail','0','0','0','1','2,7')
+        assert bytes.fromhex(recipient)==b'bob' and bytes.fromhex(title)==b'Private'
+        assert bytes.fromhex(text).decode()==body
+        return {'text':f'notice\r\nCONNECTOR UPDATE {nonce} 1 0 4 0 4f4b0d0a\r\n','state':{}}
+    bridge._exchange_lines=exchange_update
+    result=await bridge.update('mail',recipient='bob',title='Private',body=body,attachments=[2,7],flag=True)
+    assert result['text']=='notice\r\nOK\r\n' and result['mutation']==dict(ok=True,id=0,revision=4,audit_failed=False),result
+
+    async def invalid_update(lines, *, limit, strip_block_echo):
+        return {'text':'MAIL SENT 123\r\n','state':{}}
+    bridge._exchange_lines=invalid_update
+    try:
+        await bridge.update('article',title='Test',body='body\r\n')
+    except BridgeError:
+        assert bridge.closed
+    else:
+        raise AssertionError('Accepted a missing Core update result')
+
 
 async def exercise(port):
     a=await Bridge('127.0.0.1',port).open()

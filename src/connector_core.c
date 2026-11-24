@@ -2,10 +2,19 @@
 #include <stdlib.h>
 #include <string.h>
 
-void connector_block_clear(ConnectorBlock *block) { free(block->data);memset(block,0,sizeof(*block)); }
+void connector_block_clear(ConnectorBlock *block) {
+    /* A partially received update can contain private mail. */
+    if(block->data && block->kind==CONNECTOR_UPDATE_BLOCK) {
+        volatile char *p=block->data;
+        for(size_t i=0;i<block->used;i++)p[i]=0;
+    }
+    free(block->data);memset(block,0,sizeof(*block));
+}
 int connector_block_begin(ConnectorBlock *block,ConnectorBlockKind kind,size_t size,uint64_t now) {
     connector_block_clear(block);
-    size_t maximum=kind==CONNECTOR_FILE_BLOCK?CONNECTOR_FILE_BLOCK_MAX:kind==CONNECTOR_LINK_BLOCK?CONNECTOR_LINK_BLOCK_MAX:0;
+    size_t maximum=kind==CONNECTOR_FILE_BLOCK?CONNECTOR_FILE_BLOCK_MAX:
+        kind==CONNECTOR_LINK_BLOCK?CONNECTOR_LINK_BLOCK_MAX:
+        kind==CONNECTOR_UPDATE_BLOCK?CONNECTOR_UPDATE_BLOCK_MAX:0;
     if(!size || size>maximum)return 0;
     block->data=malloc(size+1);if(!block->data)return -1;
     block->size=size;block->kind=kind;block->deadline=now+60000;return 1;

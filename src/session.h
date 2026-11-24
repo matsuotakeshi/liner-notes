@@ -35,6 +35,8 @@ typedef struct {
     int binary_menu;
     ConnectorReader binary_reader;
     char connector_token[65],connector_view_nonce[33];
+    char connector_update_nonce[33];
+    int connector_finish_editor;
     int legacy_connector;
     int connector_literal;
     ConnectorBlock connector_block;

@@ -811,11 +811,30 @@ static void mail_execute(const BoardRequest *q,BoardResult *r) {
     /* Preserve the completion kind even on quota refusal so a failed send
      * returns to the editor with its unsent text and draft revision intact. */
     r->mail_action=q->action;
-    if((q->action=='S' || q->action=='W') && strlen(q->body)>ln_limit("BODY",BOARD_BODY)) { (r->feedback.failed=1,strcpy(r->text,"ERR body limit\r\n"));return; }
     MailActor actor={q->user,q->user_epoch};
-    if(mailbox_broken()) { snprintf(r->text,sizeof(r->text),"%s",mail_text(q,MSG_MAIL_STORAGE,"MAIL ERROR storage\r\n"));return; }
+    if(mailbox_broken()) { mail_result(q,MAIL_CORE_STORAGE,r);return; }
     uint32_t id=q->number;
     if(q->mail_attachments.count>MAIL_ATTACH_MAX)goto unavailable;
+    if(strchr("SWsw",q->action) && q->action) {
+        int prepare=q->action=='s' || q->action=='w';
+        int send=q->action=='S' || q->action=='s';
+        if(strlen(q->body)>ln_limit("BODY",BOARD_BODY)) { r->feedback.failed=1;strcpy(r->text,"ERR body limit\r\n");return; }
+        MailCompose target={.to=q->number,.parent=q->cursor};
+        if(prepare) {
+            MailOutcome result=mail_core_prepare(&actor,q->username,q->number,q->title,&target);
+            if(result!=MAIL_CORE_OK) { mail_result(q,result,r);return; }
+        }
+        const char *body=send?body_with_signature(q,r):q->body;
+        if(!body)return;
+        MailWrite input={target.to,target.parent,q->mail_revision,prepare?target.title:q->title,body,q->mail_attachments};
+        MailOutcome result=send?mail_core_send(&actor,&input,&id):mail_core_draft_save(&actor,&input,&r->mail_revision);
+        if(result!=MAIL_CORE_OK) { mail_result(q,result,r);return; }
+        if(send) {
+            r->mail_delivery=target.to;r->mail_id=id;
+            snprintf(r->text,sizeof(r->text),mail_text(q,MSG_MAIL_SENT,"MAIL SENT %u\r\n"),id);
+        } else strcpy(r->text,mail_text(q,MSG_MAIL_DRAFT_SAVED,"MAIL DRAFT SAVED\r\n"));
+        return;
+    }
     if(q->action=='A') {
         MailOutcome result=mail_core_attachment_select(&actor,&q->mail_attachments,id,!!q->cursor,&r->mail_attachments);
         if(result!=MAIL_CORE_OK) { mail_result(q,result,r);return; }
@@ -860,11 +879,10 @@ static void mail_execute(const BoardRequest *q,BoardResult *r) {
         size_t offset=0;for(unsigned i=0;i<draft.attachments.count;i++)offset+=mail_attachment_text(q,draft.attachments.ids[i],r->text+offset,sizeof(r->text)-offset,NULL);
         snprintf(r->text+offset,sizeof(r->text)-offset,mail_text(q,MSG_MAIL_DRAFT_INFO,"MAIL DRAFT %u TO %s REPLY %u TITLE %s\r\n"),draft.revision,draft.recipient,draft.parent,draft.title);return;
     }
-    if(q->action=='W' || q->action=='C') {
-        MailWrite input={q->number,q->cursor,q->mail_revision,q->title,q->body,q->mail_attachments};
-        MailOutcome result=q->action=='W'?mail_core_draft_save(&actor,&input,&r->mail_revision):mail_core_draft_delete(&actor,q->mail_revision);
+    if(q->action=='C') {
+        MailOutcome result=mail_core_draft_delete(&actor,q->mail_revision);
         if(result!=MAIL_CORE_OK) { mail_result(q,result,r);return; }
-        snprintf(r->text,sizeof(r->text),"%s",q->action=='W'?mail_text(q,MSG_MAIL_DRAFT_SAVED,"MAIL DRAFT SAVED\r\n"):mail_text(q,MSG_MAIL_DRAFT_DELETED,"MAIL DRAFT DELETED\r\n"));return;
+        strcpy(r->text,mail_text(q,MSG_MAIL_DRAFT_DELETED,"MAIL DRAFT DELETED\r\n"));return;
     }
     if(q->action=='B' || q->action=='Q') {
         MailCompose compose;
@@ -907,14 +925,6 @@ static void mail_execute(const BoardRequest *q,BoardResult *r) {
         MailOutcome result=q->action=='K'?mail_core_retract(&actor,id):mail_core_delete(&actor,id);
         if(result!=MAIL_CORE_OK) { mail_result(q,result,r);return; }
         snprintf(r->text,sizeof(r->text),mail_text(q,MSG_MAIL_DELETED,"MAIL DELETED %u\r\n"),id);return;
-    }
-    if(q->action=='S') {
-        const char *body=body_with_signature(q,r);if(!body)return;
-        MailWrite input={q->number,q->cursor,q->mail_revision,q->title,body,q->mail_attachments};
-        MailOutcome result=mail_core_send(&actor,&input,&id);
-        if(result!=MAIL_CORE_OK) { mail_result(q,result,r);return; }
-        r->mail_delivery=q->number;r->mail_id=id;
-        snprintf(r->text,sizeof(r->text),mail_text(q,MSG_MAIL_SENT,"MAIL SENT %u\r\n"),id);return;
     }
 unavailable:r->feedback.failed=1;snprintf(r->text,sizeof(r->text),"%s",mail_text(q,MSG_MAIL_UNAVAILABLE,"MAIL ERROR unavailable\r\n"));return;
 }
@@ -1162,7 +1172,7 @@ static void execute(const BoardRequest *q,BoardResult *r) {
             else mail_result(q,result,r);
             return;
         }
-        r->service_action='M';r->mail_delivery=delivery.recipient;
+        r->service_action='M';r->mail_delivery=delivery.recipient;r->mail_id=delivery.id;
         snprintf(r->text,sizeof(r->text),"SYSOP MAIL SENT %u\r\n",delivery.id);return;
     }
     if(q->op=='!') { activity_execute(q,r);return; }
@@ -1475,7 +1485,11 @@ static void execute(const BoardRequest *q,BoardResult *r) {
         ArticleOutcome result=q->op=='e'?article_prepare_post(&actor,q->board,q->number):
             article_post(&actor,q->board,q->number,q->username,q->title,body,&r->selected);
         if(result!=ARTICLE_OK) { post_result(result,r);return; }
-        if(q->op=='P') { r->feedback.article_access='P';r->feedback.article_access_id=r->selected;snprintf(r->text,sizeof(r->text),"SAVED %u\r\n",r->selected); }
+        if(q->op=='P') {
+            if(q->action=='b')r->board=q->board;
+            r->feedback.article_access='P';r->feedback.article_access_id=r->selected;
+            snprintf(r->text,sizeof(r->text),"SAVED %u\r\n",r->selected);
+        }
         else if(q->action=='?') { r->service_action='E';r->service_number=q->number?2:1; }
         else { r->editing=1;strcpy(r->text,"EDIT end with . or /CANCEL\r\n"); }
         return;

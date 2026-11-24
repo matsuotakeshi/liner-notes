@@ -100,7 +100,7 @@ class Bridge:
     async def _send(self, line):
         await self._send_lines([line])
 
-    async def _send_lines(self, lines):
+    async def _send_lines(self, lines, *, limit=100000):
         """One bounded write for one operation; retain individual protocol lines."""
         if self.closed: raise BridgeError('BBS connection closed; please sign in again')
         chunks=[];total=0
@@ -109,7 +109,7 @@ class Bridge:
             raw=line.encode('utf-8')
             if len(raw)>4096: raise BridgeError('Input exceeds 4096 bytes')
             total+=len(raw)+2
-            if total>100000: raise BridgeError('Connector operation exceeds limit')
+            if total>limit: raise BridgeError('Connector operation exceeds limit')
             chunks.append(raw+b'\r\n')
         raw=b''.join(chunks)
         self.writer.write(raw.replace(b'\xff', b'\xff\xff') if self.telnet else raw)
@@ -147,8 +147,11 @@ class Bridge:
             else:
                 line=f'CONNECTOR TRANSFER {self.token} '+command if self.state.get('editing') and self.state.get('transfer_block') and command.startswith('MFILE') else command
                 sent=[line]
+        return await self._exchange_lines(sent, timeout=timeout)
+
+    async def _exchange_lines(self, sent, *, limit=100000, timeout=None, strip_block_echo=False):
         request = secrets.token_hex(16)
-        await self._send_lines([*sent,f'CONNECTOR SYNC {self.token} {request}'])
+        await self._send_lines([*sent,f'CONNECTOR SYNC {self.token} {request}'], limit=limit)
         prefix = f'CONNECTOR STATE {request} '.encode()
         result = await self._until(prefix, include_line=True, timeout=timeout)
         at = result.rfind(prefix)
@@ -159,9 +162,13 @@ class Bridge:
         body = result[:at]
         echoed_sync = f'CONNECTOR SYNC {self.token} {request}\r\n'.encode()
         if body.endswith(echoed_sync):body=body[:-len(echoed_sync)]
-        for line in sent:
-            echo=line.encode()+b'\r\n'
-            if body.startswith(echo):body=body[len(echo):]
+        if strip_block_echo:
+            echoes={line.encode()+b'\r\n' for line in sent}
+            body=b''.join(line for line in body.splitlines(keepends=True) if line not in echoes)
+        else:
+            for line in sent:
+                echo=line.encode()+b'\r\n'
+                if body.startswith(echo):body=body[len(echo):]
         return {'text': body.decode('utf-8', errors='replace'), 'state': dict(self.state)}
 
     async def view(self, kind, ident, cursor, path=''):
@@ -179,6 +186,35 @@ class Bridge:
             raise BridgeError('Invalid core view reply') from error
         result['text'] = result['text'][:marker.start()] + payload['text'] + result['text'][marker.end():]
         result['data'] = payload['data']
+        return result
+
+    async def update(self, kind, *, board=0, id=0, arg=0, flag=False, attachments=(),
+                     recipient='', title='', body=''):
+        """Submit one named Core operation; caller owns lock, and never retries it."""
+        nonce = secrets.token_hex(16)
+        encode = lambda value: value.encode('utf-8').hex()
+        payload = '|'.join((nonce, kind, str(board), str(id), str(arg), str(int(flag)),
+                            ','.join(map(str, attachments)), encode(recipient), encode(title), encode(body)))
+        if len(payload)>2*262144+512:raise BridgeError('Connector operation exceeds limit')
+        prefix = f'CONNECTOR DATA {self.token} '
+        start = f'CONNECTOR UPDATE {self.token} {len(payload)}'
+        line_limit = min(4096, self.state['input_limit'])
+        chunk = line_limit-len(prefix)
+        if line_limit<max(112,len(start)) or chunk<1:raise BridgeError('Connector input limit is too low')
+        sent = [start]+[prefix+payload[at:at+chunk] for at in range(0,len(payload),chunk)]
+        result = await self._exchange_lines(sent, limit=2100000, strip_block_echo=True)
+        marker = re.search(r'(?:^|(?<=\r\n))CONNECTOR UPDATE '+nonce+r' ([01]) (\d+) (\d+) ([01]) ([0-9a-f]*)\r\n',
+                           result['text'])
+        try:
+            if not marker:raise ValueError('Missing update result')
+            text = bytes.fromhex(marker[5]).decode('utf-8', errors='replace')
+        except ValueError as error:
+            await self.close()
+            raise BridgeError('Invalid core update reply. Check the result before retrying.') from error
+        result['text'] = result['text'][:marker.start()] + text + result['text'][marker.end():]
+        result['mutation'] = {'ok': marker[1]=='1', 'id': int(marker[2]), 'revision': int(marker[3]),
+                              'audit_failed': marker[4]=='1'}
+        result['data'] = {}
         return result
 
     async def command(self, command=None):

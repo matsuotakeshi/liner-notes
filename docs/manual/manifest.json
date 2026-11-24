@@ -484,6 +484,8 @@
         "WEBUI_COVERAGE.md",
         "WEBUI.md",
         "webui/commands.py",
+        "webui/app.py",
+        "src/session_web_update.c",
         "webui/static/reports-ui.js"
       ]
     },
@@ -883,6 +885,7 @@
         "src/connector_protocol.h",
         "tests/test_connector_protocol.c",
         "src/session_connector.c",
+        "src/session_web_update.c",
         "src/session_transfer.c",
         "src/session_menu.c",
         "src/session_auth.c",

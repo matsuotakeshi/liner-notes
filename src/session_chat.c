@@ -63,6 +63,34 @@ int session_impl_status_result(Session *s,const BoardResult *completion,uint64_t
     return 0;
 }
 
+const char *session_impl_chat_delivery(Session *s,const OperationResult *r,uint64_t now,MessageId *message) {
+    if(!rtbbs(s)->conversation.chatting) { *message=MSG_TALK_GONE;return "CHAT ERROR target\r\n"; }
+    int status;
+    if(r->chat_action=='D') {
+        status=chat_private(s->core.id,r->chat_target,r->text,now);
+        if(status>0 && rtbbs(s)->conversation.talk_once) {
+            rtbbs(s)->conversation.talk_once=0;rtbbs(s)->conversation.talk_target=0;
+            rtbbs(s)->conversation.talk_select=rtbbs(s)->conversation.talk_lost=0;
+            if(rtbbs(s)->conversation.talk_return_editor) {
+                rtbbs(s)->conversation.talk_return_editor=0;
+                rtbbs(s)->conversation.outside_talk=0;rtbbs(s)->conversation.chatting=0;
+            }
+            if(rtbbs(s)->conversation.chatting)chat_prompt(s);else session_impl_prompt(s);
+        }
+        if(status==-3) { *message=MSG_TALK_REFUSED;return "CHAT ERROR refused\r\n"; }
+        if(status==-2) {
+            rtbbs(s)->conversation.talk_lost=1;
+            *message=MSG_TALK_GONE;return "CHAT ERROR target\r\n";
+        }
+    } else {
+        status=chat_say(s->core.id,r->text,now);
+        if(status==-4) { *message=MSG_CHAT_STORAGE;return "CHAT ERROR storage\r\n"; }
+    }
+    if(status>0)return NULL;
+    *message=status<0?MSG_CHAT_RATE:MSG_CHAT_INVALID;
+    return status<0?"CHAT ERROR rate\r\n":"CHAT ERROR text\r\n";
+}
+
 int session_impl_chat_result(Session *s,const BoardResult *completion,uint64_t now) {
     (void)now;
     if(rtbbs(s)->conversation.chat_pending) {
@@ -106,17 +134,11 @@ int session_impl_chat_result(Session *s,const BoardResult *completion,uint64_t n
                 rtbbs(s)->conversation.talk_target=completion->chat_target;rtbbs(s)->conversation.talk_lost=0;
                 char text[256];snprintf(text,sizeof(text),rtbbs(s)->presentation.ui.enabled?ui_text(&rtbbs(s)->presentation.ui,MSG_TALK_OPEN):"CHAT TALK OPEN %lu\r\n",rtbbs(s)->conversation.talk_target);session_impl_queue_text(s,text);chat_prompt(s);
             } else { rtbbs(s)->conversation.talk_lost=1;chat_error(s,MSG_TALK_INVALID,"CHAT ERROR target\r\n"); }
-        } else if(rtbbs(s)->conversation.chatting && completion->chat_action=='D') {
-            int ok=chat_private(s->core.id,completion->chat_target,completion->text,now);
-            if(ok>0 && rtbbs(s)->conversation.talk_once) { rtbbs(s)->conversation.talk_once=0;rtbbs(s)->conversation.talk_target=0;rtbbs(s)->conversation.talk_select=rtbbs(s)->conversation.talk_lost=0;if(rtbbs(s)->conversation.talk_return_editor) { rtbbs(s)->conversation.talk_return_editor=0;rtbbs(s)->conversation.outside_talk=0;rtbbs(s)->conversation.chatting=0; }if(rtbbs(s)->conversation.chatting)chat_prompt(s);else session_impl_prompt(s); }
-            if(ok==-3)chat_error(s,MSG_TALK_REFUSED,"CHAT ERROR refused\r\n");
-            else if(ok==-2) { rtbbs(s)->conversation.talk_lost=1;chat_error(s,MSG_TALK_GONE,"CHAT ERROR target\r\n"); }
-            else if(ok<=0)chat_error(s,ok<0?MSG_CHAT_RATE:MSG_CHAT_INVALID,ok<0?"CHAT ERROR rate\r\n":"CHAT ERROR text\r\n");
         } else if(rtbbs(s)->conversation.chatting && completion->chat_action=='W')chat_who(s->core.id);
-        else if(rtbbs(s)->conversation.chatting && completion->chat_action=='S') {
-            int ok=chat_say(s->core.id,completion->text,now);
-            if(ok==-4)chat_error(s,MSG_CHAT_STORAGE,"CHAT ERROR storage\r\n");
-            else if(ok<=0)chat_error(s,ok<0?MSG_CHAT_RATE:MSG_CHAT_INVALID,ok<0?"CHAT ERROR rate\r\n":"CHAT ERROR text\r\n");
+        else if(rtbbs(s)->conversation.chatting && (completion->chat_action=='S' || completion->chat_action=='D')) {
+            MessageId message;
+            const char *error=session_impl_chat_delivery(s,completion,now,&message);
+            if(error)chat_error(s,message,error);
         }
         return 1;
     }
