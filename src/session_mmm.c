@@ -588,6 +588,7 @@ static void command(Session *s,char *text) {
         break;
     case MMM_LOGOUT:
         if(session_logout(s)) {
+            OPENSSL_cleanse(m->pfile,sizeof(m->pfile));
             chat_disconnect(s->core.id);m->screen=MAIN_SCREEN;m->parent=0;m->depth=0;
             m->sequence_read=0;m->login_at=0;m->service_next=0;
             m->pager=m->editor=0;m->ui_aux=0;

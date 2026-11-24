@@ -181,7 +181,7 @@ def personal_file_checks(server, bob, sender, source, spool):
         with_client = Telnet(server.port)
         try:
             with_client.until()
-            with_client.cmd('login bob', b'Password> ')
+            with_client.cmd('login bob', b'Password (8-128 bytes)> ')
             with_client.cmd(PASSWORD, main)
             assert b'0 / 10240' in with_client.cmd('pfile', main)
         finally:
@@ -228,6 +228,7 @@ def ssh_personal_check(binary, root, data, members, helper, spool, sender, sourc
         transport.start_client(timeout=10)
         assert transport.get_remote_server_key().get_base64() == host.with_suffix('.pub').read_text().split()[1]
         transport.auth_password('alice', PASSWORD)
+        server.expected_errors.append('SSH auth accepted slot=0')
         channel = transport.open_session(timeout=10)
         channel.get_pty(term='xterm', width=80, height=24)
         channel.invoke_shell()
