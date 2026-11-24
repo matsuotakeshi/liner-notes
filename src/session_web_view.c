@@ -231,21 +231,19 @@ void session_impl_web_view(Session *s,const char *payload) {
     q->board=s->core.board;s->core.structured=1;
     SessionOperationStatus status=session_submit(s,q);
     s->core.structured=structured;
-    if(status==SESSION_OPERATION_ACCEPTED) {
-        memcpy(s->connection.connector_view_nonce,nonce,sizeof(nonce));
-        if(q->op=='m') {
-            ui->mail_state.mail_mode=1;
-            if(q->action=='L')mail_navigation_filter(&ui->mail_state.mail,MAIL_LIST_ALL,NULL,q->cursor);
-        }
-    } else reply(s,nonce,status==SESSION_OPERATION_LOGIN_REQUIRED?"ERR login required\r\n":"ERR board busy\r\n",empty);
+    if(status==SESSION_OPERATION_ACCEPTED)memcpy(s->connection.connector_view_nonce,nonce,sizeof(nonce));
+    else reply(s,nonce,status==SESSION_OPERATION_LOGIN_REQUIRED?"ERR login required\r\n":"ERR board busy\r\n",empty);
     free(q);
 }
 
 int session_impl_web_view_result(Session *s,const OperationResult *r,SessionResultView view) {
     char *nonce=s->connection.connector_view_nonce;
     if(!*nonce)return 0;
-    if(r->mail_action=='L')
-        mail_navigation_page(&rtbbs(s)->mail_state.mail,MAIL_EVENT_LIST,r->mail_next);
+    if(view.status==SESSION_RESULT_OK && (r->mail_action=='L' || r->mail_action=='R')) {
+        rtbbs(s)->mail_state.mail_mode=1;
+        if(r->mail_action=='L')
+            mail_navigation_filter(&rtbbs(s)->mail_state.mail,MAIL_LIST_ALL,NULL,r->mail_next);
+    }
     reply(s,nonce,r->text,view);
     nonce[0]=0;
     return 1;

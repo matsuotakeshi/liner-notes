@@ -50,7 +50,7 @@ async def exercise(port):
             denied=await a.view('mail',1,0)
             invalid=await a.view('post',1,0)
         assert public['data']['boards'] and not public['text'],public
-        assert 'ERR login required' in denied['text'] and not denied['data'],denied
+        assert 'ERR login required' in denied['text'] and not denied['data'] and not denied['state']['mail'],denied
         assert 'ERR connector view syntax' in invalid['text'] and not invalid['data'],invalid
         r=await a.command('REGISTER alice');assert r['state']['secret']
         r=await a.command('web-test-password');assert r['state']['user']==1 and 'web-test-password' not in r['text']
