@@ -100,6 +100,8 @@ void session_impl_command(Session *s,char *line);
 void session_rtbbs_command(Session *s,char *line);
 int session_impl_message_result(Session *s,const BoardResult *completion,uint64_t now);
 int session_impl_service_command(Session *s,char *line);
+int session_impl_conference_command(Session *,char *);
+int session_impl_conference_result(Session *,const OperationResult *);
 void session_impl_gather_input(Session *s,const char *line);
 int session_impl_mail_result(Session *s,const BoardResult *completion,uint64_t now);
 MailSessionEvent session_impl_mail_event(int action);

@@ -10,6 +10,7 @@
 /* Internal only: signed SSH key proof verified by the transport, never decoded from text. */
 #define BOARD_SSH_KEY '\x1d'
 #define BOARD_NOTE_VIEW '\x1c'
+#define BOARD_CONFERENCE '\x1b'
 #define BOARD_TITLE 80
 #include "content_limits.h"
 #include "mail_attachments.h"
@@ -31,6 +32,7 @@ typedef struct {
     char link_origin[65],link_article[65];
     char title[BOARD_TITLE+1], body[BOARD_BODY+1];
     MmmScanTargets mmm_scanlist;
+    ConferenceRequest conference;
 } OperationRequest;
 typedef OperationRequest BoardRequest;
 /* Operation effects are produced beside domain results, never decoded from text.

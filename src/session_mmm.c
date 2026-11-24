@@ -27,7 +27,7 @@ void mmm_say(Session *s,const char *en,const char *ja) {
 void mmm_prompt(Session *s) {
     const MmmUi *m=mmm_view(s);
     if(s->core.pending || s->core.closing || !s->core.active || s->connection.door ||
-       s->connection.zmodem || s->connection.zmodem_start || (m->continuous && m->screen==NEW_SCREEN))return;
+       s->connection.zmodem || s->connection.zmodem_start || m->conference_automatic || (m->continuous && m->screen==NEW_SCREEN))return;
     if(m->application.step && m->input!=INPUT_PASSWORD) {
         const char *field=application_form_field(&m->application);
         if(!field) { mmm_say(s,"Apply? Y / E / /CANCEL > ","申請しますか Y / E / /CANCEL > ");return; }
@@ -49,8 +49,9 @@ void mmm_prompt(Session *s) {
     if(m->input!=INPUT_NONE) { session_impl_queue_text(s,inputs[m->input]);return; }
     if(!s->core.user) { session_impl_queue_text(s,"LOGIN>> ");return; }
     static const char *const screens[]={"MAIN>> ","NOTES>> ","NOTES>> ","INDEX> ","OPEN> ",
-        "MAIL>> ","FILER>> ","CHAT>> ","TERM>> ","GAMES>> ","NEW>> ","MANAGE>> "};
-    session_impl_queue_text(s,screens[m->screen]);
+        "MAIL>> ","FILER>> ","CHAT>> ","TERM>> ","GAMES>> ","NEW>> ","MANAGE>> ","TALK) "};
+    if(m->screen==TALK_SCREEN && m->conference_room)session_impl_queue_text(s,"TALK> ");
+    else session_impl_queue_text(s,screens[m->screen]);
 }
 
 void mmm_menu(Session *s,int requested) {
@@ -59,8 +60,8 @@ void mmm_menu(Session *s,int requested) {
                               "ログインが必要です。login ID / register ID / ?\r\n");return; }
     switch(mmm_view(s)->screen) {
     case MAIN_SCREEN:
-        mmm_say(s,"1 Mail   2 Notes   3 Filer   4 Chat   5 Settings   6 Games   7 Exit\r\nnew: recent notes   ? Help\r\n",
-              "1 メール   2 ノート   3 保管庫   4 チャット   5 設定   6 ゲーム   7 終了\r\nnew: 新着巡回   ? ヘルプ\r\n");break;
+        mmm_say(s,"1 Mail   2 Notes   3 Filer   4 Chat   5 Settings   6 Games   7 Exit\r\nnew: recent notes   talk: line conference   ? Help\r\n",
+              "1 メール   2 ノート   3 保管庫   4 チャット   5 設定   6 ゲーム   7 終了\r\nnew: 新着巡回   talk: 一行会議   ? ヘルプ\r\n");break;
     case NOTES_SCREEN: mmm_say(s,"Number: select   L: more   .: up   /: main\r\n",
                              "番号で選択   L: 続き   .: 上へ   /: メイン\r\n");break;
     case BOARD_SCREEN: mmm_say(s,"1 Open   2 Post   3 Sub-boards   .: back\r\ndraft / retitle NOTE TITLE / withdraw NOTE confirm\r\n",
@@ -84,6 +85,7 @@ void mmm_menu(Session *s,int requested) {
     case GAMES_SCREEN: mmm_say(s,"Select a game number. Enter refreshes, . returns.\r\n",
                              "番号で起動。Enterで再表示、. で戻る。\r\n");break;
     case MANAGE_SCREEN: mmm_manage_menu(s);break;
+    case TALK_SCREEN: mmm_conference_menu(s);break;
     case NEW_SCREEN: mmm_say(s,"Number: read   more: next page   .: back\r\n",
                            "番号で読む   more: 次のページ   .: 戻る\r\n");break;
     }
@@ -618,6 +620,7 @@ static void command(Session *s,char *text) {
         if(s->core.admin || s->core.sigop) { m->screen=MANAGE_SCREEN;mmm_menu(s,1); }
         else mmm_say(s,"Management access denied.\r\n","管理操作の権限がありません。\r\n");
         break;
+    case MMM_TALK: mmm_conference_enter(s,input.argument);break;
     case MMM_PFILE: personal_file(s,input.argument);break;
     case MMM_SIGNATURE: signature_command(s,input.argument);break;
     case MMM_DRAFT: note_draft_command(s,input.argument);break;
@@ -871,6 +874,11 @@ static void result(Session *s,const OperationResult *r,SessionResultView project
     (void)cancelled;
     MmmUi *m=mmm_state(s);
     MmmJob job=m->job;m->job=JOB_NONE;
+    if(job==JOB_CONFERENCE) {
+        if(r->page.kind==OPERATION_PAGE_CONFERENCE)mmm_conference_result(s,&r->page.data.conference);
+        else { m->conference_automatic=0;mmm_say(s,"Conference unavailable.\r\n","一行会議を利用できません。\r\n"); }
+        mmm_prompt(s);return;
+    }
     if(job==JOB_CHAT && m->chat_kicked) { m->chat_kicked=0;mmm_prompt(s);return; }
     if(r->auth>0 && projection.status==SESSION_RESULT_OK) {
         mmm_load_preferences(s,r);
@@ -1197,6 +1205,8 @@ static void tick(Session *s,uint64_t now) {
     const MmmUi *m=mmm_view(s);
     if(!s->core.pending && m->screen==NEW_SCREEN && (m->continuous || m->stream_seen) &&
        (!s->connection.io.drained || s->connection.io.drained(s->connection.io.context)))mmm_stream_step(s);
+    if(!s->core.pending && m->screen==TALK_SCREEN && m->conference_automatic &&
+       (!s->connection.io.drained || s->connection.io.drained(s->connection.io.context)))mmm_conference_tick(s);
     NotificationAudience audience=mail_audience(s);
     uint32_t arrivals=notification_mail_take(&mmm_state(s)->notifications,&audience);
     if(arrivals) { mmm_say(s,"\r\nNew mail has arrived.\r\n","\r\n新着メールがあります。\r\n");mmm_prompt(s); }

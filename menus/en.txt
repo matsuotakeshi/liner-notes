@@ -7,6 +7,7 @@
  [Communication and mail]
   M Mail         C Chat             T Private talk
   G Gather       W Online           D Call SYSOP
+  LINECONF Line conference
   \ Memo         # Account          SYSOPMAIL title
  [Write and settings]
   E Shared editor I Settings        A Register / apply

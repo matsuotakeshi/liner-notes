@@ -123,6 +123,8 @@ void session_result(Session *s,const BoardResult *completion,uint64_t now) {
     int cancelled=s->ui_binding.active->keep_position(s,completion);
     SessionResultView view=session_core_receive(&s->core,completion,now,cancelled);
     if(view.status!=SESSION_RESULT_IGNORED && completion->auth)session_ui_discard_inactive(s);
+    if(view.status!=SESSION_RESULT_IGNORED && (completion->auth || completion->password_changed))
+        board_conference_session(s->core.slot,s->core.id,s->core.user,s->core.user_epoch);
     if(view.status==SESSION_RESULT_OK && completion->mail_notify_user)
         session_mail_notify(s,completion->mail_notify_user,completion->mail_notify_deny,completion->mail_notify_revision);
     if(view.status!=SESSION_RESULT_IGNORED)s->ui_binding.active->result(s,completion,view,now,cancelled);

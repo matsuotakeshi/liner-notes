@@ -26,6 +26,9 @@ TABLES={
  'delegated':'board INTEGER,gid INTEGER,PRIMARY KEY(board,gid)',
  'group_moves':'board INTEGER PRIMARY KEY,actor INTEGER,source INTEGER,destination INTEGER,done INTEGER',
  'applications':'user INTEGER,field TEXT,value TEXT,PRIMARY KEY(user,field)',
+ 'conference_rooms':'id INTEGER PRIMARY KEY CHECK(id BETWEEN 1 AND 1500),title TEXT NOT NULL CHECK(length(CAST(title AS BLOB)) BETWEEN 1 AND 80)',
+ 'conference_lines':'id INTEGER PRIMARY KEY AUTOINCREMENT CHECK(id BETWEEN 1 AND 2147483646),room INTEGER NOT NULL REFERENCES conference_rooms(id),user INTEGER NOT NULL CHECK(user>0),name TEXT NOT NULL CHECK(length(CAST(name AS BLOB)) BETWEEN 1 AND 80),stamp INTEGER NOT NULL CHECK(stamp>=0),body TEXT NOT NULL CHECK(length(CAST(body AS BLOB)) BETWEEN 1 AND 512),UNIQUE(room,id)',
+ 'conference_read':'user INTEGER NOT NULL CHECK(user>0),room INTEGER NOT NULL REFERENCES conference_rooms(id),through INTEGER NOT NULL,PRIMARY KEY(user,room),FOREIGN KEY(room,through) REFERENCES conference_lines(room,id)',
  'link_articles':'board INTEGER NOT NULL,origin TEXT NOT NULL,article TEXT NOT NULL,local_id INTEGER UNIQUE NOT NULL,revision INTEGER NOT NULL,kind TEXT NOT NULL,author TEXT NOT NULL,alias TEXT NOT NULL,created INTEGER NOT NULL,parent INTEGER NOT NULL,title TEXT NOT NULL,body_hash TEXT NOT NULL,done INTEGER NOT NULL,actor INTEGER NOT NULL,PRIMARY KEY(board,origin,article)',
 }
 MAGICS={b'RTMEMB01',b'LNMAIL01',b'LNVLT001',b'LNBDP001',b'LNBMOV01',b'LNBACC01',b'LNCAT001',b'LNSIG001',b'LNDOWN01',b'LNCHAT01',b'LNULOCK1',b'LNUSER01',b'LNPROF01',b'RTMOD001',b'RTEXTRA1',b'LNACTV01'}|{f'RTBOARD{i}'.encode() for i in range(1,6)}

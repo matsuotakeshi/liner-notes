@@ -7,7 +7,7 @@
 
 typedef enum {
     MAIN_SCREEN, NOTES_SCREEN, BOARD_SCREEN, INDEX_SCREEN, OPEN_SCREEN, MAIL_SCREEN,
-    FILER_SCREEN, CHAT_SCREEN, TERM_SCREEN, GAMES_SCREEN, NEW_SCREEN, MANAGE_SCREEN
+    FILER_SCREEN, CHAT_SCREEN, TERM_SCREEN, GAMES_SCREEN, NEW_SCREEN, MANAGE_SCREEN, TALK_SCREEN
 } MmmScreen;
 typedef enum {
     INPUT_NONE, INPUT_LOGIN, INPUT_PASSWORD, INPUT_BOARD_PASSWORD, INPUT_TITLE,
@@ -20,7 +20,8 @@ typedef enum {
     JOB_MAIL_BATCH, JOB_SEQUENCE, JOB_NEW_BEGIN, JOB_NEW_PAGE, JOB_NEW_READ, JOB_OFF,
     JOB_SCANLIST, JOB_SCANLIST_SAVE, JOB_LABEL, JOB_OPEN_WINDOW, JOB_OPEN_PAGE, JOB_OPEN_READ,
     JOB_NOTE_DRAFT, JOB_NOTE_DRAFT_SAVE, JOB_NOTE_DRAFT_STATUS, JOB_NOTE_DRAFT_DROP, JOB_NOTE_CHANGE,
-    JOB_NOTE_DRAFT_DROPPED, JOB_STREAM_READ, JOB_STREAM_SEEN, JOB_MANAGE, JOB_PFILE_APPEND, JOB_PFILE_MAIL, JOB_SIGNATURE, JOB_SIGNATURE_EDIT, JOB_SIGNATURE_SAVE
+    JOB_NOTE_DRAFT_DROPPED, JOB_STREAM_READ, JOB_STREAM_SEEN, JOB_MANAGE, JOB_PFILE_APPEND, JOB_PFILE_MAIL, JOB_SIGNATURE, JOB_SIGNATURE_EDIT, JOB_SIGNATURE_SAVE,
+    JOB_CONFERENCE
 } MmmJob;
 typedef enum { OPEN_BOARD_MENU, OPEN_INDEX, OPEN_BASE, OPEN_POST, OPEN_NEW, OPEN_NEW_OR_INDEX } MmmBoardAction;
 typedef enum { BROWSE_READ, BROWSE_INDEX, BROWSE_EXACT, BROWSE_RESPONSE, BROWSE_TITLES } MmmBrowse;
@@ -70,6 +71,9 @@ typedef struct {
     unsigned scan_count,scan_at;
     uint32_t scan_boards[MMM_SCAN_MAX],open_board;
     MmmScanMode scan_modes[MMM_SCAN_MAX];
+    ConferenceAction conference_action;
+    uint32_t conference_room,conference_scope,conference_next,conference_mark;
+    int conference_automatic;
 } MmmUi;
 
 MmmUi *mmm_state(Session *s);
@@ -98,6 +102,11 @@ void mmm_open_page(Session *s,uint32_t cursor);
 void mmm_off(Session *s,int skip);
 int mmm_service_line(Session *s,char *text);
 void mmm_manage_menu(Session *s);
+void mmm_conference_enter(Session *,const char *);
+int mmm_conference_line(Session *,char *);
+void mmm_conference_result(Session *,const ConferenceReply *);
+void mmm_conference_menu(Session *);
+void mmm_conference_tick(Session *);
 void mmm_mail_result(Session *s,const OperationResult *r,SessionResultView projection);
 void mmm_mail_batch_result(Session *s,const OperationFeedback *feedback);
 void mmm_file_result(Session *s,const OperationResult *r,const OperationPage *page,int add);

@@ -37,6 +37,7 @@ bin/liner-notes-check-resume
 @sample %%DATADIR%%/help/ja/files.txt.sample
 @sample %%DATADIR%%/help/ja/gather.txt.sample
 @sample %%DATADIR%%/help/ja/index.txt.sample
+@sample %%DATADIR%%/help/ja/lineconf.txt.sample
 @sample %%DATADIR%%/help/ja/mail.txt.sample
 @sample %%DATADIR%%/help/ja/post.txt.sample
 @sample %%DATADIR%%/help/ja/profile.txt.sample
@@ -54,6 +55,7 @@ bin/liner-notes-check-resume
 @sample %%DATADIR%%/help/en/files.txt.sample
 @sample %%DATADIR%%/help/en/gather.txt.sample
 @sample %%DATADIR%%/help/en/index.txt.sample
+@sample %%DATADIR%%/help/en/lineconf.txt.sample
 @sample %%DATADIR%%/help/en/mail.txt.sample
 @sample %%DATADIR%%/help/en/post.txt.sample
 @sample %%DATADIR%%/help/en/profile.txt.sample
