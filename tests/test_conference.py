@@ -131,7 +131,8 @@ def run(binary):
             alice.cmd("private conference fixture", b"Talk #" + target + b"> ")
             alice.cmd("//", PROMPT)
             assert b"private conference fixture" not in bob.cmd("LINECONF HISTORY 1")
-            assert b"SUSPENDED 2" in alice.cmd("SUSPEND 2")
+            suspension = alice.cmd("SUSPEND 2")
+            assert b"Member #2 is suspended." in suspension, suspension
             disconnected(bob)
             disconnected(bob2)
             rejected = connect()
@@ -145,7 +146,8 @@ def run(binary):
             assert b"CONFERENCE POSITION 2 2" in alice.cmd("LINECONF POSITION 2")
             assert b"concurrent Bob" in alice.cmd("LINECONF HISTORY 1")
             # Bob's pre-suspension read marker is also durable.
-            assert b"RESUMED 2" in alice.cmd("RESUME 2")
+            reinstatement = alice.cmd("RESUME 2")
+            assert b"Member #2 is active again." in reinstatement, reinstatement
             with closing(Client(server.port)) as bob:
                 login(bob, "bob")
                 assert b"CONFERENCE POSITION 1 4" in bob.cmd("LINECONF POSITION 1")

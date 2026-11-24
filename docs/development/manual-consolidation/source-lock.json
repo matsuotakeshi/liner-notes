@@ -391,6 +391,6 @@
   "src/menu.c": "962c853e3c5acebd444fcbcd96e6a876932bb176f14f4bdb27638d7217c06624",
   "src/session_conference.c": "82306520e1deb927ca848754f1ae54b7702cd54dbcf3b01484236de314021c6c",
   "src/session_mmm_conference.c": "3895a5976210cb0ccc850419b08aa690a4048a231ac718fe0e7b1f8209118b99",
-  "tests/test_conference.py": "6d3dd91f53863cec298456b5511644456136eb083776c5fdf0e2118e12bdbcf3",
+  "tests/test_conference.py": "b0679a37892be698db0efc4638b9f093c2a51ef397269939f88688f511696a65",
   "tests/test_conference_core.c": "9e5953a794f4b13c67a784aa046b5b901b6052db2fc994d044c4c86f9131c629"
 }
