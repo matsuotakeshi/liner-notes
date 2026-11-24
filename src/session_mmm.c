@@ -27,7 +27,7 @@ void mmm_say(Session *s,const char *en,const char *ja) {
 void mmm_prompt(Session *s) {
     const MmmUi *m=mmm_view(s);
     if(s->core.pending || s->core.closing || !s->core.active || s->connection.door ||
-       s->connection.zmodem || s->connection.zmodem_start)return;
+       s->connection.zmodem || s->connection.zmodem_start || (m->continuous && m->screen==NEW_SCREEN))return;
     if(m->application.step && m->input!=INPUT_PASSWORD) {
         const char *field=application_form_field(&m->application);
         if(!field) { mmm_say(s,"Apply? Y / E / /CANCEL > ","申請しますか Y / E / /CANCEL > ");return; }
@@ -49,7 +49,7 @@ void mmm_prompt(Session *s) {
     if(m->input!=INPUT_NONE) { session_impl_queue_text(s,inputs[m->input]);return; }
     if(!s->core.user) { session_impl_queue_text(s,"LOGIN>> ");return; }
     static const char *const screens[]={"MAIN>> ","NOTES>> ","NOTES>> ","INDEX> ","OPEN> ",
-        "MAIL>> ","FILER>> ","CHAT>> ","TERM>> ","GAMES>> ","NEW>> "};
+        "MAIL>> ","FILER>> ","CHAT>> ","TERM>> ","GAMES>> ","NEW>> ","MANAGE>> "};
     session_impl_queue_text(s,screens[m->screen]);
 }
 
@@ -63,26 +63,27 @@ void mmm_menu(Session *s,int requested) {
               "1 メール   2 ノート   3 保管庫   4 チャット   5 設定   6 ゲーム   7 終了\r\nnew: 新着巡回   ? ヘルプ\r\n");break;
     case NOTES_SCREEN: mmm_say(s,"Number: select   L: more   .: up   /: main\r\n",
                              "番号で選択   L: 続き   .: 上へ   /: メイン\r\n");break;
-    case BOARD_SCREEN: mmm_say(s,"1 Open   2 Post   3 Sub-boards   .: back\r\n",
-                             "1 読む   2 投稿   3 子ボード   .: 戻る\r\n");break;
+    case BOARD_SCREEN: mmm_say(s,"1 Open   2 Post   3 Sub-boards   .: back\r\ndraft / retitle NOTE TITLE / withdraw NOTE confirm\r\n",
+                             "1 読む   2 投稿   3 子ボード   .: 戻る\r\ndraft 下書き / retitle 番号 題名 / withdraw 番号 confirm\r\n");break;
     case INDEX_SCREEN: mmm_say(s,"Number: open   Space/BS: page   f/F: find/continue   w: post   q: close\r\n",
                              "番号で開く   空白/BS: ページ   f/F: 検索/続行   w: 投稿   q: 閉じる\r\n");break;
-    case OPEN_SCREEN: mmm_say(s,"Space/BS: response  +/-: base note  =/*: first/last  l/L: unread  f/F: find  w: reply  i: index  q: close\r\n",
-                            "空白/BS: レス  +/-: ベース  =/*: 先頭/末尾  l/L: 未読  f/F: 検索  w: 返信  i: 索引  q: 閉じる\r\n");break;
+    case OPEN_SCREEN: mmm_say(s,"Space/BS: response  +/-: base note  =/*: first/last  l/L: unread  f/F: find  s: save to personal file  w: reply  i: index  q: close\r\n",
+                            "空白/BS: レス  +/-: ベース  =/*: 先頭/末尾  l/L: 未読  f/F: 検索  s: 個人ファイルに保存  w: 返信  i: 索引  q: 閉じる\r\n");break;
     case MAIL_SCREEN:
-        mmm_say(s,"inbox / sent / unread / more / read ID / send USER / reply ID / delete ID confirm\r\nfiles / resume / get ID / getall MAIL / upload / uploadbatch / resumebatch   .: back\r\n",
-              "inbox 受信 / sent 送信済み / unread 未読 / more 続き / read 番号 / send 宛先 / reply 番号 / delete 番号 confirm\r\nfiles 添付一覧 / resume 下書き再開 / get 番号 / getall メール番号 / upload / uploadbatch / resumebatch   .: 戻る\r\n");break;
+        mmm_say(s,"inbox / sent / unread / more / read ID / send USER / reply ID / delete ID confirm\r\nfind TEXT / news YYYY-MM-DD / notify [on|off] / killmail ID confirm / protocol [name]\r\nfiles / resume / get ID / getall MAIL / upload / uploadbatch / resumebatch   .: back\r\n",
+              "inbox 受信 / sent 送信済み / unread 未読 / more 続き / read 番号 / send 宛先 / reply 番号 / delete 番号 confirm\r\nfind 本文検索 / news YYYY-MM-DD 新着 / notify [on|off] 通知 / killmail 番号 confirm / protocol [方式]\r\nfiles 添付一覧 / resume 下書き再開 / get 番号 / getall メール番号 / upload / uploadbatch / resumebatch   .: 戻る\r\n");break;
     case FILER_SCREEN:
-        mmm_say(s,"list / more / cd PATH / find PATTERN / info ID / text ID / unlock / get ID\r\nput [description] / resume / add ID / batch / clear   .: back\r\n",
-              "list 一覧 / more 続き / cd パス / find 検索語 / info 番号 / text 番号 / unlock / get 番号\r\nput [説明] / resume / add 番号 / batch / clear   .: 戻る\r\n");break;
+        mmm_say(s,"list / more / cd PATH / find PATTERN / info ID / text ID / unlock / get ID\r\nput [description] / resume / add ID / batch / clear / protocol [name]   .: back\r\n",
+              "list 一覧 / more 続き / cd パス / find 検索語 / info 番号 / text 番号 / unlock / get 番号\r\nput [説明] / resume / add 番号 / batch / clear / protocol [方式]   .: 戻る\r\n");break;
     case CHAT_SCREEN:
         mmm_say(s,"Type a line to chat. /who lists users, /wire ID TEXT sends privately, /leave returns.\r\n",
               "1行で発言。/who 接続者、/wire 番号 本文 で個別送信、/leave で戻ります。\r\n");break;
     case TERM_SCREEN:
-        mmm_say(s,"lang ja|en / size COLUMNS ROWS / save / load / profile [USER] / set FIELD VALUE   .: back\r\n",
-              "lang ja|en 言語 / size 列 行 / save 保存 / load 読込 / profile [会員] / set 項目 値   .: 戻る\r\n");break;
+        mmm_say(s,"lang ja|en / size COLUMNS ROWS / save / load / profile [USER] / set FIELD VALUE   .: back\r\nfind TEXT / findfield FIELD TEXT / ingroup GROUP / privacy FIELD private|members|monthday\r\n",
+              "lang ja|en 言語 / size 列 行 / save 保存 / load 読込 / profile [会員] / set 項目 値   .: 戻る\r\nfind 検索 / findfield 項目 語句 / ingroup グループ / privacy 項目 private|members|monthday\r\n");break;
     case GAMES_SCREEN: mmm_say(s,"Select a game number. Enter refreshes, . returns.\r\n",
                              "番号で起動。Enterで再表示、. で戻る。\r\n");break;
+    case MANAGE_SCREEN: mmm_manage_menu(s);break;
     case NEW_SCREEN: mmm_say(s,"Number: read   more: next page   .: back\r\n",
                            "番号で読む   more: 次のページ   .: 戻る\r\n");break;
     }
@@ -94,8 +95,8 @@ static void help(Session *s,const char *topic) {
     if(s->core.user && (mmm_view(s)->screen==MAIN_SCREEN || mmm_view(s)->screen==NOTES_SCREEN))
         mmm_say(s,"notes / go / open / post / mail / filer / chat / term / profile / games / scanlist / new [-n] / setsequencer / logout / off [-n] / ui\r\n",
               "notes / go / open / post / mail / filer / chat / term / profile / games / scanlist / new [-n] / setsequencer / logout / off [-n] / ui\r\n");
-    if(s->core.admin && mmm_view(s)->screen==MAIN_SCREEN)
-        mmm_say(s,"boardlabel BOARD [LABEL|NONE]\r\n","boardlabel ボード番号 [ラベル|NONE]\r\n");
+    if(s->core.user)mmm_say(s,"pfile: session personal file / regsign: signature\r\n","pfile: 接続中のパーソナルファイル / regsign: 署名\r\n");
+    if(s->core.admin || s->core.sigop)mmm_say(s,"manage: board and member administration\r\n","manage: ボード・会員の管理\r\n");
 }
 
 OperationRequest *mmm_request(Session *s,char op) {
@@ -203,7 +204,48 @@ static void discard_draft(MmmUi *m) {
 void mmm_clear_composition(MmmUi *m) {
     discard_draft(m);
     m->mail_to=m->mail_parent=m->mail_revision=0;
+    m->note_board=m->note_draft_revision=m->post_parent=0;
+    m->pfile_editing=m->signature_editing=0;
     memset(&m->attachments,0,sizeof(m->attachments));
+}
+
+void mmm_pfile_append(Session *s,const char *text,size_t size) {
+    MmmUi *m=mmm_state(s);
+    size_t used=strlen(m->pfile);
+    if(size>MMM_PFILE_MAX-used) {
+        mmm_say(s,"Personal file is full.\r\n","パーソナルファイルの容量を超えます。\r\n");return;
+    }
+    memcpy(m->pfile+used,text,size);
+    m->pfile[used+size]=0;
+    mmm_say(s,"Saved to the personal file.\r\n","パーソナルファイルに保存しました。\r\n");
+}
+
+static void personal_file(Session *s,const char *arg) {
+    MmmUi *m=mmm_state(s);
+    if(!*arg) {
+        char used[80];
+        snprintf(used,sizeof(used),"Personal file: %zu / %u bytes\r\n",strlen(m->pfile),MMM_PFILE_MAX);
+        session_impl_queue_text(s,used);
+        mmm_say(s,"-t: view  -e: edit  -d confirm: clear\r\n","-t 表示  -e 編集  -d confirm 消去\r\n");
+    } else if(!strcmp(arg,"-t"))session_impl_queue_text(s,m->pfile);
+    else if(!strcmp(arg,"-e")) {
+        mmm_clear_composition(m);
+        strcpy(m->body,m->pfile);m->pfile_editing=1;m->input=INPUT_EDITOR;
+    } else if(!strcmp(arg,"-d confirm")) {
+        OPENSSL_cleanse(m->pfile,sizeof(m->pfile));
+        mmm_say(s,"Personal file cleared.\r\n","パーソナルファイルを消去しました。\r\n");
+    } else mmm_bad_service_command(s);
+}
+
+static void signature_command(Session *s,const char *arg) {
+    if(!*arg || !strcmp(arg,"-t") || !strcmp(arg,"-e")) {
+        mmm_simple_operation(s,BOARD_NOTE_VIEW,'g',0,!strcmp(arg,"-e")?JOB_SIGNATURE_EDIT:JOB_SIGNATURE);
+        return;
+    }
+    int mode=!strcmp(arg,"-a")?'a':!strcmp(arg,"-n")?'n':!strcmp(arg,"-d confirm")?'g':0;
+    if(!mode) { mmm_bad_service_command(s);return; }
+    OperationRequest *q=mmm_request(s,BOARD_NOTE_VIEW);
+    if(q) { q->action='G';q->scope=mode;mmm_submit(s,q,JOB_SIGNATURE); }
 }
 
 static void editorial(Session *s,char *text) {
@@ -226,10 +268,29 @@ static void editorial(Session *s,char *text) {
         return;
     }
     if(!strcmp(text,"w")) {
+        if(m->signature_editing) {
+            if(strlen(m->body)>MMM_SIGNATURE_MAX) {
+                mmm_say(s,"Signature exceeds 2048 bytes.\r\n","署名は2048バイト以内です。\r\n");return;
+            }
+            OperationRequest *q=mmm_request(s,BOARD_NOTE_VIEW);
+            if(q) {
+                q->action='G';q->scope='g';strcpy(q->body,m->body);mmm_submit(s,q,JOB_SIGNATURE_SAVE);
+            }
+            return;
+        }
+        if(m->pfile_editing) {
+            if(strlen(m->body)>MMM_PFILE_MAX) {
+                mmm_say(s,"Personal file is full.\r\n","パーソナルファイルの容量を超えます。\r\n");return;
+            }
+            OPENSSL_cleanse(m->pfile,sizeof(m->pfile));
+            mmm_pfile_append(s,m->body,strlen(m->body));mmm_clear_composition(m);m->input=INPUT_NONE;return;
+        }
         if(!*m->body) { mmm_say(s,"Enter a body before saving.\r\n","本文を入力してください。\r\n");return; }
         OperationRequest *q=mmm_request(s,m->mail_to?'m':'P');
         if(q) {
             q->number=m->mail_to?m->mail_to:m->post_parent;
+            q->append_signature=(m->mail_to || m->post_parent)!=0;
+            if(!m->mail_to)q->board=m->note_board;
             if(m->mail_to) {
                 q->action='S';q->cursor=m->mail_parent;q->mail_revision=m->mail_revision;
                 q->mail_attachments=m->attachments;
@@ -239,6 +300,20 @@ static void editorial(Session *s,char *text) {
         return;
     }
     if(!strcmp(text,"q")) { mmm_clear_composition(m);m->input=INPUT_NONE;return; }
+    if(!strcmp(text,"g") && !m->pfile_editing) {
+        if(!*m->pfile || editor_apply(&d,EDITOR_APPEND_BLOCK,0,0,m->pfile)!=EDITOR_OK)
+            mmm_say(s,"Cannot insert the personal file.\r\n","パーソナルファイルを取り込めません。\r\n");
+        else mmm_say(s,"Personal file inserted.\r\n","パーソナルファイルを取り込みました。\r\n");
+        return;
+    }
+    if(!m->pfile_editing && !m->signature_editing && !m->mail_to && !strcmp(text,"s")) {
+        OperationRequest *q=mmm_request(s,'w');
+        if(q) {
+            q->board=m->note_board;q->number=m->post_parent;q->cursor=m->note_draft_revision;
+            strcpy(q->title,m->title);strcpy(q->body,m->body);mmm_submit(s,q,JOB_NOTE_DRAFT_SAVE);
+        }
+        return;
+    }
     if(m->mail_to && (!strcmp(text,"s") || !strncmp(text,"attach ",7) || !strncmp(text,"detach ",7))) {
         uint32_t id=0;
         if(text[1] && !mmm_number(text+7,&id))goto syntax;
@@ -291,8 +366,8 @@ static void editorial(Session *s,char *text) {
         }
     }
 syntax:
-    mmm_say(s,"l/p [range], a/u, i[number], d[range], r[range] OLD NEW, w, q\r\n",
-          "l/p [範囲]、a/u、i[行]、d[範囲]、r[範囲] 旧 新、w 保存、q 破棄\r\n");
+    mmm_say(s,"l/p [range], a/u, i[number], d[range], r[range] OLD NEW, s draft, w, q\r\n",
+          "l/p [範囲]、a/u、i[行]、d[範囲]、r[範囲] 旧 新、s 下書き、w 保存、q 破棄\r\n");
 }
 
 static void send_password(Session *s,const char *text) {
@@ -390,12 +465,41 @@ static void open_command(Session *s,char *arg) {
     MmmOpen command;
     if(!mmm_open_parse(arg,&command)) { mmm_bad_service_command(s);return; }
     static const MmmBoardAction actions[]={OPEN_INDEX,OPEN_BASE,OPEN_NEW,OPEN_NEW_OR_INDEX};
-    if(command.mode==MMM_OPEN_ARTICLE)mmm_state(s)->target=command.article;
-    enter_board(s,command.board,actions[command.mode]);
+    MmmUi *m=mmm_state(s);
+    m->continuous=command.continuous;m->stream_paused=0;m->stream_all=command.all;
+    m->stream_is_board=command.continuous;
+    if(command.mode==MMM_OPEN_ARTICLE)m->target=command.article;
+    enter_board(s,command.board,command.continuous?OPEN_NEW:actions[command.mode]);
+    if(!s->core.pending && m->input!=INPUT_BOARD_PASSWORD)m->continuous=m->stream_is_board=0;
 }
 
 static int open_new_only(const MmmUi *m) {
     return m->action==OPEN_NEW || m->action==OPEN_NEW_OR_INDEX;
+}
+
+static void note_draft_command(Session *s,const char *arg) {
+    if(!*arg)mmm_simple_operation(s,'d',0,0,JOB_NOTE_DRAFT_STATUS);
+    else if(!strcmp(arg,"resume"))mmm_simple_operation(s,'o',0,0,JOB_NOTE_DRAFT);
+    else if(!strcmp(arg,"drop confirm"))mmm_simple_operation(s,'d',0,0,JOB_NOTE_DRAFT_DROP);
+    else mmm_bad_service_command(s);
+}
+
+static void note_change(Session *s,char *arg,int withdraw) {
+    char *value=arg;
+    while(*value && *value!=' ' && *value!='\t')value++;
+    if(*value)*value++=0;
+    while(*value==' ' || *value=='\t')value++;
+    uint32_t id;
+    if(!mmm_number(arg,&id) || !*value || !mmm_ui_text_valid(value,80) ||
+       (withdraw && strcmp(value,"confirm"))) {
+        mmm_bad_service_command(s);return;
+    }
+    OperationRequest *q=mmm_request(s,'Z');
+    if(q) {
+        q->action=withdraw?1:2;q->number=id;q->cursor=withdraw?1:0;
+        if(!withdraw)strcpy(q->title,value);
+        mmm_submit(s,q,JOB_NOTE_CHANGE);
+    }
 }
 
 static void scanlist_command(Session *s,char *arg) {
@@ -504,18 +608,30 @@ static void command(Session *s,char *text) {
             OperationRequest *q=mmm_request(s,BOARD_NOTE_VIEW);
             if(q) {
                 q->action='C';q->scope=1;
-                if(mmm_submit(s,q,JOB_NEW_BEGIN))m->new_all=*input.argument!=0;
+                if(mmm_submit(s,q,JOB_NEW_BEGIN)) {
+                    m->continuous=*input.argument!=0;m->stream_paused=m->stream_is_board=0;
+                }
             }
         } else mmm_bad_service_command(s);
         break;
+    case MMM_MANAGE:
+        if(s->core.admin || s->core.sigop) { m->screen=MANAGE_SCREEN;mmm_menu(s,1); }
+        else mmm_say(s,"Management access denied.\r\n","管理操作の権限がありません。\r\n");
+        break;
+    case MMM_PFILE: personal_file(s,input.argument);break;
+    case MMM_SIGNATURE: signature_command(s,input.argument);break;
+    case MMM_DRAFT: note_draft_command(s,input.argument);break;
+    case MMM_RETITLE: case MMM_WITHDRAW:
+        note_change(s,input.argument,input.command==MMM_WITHDRAW);break;
     case MMM_SCANLIST: scanlist_command(s,input.argument);break;
     case MMM_BOARDLABEL: boardlabel_command(s,input.argument);break;
     case MMM_SEQUENCER: {
         if(!*input.argument) { mmm_simple_operation(s,BOARD_NOTE_VIEW,'C',0,JOB_SEQUENCE);break; }
         uint64_t stamp=0;
         if(strcmp(input.argument,"reset") && !date_filter(input.argument,&stamp)) { mmm_bad_service_command(s);break; }
-        OperationRequest *q=mmm_request(s,BOARD_NOTE_VIEW);
-        if(q) { q->action='T';q->until=stamp;mmm_submit(s,q,JOB_SEQUENCE); }
+        m->session_since=stamp;m->sequence_override=1;
+        char display[80];snprintf(display,sizeof(display),"Sequencer: %llu (session)\r\n",(unsigned long long)stamp);
+        session_impl_queue_text(s,display);
         break;
     }
     case MMM_AMBIGUOUS: mmm_say(s,"Ambiguous command.\r\n","コマンドの省略が曖昧です。\r\n");break;
@@ -578,11 +694,20 @@ static void line(Session *s,char *text,size_t size) {
 static int keys(const Session *s) {
     const MmmUi *m=mmm_view(s);
     return s->core.user && m->input==INPUT_NONE &&
-           (m->screen==INDEX_SCREEN || m->screen==OPEN_SCREEN);
+           (m->screen==INDEX_SCREEN || m->screen==OPEN_SCREEN ||
+            (m->screen==NEW_SCREEN && (m->continuous || m->stream_paused)));
 }
 
 static void key(Session *s,unsigned char ch) {
     MmmUi *m=mmm_state(s);
+    if(m->screen==NEW_SCREEN && (m->continuous || m->stream_paused)) {
+        if(m->continuous && ch!=' ' && ch!=17 && ch!=19)mmm_stream_pause(s);
+        else if(m->stream_paused && (ch=='c' || ch=='C')) { m->stream_paused=0;m->continuous=1; }
+        else if(m->stream_paused && (ch=='q' || ch=='/' || ch==4)) {
+            m->stream_paused=m->stream_is_board=0;m->screen=MAIN_SCREEN;mmm_menu(s,1);
+        }
+        mmm_prompt(s);return;
+    }
     int index=m->screen==INDEX_SCREEN;
     if(ch=='f' || (!index && ch=='\'')) {
         m->search_responses=ch=='\'';m->input=INPUT_FIND;
@@ -595,6 +720,10 @@ static void key(Session *s,unsigned char ch) {
         if(ch=='q' || ch==4) { m->screen=BOARD_SCREEN;mmm_menu(s,1); }
         else if(ch=='?' || ch=='&')help(s,"");
         else if(ch=='w')prepare_post(s,index?0:m->root);
+        else if(ch=='s' && !index && m->article) {
+            OperationRequest *q=mmm_request(s,'Z');
+            if(q) { q->action=5;q->number=m->article;mmm_submit(s,q,JOB_PFILE_APPEND); }
+        }
         else if(ch=='b')m->input=INPUT_NOTE;
         else if(ch=='i' && !index)index_page(s,m->page_start);
         else if(ch=='l' || ch=='L' || ch=='\t')
@@ -709,16 +838,21 @@ static void render_scanlist(Session *s,const MmmScanList *list) {
     for(unsigned i=0;i<list->count;i++) {
         const MmmScanBoard *row=&list->rows[i];
         char text[150];
-        snprintf(text,sizeof(text),"%u  #%u%s%s  %s\r\n",i+1,row->board,*row->label?" @":"",row->label,row->title);
+        const char *mode=row->mode==MMM_SCAN_INDEX?" -i":row->mode==MMM_SCAN_FALLBACK?" -x":"";
+        snprintf(text,sizeof(text),"%u  #%u%s%s  %s%s\r\n",i+1,row->board,*row->label?" @":"",row->label,row->title,mode);
         session_impl_queue_text(s,text);
     }
 }
 
 static void begin_new(Session *s,const OperationResult *r,const MmmScanList *list) {
     MmmUi *m=mmm_state(s);
-    m->new_since=m->new_all?0:r->since;m->new_until=r->until;
+    m->new_since=m->sequence_override?m->session_since:r->since;m->new_until=r->until;
+    m->stream_at=m->stream_next=m->stream_seen=0;
     m->scan_custom=list->custom;m->scan_count=list->count;m->scan_at=0;
-    for(unsigned i=0;i<list->count;i++)m->scan_boards[i]=list->rows[i].board;
+    m->scan_had_match=m->scan_index=0;
+    for(unsigned i=0;i<list->count;i++) {
+        m->scan_boards[i]=list->rows[i].board;m->scan_modes[i]=list->rows[i].mode;
+    }
     m->screen=NEW_SCREEN;m->row_count=0;m->service_next=0;
     mmm_new_page(s,0);
 }
@@ -751,12 +885,18 @@ static void result(Session *s,const OperationResult *r,SessionResultView project
     }
     if(projection.status!=SESSION_RESULT_OK) {
         if(job==JOB_TRANSFER)s->connection.zmodem_start=0;
+        if(job==JOB_STREAM_READ) { mmm_prompt(s);return; }
+        if(job==JOB_STREAM_SEEN) { m->stream_seen=0;mmm_stream_pause(s); }
+        if(job==JOB_NAMED || job==JOB_BOARD || job==JOB_UNLOCK ||
+           job==JOB_NEW_BEGIN || job==JOB_NEW_PAGE || job==JOB_OPEN_WINDOW)
+            m->continuous=m->stream_paused=m->stream_is_board=0;
         if(job==JOB_OFF)
             mmm_say(s,"Could not save the sequencer. Retry off, or use off -n.\r\n",
                   "巡回時刻を保存できません。off で再試行するか、off -n で終了してください。\r\n");
         switch(job) {
         case JOB_AUTH: case JOB_UNLOCK: mmm_say(s,"Authentication or registration denied.\r\n","認証または登録が拒否されました。\r\n");break;
         case JOB_OFF: break;
+        case JOB_GAME: mmm_door_result(s,r,NULL);break;
         default: mmm_say(s,"The operation is unavailable.\r\n","この操作は利用できません。\r\n");break;
         }
         mmm_prompt(s);return;
@@ -800,10 +940,56 @@ static void result(Session *s,const OperationResult *r,SessionResultView project
             render_article(s,c,projection.body);
         } else mmm_say(s,"Note is unavailable.\r\n","記事を表示できません。\r\n");
         break;
-    case JOB_PREPARE: mmm_clear_composition(m);m->input=INPUT_TITLE;break;
+    case JOB_PREPARE: {
+        uint32_t parent=m->post_parent;
+        mmm_clear_composition(m);
+        m->post_parent=parent;m->note_board=s->core.board;m->input=INPUT_TITLE;
+        break;
+    }
+    case JOB_NOTE_DRAFT_STATUS:
+        if(r->draft_revision)mmm_say(s,"Article draft saved. Use draft resume.\r\n","記事の下書きがあります。draft resume で再開できます。\r\n");
+        else mmm_say(s,"No article draft.\r\n","記事の下書きはありません。\r\n");
+        break;
+    case JOB_NOTE_DRAFT_DROP:
+        if(r->draft_revision) {
+            OperationRequest *q=mmm_request(s,'X');
+            if(q) { q->cursor=r->draft_revision;mmm_submit(s,q,JOB_NOTE_DRAFT_DROPPED); }
+        } else mmm_say(s,"No saved article draft.\r\n","保存済みの記事下書きはありません。\r\n");
+        break;
+    case JOB_NOTE_DRAFT_DROPPED:
+        mmm_say(s,"Article draft removed.\r\n","記事の下書きを削除しました。\r\n");break;
+    case JOB_NOTE_DRAFT:
+        if(r->draft_loaded) {
+            mmm_clear_composition(m);
+            m->note_board=r->board;m->note_draft_revision=r->draft_revision;m->post_parent=r->draft_parent;
+            strcpy(m->title,r->draft_title);strcpy(m->body,r->draft_body);m->input=INPUT_EDITOR;
+        } else mmm_say(s,"No article draft.\r\n","記事の下書きはありません。\r\n");
+        break;
+    case JOB_NOTE_DRAFT_SAVE:
+        m->note_draft_revision=r->draft_revision;
+        mmm_say(s,"Article draft saved.\r\n","記事の下書きを保存しました。\r\n");break;
+    case JOB_NOTE_CHANGE:
+        mmm_say(s,"Article updated.\r\n","記事を更新しました。\r\n");break;
+    case JOB_MANAGE: session_impl_queue_text(s,r->text);break;
+    case JOB_SIGNATURE_EDIT:
+        mmm_clear_composition(m);
+        strcpy(m->body,r->draft_body);m->signature_editing=1;m->input=INPUT_EDITOR;
+        break;
+    case JOB_SIGNATURE_SAVE:
+        mmm_clear_composition(m);m->input=INPUT_NONE;
+        mmm_say(s,"Signature saved.\r\n","署名を保存しました。\r\n");break;
+    case JOB_SIGNATURE:
+        if(r->service_number)mmm_say(s,"Signature: automatic.\r\n","署名: 自動挿入。\r\n");
+        else mmm_say(s,"Signature: manual.\r\n","署名: 自動挿入なし。\r\n");
+        session_impl_queue_text(s,r->draft_body);break;
+    case JOB_PFILE_APPEND: case JOB_PFILE_MAIL:
+        if(projection.content && (projection.content->kind==2 || projection.content->state==ARTICLE_VISIBLE))
+            mmm_pfile_append(s,projection.body,projection.content->size);
+        else mmm_say(s,"Message is unavailable.\r\n","メッセージを取得できません。\r\n");
+        break;
     case JOB_POST: {
         char text[48];snprintf(text,sizeof(text),"Saved #%u\r\n",s->core.current);
-        session_impl_queue_text(s,text);discard_draft(m);m->input=INPUT_NONE;
+        session_impl_queue_text(s,text);mmm_clear_composition(m);m->input=INPUT_NONE;
         if(m->screen==INDEX_SCREEN)index_page(s,m->page_start);
         break;
     }
@@ -822,12 +1008,13 @@ static void result(Session *s,const OperationResult *r,SessionResultView project
             int mode=s->connection.zmodem_receive;
             MessageId ready=mode==2 || mode==10?MSG_ZMODEM_BATCH_READY:
                 mode==6 || mode==11 || mode==12?MSG_ZMODEM_BATCH_UPLOAD_READY:MSG_ZMODEM_READY;
-            session_impl_queue_text(s,message_text(m->language,ready));
+            if(s->connection.zmodem_protocol)mmm_say(s,"Start terminal transfer using the selected protocol.\r\n","選択した方式で端末の転送を開始してください。\r\n");
+            else session_impl_queue_text(s,message_text(m->language,ready));
         }
         break;
     case JOB_SEQUENCE: {
-        if(r->feedback.checkpoint_saved)m->sequence_read=0;
-        char stamp[64];snprintf(stamp,sizeof(stamp),"Sequencer: %llu\r\n",(unsigned long long)r->since);
+        char stamp[80];snprintf(stamp,sizeof(stamp),"Sequencer: %llu%s\r\n",
+            (unsigned long long)(m->sequence_override?m->session_since:r->since),m->sequence_override?" (session)":"");
         session_impl_queue_text(s,stamp);break;
     }
     case JOB_NEW_BEGIN:
@@ -836,14 +1023,29 @@ static void result(Session *s,const OperationResult *r,SessionResultView project
     case JOB_NEW_PAGE:
         if(page && page->kind==OPERATION_PAGE_ARTICLES) {
             const ArticlePage *news=&page->data.articles;
-            if(!news->count && news->next)mmm_new_page(s,news->next);
-            else if(!news->count && m->scan_custom && m->scan_at+1<m->scan_count) {
-                m->scan_at++;mmm_new_page(s,0);
-            } else mmm_render_news(s,news);
+            if(m->continuous || m->stream_paused) {
+                m->row_count=news->count;m->stream_at=0;m->stream_next=news->next;
+                for(unsigned i=0;i<news->count;i++)m->rows[i]=news->rows[i].id;
+            } else {
+                if(news->count)m->scan_had_match=1;
+                if(!news->count && news->next)mmm_new_page(s,news->next);
+                else if(!news->count && m->scan_custom && m->scan_at<m->scan_count &&
+                        m->scan_modes[m->scan_at]==MMM_SCAN_FALLBACK && !m->scan_had_match && !m->scan_index) {
+                    m->scan_index=1;mmm_new_page(s,0);
+                } else if(!news->count && m->scan_custom && m->scan_at+1<m->scan_count) {
+                    mmm_next_scan_board(s);mmm_new_page(s,0);
+                } else mmm_render_news(s,news);
+            }
         }
         break;
     case JOB_OPEN_WINDOW:
-        m->new_since=r->since;m->new_until=r->until;mmm_open_page(s,0);break;
+        m->new_since=m->sequence_override?m->session_since:r->since;m->new_until=r->until;
+        if(m->stream_is_board) {
+            m->screen=NEW_SCREEN;m->new_since=0;m->scan_custom=0;
+            m->row_count=m->stream_at=m->stream_next=m->stream_seen=0;
+            mmm_new_page(s,0);
+        } else mmm_open_page(s,0);
+        break;
     case JOB_OPEN_PAGE:
         if(page && page->kind==OPERATION_PAGE_ARTICLES)open_news_result(s,&page->data.articles);
         break;
@@ -854,10 +1056,18 @@ static void result(Session *s,const OperationResult *r,SessionResultView project
     case JOB_LABEL: session_impl_queue_text(s,r->text);break;
     case JOB_NEW_READ:
         if(projection.content && projection.content->state==ARTICLE_VISIBLE) {
-            if(!m->new_all)m->sequence_read=1;
+            m->sequence_read=1;
             render_article(s,projection.content,projection.body);
         } else mmm_say(s,"Note is unavailable.\r\n","記事を表示できません。\r\n");
         break;
+    case JOB_STREAM_READ:
+        if(projection.content && projection.content->state==ARTICLE_VISIBLE) {
+            render_article(s,projection.content,projection.body);
+            if(!m->stream_is_board)m->sequence_read=1;
+            m->stream_seen=projection.content->id;m->stream_seen_board=projection.content->board;
+        }
+        break;
+    case JOB_STREAM_SEEN: m->stream_seen=0;break;
     case JOB_OFF: if(r->feedback.checkpoint_saved)session_core_close(&s->core);break;
     default: break;
     }
@@ -917,8 +1127,23 @@ static void chat_kick(Session *s) {
     if(m->job==JOB_CHAT)m->chat_kicked=1;
     mmm_say(s,"You were removed from chat.\r\n","チャットから退出しました。\r\n");mmm_prompt(s);
 }
-static void ignored_mail(Session *s,uint32_t id,int deny,uint32_t rev) { (void)s;(void)id;(void)deny;(void)rev; }
-static void mail_arrived(Session *s,uint32_t id) { (void)s;(void)id; }
+static NotificationAudience mail_audience(const Session *s) {
+    const MmmUi *m=mmm_view(s);
+    unsigned blocked=(s->connection.door?NOTICE_DOOR:0) |
+        (s->connection.zmodem || s->connection.zmodem_start?NOTICE_TRANSFER:0) |
+        (s->connection.binary?NOTICE_BINARY:0) | (m->input!=INPUT_NONE?NOTICE_INPUT:0) |
+        (s->core.pending?NOTICE_PENDING:0) | (m->chatting?NOTICE_CHAT:0) |
+        (m->continuous?NOTICE_SCAN:0);
+    return (NotificationAudience){s->core.user,blocked,s->core.active,s->core.closing,1,0};
+}
+
+static void mail_preference(Session *s,uint32_t id,int deny,uint32_t revision) {
+    notification_mail_preference(&mmm_state(s)->notifications,s->core.user,id,deny,revision);
+}
+static void mail_arrived(Session *s,uint32_t id) {
+    NotificationAudience audience=mail_audience(s);
+    notification_mail_arrived(&mmm_state(s)->notifications,&audience,id);
+}
 static void transfer_finish(Session *s,int ok,unsigned id,uint64_t size,int recovery) {
     char text[152];
     if(ok)snprintf(text,sizeof(text),mmm_local(s,"Transfer complete: %u (%llu bytes).\r\n",
@@ -933,10 +1158,52 @@ static void transfer_receipt(Session *s,const char *text) {
     session_impl_queue_text(s,text);
 }
 void door_finish(Session *s) { if(mmm_view(s)->screen==GAMES_SCREEN)mmm_games(s,0);mmm_prompt(s); }
-static void tick(Session *s,uint64_t now) { (void)s;(void)now; }
+void mmm_stream_pause(Session *s) {
+    MmmUi *m=mmm_state(s);
+    if(!m->continuous)return;
+    m->continuous=0;m->stream_paused=1;
+    mmm_say(s,"Reading paused. C: continue  Q: exit\r\n","読み出しを中断しました。C: 続行 Q: 終了\r\n");
+}
+
+void mmm_stream_step(Session *s) {
+    MmmUi *m=mmm_state(s);
+    if(m->stream_seen) {
+        OperationRequest *q=mmm_request(s,'s');
+        if(q) {
+            q->board=m->stream_seen_board;q->number=m->stream_seen;
+            if(mmm_submit(s,q,JOB_STREAM_SEEN))return;
+        }
+        mmm_stream_pause(s);return;
+    }
+    if(!m->continuous)return;
+    if(m->stream_at<m->row_count) {
+        OperationRequest *q=mmm_request(s,'Z');
+        if(q) {
+            q->action=5;q->number=m->rows[m->stream_at];
+            if(mmm_submit(s,q,JOB_STREAM_READ)) { m->stream_at++;return; }
+        }
+        mmm_stream_pause(s);
+    } else if(m->stream_next)mmm_new_page(s,m->stream_next);
+    else if(!m->stream_is_board && m->scan_custom && m->scan_at+1<m->scan_count) {
+        mmm_next_scan_board(s);mmm_new_page(s,0);
+    } else {
+        m->continuous=m->stream_is_board=0;m->screen=MAIN_SCREEN;
+        mmm_say(s,"End of continuous reading.\r\n","連続読み出しを終了しました。\r\n");mmm_prompt(s);
+    }
+}
+
+static void tick(Session *s,uint64_t now) {
+    (void)now;
+    const MmmUi *m=mmm_view(s);
+    if(!s->core.pending && m->screen==NEW_SCREEN && (m->continuous || m->stream_seen) &&
+       (!s->connection.io.drained || s->connection.io.drained(s->connection.io.context)))mmm_stream_step(s);
+    NotificationAudience audience=mail_audience(s);
+    uint32_t arrivals=notification_mail_take(&mmm_state(s)->notifications,&audience);
+    if(arrivals) { mmm_say(s,"\r\nNew mail has arrived.\r\n","\r\n新着メールがあります。\r\n");mmm_prompt(s); }
+}
 static int keep_position(Session *s,const OperationResult *r) {
     (void)r;const MmmUi *m=mmm_view(s);
-    return m->job==JOB_BOARD && open_new_only(m);
+    return (m->job==JOB_BOARD && open_new_only(m)) || m->job==JOB_STREAM_READ || m->job==JOB_NOTE_DRAFT || m->job==JOB_PFILE_APPEND;
 }
 static int uppercase(const Session *s,const char *line,size_t size) { (void)s;(void)line;(void)size;return 0; }
 
@@ -976,7 +1243,7 @@ const SessionUiAdapter *session_ui_mmm(void) {
         .snapshot=snapshot,.cleanup=cleanup,.connector_line=unsupported_line,.binary_byte=unsupported_binary,
         .prepare_request=prepare,.preferences=preferences,.signature=signature,.scan_pause=noop,
         .scan_stop=noop,.board_refresh=refresh_board_list,.access_refresh=refresh_board_list,.chat_kick=chat_kick,.chat_event=mmm_chat_event,
-        .announce=session_impl_queue_text,.notify=notify,.mail_arrived=mail_arrived,.mail_notify=ignored_mail,
+        .announce=session_impl_queue_text,.notify=notify,.mail_arrived=mail_arrived,.mail_notify=mail_preference,
         .transfer_receipt=transfer_receipt,.transfer_finish=transfer_finish,.notice=notice,
         .enter=enter,.leave=noop,.can_leave=can_leave,.line=line,.keep_position=keep_position,.result=result,
         .emit=session_impl_queue_text,.prompt=mmm_prompt,.menu=mmm_menu,.help=help,.uppercase=uppercase,.tick=tick,.door_finish=door_finish,

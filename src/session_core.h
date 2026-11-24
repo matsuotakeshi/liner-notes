@@ -22,7 +22,8 @@ typedef struct {
     uint32_t current;
     uint32_t user;
     uint32_t board;
-    uint32_t user_epoch;
+    uint32_t user_epoch,mail_notify_revision;
+    int mail_notify_deny;
     unsigned member_level;
     int admin,sigop;
     char username[33];

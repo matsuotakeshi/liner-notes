@@ -158,6 +158,8 @@ ArticleOutcome article_search(const ArticleActor *,uint32_t board,uint32_t start
  * return at most 8 rows, total=0. start=0 means 1; an empty continuation is
  * valid. No body reads, acknowledgement or check-time/session mutation. */
 typedef enum { ARTICLE_HERE, ARTICLE_ALL, ARTICLE_SUBTREE } ArticleScope;
+ArticleOutcome article_news_filtered(const ArticleActor *,uint32_t board,ArticleScope scope,
+                                     uint32_t start,uint64_t since,uint64_t until,int unread,ArticlePage *);
 ArticleOutcome article_news(const ArticleActor *,uint32_t board,ArticleScope scope,
                             uint32_t start,uint64_t since,uint64_t until,ArticlePage *out);
 /* Borrowed exact-author/literal-query filter. "*" means any author/no term.

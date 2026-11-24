@@ -20,6 +20,10 @@ int main(void) {
     assert(parse("mail",0).command==MMM_UNKNOWN);
     assert(parse("filer",0).command==MMM_UNKNOWN);
     assert(parse("scanlist",0).command==MMM_UNKNOWN);
+    assert(parse("withdraw 4 confirm",0).command==MMM_UNKNOWN);
+    assert(parse("draft resume",1).command==MMM_DRAFT);
+    assert(parse("retitle 1 corrected",1).command==MMM_RETITLE);
+    assert(parse("manage",1).command==MMM_MANAGE);
     assert(parse("new",1).command==MMM_NEW);
     assert(parse("scanlist -d",1).command==MMM_SCANLIST);
     assert(parse("boardlabel",1).command==MMM_BOARDLABEL);
@@ -38,11 +42,22 @@ int main(void) {
     assert(mmm_open_parse(open_or,&spec) && spec.mode==MMM_OPEN_NEW_OR_INDEX && !strcmp(spec.board,"Retro music"));
     assert(!mmm_open_parse(open_bad,&spec));
     assert(mmm_open_parse(single,&spec) && spec.mode==MMM_OPEN_ARTICLE && spec.article==42);
+    char continuous[]="-n #4", continuous_all[]="-a -n @synth", all_only[]="-a #3", conflicting[]="-n -b4 #3";
+    assert(mmm_open_parse(continuous,&spec) && spec.continuous && !spec.all && !strcmp(spec.board,"#4"));
+    assert(mmm_open_parse(continuous_all,&spec) && spec.continuous && spec.all);
+    assert(!mmm_open_parse(all_only,&spec));
+    assert(!mmm_open_parse(conflicting,&spec));
     MmmScanTargets scan;
     char ordered[]="  #3\t@Synth 7 ",invalid[]="#3 @ #2";
     assert(mmm_scanlist_parse(ordered,&scan) && scan.count==3 && scan.targets[0].board==3 &&
            !strcmp(scan.targets[1].label,"Synth") && scan.targets[2].board==7);
     assert(!mmm_scanlist_parse(invalid,&scan));
+    char pattern[]="-x @syn* -i #7 !#2",bad_mode[]="-x !#2";
+    assert(mmm_scanlist_parse(pattern,&scan) && scan.count==3);
+    assert(scan.targets[0].mode==MMM_SCAN_FALLBACK && !strcmp(scan.targets[0].label,"syn*"));
+    assert(scan.targets[1].mode==MMM_SCAN_INDEX && scan.targets[1].board==7);
+    assert(scan.targets[2].exclude && scan.targets[2].board==2);
+    assert(!mmm_scanlist_parse(bad_mode,&scan));
     uint32_t first,last;
     int except;
     const char *rest;

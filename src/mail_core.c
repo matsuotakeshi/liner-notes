@@ -123,6 +123,16 @@ MailOutcome mail_core_delete(const MailActor *actor,uint32_t id) {
     if(!mailbox_remove(id,actor->user))return MAIL_CORE_STORAGE;
     mail_files_cleanup();return MAIL_CORE_OK;
 }
+MailOutcome mail_core_retract(const MailActor *actor,uint32_t id) {
+    MailOutcome result=authorize(actor);
+    if(result!=MAIL_CORE_OK)return result;
+    /* The mail worker serializes this check with read and delete. Both views and
+     * attachment authorization use the same existing durable deletion record. */
+    const MailMessage *item=mailbox_get(id,actor->user);
+    if(!item || item->sender!=actor->user || item->read)return store_failure();
+    if(!mailbox_remove(id,actor->user))return MAIL_CORE_STORAGE;
+    mail_files_cleanup();return MAIL_CORE_OK;
+}
 MailOutcome mail_core_attachment_select(const MailActor *actor,const MailAttachments *current,
                                         uint32_t id,int detach,MailAttachments *out) {
     if(!out)return MAIL_CORE_UNAVAILABLE;

@@ -19,12 +19,12 @@
 | 接続直後 | `login ID`、局が許可する場合は `register ID` |
 | 主メニュー | `1` メール、`2` ノート、`3` 保管庫、`4` チャット、`5` 設定、`6` ゲーム、`7` 終了。 `/` で主メニュー、 `.` で一つ上の階層 |
 | ボード | 番号で選択、 `L` で続き。通常ボードでは `1` で索引、 `2` で投稿、 `3` で子ボード |
-| ボードの直接指定 | `go #番号`、 `open [-i|-s|-x|-b番号] [ボード]`、 `post [ボード]`。ボードは番号、`@ラベル`、一意な表示名で指定可能。 `-s` は新着がなければ元の画面に戻り、`-x` は索引を表示 |
+| ボードの直接指定 | `go #番号`、 `open [-i|-s|-x|-b番号|-n [-a]] [ボード]`、 `post [ボード]`。ボードは番号、`@ラベル`、一意な表示名で指定可能。 `-s` は新着がなければ元の画面に戻り、`-x` は索引を表示 |
 | 索引・読書 | 画面に表示された番号や単独キーで操作。空白・Backspaceで移動、 `w` で投稿または返信、 `i` で索引、 `q` で読書終了 |
 | 読書中の検索 | `f/F` はベースノートの題名検索と続行、 `'` と `"` は返信の題名検索と続行。 `l/L` は共通の既読状態を使った未読移動 |
 | エディタ | `.` で本文入力を終えて編集へ。 `l/p` で表示、 `a/u/i` で追加・挿入、 `d` で削除、 `r` で文字列置換。 `w` で保存、 `q` で破棄 |
-| メール | `inbox`、`sent`、`unread`、`more`、`read ID`、`send USER`、`reply ID`、`delete ID confirm`。編集中に `s` で下書き保存、`attach ID` と `detach ID` で添付を選択。メール画面の `resume` で下書きを開き、`files` で添付用ファイルを確認。ZMODEMの `upload`、`uploadbatch`、`resumebatch`、`get ID`、`getall メール番号` |
-| 保管庫 | `cd パス`、`dirs`、`list`、`more`、`find *.TXT`、`info ID`、`text ID`、`unlock [パス]`。ZMODEMの `get ID`、`put [説明]`、`resume`、`putbatch`、`add ID`、`batch`、`clear` |
+| メール | `find 語句`、`news YYYY-MM-DD`、`notify [on|off]`、`killmail 番号 confirm`、`save 番号`。`inbox`、`sent`、`unread`、`more`、`read ID`、`send USER`、`reply ID`、`delete ID confirm`。編集中に `s` で下書き保存、`attach ID` と `detach ID` で添付を選択。メール画面の `resume` で下書きを開き、`files` で添付用ファイルを確認。ZMODEMの `upload`、`uploadbatch`、`resumebatch`、`get ID`、`getall メール番号` |
+| 保管庫 | `cd パス`、`dirs`、`list`、`more`、`find *.TXT`、`info ID`、`text ID`、`unlock [パス]`。ZMODEMの `get ID`、`put [説明]`、`resume`、`putbatch`、`add ID`、`batch`、`clear`。`protocol [方式]` から他の転送方式を選択できます。 |
 | チャット | 行入力で発言。 `/who` で接続一覧、`/wire ID 本文` で個別に送信、`/leave` で戻る |
 | 設定 | `lang ja|en`、`size 列 行`、`save`、`load`、`profile [USER]`、`set FIELD VALUE` |
 | ゲーム | 許可されたゲームを一覧し、番号または `play ID` で起動。終了時はゲーム一覧に復帰 |
@@ -37,8 +37,12 @@
 - `session_mmm.c` は画面遷移と編集・ノート読書、`session_mmm_services.c` は共通サービスとの接続を扱います。`mmm_input.c` が主メニューのコマンドと編集範囲を解析します。
 - ボード選択・投稿準備・実際の書き込み・一覧と本文の取得に既存の権限判定を適用します。読み取り用に追加した型付き要求はボード階層とノートの順序・題名検索を返します。非表示記事や閲覧権限のない記事はその候補から除外します。
 - 既存のWebUI等は従来のRAWハンドシェイクを使います。MMM既定の待受からRAWに入った接続にもCoreのログイン条件を適用し、その接続でのUI切替を禁止します。
-- MMMの新着基準は `news` のMMM専用種別に保存します。通常の `new` または `open -s/-x` で本文を表示した後の `off` がログイン時刻を自動保存します。同じ秒の投稿を飛ばさないよう境界秒を含めます。会員による明示的な時刻設定では `TZ` の日付を使います。
+- MMMの新着基準は `news` のMMM専用種別に保存します。`new`（`-n` で連続表示）または `open -s/-x` で本文を表示した後の `off` がログイン時刻を自動保存します。`setsequencer` の上書きは接続中だけ使います。同じ秒の投稿を飛ばさないよう境界秒を含めます。会員による明示的な時刻設定では `TZ` の日付を使います。
 - `mmm_scanlist` は会員・順番・ボード番号、`mmm_board_labels` はボード番号とラベルの対応を保存します。既存DBには表を追加し、論理バックアップと持ち出しに含めます。ACL、入室パスワード、削除状態をクエリごとに検査します。
 - 端末統合試験は `make test-mmm-ui test-mmm-services test-mmm-traversal test-mmm-input` で実行できます。転送試験ではテスト用ヘルパーで引数と完了応答を検証します。
 
-旧MMMのリスト内のワイルドカードやボード別の読書オプション、未読メールの撤回、パーソナルファイルと署名、旧ライン会議は今後の対象です。保管庫の転送入口はZMODEMです。MASHは別のUIプロファイルとして扱います。
+旧mmmの操作仕様は Revision 4.0 ユーザーマニュアルの `open`（「連続表示オプション」）、`new`、`scanlist`、`setsequencer`、`killmail`、`pfile` を参照しました。`-n` は連続表示です。Liner Notesの最大64ボード制限とボードACLも適用されます。パターンと除外指定は `mmm_scan_rules` に保存し、既存の巡回表と同じトランザクションに含めます。巡回中の展開結果にもACLを適用します。
+
+署名は `mmm_signatures` に保存し、自動付加を有効にすると返信とメールの確定時に共通Coreが適用します。
+
+未対応の範囲は旧版のライン会議、パーソナルファイルへの直接バイナリ受信です。MASHは別のUIプロファイルです。

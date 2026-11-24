@@ -19,6 +19,7 @@ void session_core_init(SessionCore *s,unsigned long id,int slot,int boards,int m
     memset(s,0,sizeof(*s));s->active=1;s->id=id;s->slot=slot;s->board_enabled=boards;s->member_mode=members;s->board=1;
 }
 static void clear_identity(SessionCore *s) {
+    s->mail_notify_revision=0;s->mail_notify_deny=0;
     s->user=s->user_epoch=s->current=0;s->board=1;s->username[0]=0;s->member_level=0;s->admin=s->sigop=0;
     memset(s->board_grants,0,sizeof(s->board_grants));session_core_clear_vault_grants(s);
 }

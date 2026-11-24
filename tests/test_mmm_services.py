@@ -64,7 +64,16 @@ def run(binary, vaultctl):
             with closing(Client(server.port)) as alice, closing(Client(server.port)) as bob:
                 login(alice, "alice", True)
                 login(bob, "bob", True)
+                bob.cmd("mail", MAIL)
+                assert b"notifications: off" in bob.cmd("notify off", MAIL)
+                bob.cmd(".", MAIN)
 
+                alice.cmd("regsign -e", b"Editor>> ")
+                alice.cmd("a", b"Text> ")
+                alice.cmd("Alice signature", b"Text> ")
+                alice.cmd(".", b"Editor>> ")
+                assert b"Signature saved" in alice.cmd("w", MAIN)
+                assert b"automatic" in alice.cmd("regsign -a", MAIN)
                 assert b"No messages" in alice.cmd("mail", MAIL)
                 alice.cmd("send bob", b"Title> ")
                 alice.cmd("MMM mail", b"Text> ")
@@ -76,9 +85,22 @@ def run(binary, vaultctl):
                 assert b"Mail sent" in alice.cmd("w", MAIL)
                 assert b"MMM mail" in alice.cmd("sent", MAIL)
                 assert b"MMM mail" in bob.cmd("1", MAIL)
-                assert b"private text" in bob.cmd("read 1", MAIL)
+                assert b"MMM mail" in bob.cmd("find private text", MAIL)
+                assert b"MMM mail" in bob.cmd("news 2000-01-01", MAIL)
+                assert b"unavailable" in bob.cmd("killmail 1 confirm", MAIL)
+                delivered = bob.cmd("read 1", MAIL)
+                assert b"private text" in delivered and b"Alice signature" in delivered
+                assert b"personal file" in bob.cmd("save 1", MAIL)
+                assert b"unavailable" in alice.cmd("killmail 1 confirm", MAIL)
                 bob.cmd("delete 1 confirm", MAIL)
                 assert b"No messages" in bob.cmd("inbox", MAIL)
+                alice.cmd("send bob", b"Title> ")
+                alice.cmd("retractable", b"Text> ")
+                alice.cmd("not seen", b"Text> ")
+                alice.cmd(".", b"Editor>> ")
+                assert b"Mail sent" in alice.cmd("w", MAIL)
+                assert b"retracted" in alice.cmd("killmail 2 confirm", MAIL)
+                assert b"retractable" not in bob.cmd("inbox", MAIL)
                 alice.cmd(".", MAIN)
                 bob.cmd(".", MAIN)
 
@@ -90,6 +112,10 @@ def run(binary, vaultctl):
                 if os.name == "posix":
                     transferred = alice.cmd("get 1", FILER)
                     assert b"HELPER=send:1:alice" in transferred and b"Transfer complete" in transferred
+                assert b"Protocol: xmodem-1k" in alice.cmd("protocol xmodem-1k", FILER)
+                assert b"one file" in alice.cmd("batch", FILER)
+                assert b"requires ZMODEM" in alice.cmd("resume", FILER)
+                alice.cmd("protocol zmodem", FILER)
                 alice.cmd(".", MAIN)
 
                 alice.cmd("chat", CHAT)
@@ -111,6 +137,13 @@ def run(binary, vaultctl):
                 alice.cmd("term", TERM)
                 assert b"Profile saved" in alice.cmd("set handle Alice-synth", TERM)
                 assert b"Alice-synth" in alice.cmd("profile", TERM)
+                assert b"Alice-synth" in alice.cmd("findfield handle Alice-synth", TERM)
+                assert b"Profile saved" in alice.cmd("set interests PrivateHobby", TERM)
+                assert b"Profile saved" in alice.cmd("privacy interests private", TERM)
+                bob.cmd("term", TERM)
+                assert b"PrivateHobby" not in bob.cmd("profile alice", TERM)
+                assert b"No matching profiles" in bob.cmd("find PrivateHobby", TERM)
+                bob.cmd(".", MAIN)
                 alice.cmd("lang ja", TERM)
                 alice.cmd("size 100 30", TERM)
                 assert b"LANG ja  SIZE 100 30" in alice.cmd("save", TERM)
@@ -119,6 +152,8 @@ def run(binary, vaultctl):
                 listing = bob.cmd("6", GAMES)
                 assert b"Fixture game" in listing and b"Restricted" not in listing
                 if os.name == "posix" and os.geteuid() != 0:
+                    assert b"Unknown game number" in bob.cmd("99", GAMES)
+                    assert b"Game access denied" in bob.cmd("2", GAMES)
                     assert b"GAME_USER=2:bob" in bob.cmd("1", b"GAME_USER=2:bob")
                     assert b"ANSWER=hello" in bob.cmd("hello", GAMES)
                 bob.cmd(".", MAIN)
@@ -130,9 +165,8 @@ def run(binary, vaultctl):
                 bob.until(NOTES)
                 bob.cmd("/", MAIN)
 
-                assert b"Sequencer fixture" in bob.cmd("new -n", NEW)
-                assert b"note from bob" in bob.cmd("1", NEW)
-                bob.cmd(".", MAIN)
+                streamed = bob.cmd("new -n", MAIN)
+                assert b"Sequencer fixture" in streamed and b"note from bob" in streamed
                 bob.send(b"off -n\r\n")
                 disconnected(bob)
                 assert checkpoints() == []
@@ -150,7 +184,7 @@ def run(binary, vaultctl):
             assert b"LANG ja  SIZE 100 30" in alice.cmd("term", TERM)
             alice.cmd(".", MAIN)
             assert b"Sequencer: 0" in alice.cmd("setsequencer reset", MAIN)
-            assert checkpoints() == [(1, 3, 0)]
+            assert checkpoints() == saved
         print("PASS: MMM mail drafts, filer, transfer handoff, chat, settings, Door and sequencer restart")
 
 

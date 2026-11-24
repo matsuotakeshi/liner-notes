@@ -50,9 +50,12 @@ void door_core_list(const DoorCatalog *catalog,unsigned level,DoorListing *listi
         item->id=game->id;item->seconds=game->seconds;strcpy(item->title,game->title);
     }
 }
-const DoorSpec *door_core_launch(const DoorCatalog *catalog,unsigned id,unsigned level,uint32_t user,int is_root) {
-    if(!user || is_root)return NULL;
+const DoorSpec *door_core_find(const DoorCatalog *catalog,unsigned id) {
     for(unsigned i=0;i<catalog->count;i++)
-        if(catalog->games[i].id==id && level>=catalog->games[i].level)return &catalog->games[i];
+        if(catalog->games[i].id==id)return &catalog->games[i];
     return NULL;
+}
+const DoorSpec *door_core_launch(const DoorCatalog *catalog,unsigned id,unsigned level,uint32_t user,int is_root) {
+    const DoorSpec *game=door_core_find(catalog,id);
+    return user && !is_root && game && level>=game->level?game:NULL;
 }

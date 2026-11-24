@@ -100,6 +100,17 @@ def run(binary):
             own = alice.cmd("scanlist", MAIN)
             assert own.index(b"#3 @retro.g") < own.index(b"#2 @synth"), own
             assert b"default" in bob.cmd("scanlist", MAIN)
+            assert b"Management access denied" in alice.cmd("manage", MAIN)
+            manage = b"MANAGE>> "
+            assert b"boardset" in admin.cmd("manage", manage)
+            assert b"owner" in admin.cmd("members", manage)
+            admin.cmd(".", MAIN)
+            assert b"Scanlist saved." in alice.cmd("scanlist set -x @SYN* -i #3 !#2", MAIN)
+            matching = alice.cmd("scanlist", MAIN)
+            assert b"#3 @retro.g" in matching and b"-i" in matching and b"#2" not in matching
+            assert b"Retro item" in alice.cmd("new", NEW)
+            alice.cmd(".", MAIN)
+            assert b"Scanlist saved." in alice.cmd("scanlist set @retro.g #2", MAIN)
 
             first = alice.cmd("new", NEW)
             assert b"Retro item" in first and b"Sound item" not in first and b"General item" not in first, first
@@ -110,7 +121,7 @@ def run(binary):
             # Start another ordered traversal, then revoke the next board before
             # requesting its page. Inaccessible personal rows cannot select or
             # disclose inaccessible data, including after restarting.
-            assert b"Retro item" in alice.cmd("new -n", NEW)
+            assert b"Retro item" in alice.cmd("new", NEW)
             restrict_board(raw, 2, "Private sound")
             denied = alice.cmd("more", NEW)
             assert b"Sound item" not in denied and b"General item" not in denied and b"No matching" in denied, denied
@@ -141,7 +152,19 @@ def run(binary):
             login(alice, "alice")
             assert b"No readable boards" in alice.cmd("scanlist", MAIN)
             assert b"Scanlist saved." in alice.cmd("scanlist -d", MAIN)
-            assert b"General item" in alice.cmd("new -n", NEW)
+            assert b"General item" in alice.cmd("new", NEW)
+            first_note = alice.cmd("1", NEW)
+            assert b"general body" in first_note
+            alice.cmd(".", MAIN)
+            repeated = alice.cmd("open -n -a #1", MAIN)
+            assert b"general body" in repeated and b"End of continuous reading." in repeated
+            assert b"general body" not in alice.cmd("open -n #1", MAIN)
+            assert b"(session)" in alice.cmd("setsequencer 2000-01-01", MAIN)
+            assert b"(session)" in alice.cmd("setsequencer", MAIN)
+
+        with closing(start()) as server, closing(Client(server.port)) as alice:
+            login(alice, "alice")
+            assert b"(session)" not in alice.cmd("setsequencer", MAIN)
         print("PASS: MMM labels, ordered scanlists, -s/-x, live ACL revocation, restart and DB export")
 
 

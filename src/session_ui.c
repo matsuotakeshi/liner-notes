@@ -84,6 +84,7 @@ SessionUiSelection session_ui_select(Session *s,const char *name) {
     s->ui_binding.active->leave(s);s->ui_binding.active=c->adapters[i];s->ui_binding.state=s->ui_binding.states[i];
     s->core.login_required=s->ui_binding.active->login_required;
     s->ui_binding.active->enter(s,0,view.menu,view.language);
+    if(s->core.user)s->ui_binding.active->mail_notify(s,s->core.user,s->core.mail_notify_deny,s->core.mail_notify_revision);
     return SESSION_UI_SELECTED;
 }
 
@@ -122,6 +123,8 @@ void session_result(Session *s,const BoardResult *completion,uint64_t now) {
     int cancelled=s->ui_binding.active->keep_position(s,completion);
     SessionResultView view=session_core_receive(&s->core,completion,now,cancelled);
     if(view.status!=SESSION_RESULT_IGNORED && completion->auth)session_ui_discard_inactive(s);
+    if(view.status==SESSION_RESULT_OK && completion->mail_notify_user)
+        session_mail_notify(s,completion->mail_notify_user,completion->mail_notify_deny,completion->mail_notify_revision);
     if(view.status!=SESSION_RESULT_IGNORED)s->ui_binding.active->result(s,completion,view,now,cancelled);
     if(view.status==SESSION_RESULT_OK && (completion->auth>0 || completion->feedback.ui_profile_saved)) {
         memcpy(s->ui_binding.preferred,completion->ui_profile,sizeof(s->ui_binding.preferred));
@@ -210,7 +213,11 @@ void session_chat_kick(Session *s) { s->ui_binding.active->chat_kick(s); }
 void session_announce(Session *s,const char *text) { s->ui_binding.active->announce(s,text); }
 void session_notify(Session *s,MessageId id,uint32_t number,const char *body) { s->ui_binding.active->notify(s,id,number,body); }
 void session_mail_arrived(Session *s,uint32_t user) { s->ui_binding.active->mail_arrived(s,user); }
-void session_mail_notify(Session *s,uint32_t user,int deny,uint32_t revision) { s->ui_binding.active->mail_notify(s,user,deny,revision); }
+void session_mail_notify(Session *s,uint32_t user,int deny,uint32_t revision) {
+    if(!user || user!=s->core.user || revision<s->core.mail_notify_revision)return;
+    s->core.mail_notify_deny=deny;s->core.mail_notify_revision=revision;
+    s->ui_binding.active->mail_notify(s,user,deny,revision);
+}
 void session_transfer_receipt(Session *s,const char *text) { s->ui_binding.active->transfer_receipt(s,text); }
 void session_zmodem_finish(Session *s,int ok,unsigned id,uint64_t size,int recovery) {
     s->connection.zmodem=0;s->connection.zmodem_start=0;
