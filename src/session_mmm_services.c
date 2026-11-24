@@ -220,13 +220,27 @@ void mmm_games(Session *s,uint32_t id) {
     mmm_simple_operation(s,'}','J',id,JOB_GAME);
 }
 
-void mmm_new_page(Session *s,uint32_t cursor) {
+static void news_page(Session *s,uint32_t cursor,uint32_t board,int skip,MmmJob job) {
     const MmmUi *m=mmm_view(s);
     OperationRequest *q=mmm_request(s,BOARD_NOTE_VIEW);
     if(q) {
-        q->action='S';q->cursor=cursor;q->since=m->new_since;q->until=m->new_until;
-        mmm_submit(s,q,JOB_NEW_PAGE);
+        q->action='S';q->number=board;q->scope=skip;q->cursor=cursor;q->since=m->new_since;q->until=m->new_until;
+        mmm_submit(s,q,job);
     }
+}
+
+void mmm_new_page(Session *s,uint32_t cursor) {
+    const MmmUi *m=mmm_view(s);
+    if(m->scan_custom && m->scan_at>=m->scan_count) {
+        ArticlePage empty={0};
+        mmm_render_news(s,&empty);
+        return;
+    }
+    news_page(s,cursor,m->scan_custom?m->scan_boards[m->scan_at]:0,m->scan_custom,JOB_NEW_PAGE);
+}
+
+void mmm_open_page(Session *s,uint32_t cursor) {
+    news_page(s,cursor,mmm_view(s)->open_board,0,JOB_OPEN_PAGE);
 }
 
 void mmm_off(Session *s,int skip) {
@@ -456,6 +470,10 @@ void mmm_door_result(Session *s,const OperationResult *r,const OperationPage *pa
 void mmm_render_news(Session *s,const ArticlePage *page) {
     MmmUi *m=mmm_state(s);
     m->row_count=page->count;m->service_next=page->next;
+    if(m->scan_custom && !page->next && m->scan_at<m->scan_count) {
+        m->scan_at++;
+        if(m->scan_at<m->scan_count)m->service_next=1; /* First ID in the next board. */
+    }
     for(unsigned i=0;i<page->count;i++) {
         const ArticleSummary *row=&page->rows[i];
         m->rows[i]=row->id;

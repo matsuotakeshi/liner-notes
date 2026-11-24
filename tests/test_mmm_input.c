@@ -19,7 +19,10 @@ int main(void) {
     assert(parse("notes",0).command==MMM_UNKNOWN);
     assert(parse("mail",0).command==MMM_UNKNOWN);
     assert(parse("filer",0).command==MMM_UNKNOWN);
+    assert(parse("scanlist",0).command==MMM_UNKNOWN);
     assert(parse("new",1).command==MMM_NEW);
+    assert(parse("scanlist -d",1).command==MMM_SCANLIST);
+    assert(parse("boardlabel",1).command==MMM_BOARDLABEL);
     assert(parse("se",1).command==MMM_SEQUENCER);
     assert(parse("fi Manual/Downloads",1).command==MMM_FILER);
     assert(parse("  12  ",1).number==12);
@@ -29,6 +32,17 @@ int main(void) {
     assert(open.command==MMM_OPEN && !strcmp(open.argument,"-i Music.Synth"));
     assert(parse("open -?",1).usage);
     assert(parse("4294967296",1).command==MMM_UNKNOWN);
+    MmmOpen spec;
+    char open_new[]="-S @Synth",open_or[]="-x\tRetro music",open_bad[]="-s -x #3",single[]="-i -b42 #3";
+    assert(mmm_open_parse(open_new,&spec) && spec.mode==MMM_OPEN_NEW && !strcmp(spec.board,"@Synth"));
+    assert(mmm_open_parse(open_or,&spec) && spec.mode==MMM_OPEN_NEW_OR_INDEX && !strcmp(spec.board,"Retro music"));
+    assert(!mmm_open_parse(open_bad,&spec));
+    assert(mmm_open_parse(single,&spec) && spec.mode==MMM_OPEN_ARTICLE && spec.article==42);
+    MmmScanTargets scan;
+    char ordered[]="  #3\t@Synth 7 ",invalid[]="#3 @ #2";
+    assert(mmm_scanlist_parse(ordered,&scan) && scan.count==3 && scan.targets[0].board==3 &&
+           !strcmp(scan.targets[1].label,"Synth") && scan.targets[2].board==7);
+    assert(!mmm_scanlist_parse(invalid,&scan));
     uint32_t first,last;
     int except;
     const char *rest;

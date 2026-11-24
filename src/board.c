@@ -499,13 +499,23 @@ static void note_view(const BoardRequest *q,BoardResult *r) {
             q->action=='T'?member_core_mmm_set(&member,q->until):
             member_core_check_commit(&member,MEMBER_CHECK_MMM,"",q->until);
         if(status!=MEMBER_CORE_OK)member_result(status,r);
-        else if(q->action=='C') { r->since=window.since;r->until=window.until; }
+        else if(q->action=='C') {
+            r->since=window.since;r->until=window.until;
+            if(q->scope) {
+                MmmScanList page;
+                result=mmm_note_scanlist(&actor,&page);
+                if(result!=ARTICLE_OK)post_result(result,r);
+                else OPERATION_PAGE(r,MMM_SCANLIST,mmm_scanlist,page);
+            }
+        }
         else { r->feedback.checkpoint_saved=1;r->since=q->until; }
         return;
     }
     if(q->action=='S') {
         ArticlePage page;
-        result=article_news(&actor,q->board,ARTICLE_ALL,q->cursor,q->since,q->until,&page);
+        result=article_news(&actor,q->number,q->number?ARTICLE_HERE:ARTICLE_ALL,q->cursor,q->since,q->until,&page);
+        /* An entry can become unreadable halfway through an ordered scan. */
+        if(result==ARTICLE_BOARD_DENIED && q->scope)result=ARTICLE_OK;
         if(result==ARTICLE_OK)OPERATION_PAGE(r,ARTICLES,articles,page);
     } else if(q->action=='B') {
         ArticleBoardsPage page;
@@ -513,8 +523,22 @@ static void note_view(const BoardRequest *q,BoardResult *r) {
         if(result==ARTICLE_OK)OPERATION_PAGE(r,BOARDS,boards,page);
     } else if(q->action=='N') {
         uint32_t id;
-        result=article_board_named(&actor,q->title,&id);
+        result=q->title[0]=='@'?mmm_note_label_resolve(&actor,q->title+1,&id):article_board_named(&actor,q->title,&id);
         if(result==ARTICLE_OK)r->service_number=id;
+    } else if(q->action=='L') {
+        char label[MMM_LABEL_MAX+1];
+        result=mmm_note_label(&actor,q->number,q->scope?q->title:NULL,label);
+        if(result==ARTICLE_OK) {
+            r->service_number=q->number;
+            strcpy(r->service_text,label);
+            snprintf(r->text,sizeof(r->text),"BOARDLABEL %u %s\r\n",q->number,*label?label:"NONE");
+        }
+    } else if(q->action=='D') {
+        MmmScanList page;
+        result=mmm_note_scanlist(&actor,&page);
+        if(result==ARTICLE_OK)OPERATION_PAGE(r,MMM_SCANLIST,mmm_scanlist,page);
+    } else if(q->action=='W') {
+        result=mmm_note_scanlist_save(&actor,&q->mmm_scanlist);
     } else {
         ArticlePage page;
         result=article_browse_notes(&actor,q->board,q->number,q->cursor,q->descending,
@@ -909,6 +933,9 @@ static void post_result(ArticleOutcome result,BoardResult *r) {
     switch(result) {
     case ARTICLE_REVOKED: r->revoked=1;(r->feedback.failed=1,strcpy(r->text,"ERR session revoked\r\n"));break;
     case ARTICLE_LOGIN_REQUIRED: (r->feedback.failed=1,strcpy(r->text,"ERR login required\r\n"));break;
+    case ARTICLE_ADMIN_REQUIRED: (r->feedback.failed=1,strcpy(r->text,"ERR admin required\r\n"));break;
+    case ARTICLE_INVALID_QUERY: (r->feedback.failed=1,strcpy(r->text,"ERR command\r\n"));break;
+    case ARTICLE_SETTINGS_STORAGE: (r->feedback.failed=1,strcpy(r->text,"ERR settings storage\r\n"));break;
     case ARTICLE_BOARD_DENIED: (r->feedback.failed=1,strcpy(r->text,"ERR board unavailable\r\n"));break;
     case ARTICLE_POSTING_DENIED: (r->feedback.failed=1,strcpy(r->text,"ERR posting denied\r\n"));break;
     case ARTICLE_NOT_FOUND: (r->feedback.failed=1,strcpy(r->text,"ERR no parent\r\n"));break;

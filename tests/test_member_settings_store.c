@@ -6,11 +6,42 @@
 static sqlite3 *features_db;
 static int features_broken;
 #include "member_settings_store.inc"
+#include "mmm_notes_store.inc"
 static void sql(const char *text) { assert(sqlite3_exec(features_db,text,NULL,NULL,NULL)==SQLITE_OK); }
+
+static void mmm_names_and_order(void) {
+    sql(MMM_NOTES_SCHEMA);
+    char label[MMM_LABEL_MAX+1];uint32_t board;
+    assert(mmm_notes_label_get(2,label) && !*label);
+    assert(mmm_notes_label_save(2,"audio")==1);
+    assert(mmm_notes_label_save(3,"retro")==1);
+    assert(mmm_notes_label_save(3,"audio")==-1);
+    assert(mmm_notes_label_get(3,label) && !strcmp(label,"retro"));
+    assert(mmm_notes_label_lookup("audio",&board) && board==2);
+    assert(mmm_notes_label_save(2,"")==1);
+    assert(mmm_notes_label_lookup("audio",&board) && !board);
+
+    uint32_t boards[MMM_SCAN_MAX];unsigned count=99;
+    const uint32_t preferred[]={8,3,6},duplicate[]={2,2};
+    assert(mmm_notes_scanlist_replace(1,preferred,3));
+    assert(!mmm_notes_scanlist_replace(1,duplicate,2));
+    assert(mmm_notes_scanlist_load(1,boards,&count) && count==3 &&
+           !memcmp(boards,preferred,sizeof(preferred)));
+    assert(mmm_notes_scanlist_load(2,boards,&count) && !count);
+    sql("PRAGMA query_only=ON");
+    assert(!mmm_notes_scanlist_replace(1,NULL,0));
+    assert(mmm_notes_scanlist_load(1,boards,&count) && count==3);
+    sql("PRAGMA query_only=OFF");
+    assert(mmm_notes_scanlist_replace(1,NULL,0));
+    assert(mmm_notes_scanlist_load(1,boards,&count) && !count);
+    puts("PASS: unique MMM aliases, private scan order, atomic rollback and reset");
+}
+
 int main(void) {
     assert(sqlite3_open(":memory:",&features_db)==SQLITE_OK);
     sql("CREATE TABLE menu_preferences(id INTEGER PRIMARY KEY,value INTEGER);CREATE TABLE news(user INTEGER,kind INTEGER,stamp INTEGER NOT NULL,PRIMARY KEY(user,kind));CREATE TABLE news_scoped(user INTEGER,kind INTEGER,scope TEXT,stamp INTEGER NOT NULL,PRIMARY KEY(user,kind,scope));");
     sql(UI_PREFERENCE_SCHEMA);
+    mmm_names_and_order();
     char profile[32];assert(member_settings_repository_ui_get(1,profile) && !*profile);
     assert(member_settings_repository_ui_save(1,"future-ui"));
     assert(member_settings_repository_ui_get(1,profile) && !strcmp(profile,"future-ui"));

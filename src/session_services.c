@@ -53,6 +53,14 @@ int session_impl_message_result(Session *s,const BoardResult *completion,uint64_
 
 int session_impl_service_command(Session *s,char *line) {
     BoardRequest q={0};q.op='!';q.scope=rtbbs(s)->presentation.ui.enabled?(int)rtbbs(s)->presentation.ui.language+1:0;
+    if(!strncmp(line,"BOARDLABEL ",11)) {
+        const char *tail;
+        if(!session_impl_number_arg(line+11,&q.number,&tail) || (*tail && *tail!=' '))goto invalid;
+        while(*tail==' ')tail++;
+        if(strlen(tail)>MMM_LABEL_MAX || (*tail && !session_impl_safe_text(tail)))goto invalid;
+        q.op=BOARD_NOTE_VIEW;q.action='L';q.scope=*tail!=0;
+        strcpy(q.title,tail);session_impl_submit(s,&q);return 1;
+    }
     if(!strcmp(line,"GATHER") || !strcmp(line,"GATHER READ")) {
         q.action='G';session_impl_submit(s,&q);gather_flow_read_submitted(&rtbbs(s)->conversation.gather,!strcmp(line,"GATHER READ"),s->core.pending);return 1;
     }
