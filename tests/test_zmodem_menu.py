@@ -113,14 +113,14 @@ def run(binary,ctl,receiver,sender,rights=False):
             c.cmd('U',b'> ');c.cmd('ZMODEM',b'> ');c.cmd('',b'1 GiB.\r\n');code,out,err=transfer(c,sender,['--','payload-0.bin','payload-1.bin'],source);assert failed(out)
             assert not spool_contents(spool)
             # A private-talk attempt while the engine owns the wire is refused.
-            api.protocol.send('ONLINE');target=None
+            api.protocol.send('ONLINE');talk_connection=None
             for _ in range(32):
                 row=api.protocol.line()
                 if row==b'CHAT END':break
-                if row.startswith(b'CHAT WHO ') and b'bob' in row:target=int(row.split()[2])
-            assert target
+                if row.startswith(b'CHAT WHO ') and b'bob' in row:talk_connection=int(row.split()[2])
+            assert talk_connection
             c.cmd('U',b'> ');c.cmd('ZMODEM',b'> ');c.cmd('',b'1 GiB.\r\n')
-            api.protocol.request('TALK '+str(target),lambda x:x.startswith(b'CHAT TALK OPEN '))
+            api.protocol.request('TALK '+str(talk_connection),lambda x:x.startswith(b'CHAT TALK OPEN '))
             api.protocol.request('/SAY secret-during-transfer',lambda x:x.startswith(b'CHAT ERROR target'))
             api.protocol.request('//',lambda x:x==b'TALK CLOSED')
             s.expected_errors.append('ZMODEM failure: TIMEOUT')
