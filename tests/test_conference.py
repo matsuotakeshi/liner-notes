@@ -40,6 +40,9 @@ def run(binary):
             for name in ("alice", "bob", "guest"):
                 with closing(Raw(server.port)) as client:
                     auth(client, name, True)
+            with closing(Raw(server.port)) as anonymous:
+                anonymous.send(b"LINECONF\n")
+                anonymous.expect(b"ERR conference login required")
         (root / "admins").write_text("1\n", encoding="ascii")
 
         def start(data=root, default="rtbbs"):
@@ -57,15 +60,17 @@ def run(binary):
 
             anonymous = connect()
             anonymous.until(PROMPT)
-            assert b"conference login required" in anonymous.cmd("LINECONF")
-            assert b"conference login required" in anonymous.cmd("LINECONF POST 1 anonymous")
+            assert b"Log in to use the line conference." in anonymous.cmd("LINECONF")
+            assert b"Log in to use the line conference." in anonymous.cmd("LINECONF POST 1 anonymous")
+            anonymous.cmd("LANG ja")
+            assert "一行会議を利用するにはログインしてください。".encode() in anonymous.cmd("LINECONF")
             guest = connect("guest")
-            assert b"conference access denied" in guest.cmd("LINECONF")
-            assert b"conference access denied" in guest.cmd("LINECONF POST 1 guest")
+            assert b"Line conference access denied." in guest.cmd("LINECONF")
+            assert b"Line conference access denied." in guest.cmd("LINECONF POST 1 guest")
             alice, bob = connect("alice"), connect("bob")
             assert b"ROOM 1 General" in alice.cmd("LINECONF")
             assert b"LINECONF NEW" in alice.cmd("HELP LINECONF")
-            assert b"conference access denied" in bob.cmd("LINECONF CREATE 2 Lounge")
+            assert b"Line conference access denied." in bob.cmd("LINECONF CREATE 2 Lounge")
             assert b"CONFERENCE CREATED 2" in alice.cmd("LINECONF CREATE 2 Lounge")
             alice.cmd("UI mmm", b"UI preference saved.")
             alice.until(MAIN)
@@ -104,13 +109,13 @@ def run(binary):
             assert history.count(b"concurrent Alice")==1 and history.count(b"concurrent Bob")==1
 
             # Explicit failure must surface to the client without incrementing IDs.
-            assert b"ERR LINECONF syntax" in bob.cmd("LINECONF POST 1 " + "x"*513)
+            assert b"Check the LINECONF command." in bob.cmd("LINECONF POST 1 " + "x"*513)
             with closing(sqlite3.connect(root/"liner.sqlite")) as db, db:
                 db.execute("CREATE TRIGGER fail_conference BEFORE INSERT ON conference_lines "
                            "BEGIN SELECT RAISE(ABORT,'test write failure'); END;")
             try:
                 answer = bob.cmd("LINECONF POST 1 not durable")
-                assert b"ERR conference storage" in answer and b"SAVED" not in answer
+                assert b"The line conference storage operation failed." in answer and b"SAVED" not in answer
             finally:
                 with closing(sqlite3.connect(root/"liner.sqlite")) as db, db:
                     db.execute("DROP TRIGGER fail_conference")
@@ -133,7 +138,7 @@ def run(binary):
             rejected.until(PROMPT)
             rejected.cmd("LOGIN bob", b"> ")
             rejected.cmd(PASSWORD, PROMPT)
-            assert b"conference login required" in rejected.cmd("LINECONF")
+            assert b"Log in to use the line conference." in rejected.cmd("LINECONF")
 
         with closing(start()) as server, closing(Client(server.port)) as alice:
             login(alice, "alice")

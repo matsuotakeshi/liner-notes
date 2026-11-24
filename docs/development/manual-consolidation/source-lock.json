@@ -66,7 +66,7 @@
   "src/storage_sqlite.c": "effeafe5985446e82810d45759c8a5bcf2d9e61d6b573cb5e9837f901b36ac48",
   "src/telnet.c": "a490e550fb227858727b4edc656c7c1d60bf90f6fa13a2f74dd361234b8ff422",
   "src/transfer_line.c": "7da32dfcd4ffdbc67b05a7ffc463f0f03d67a8e1b6a17a47cf28297ea0c808a5",
-  "src/ui.c": "7777ec3f47ae457b9f59ff72e3bcbe260a89b85d88a84a9d26dcff211897387f",
+  "src/ui.c": "562a6b4e69513142a00770c85da87b62cb0ca1091447752790951bea1e9c67fb",
   "src/userlog.c": "989a93c9993e7b93aba2815214a1075b3cd37ddfa0712803eab4d9f940f6e58e",
   "src/vault.c": "797c144ebaca5938ba0c523227b654c41e3d6c83aa5042e756dc60d479ad6340",
   "src/vault.h": "9c8e22630fe3bc38aba5736455b067d272654b6c3f5884676f09283da591121e",
@@ -84,8 +84,8 @@
   "webui/deployment/apache.conf": "725cd6feb187808111277812b946eb208b4e94ff685bd5e340eda49c96e60f7f",
   "webui/example.toml": "a97e62182dc86eddaa67c7efe5df5d41426346d1ccc5d7a469d04591451fd27c",
   "webui/static/reports-ui.js": "44f7d9cdbec2eb1a0bfb7f01942b767593697e3f29385805a2e792ad31752065",
-  "src/locales/ja.def": "4e7b3cc5cce38694ce96b18e15e5977648bd2f2277362a115901f092f52cf951",
-  "src/locales/en.def": "da76de795b8d456cfc60fcbe5ca9e1bce7566aa2159fd69b245ffc0d13eef24f",
+  "src/locales/ja.def": "589e07e5526d4d8b248f9ff43aca727787d751bc52a4abdc59a275cee3fbccc9",
+  "src/locales/en.def": "5cf3c12ee70be10e2ea5f386cac97bd9555fef3922fab6a25680ba52a33bd219",
   "webui/static/app.js": "ff79c5ac310c835df7e13595f2027d4c4ee8e699fc77c5192b102cca33ddba8c",
   "linux/selinux/liner_notes.te": "949362e75d59ab1e9b1aa41efd8163f7af8834cb26fd1798832956fe1c0e5287",
   "linux/selinux/liner_notes.fc": "cddf5f896e47ade011c15299d61859415c69f8da56a760a2fd2de90b31833e37",
@@ -391,6 +391,6 @@
   "src/menu.c": "962c853e3c5acebd444fcbcd96e6a876932bb176f14f4bdb27638d7217c06624",
   "src/session_conference.c": "82306520e1deb927ca848754f1ae54b7702cd54dbcf3b01484236de314021c6c",
   "src/session_mmm_conference.c": "3895a5976210cb0ccc850419b08aa690a4048a231ac718fe0e7b1f8209118b99",
-  "tests/test_conference.py": "fe48f0a722d08e6b3ecfe97c14e013cf6004ea25b13416b780c5a60da4bf0f71",
+  "tests/test_conference.py": "6d3dd91f53863cec298456b5511644456136eb083776c5fdf0e2118e12bdbcf3",
   "tests/test_conference_core.c": "9e5953a794f4b13c67a784aa046b5b901b6052db2fc994d044c4c86f9131c629"
 }
