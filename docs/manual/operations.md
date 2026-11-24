@@ -2,7 +2,7 @@
 
 ## 起動状態を確認する
 
-次期版の`liner-notes-doctor --check-all`で設定・DB・権限・外部機能を読み取り専用で診断できます。終了コードと対象範囲は[設定診断](troubleshooting.md)を参照してください。停止や自動修正は行いません。
+0.75の`liner-notes-doctor --check-all`で設定・DB・権限・外部機能を読み取り専用で診断できます。終了コードと対象範囲は[設定診断](troubleshooting.md)を参照してください。停止や自動修正は行いません。
 
 FreeBSDは `service liner_notes status` と `sockstat -4l -P tcp`、Linuxは `systemctl status liner-notes`、`ss -ltnp`、`journalctl -u liner-notes` を使います。Web・リンクは別サービスです。監督プロセスが存在するだけで本体が待受中とは限りません。変更後は実際のログインまで確認します。
 

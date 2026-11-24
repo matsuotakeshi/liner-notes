@@ -1,8 +1,6 @@
 # Liner Notesの概要
 
-Liner Notesは、親記事と返信をツリーでたどるHyperNotes型掲示板です。会員間メール、ファイル保管庫、チャット、個別トーク、Gather伝言板、外部ゲームを備え、TelnetメニューとWebUIから同じBBSを利用します。公開マニュアルの対象は **安定版0.74.1**、文書改訂日は **2026-11-09** です。
-
-この開発ブランチの「次期版（未リリース）」節は共有ボードの削除伝播・全ボードの子孫不可視の変更を説明します。公開済み0.74.1の動作とは区別してください。
+Liner Notesは、親記事と返信をツリーでたどるHyperNotes型掲示板です。会員間メール、ファイル保管庫、チャット、個別トーク、Gather伝言板、外部ゲームを備え、TelnetメニューとWebUIから同じBBSを利用します。このマニュアルの対象は **0.75**、文書改訂日は **2026-11-24** です。
 
 ## 機能と入口
 
@@ -36,7 +34,8 @@ Telnet端末 ──────────────────────�
 | FreeBSD 15.1 / amd64 | ports・pkg、rc.d、Telnet、Web、PTY Door、管理ツール |
 | Rocky Linux 10.2 / x86_64 | RPM、本体・Web・リンクのsystemdサービス。SELinux有効環境での常駐確認あり |
 | Rocky Linux 9 / AlmaLinux 9 | Clang・Python 3.11によるソース構築とコンテナ上の回帰検査。RPM実機常駐確認とは別 |
-| Ubuntu、Solaris / illumos | この安定版の対応を保証する対象ではありません |
+| Ubuntu | ソース構築とネイティブ回帰試験 |
+| Oracle Solaris 11.4 CBE / x86-64 | [検証対象の機能と制約](install-solaris.md)を参照 |
 | Windows / DOS | ネイティブサービス、COM、Door互換実行の対応対象ではありません |
 
 本体はC、補助ツール・コネクタはPython 3.11以降を使用します。SQLite・OpenSSLと、選択機能に応じた依存ソフトが必要です。端末はUTF-8とANSI表示を前提にします。Telnetは暗号化されません。Web公開にはHTTPSを使用してください。
@@ -45,4 +44,4 @@ Liner NotesはGPL-3.0-onlyです。Web端末の同梱ライブラリにはMITラ
 
 ## この版に含まれないもの
 
-内蔵SSHサーバー、IPv6直接待受、Windows COM、DOS/FOSSIL互換実行、DOOR.SYS、旧RTBBS保存データの直接利用・変換は提供しません。FidoNet対応は計画対象から除外しています。FreeBSDのOpenSSH経由の入口は利用できます。物理モデムと全種類の外部ゲームの動作は、設置者が個別に確認してください。
+内蔵SSHはビルド時に選べる機能で、既定で待ち受けません。利用条件は[接続方式](connections.md)を参照してください。IPv6直接待受、Windows COM、DOS/FOSSIL互換実行、DOOR.SYS、旧RTBBS保存データの直接利用・変換は提供しません。FidoNet対応は計画対象から除外しています。物理モデムと外部ゲームの動作は、設置者が個別に確認してください。

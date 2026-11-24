@@ -22,7 +22,16 @@ def check(out):
     fail=lambda text:errors.append(text)
     if (DOC/'LICENSE').read_bytes()!=(ROOT/'LICENSE').read_bytes():fail('Canonical license copy differs')
     if set(p['chapter'] for p in m['pages'])!=set(range(1,8)):fail('Seven chapters required')
-    if not re.search(r'DISTVERSION=\s*'+re.escape(m['version'])+r'\s', (ROOT/'ports/comms/liner-notes/Makefile').read_text(encoding='utf8')):fail('Stable version differs from ports')
+    version=re.escape(m['version'])
+    version_sources={
+        'ports/comms/liner-notes/Makefile':r'^DISTVERSION=[ \t]*'+version+r'$',
+        'linux/rpm/liner-notes.spec':r'^Version:[ \t]*'+version+r'$',
+        'debian/changelog':r'\Aliner-notes \('+version+r'-[0-9]+\) ',
+    }
+    for name, pattern in version_sources.items():
+        if not re.search(pattern,(ROOT/name).read_text(encoding='utf8'),re.M):
+            fail('Manual version differs from '+name)
+    if m['source_commit']!='v'+m['version']:fail('Manual target tag differs from version')
     inventories=ROOT/'docs/development/manual-consolidation/inventory.json'
     if inventories.exists():
         inventory=json.loads(inventories.read_text(encoding='utf8'))

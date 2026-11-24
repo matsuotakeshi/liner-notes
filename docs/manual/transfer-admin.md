@@ -50,4 +50,4 @@ liner-notes-admin transfers reconcile --root /var/db/liner-notes/spool pending-I
 
 ## Solaris移植中のspool排他
 
-次期版のSolarisではspool直下に空の`.namespace-lock`を0600で保持します。これは転送データではなく、削除・復元の対象にできません。転送データを整理した後にも残る正常な管理ファイルです。手作業で削除・置換すると排他対象が変わるため操作しないでください。FreeBSD/Linuxでは従来のディレクトリflockを維持します。[Solarisの検証状況](install-solaris.md)を参照してください。
+Solarisではspool直下に空の`.namespace-lock`を0600で保持します。これは転送データではなく、削除・復元の対象にできません。転送データを整理した後にも残る正常な管理ファイルです。手作業で削除・置換すると排他対象が変わるため操作しないでください。FreeBSD/Linuxでは従来のディレクトリflockを維持します。[Solarisの検証状況](install-solaris.md)を参照してください。
