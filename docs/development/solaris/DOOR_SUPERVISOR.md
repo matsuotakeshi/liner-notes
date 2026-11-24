@@ -85,4 +85,6 @@ released features.
 See the [direct Solaris test record](evidence/door-supervisor-20261124.txt)
 for the candidate build, worker shutdown and staged manifest checks.
 See the [reviewed-main acceptance record](evidence/door-main-smf-20261124.txt)
-for native SMF start/stop and the remaining BBS cleanup regression.
+for native SMF start/stop and the original BBS cleanup failure. The
+[final BBS acceptance record](evidence/door-acceptance-ee0c398-20261124.txt)
+records the four scenarios on the reviewed commit after the cleanup fix.
