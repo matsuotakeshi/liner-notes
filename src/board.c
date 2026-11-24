@@ -32,6 +32,7 @@
 #include "extras.h"
 #include "profile_store.h"
 #include "mailbox.h"
+#include "chat_core.h"
 #include "mail_files.h"
 #include "messages.h"
 #include <openssl/crypto.h>
@@ -120,6 +121,14 @@ static uint32_t user_posts[(MEMBER_MAX+1)];
 static int version=4,format5;
 static uint32_t article_count;
 static int store=-1, failed, ending, running, body_read_failed;
+static ConferenceActor conference_sessions[CONNECTION_MAX];
+
+void board_conference_session(int slot,unsigned long session,uint32_t user,uint32_t epoch) {
+    if(!running || slot<0 || slot>=CONNECTION_MAX)return;
+    LOCK();
+    conference_sessions[slot]=(ConferenceActor){session,slot,user,epoch};
+    UNLOCK();
+}
 typedef struct UiSave { struct UiSave *next;uint64_t ticket;BoardRequest request; } UiSave;
 static UiSave *ui_head,*ui_tail;
 static struct { int state; uint64_t ticket; BoardRequest request; BoardResult result; } jobs[QUEUE];
@@ -910,6 +919,45 @@ unavailable:r->feedback.failed=1;snprintf(r->text,sizeof(r->text),"%s",mail_text
 }
 #include "link_schema.h"
 #include "features64.inc"
+
+static int conference_guest(const char *login) {
+    const char guest[]="guest";
+    if(strlen(login)!=sizeof(guest)-1)return 0;
+    for(unsigned i=0;i<sizeof(guest)-1;i++) {
+        unsigned char ch=(unsigned char)login[i];
+        if(ch>='A' && ch<='Z')ch=(unsigned char)(ch+'a'-'A');
+        if(ch!=(unsigned char)guest[i])return 0;
+    }
+    return 1;
+}
+
+static ConferenceStatus conference_identity(void *unused,const ConferenceActor *actor,ConferenceIdentity *who) {
+    (void)unused;
+    if(actor->slot<0 || actor->slot>=CONNECTION_MAX)return CONFERENCE_EXPIRED;
+    LOCK();ConferenceActor live=conference_sessions[actor->slot];UNLOCK();
+    if(live.session!=actor->session || live.user!=actor->user || live.epoch!=actor->epoch)
+        return CONFERENCE_EXPIRED;
+
+    IdentityProvider auth=identity_legacy_provider();
+    Principal principal;
+    if(!auth.resolve(auth.context,actor->user,actor->epoch,&principal) ||
+       !members_active(actor->user) || members_pending(actor->user))return CONFERENCE_EXPIRED;
+    const char *login=members_name(actor->user);
+    const char *name=profile_value(actor->user,0);
+    if(strlen(name)>80 || !chat_core_text_valid(name))name=login;
+    snprintf(who->name,sizeof(who->name),"%s",name);
+    who->guest=conference_guest(login);
+    who->administrator=moderation_admin(actor->user);
+    return CONFERENCE_OK;
+}
+
+static void conference_execute(const BoardRequest *q,BoardResult *r) {
+    ConferenceActor actor={q->session,q->slot,q->user,q->user_epoch};
+    r->page.kind=OPERATION_PAGE_CONFERENCE;
+    ConferenceStatus status=conference_run(features_db,conference_identity,NULL,&actor,&q->conference,&r->page.data.conference);
+    if(status!=CONFERENCE_OK)r->feedback.failed=1;
+}
+
 static int append_article_record(uint32_t board,uint32_t parent,uint32_t user,
                                  const char *author,const char *title,const char *body,
                                  int remote,uint64_t remote_stamp,uint32_t *id) {
@@ -1095,6 +1143,7 @@ static void execute(const BoardRequest *q,BoardResult *r) {
     }
     if(q->op=='}') { advanced_execute(q,r);return; }
     if(q->op==BOARD_NOTE_VIEW) { note_view(q,r);return; }
+    if(q->op==BOARD_CONFERENCE) { conference_execute(q,r);return; }
     if(q->op==BOARD_LINK) { link_execute(q,r);return; }
     if(q->op==BOARD_MEMBER_LIFECYCLE) {
         MemberActor actor={q->user,q->user_epoch};MemberChange change;
@@ -1593,6 +1642,7 @@ int board_start_config(const char *path,const char *members,const char *catalog,
     if(!access_prune(1)) { fprintf(stderr,"board access: retention failed\n");return 0; }
     for(uint32_t id=1;id<=article_count;id++) if(*extras_title(id)) strcpy((*article_at(id-1)).title,extras_title(id));
     if(!completion_open())return 0;
+    memset(conference_sessions,0,sizeof(conference_sessions));
 #ifdef _WIN32
     InitializeCriticalSection(&mutex); InitializeConditionVariable(&condition);
     worker=(HANDLE)_beginthreadex(NULL,32*1024*1024,work,NULL,0,NULL);

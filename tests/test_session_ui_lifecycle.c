@@ -63,6 +63,9 @@ const SessionUiAdapter *session_ui_mmm(void) {
     static SessionUiAdapter second;
     second=adapter;second.name="mmm";return &second;
 }
+void board_conference_session(int slot,unsigned long session,uint32_t user,uint32_t epoch) {
+    (void)slot;(void)session;(void)user;(void)epoch;
+}
 int board_submit(const BoardRequest *q) { assert(q->user==12 && q->user_epoch==3 && q->session==77 && q->slot==2);requests++;return 1; }
 
 int main(void) {

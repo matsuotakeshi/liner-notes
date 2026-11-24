@@ -6,6 +6,7 @@
 #include "vault_query_core.h"
 #include "door_core.h"
 #include "mmm_notes.h"
+#include "conference_core.h"
 /* Bounded, owned results copied only after Core authorization. No display-text
  * parsing, pointers into repositories, or extra unbounded body allocation. */
 typedef enum { OPERATION_PAGE_NONE,
@@ -27,6 +28,7 @@ typedef enum { OPERATION_PAGE_NONE,
     OPERATION_PAGE_FILE_CHILDREN,
     OPERATION_PAGE_FILE_AUDIT,
     OPERATION_PAGE_DOORS,
+    OPERATION_PAGE_CONFERENCE,
     OPERATION_PAGE_MMM_SCANLIST
 } OperationPageKind;
 typedef struct {
@@ -51,6 +53,7 @@ typedef struct {
         VaultQueryAudit file_audit;
         DoorListing doors;
         MmmScanList mmm_scanlist;
+        ConferenceReply conference;
     } data;
 } OperationPage;
 /* Producer adapters opt in through the request, preserving legacy output. */

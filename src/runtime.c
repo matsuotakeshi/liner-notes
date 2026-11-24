@@ -113,6 +113,7 @@ static ConnectionPolicy policy={.idle_seconds=600,.warning_seconds=60,.grace_sec
 static void stop(int sig) { (void)sig; stopping=1; }
 static void drop(Connection *c) {
     if(c->fd==INVALID)return; /* Unused slots contain no live secrets/resources. */
+    if(c->app.core.id)board_conference_session(c->app.core.slot,0,0,0);
     if(session_disconnect_preferences(&c->app,NULL)) {
         BoardRequest *q=calloc(1,sizeof(*q));
         if(q) { session_disconnect_preferences(&c->app,q);

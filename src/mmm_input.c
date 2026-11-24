@@ -30,7 +30,8 @@ static const struct {
     {"withdraw","withdraw NOTE confirm",MMM_WITHDRAW,1},
     {"manage","manage",MMM_MANAGE,1},
     {"pfile","pfile [-t|-e|-d confirm]",MMM_PFILE,1},
-    {"regsign","regsign [-e|-t|-a|-n|-d confirm]",MMM_SIGNATURE,1}
+    {"regsign","regsign [-e|-t|-a|-n|-d confirm]",MMM_SIGNATURE,1},
+    {"talk","talk [-c|-n]",MMM_TALK,1}
 };
 
 static int space(char ch) { return ch==' ' || ch=='\t'; }

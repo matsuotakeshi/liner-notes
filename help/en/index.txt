@@ -9,6 +9,7 @@ HELP EDITOR    Shared editor and auxiliary commands
 HELP DRAFT     Saving and resuming drafts
 HELP FILES     File vault and downloads
 HELP GATHER    Gather message board
+HELP LINECONF  Line conference
 HELP SETTINGS  Language, paging and preferences
 HELP MAIL      Member mail
 HELP PROFILE   Public profiles

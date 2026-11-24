@@ -7,6 +7,7 @@
  [交流・メール]
   M メール       C チャット         T 個別トーク
   G Gather伝言板 W 接続者一覧       D SYSOP呼出
+  LINECONF 一行会議
   \ 接続者メモ   # 自分の状態       SYSOPMAIL 題名
  [書く・設定]
   E 共通エディタ I 個人設定         A 入会・登録

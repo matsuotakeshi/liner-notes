@@ -384,6 +384,7 @@ static int manage_command(Session *s,const char *name,char *arg) {
 int mmm_service_line(Session *s,char *text) {
     MmmUi *m=mmm_state(s);
     if(m->screen==CHAT_SCREEN) { chat_line(s,text);return 1; }
+    if(m->screen==TALK_SCREEN)return mmm_conference_line(s,text);
     if(m->screen<MAIL_SCREEN)return 0;
     if(!strcmp(text,".") || !strcmp(text,"/")) {
         m->continuous=m->stream_paused=m->stream_is_board=0;
