@@ -86,6 +86,20 @@ def run(binary):
             reply = mmm.cmd("base target", OPEN)
             assert b"updated" in reply and b"other topic" not in reply
             assert b"No further" in key(mmm, b"F", OPEN)
+            assert b"personal file" in key(mmm,b"s",OPEN)
+            key(mmm,b"q",NOTES)
+            assert b"updated" in mmm.cmd("pfile -t",NOTES)
+            assert b"updated" in mmm.cmd("retitle 1 revised title",NOTES)
+            assert b"unavailable" in mmm.cmd("withdraw 990 confirm",NOTES)
+            mmm.cmd("post #1",b"Title> ")
+            mmm.cmd("persistent draft",b"Text> ")
+            mmm.cmd("draft text",b"Text> ")
+            mmm.cmd(".",b"Editor>> ")
+            assert b"draft saved" in mmm.cmd("s",b"Editor>> ")
+            mmm.cmd("q",NOTES)
+            assert b"draft text" in mmm.cmd("draft resume",b"Editor>> ") + mmm.cmd("p",b"Editor>> ")
+            mmm.cmd("q",NOTES)
+            assert b"draft removed" in mmm.cmd("draft drop confirm",NOTES)
 
             legacy = connect()
             legacy.send(b"RAW\r\n")
@@ -96,7 +110,10 @@ def run(binary):
             legacy.cmd("LOGIN reader", b"PASSWORD\r\n")
             legacy.send(b"test-secret-789\r\n")
             assert b"LOGGED IN reader" in legacy.until(b"LOGGED IN reader\r\n")
-            assert b"updated" in legacy.cmd("READ 1", b"END\r\n")
+            view = legacy.cmd("READ 1", b"END\r\n")
+            assert b"updated" in view and b"revised title" in view
+            assert b"updated" in mmm.cmd("withdraw 3 confirm",NOTES)
+            legacy.cmd("READ 3", b"WITHDRAWN 3 PARENT 0\r\n")
             nonce = "1" * 32
             synced = legacy.cmd("CONNECTOR SYNC " + token + " " + nonce,
                                 b"CONNECTOR STATE " + nonce.encode() + b" ")

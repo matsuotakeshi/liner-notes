@@ -21,6 +21,8 @@ TABLES={
  'news':'user INTEGER,kind INTEGER,stamp INTEGER NOT NULL,PRIMARY KEY(user,kind)',
  'mmm_board_labels':'board INTEGER PRIMARY KEY CHECK(board BETWEEN 1 AND 1024),label TEXT NOT NULL UNIQUE CHECK(length(label) BETWEEN 1 AND 31)',
  'mmm_scanlist':'user INTEGER NOT NULL CHECK(user>0),position INTEGER NOT NULL CHECK(position BETWEEN 1 AND 64),board INTEGER NOT NULL CHECK(board BETWEEN 1 AND 1024),PRIMARY KEY(user,position),UNIQUE(user,board)',
+ 'mmm_signatures':'user INTEGER PRIMARY KEY CHECK(user>0),body TEXT NOT NULL CHECK(length(CAST(body AS BLOB))<=2048),automatic INTEGER NOT NULL CHECK(automatic IN (0,1))',
+ 'mmm_scan_rules':'user INTEGER NOT NULL CHECK(user>0),position INTEGER NOT NULL CHECK(position BETWEEN 1 AND 64),board INTEGER NOT NULL CHECK(board BETWEEN 0 AND 1024),pattern TEXT NOT NULL CHECK(length(pattern)<=31),excluded INTEGER NOT NULL CHECK(excluded IN (0,1)),mode INTEGER NOT NULL CHECK(mode IN (0,1,2)),PRIMARY KEY(user,position)',
  'delegated':'board INTEGER,gid INTEGER,PRIMARY KEY(board,gid)',
  'group_moves':'board INTEGER PRIMARY KEY,actor INTEGER,source INTEGER,destination INTEGER,done INTEGER',
  'applications':'user INTEGER,field TEXT,value TEXT,PRIMARY KEY(user,field)',

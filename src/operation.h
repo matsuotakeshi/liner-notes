@@ -19,7 +19,7 @@ typedef struct {
     unsigned long session,chat_target;
     int slot;
     char op;
-    int notes_unread, action, scope, zcontrol,descending;int structured;uint64_t since,until;
+    int notes_unread, action, scope, zcontrol,descending;int structured,append_signature;uint64_t since,until;
     uint32_t number;
     uint32_t cursor;
     unsigned ui_aux;uint32_t audit_article,audit_actor,mail_revision,mail_attachment; MailAttachments mail_attachments;
@@ -37,6 +37,7 @@ typedef OperationRequest BoardRequest;
  * text remains the legacy display payload. Zero feedback means no successful effect. */
 typedef struct {
     int failed,preferences_saved,checkpoint_saved,seen,ui_profile_saved;
+    DoorRequestError door_error;
     char article_access;uint32_t article_access_id;int audit_failed;
     int page_found; uint32_t page_next;
     int file_detail,file_board_info,file_menu,file_unlocked,file_copied;

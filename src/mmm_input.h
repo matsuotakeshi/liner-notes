@@ -7,7 +7,8 @@ typedef enum {
     MMM_UNKNOWN, MMM_AMBIGUOUS, MMM_MENU, MMM_NUMBER, MMM_HOME, MMM_UP, MMM_HELP,
     MMM_LOGIN, MMM_REGISTER, MMM_LOGOUT, MMM_OFF, MMM_NOTES, MMM_GO, MMM_OPEN,
     MMM_POST, MMM_UI, MMM_MAIL, MMM_FILER, MMM_CHAT, MMM_TERM, MMM_PROFILE,
-    MMM_GAMES, MMM_NEW, MMM_SEQUENCER, MMM_SCANLIST, MMM_BOARDLABEL
+    MMM_GAMES, MMM_NEW, MMM_SEQUENCER, MMM_SCANLIST, MMM_BOARDLABEL,
+    MMM_DRAFT, MMM_RETITLE, MMM_WITHDRAW, MMM_MANAGE, MMM_PFILE, MMM_SIGNATURE
 } MmmCommand;
 typedef struct {
     MmmCommand command;
@@ -24,7 +25,7 @@ int mmm_range(const char *text, uint32_t lines, uint32_t *first, uint32_t *last,
               int *complement, const char **tail);
 void mmm_command_help(MmmCommand command, const char **name, const char **usage);
 typedef enum { MMM_OPEN_INDEX, MMM_OPEN_ARTICLE, MMM_OPEN_NEW, MMM_OPEN_NEW_OR_INDEX } MmmOpenMode;
-typedef struct { MmmOpenMode mode; uint32_t article; const char *board; } MmmOpen;
+typedef struct { MmmOpenMode mode; uint32_t article; const char *board; int continuous, all; } MmmOpen;
 int mmm_open_parse(char *,MmmOpen *);
 int mmm_scanlist_parse(char *,MmmScanTargets *);
 #endif

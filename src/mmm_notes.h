@@ -2,10 +2,14 @@
 #define LINER_MMM_NOTES_H
 #include "article_core.h"
 
-enum { MMM_LABEL_MAX=31, MMM_SCAN_MAX=64 };
-typedef struct { uint32_t board; char label[MMM_LABEL_MAX+1]; } MmmBoardTarget;
+enum { MMM_LABEL_MAX=31, MMM_SCAN_MAX=64, MMM_SIGNATURE_MAX=2048 };
+typedef struct { int automatic; char body[MMM_SIGNATURE_MAX+1]; } MmmSignature;
+ArticleOutcome mmm_signature_get(const ArticleActor *,MmmSignature *);
+ArticleOutcome mmm_signature_set(const ArticleActor *,int action,const char *,MmmSignature *);
+typedef enum { MMM_SCAN_NEW, MMM_SCAN_INDEX, MMM_SCAN_FALLBACK } MmmScanMode;
+typedef struct { uint32_t board; char label[MMM_LABEL_MAX+1]; int exclude; MmmScanMode mode; } MmmBoardTarget;
 typedef struct { unsigned count; MmmBoardTarget targets[MMM_SCAN_MAX]; } MmmScanTargets;
-typedef struct { uint32_t board; char label[MMM_LABEL_MAX+1],title[81]; } MmmScanBoard;
+typedef struct { uint32_t board; char label[MMM_LABEL_MAX+1],title[81]; MmmScanMode mode; } MmmScanBoard;
 typedef struct { int custom; unsigned count; MmmScanBoard rows[MMM_SCAN_MAX]; } MmmScanList;
 
 /* Worker-owned MMM operations. Label lookup can return a board requiring

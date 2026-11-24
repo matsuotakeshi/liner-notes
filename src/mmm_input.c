@@ -13,7 +13,7 @@ static const struct {
     {"logout","logout",MMM_LOGOUT,1},
     {"notes","notes",MMM_NOTES,1},
     {"go","go board",MMM_GO,1},
-    {"open","open [-i|-s|-x|-bNUMBER] [#board|@label|title]",MMM_OPEN,1},
+    {"open","open [-i|-s|-x|-bNUMBER|-n [-a]] [#board|@label|title]",MMM_OPEN,1},
     {"post","post [board]",MMM_POST,1},
     {"mail","mail",MMM_MAIL,1},
     {"filer","filer [board]",MMM_FILER,1},
@@ -23,8 +23,14 @@ static const struct {
     {"games","games",MMM_GAMES,1},
     {"new","new [-n]",MMM_NEW,1},
     {"setsequencer","setsequencer [YYYY-MM-DD|reset]",MMM_SEQUENCER,1},
-    {"scanlist","scanlist [set #BOARD|@LABEL ... | reset | -d]",MMM_SCANLIST,1},
-    {"boardlabel","boardlabel BOARD [LABEL|NONE]",MMM_BOARDLABEL,1}
+    {"scanlist","scanlist [set #BOARD|@LABEL|@PATTERN|* [!TARGET] ... | reset | -d]",MMM_SCANLIST,1},
+    {"boardlabel","boardlabel BOARD [LABEL|NONE]",MMM_BOARDLABEL,1},
+    {"draft","draft [resume|drop confirm]",MMM_DRAFT,1},
+    {"retitle","retitle NOTE TITLE",MMM_RETITLE,1},
+    {"withdraw","withdraw NOTE confirm",MMM_WITHDRAW,1},
+    {"manage","manage",MMM_MANAGE,1},
+    {"pfile","pfile [-t|-e|-d confirm]",MMM_PFILE,1},
+    {"regsign","regsign [-e|-t|-a|-n|-d confirm]",MMM_SIGNATURE,1}
 };
 
 static int space(char ch) { return ch==' ' || ch=='\t'; }
@@ -62,6 +68,8 @@ int mmm_open_parse(char *arg,MmmOpen *out) {
         if(!arg[1])return 0;
         switch(fold(arg[1])) {
         case 'i': if(arg[2])return 0;break;
+        case 'n': if(arg[2] || out->continuous)return 0;out->continuous=1;break;
+        case 'a': if(arg[2] || out->all)return 0;out->all=1;break;
         case 's': case 'x':
             if(arg[2] || out->mode!=MMM_OPEN_INDEX)return 0;
             out->mode=fold(arg[1])=='s'?MMM_OPEN_NEW:MMM_OPEN_NEW_OR_INDEX;
@@ -75,7 +83,7 @@ int mmm_open_parse(char *arg,MmmOpen *out) {
         arg=next;
     }
     out->board=arg;
-    return 1;
+    return (!out->all || out->continuous) && (!out->continuous || out->mode==MMM_OPEN_INDEX);
 }
 
 int mmm_scanlist_parse(char *arg,MmmScanTargets *out) {
@@ -84,8 +92,17 @@ int mmm_scanlist_parse(char *arg,MmmScanTargets *out) {
     while(*arg) {
         if(out->count==MMM_SCAN_MAX)return 0;
         char *next=split_word(arg);
+        MmmScanMode mode=MMM_SCAN_NEW;
+        if(!strcmp(arg,"-i") || !strcmp(arg,"-s") || !strcmp(arg,"-x")) {
+            mode=arg[1]=='i'?MMM_SCAN_INDEX:arg[1]=='x'?MMM_SCAN_FALLBACK:MMM_SCAN_NEW;
+            if(!*next)return 0;
+            arg=next;next=split_word(arg);
+        }
         MmmBoardTarget *target=&out->targets[out->count++];
-        if(*arg=='@') {
+        target->mode=mode;
+        if(*arg=='!') { if(mode!=MMM_SCAN_NEW)return 0;target->exclude=1;arg++; }
+        if(*arg=='*' && !arg[1])strcpy(target->label,"*");
+        else if(*arg=='@') {
             size_t n=strlen(arg+1);
             if(!n || n>MMM_LABEL_MAX)return 0;
             memcpy(target->label,arg+1,n+1);

@@ -771,7 +771,7 @@ ArticleOutcome article_search(const ArticleActor *actor,uint32_t board,uint32_t 
 }
 
 static ArticleOutcome news_articles(const ArticleActor *actor,uint32_t board,ArticleScope scope,
-                                    uint32_t start,uint64_t since,uint64_t until,ArticlePage *out) {
+                                    uint32_t start,uint64_t since,uint64_t until,int unread,ArticlePage *out) {
     ArticleOutcome result=health();
     if(result!=ARTICLE_OK)return result;
     result=identity(actor,1);
@@ -794,21 +794,28 @@ static ArticleOutcome news_articles(const ArticleActor *actor,uint32_t board,Art
         if(hidden<0)return ARTICLE_STORAGE;
         if(hidden || !article.created || article.created<since ||
            (until && article.created>until))continue;
+        if(unread && members_seen(user,id))continue;
+        if(unread && members_broken())return ARTICLE_READ_STATE_STORAGE;
         add_summary(out,id,&article);
     }
     out->next=id<=count?id:0;
     return ARTICLE_OK;
 }
 
-ArticleOutcome article_news(const ArticleActor *actor,uint32_t board,ArticleScope scope,
-                            uint32_t start,uint64_t since,uint64_t until,ArticlePage *out) {
+ArticleOutcome article_news_filtered(const ArticleActor *actor,uint32_t board,ArticleScope scope,
+                                     uint32_t start,uint64_t since,uint64_t until,int unread,ArticlePage *out) {
     if(!out)return ARTICLE_INVALID_READ;
     memset(out,0,sizeof(*out));
     policy_context(actor?actor->board_grants:NULL);
-    ArticleOutcome result=news_articles(actor,board,scope,start,since,until,out);
+    ArticleOutcome result=news_articles(actor,board,scope,start,since,until,unread,out);
     policy_context(NULL);
     if(result!=ARTICLE_OK)memset(out,0,sizeof(*out));
     return result;
+}
+
+ArticleOutcome article_news(const ArticleActor *actor,uint32_t board,ArticleScope scope,
+                            uint32_t start,uint64_t since,uint64_t until,ArticlePage *out) {
+    return article_news_filtered(actor,board,scope,start,since,until,0,out);
 }
 
 static int filter_text(const char *text,size_t max) {

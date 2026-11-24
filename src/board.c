@@ -492,6 +492,13 @@ static void member_result(MemberOutcome result,BoardResult *r);
 static void note_view(const BoardRequest *q,BoardResult *r) {
     ArticleActor actor={q->user,q->user_epoch,q->board_grants};
     ArticleOutcome result;
+    if(q->action=='g' || q->action=='G') {
+        MmmSignature signature;
+        result=q->action=='G'?mmm_signature_set(&actor,q->scope,q->body,&signature):mmm_signature_get(&actor,&signature);
+        if(result!=ARTICLE_OK)post_result(result,r);
+        else { r->service_number=(uint32_t)signature.automatic;strcpy(r->draft_body,signature.body); }
+        return;
+    }
     if(q->action=='C' || q->action=='K' || q->action=='T') {
         MemberActor member={q->user,q->user_epoch};
         MemberCheckWindow window;
@@ -513,7 +520,8 @@ static void note_view(const BoardRequest *q,BoardResult *r) {
     }
     if(q->action=='S') {
         ArticlePage page;
-        result=article_news(&actor,q->number,q->number?ARTICLE_HERE:ARTICLE_ALL,q->cursor,q->since,q->until,&page);
+        result=article_news_filtered(&actor,q->number,q->number?ARTICLE_HERE:ARTICLE_ALL,
+                                     q->cursor,q->since,q->until,q->notes_unread,&page);
         /* An entry can become unreadable halfway through an ordered scan. */
         if(result==ARTICLE_BOARD_DENIED && q->scope)result=ARTICLE_OK;
         if(result==ARTICLE_OK)OPERATION_PAGE(r,ARTICLES,articles,page);
@@ -543,6 +551,7 @@ static void note_view(const BoardRequest *q,BoardResult *r) {
         ArticlePage page;
         result=article_browse_notes(&actor,q->board,q->number,q->cursor,q->descending,
                                     q->notes_unread,*q->title?q->title:NULL,&page);
+        if(result==ARTICLE_BOARD_DENIED && q->scope)result=ARTICLE_OK;
         if(result==ARTICLE_OK)OPERATION_PAGE(r,ARTICLES,articles,page);
     }
     if(result!=ARTICLE_OK)post_result(result,r);
@@ -772,6 +781,22 @@ static void mail_transfer_execute(const BoardRequest *q,BoardResult *r) {
     if(context.outcome==MAIL_CORE_STORAGE)(r->feedback.failed=1,strcpy(r->text,"ERR vault storage\r\n"));
     else if(context.outcome!=MAIL_CORE_OK)mail_result(q,context.outcome,r);
 }
+/* The request opts in. The worker loads only the authenticated actor's
+ * current signature and validates the combined body before any durable write. */
+static const char *body_with_signature(const BoardRequest *q,BoardResult *r) {
+    if(!q->append_signature || !*q->body)return q->body;
+    MmmSignature signature;
+    ArticleActor actor={q->user,q->user_epoch,q->board_grants};
+    ArticleOutcome status=mmm_signature_get(&actor,&signature);
+    if(status!=ARTICLE_OK) { post_result(status,r);return NULL; }
+    if(!signature.automatic)return q->body;
+    size_t body=strlen(q->body),suffix=strlen(signature.body);
+    if(body+suffix>ln_limit("BODY",BOARD_BODY)) { post_result(ARTICLE_BODY_LIMIT,r);return NULL; }
+    memcpy(r->draft_body,q->body,body);
+    memcpy(r->draft_body+body,signature.body,suffix+1);
+    return r->draft_body;
+}
+
 static void mail_execute(const BoardRequest *q,BoardResult *r) {
     /* Preserve the completion kind even on quota refusal so a failed send
      * returns to the editor with its unsent text and draft revision intact. */
@@ -868,13 +893,14 @@ static void mail_execute(const BoardRequest *q,BoardResult *r) {
         size_t offset=0;for(unsigned i=0;i<item.attachments.count;i++)offset+=mail_attachment_text(q,item.attachments.ids[i],r->text+offset,sizeof(r->text)-offset);
         snprintf(r->text+offset,sizeof(r->text)-offset,mail_text(q,MSG_MAIL_ITEM,"MAIL ITEM %u FROM %s TO %s READ %u REPLY %u\r\nTITLE %s\r\nBODY\r\n%sMAIL END\r\n"),m->id,m->from,m->to,(unsigned)m->read,m->parent,m->title,r->draft_body);return;
     }
-    if(q->action=='D') {
-        MailOutcome result=mail_core_delete(&actor,id);
+    if(q->action=='D' || q->action=='K') {
+        MailOutcome result=q->action=='K'?mail_core_retract(&actor,id):mail_core_delete(&actor,id);
         if(result!=MAIL_CORE_OK) { mail_result(q,result,r);return; }
         snprintf(r->text,sizeof(r->text),mail_text(q,MSG_MAIL_DELETED,"MAIL DELETED %u\r\n"),id);return;
     }
     if(q->action=='S') {
-        MailWrite input={q->number,q->cursor,q->mail_revision,q->title,q->body,q->mail_attachments};
+        const char *body=body_with_signature(q,r);if(!body)return;
+        MailWrite input={q->number,q->cursor,q->mail_revision,q->title,body,q->mail_attachments};
         MailOutcome result=mail_core_send(&actor,&input,&id);
         if(result!=MAIL_CORE_OK) { mail_result(q,result,r);return; }
         r->mail_delivery=q->number;r->mail_id=id;
@@ -1235,6 +1261,7 @@ static void execute(const BoardRequest *q,BoardResult *r) {
         else if(q->op=='w') {
             r->draft_revision=revision;snprintf(r->text,sizeof(r->text),"DRAFT STORED %u\r\n",revision);
         } else if(q->op=='d') {
+            r->draft_revision=revision;
             if(revision)snprintf(r->text,sizeof(r->text),"DRAFT STORED %u\r\n",revision);
             else strcpy(r->text,"DRAFT NONE\r\n");
         } else if(!draft.revision)strcpy(r->text,"DRAFT NONE\r\n");
@@ -1393,8 +1420,10 @@ static void execute(const BoardRequest *q,BoardResult *r) {
     }
     if(q->op=='P' || q->op=='e') {
         ArticleActor actor={q->user,q->user_epoch,q->board_grants};
+        const char *body=q->op=='P'?body_with_signature(q,r):q->body;
+        if(!body)return;
         ArticleOutcome result=q->op=='e'?article_prepare_post(&actor,q->board,q->number):
-            article_post(&actor,q->board,q->number,q->username,q->title,q->body,&r->selected);
+            article_post(&actor,q->board,q->number,q->username,q->title,body,&r->selected);
         if(result!=ARTICLE_OK) { post_result(result,r);return; }
         if(q->op=='P') { r->feedback.article_access='P';r->feedback.article_access_id=r->selected;snprintf(r->text,sizeof(r->text),"SAVED %u\r\n",r->selected); }
         else if(q->action=='?') { r->service_action='E';r->service_number=q->number?2:1; }
