@@ -26,8 +26,9 @@ static void blocks(void) {
     assert(!a.data && !a.size && !a.used && !a.deadline);
     text=connector_block_take(&b,&kind);assert(kind==CONNECTOR_LINK_BLOCK && !strcmp(text,"xyz"));free(text);
     assert(connector_block_append(&a,"orphan",6)==-1 && !a.data);
-    for(unsigned k=0;k<2;k++) {
-        size_t maximum=k?CONNECTOR_LINK_BLOCK_MAX:CONNECTOR_FILE_BLOCK_MAX;
+    const size_t limits[]={CONNECTOR_FILE_BLOCK_MAX,CONNECTOR_LINK_BLOCK_MAX,CONNECTOR_UPDATE_BLOCK_MAX};
+    for(unsigned k=0;k<sizeof(limits)/sizeof(*limits);k++) {
+        size_t maximum=limits[k];
         assert(connector_block_begin(&a,(ConnectorBlockKind)k,maximum,10)==1);
         char *chunk=malloc(maximum);assert(chunk);memset(chunk,'A',maximum);
         assert(connector_block_append(&a,chunk,maximum-1)==0);

@@ -16,7 +16,7 @@ from urllib.parse import urlsplit, quote
 
 from aiohttp import web, WSMsgType
 from .bridge import Bridge, BridgeError, empty_view, response_data
-from .commands import COMMANDS, build_action, visible
+from .commands import COMMANDS, CORE_UPDATES, action_arguments, core_update, visible
 from .presentation import Presentation
 from .terminal import relay
 from .transfers import ResumeRecords
@@ -184,12 +184,16 @@ def create_app(config):
 
     async def operate(request):
         session=current(request,mutate=True);payload=await object_body(request)
-        command,item=build_action(payload['action'],payload.get('values',{}),{**session.bridge.state,'vault_sigop':session.vault_sigop},payload.get('confirmed') is True)
+        key=payload['action']
         async with session.bridge.lock:
+            args,item=action_arguments(key,payload.get('values',{}),{**session.bridge.state,'vault_sigop':session.vault_sigop},payload.get('confirmed') is True)
             group=item['group']
             if session.bridge.state.get('chat') and group!='chat':raise BridgeError('Leave the chat before this operation')
+            typed = session.bridge.state.get('core_updates') == 1 and key in CORE_UPDATES
+            if typed and (key!='profile.handle' or session.bridge.state.get('user')):
+                return response(session,await session.bridge.update(key,flag=item['confirm'],**core_update(key,args)))
             if session.bridge.state.get('mail') and group!='mail':await session.bridge.exchange('MAIL EXIT')
-            result=await session.bridge.exchange(command)
+            result=await session.bridge.exchange(item['command'].format(**args).rstrip())
             if item['edit'] and session.bridge.state.get('editing'):
                 preview=await session.bridge.exchange('/PREVIEW');result['preview']=preview['text']
         return response(session,result)
@@ -246,6 +250,17 @@ def create_app(config):
             raise BridgeError('Use the Web transfer controls or the terminal for this command')
         return response(session,await session.bridge.command(line))
 
+    async def chat_send(request):
+        session=current(request,mutate=True);payload=await object_body(request)
+        body=payload.get('body')
+        if not isinstance(body,str) or not body or len(body.encode())>512 or any(ord(c)<32 or ord(c)==127 for c in body):
+            raise ValueError('Invalid chat text')
+        async with session.bridge.lock:
+            if not session.bridge.state.get('chat'):raise BridgeError('Join chat or private talk first')
+            if session.bridge.state.get('core_updates') == 1:
+                return response(session,await session.bridge.update('chat_send',body=body))
+            return response(session,await session.bridge.exchange('/SAY '+body))
+
     async def compose(request):
         session=current(request,mutate=True);payload=await object_body(request)
         text=payload.get('body','');title=payload.get('title','');kind=payload.get('kind','article')
@@ -259,8 +274,22 @@ def create_app(config):
         if sum(len(line.encode())+2 for line in lines)>262144:raise BridgeError('Body exceeds 256 KiB')
         if not title or len(title.encode())>80 or any(ord(c)<32 or ord(c)==127 for c in title):raise BridgeError('Title must be 1–80 bytes')
         attachments=payload.get('attachments',[])
-        if not isinstance(attachments,list) or len(attachments)>16 or any(not isinstance(x,int) or not 1<=x<=2147483646 for x in attachments):raise ValueError('Invalid attachments')
+        if not isinstance(attachments,list) or len(attachments)>16 or any(type(x) is not int or not 1<=x<=2147483646 for x in attachments):raise ValueError('Invalid attachments')
         async with session.bridge.lock:
+            if session.bridge.state.get('core_updates') == 1:
+                if kind not in ('article','mail','reply_mail','editing'):raise ValueError('Invalid compose kind')
+                if kind=='editing' and not session.bridge.state.get('editing'):raise BridgeError('No active editor')
+                recipient=payload.get('recipient','') if kind=='mail' else ''
+                if kind=='mail' and (not isinstance(recipient,str) or not re.fullmatch(r'[a-z0-9_-]{1,32}',recipient)):
+                    raise ValueError('Invalid recipient')
+                board=int(payload.get('board') or 0) if kind=='article' else 0
+                parent=int(payload.get('parent') or 0) if kind in ('article','reply_mail') else 0
+                if not 0<=board<=1024 or not 0<=parent<=2147483646 or (kind=='reply_mail' and not parent):
+                    raise ValueError('Invalid number')
+                result=await session.bridge.update(kind,board=board,id=parent,flag=payload.get('draft') is True,
+                    recipient=recipient,title=title,body=''.join(line+'\r\n' for line in lines),
+                    attachments=tuple(dict.fromkeys(attachments)))
+                return response(session,result)
             if kind=='editing':
                 if not session.bridge.state.get('editing'):raise BridgeError('No active editor')
                 # Replace using core editing operations; do not discard a saved draft on error.
@@ -311,6 +340,8 @@ def create_app(config):
             if not 1<=len(lines)<=10 or any(len(line)>70 or line in ('//','/CANCEL') or any(ord(c)<32 or ord(c)==127 for c in line) for line in lines):raise ValueError('Gather allows 10 lines of 70 characters; // and /CANCEL are reserved')
         async with session.bridge.lock:
             if any(session.bridge.state.get(k) for k in ('editing','secret','chat','gather','input')):raise BridgeError('Finish the current dialogue first')
+            if lines is not None and session.bridge.state.get('core_updates') == 1:
+                return response(session,await session.bridge.update('gather',body=''.join(line+'\r\n' for line in lines)))
             if session.bridge.state.get('mail'):await session.bridge.exchange('MAIL EXIT')
             result=await session.bridge.exchange('GATHER' if lines else 'GATHER READ')
             if not lines:return response(session,result)
@@ -546,7 +577,7 @@ def create_app(config):
     app.cleanup_ctx.append(lifetime)
     app.router.add_get(base,index)
     app.router.add_get(base+'assets/{name}',asset)
-    for path,handler in [('session',new_session),('logout',logout),('auth',authenticate),('action',operate),('query',query),('input',input_line),('compose',compose),('gather',gather),('upload',upload),('download',download)]:app.router.add_post(base+'api/'+path,handler)
+    for path,handler in [('session',new_session),('logout',logout),('auth',authenticate),('action',operate),('query',query),('input',input_line),('compose',compose),('gather',gather),('chat',chat_send),('upload',upload),('download',download)]:app.router.add_post(base+'api/'+path,handler)
     app.router.add_get(base+'api/session',session_info)
     app.router.add_get(base+'api/link',link_control)
     app.router.add_post(base+'api/link',link_control)

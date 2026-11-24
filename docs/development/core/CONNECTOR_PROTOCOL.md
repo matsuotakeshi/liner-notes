@@ -18,8 +18,37 @@ structured content. Mail attachment metadata is collected using participant ACLs
 
 The HTTP and browser response shape remains compatible. Browser attachment rows
 use structured metadata; the legacy connector converts only attachment headers,
-never rows embedded in the message body. The terminal relay and existing paths
-for composition, management, chat, and transfer remain available.
+never rows embedded in the message body. The terminal relay and dedicated file
+transfer protocol remain available.
+
+## Structured Web updates
+
+`core_updates: 1` advertises a token-bound `CONNECTOR UPDATE` block and
+`input_limit` advertises the maximum wire line size. Its ASCII fields are
+`nonce|operation|board|id|arg|flag|attachments|recipient|title|body`.
+The nonce is 32 lowercase hex digits. IDs and flags are decimal, attachments
+are comma-separated IDs, and the final three fields are UTF-8 bytes in
+lowercase hex. An empty field represents no value. Compose uses a draft flag,
+CRLF body lines and a board or reply target as appropriate. The form action
+flag is the user's explicit confirmation for operations that require it.
+The adapter checks an allowlist, the active dialogue and request bounds.
+Only the session can supply the actor, epoch and password grants.
+
+The board worker resolves mail recipients/replies and uses the same Mail Core
+write path for typed and terminal inputs. Ownership checks and the saved
+revision are enforced as part of sending or saving. An active editor's body,
+target and revision stay intact until its update succeeds. Chat sends take the
+private target from the active conversation, and acknowledge after Chat Core
+delivers or saves the message. A lost private target never defaults to public
+chat.
+
+The response supplies success, the resulting article/message ID or draft
+revision where applicable, an article audit warning, and display text. The Web
+bridge correlates it by nonce, then uses SYNC for the resulting session state.
+It does not retry an update after a missing or invalid response. Older backends
+without the capability use the existing terminal flow. Navigation, dialogue
+entry, credential prompts, terminal controls and dedicated file transfer retain
+their existing protocols.
 
 ## Responsibilities and lifetime
 

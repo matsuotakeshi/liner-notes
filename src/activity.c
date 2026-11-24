@@ -74,7 +74,7 @@ static void activity_result(ActivityOutcome result,int admin,BoardResult *r) {
     case ACTIVITY_NO_MEMBER:error="ERR no member\r\n";break;
     case ACTIVITY_INVALID:break;
     }
-    r->service_action=0;r->service_number=r->service_next=0;r->service_text[0]=0;
+    r->feedback.failed=1;r->service_action=0;r->service_number=r->service_next=0;r->service_text[0]=0;
     snprintf(r->text,sizeof(r->text),"%s",error);
 }
 void activity_execute(const BoardRequest *q,BoardResult *r) {

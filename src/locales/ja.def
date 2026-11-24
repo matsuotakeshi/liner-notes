@@ -498,6 +498,7 @@ MESSAGE(ERR_PROTOCOL_SINGLE, "この転送方式では1ファイルずつ転送�
 MESSAGE(ERR_CONNECTOR_EDITOR_STATE, "本文を入力できる編集状態ではありません。")
 MESSAGE(ERR_CONNECTOR_BUSY, "現在の操作を終えてから画面を開いてください。")
 MESSAGE(ERR_CONNECTOR_VIEW_SYNTAX, "コネクタの閲覧要求が不正です。")
+MESSAGE(ERR_CONNECTOR_UPDATE_SYNTAX, "コネクタの更新要求が不正です。")
 MESSAGE(ERR_LINK_DENIED, "この会員またはボードではBBS間リンクを利用できません。")
 MESSAGE(ERR_LINK_SYNTAX, "BBS間リンクの入力形式が正しくありません。")
 MESSAGE(ERR_LINK_PREDECESSOR, "対象記事または前の版を利用できません。リンクの状態を確認してください。")

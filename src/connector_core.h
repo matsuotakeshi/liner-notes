@@ -2,10 +2,12 @@
 #define LINER_CONNECTOR_CORE_H
 #include <stddef.h>
 #include <stdint.h>
+#include "content_limits.h"
 /* Per-session transport state. This API grants no authentication or store access. */
 enum { CONNECTOR_FILE_BLOCK_MAX=90000, CONNECTOR_LINK_BLOCK_MAX=360000,
+       CONNECTOR_UPDATE_BLOCK_MAX=2*CONTENT_BODY+512,
        CONNECTOR_FRAME_MAX=1024, CONNECTOR_WRITE_MAX=768 };
-typedef enum { CONNECTOR_FILE_BLOCK,CONNECTOR_LINK_BLOCK } ConnectorBlockKind;
+typedef enum { CONNECTOR_FILE_BLOCK,CONNECTOR_LINK_BLOCK,CONNECTOR_UPDATE_BLOCK } ConnectorBlockKind;
 typedef struct {
     char *data;size_t size,used;uint64_t deadline;ConnectorBlockKind kind;
 } ConnectorBlock;
