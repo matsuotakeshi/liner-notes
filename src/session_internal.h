@@ -107,6 +107,8 @@ int session_impl_mail_result(Session *s,const BoardResult *completion,uint64_t n
 MailSessionEvent session_impl_mail_event(int action);
 void session_impl_mail_submit(Session *s,BoardRequest *q);
 int session_impl_mail_command(Session *s,char *line);
+void session_impl_web_view(Session *,const char *);
+int session_impl_web_view_result(Session *,const OperationResult *,SessionResultView);
 int session_impl_binary_result(Session *s,const BoardResult *completion,uint64_t now);
 void session_impl_normalize_command(Session *s,char *line,size_t size);
 int session_impl_connector_line(Session *s,char *line,size_t size);

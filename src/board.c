@@ -746,10 +746,11 @@ static void extra_execute(const BoardRequest *q,BoardResult *r) {
 static const char *mail_text(const BoardRequest *q,MessageId id,const char *raw) { return q->scope?message_text(q->scope==2?LANGUAGE_EN:LANGUAGE_JA,id):raw; }
 int mail_repository_enabled(void) { return board_feature_enabled("mail"); }
 int mail_repository_buffer_save(uint32_t user,const char *body) { return profile_set(user,PROFILE_BUFFER,body)==1; }
-static size_t mail_attachment_text(const BoardRequest *q,uint32_t id,char *out,size_t size) {
+static size_t mail_attachment_text(const BoardRequest *q,uint32_t id,char *out,size_t size,OperationContent *content) {
     MailActor actor={q->user,q->user_epoch};MailFileInfo info;
     if(mail_core_attachment_info(&actor,id,&info)!=MAIL_CORE_OK)
         return (size_t)snprintf(out,size,"%s",mail_text(q,MSG_MAIL_ATTACHMENT_MISSING,"MAIL ATTACHMENT unavailable\r\n"));
+    if(content && content->file_count<MAIL_ATTACH_MAX)content->files[content->file_count++]=info;
     return (size_t)snprintf(out,size,mail_text(q,MSG_MAIL_ATTACHMENT_INFO,"MAIL ATTACHMENT %u SIZE %u NAME %s\r\n"),info.id,info.size,info.name);
 }
 static void mail_result(const BoardRequest *q,MailOutcome result,BoardResult *r) {
@@ -856,7 +857,7 @@ static void mail_execute(const BoardRequest *q,BoardResult *r) {
         }
         r->mail_revision=draft.revision;r->mail_attachments=draft.attachments;
         if(resume) { r->mail_to=draft.to;r->mail_parent=draft.parent;strcpy(r->draft_title,draft.title); }
-        size_t offset=0;for(unsigned i=0;i<draft.attachments.count;i++)offset+=mail_attachment_text(q,draft.attachments.ids[i],r->text+offset,sizeof(r->text)-offset);
+        size_t offset=0;for(unsigned i=0;i<draft.attachments.count;i++)offset+=mail_attachment_text(q,draft.attachments.ids[i],r->text+offset,sizeof(r->text)-offset,NULL);
         snprintf(r->text+offset,sizeof(r->text)-offset,mail_text(q,MSG_MAIL_DRAFT_INFO,"MAIL DRAFT %u TO %s REPLY %u TITLE %s\r\n"),draft.revision,draft.recipient,draft.parent,draft.title);return;
     }
     if(q->action=='W' || q->action=='C') {
@@ -897,9 +898,9 @@ static void mail_execute(const BoardRequest *q,BoardResult *r) {
         if(q->action=='f')r->mail_action='R';
         r->mail_id=item.message.id;
         const MailSummary *m=&item.message;
-        if(q->structured && m->id) { r->content.kind=2;r->content.id=m->id;r->content.parent=m->parent;r->content.sender=m->sender;r->content.recipient=m->recipient;r->content.at=m->time;r->content.size=strlen(r->draft_body);
+        if(q->structured && m->id) { r->content.kind=2;r->content.state=m->read;r->content.id=m->id;r->content.parent=m->parent;r->content.sender=m->sender;r->content.recipient=m->recipient;r->content.at=m->time;r->content.size=strlen(r->draft_body);
             snprintf(r->content.author,sizeof(r->content.author),"%s",m->from);snprintf(r->content.recipient_name,sizeof(r->content.recipient_name),"%s",m->to);snprintf(r->content.title,sizeof(r->content.title),"%s",m->title);r->mail_attachments=item.attachments; }
-        size_t offset=0;for(unsigned i=0;i<item.attachments.count;i++)offset+=mail_attachment_text(q,item.attachments.ids[i],r->text+offset,sizeof(r->text)-offset);
+        size_t offset=0;for(unsigned i=0;i<item.attachments.count;i++)offset+=mail_attachment_text(q,item.attachments.ids[i],r->text+offset,sizeof(r->text)-offset,q->structured?&r->content:NULL);
         snprintf(r->text+offset,sizeof(r->text)-offset,mail_text(q,MSG_MAIL_ITEM,"MAIL ITEM %u FROM %s TO %s READ %u REPLY %u\r\nTITLE %s\r\nBODY\r\n%sMAIL END\r\n"),m->id,m->from,m->to,(unsigned)m->read,m->parent,m->title,r->draft_body);return;
     }
     if(q->action=='D' || q->action=='K') {

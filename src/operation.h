@@ -54,6 +54,8 @@ typedef struct {
     int kind,state; /* 1=article, 2=mail; article state uses ArticleViewState */
     uint32_t id,parent,board,sender,recipient,root;uint64_t at;size_t size;
     char author[33],recipient_name[33],title[81];
+    unsigned file_count;
+    MailFileInfo files[MAIL_ATTACH_MAX];
 } OperationContent;
 typedef OperationContent BoardContent;
 /* content metadata describes the authorized payload in draft_body. */

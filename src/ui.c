@@ -114,6 +114,8 @@ static const char *error_text(const Ui *u,const char *p) {
         {"ERR draft revision",MSG_ERR_DRAFT_REVISION},
         {"ERR no undo",MSG_ERR_NO_UNDO},
         {"ERR connector editor state",MSG_ERR_CONNECTOR_EDITOR_STATE},
+        {"ERR connector busy",MSG_ERR_CONNECTOR_BUSY},
+        {"ERR connector view syntax",MSG_ERR_CONNECTOR_VIEW_SYNTAX},
         {"ERR link denied",MSG_ERR_LINK_DENIED},
         {"ERR link posting denied",MSG_ERR_LINK_DENIED},
         {"ERR link syntax",MSG_ERR_LINK_SYNTAX},

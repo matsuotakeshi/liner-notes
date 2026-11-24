@@ -3,10 +3,14 @@ import re
 from .bbs_transport import Bridge,BridgeError,TelnetDecoder
 from .reports import parse_report
 
+def empty_view():
+    return {'boards': [], 'notes': [], 'mail': [], 'profiles': [], 'files': [], 'file_boards': [], 'tree': [], 'matches': [], 'next': 0}
+
+
 def response_data(text):
     """Interpret documented raw records. Never turn user content into HTML."""
     lines = text.splitlines()
-    data = {'boards': [], 'notes': [], 'mail': [], 'profiles': [], 'files': [], 'file_boards': [], 'tree': [], 'matches': [], 'next': 0}
+    data = empty_view()
     for line in lines:
         m=re.fullmatch(r'VBOARD ([01]) (\S+)(?: \| (.*))?',line)
         if m:data['file_boards'].append({'upload':m[1]=='1','path':m[2],'title':m[3] or m[2]})
@@ -35,7 +39,9 @@ def response_data(text):
     m = re.search(r'(?:^|\r\n)MAIL ITEM (\d+) FROM (\S+) TO (\S+) READ (\d+) REPLY (\d+)\r\nTITLE ([^\r\n]*)\r\nBODY\r\n',text)
     if m:
         end = text.rfind('MAIL END\r\n')
-        data['message'] = {'id':int(m[1]),'sender':m[2],'recipient':m[3],'read':int(m[4]),'parent':int(m[5]),'title':m[6],'body':text[m.end():end]}
+        attachments = [{'id':int(row[1]),'size':int(row[2]),'name':row[3]}
+                       for row in re.finditer(r'^MAIL ATTACHMENT (\d+) SIZE (\d+) NAME ([^\r\n]+)\r?$', text[:m.start()], re.M)]
+        data['message'] = {'id':int(m[1]),'sender':m[2],'recipient':m[3],'read':int(m[4]),'parent':int(m[5]),'title':m[6],'body':text[m.end():end],'attachments':attachments}
     if text.startswith('PROFILES '):
         for line in lines[1:]:
             m=re.fullmatch(r'(\d+) (\S+) (.*)',line)
