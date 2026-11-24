@@ -52,6 +52,7 @@ MailOutcome mail_core_draft_get(const MailActor *,int resume,MailDraft *out,
 MailOutcome mail_core_draft_save(const MailActor *,const MailWrite *,uint32_t *revision);
 MailOutcome mail_core_draft_delete(const MailActor *,uint32_t revision);
 MailOutcome mail_core_send(const MailActor *,const MailWrite *,uint32_t *id);
+MailOutcome mail_core_retract(const MailActor *,uint32_t id);
 MailOutcome mail_core_delete(const MailActor *,uint32_t id);
 /* Selection is ephemeral. Add validates ownership, detach/clear may remove
  * stale selections. Save/send revalidate every selected attachment. */

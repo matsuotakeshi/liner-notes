@@ -94,18 +94,31 @@ static int door_paths_valid(void *context,const DoorSpec *game) {
 int doors_config(const char *path) {
     return door_config_load(&catalog,path,door_paths_valid,NULL);
 }
+void doors_listing(unsigned level,DoorListing *listing) { door_core_list(&catalog,level,listing); }
 void doors_list(unsigned level,char *out,size_t size) {
-    DoorListing listing;door_core_list(&catalog,level,&listing);
+    DoorListing listing;doors_listing(level,&listing);
     door_protocol_list(&listing,out,size);
 }
-Door *door_start(unsigned id,unsigned level,uint32_t user,const char *name,unsigned columns,unsigned rows,uint64_t now,unsigned long session,uint32_t epoch) {
-    errno=0;if(!user || geteuid()==0) { door_launch_diagnostic("identity",0);return NULL; }doors_reap();errno=0;
-    const DoorSpec *g=door_core_launch(&catalog,id,level,user,geteuid()==0);
-    if(!g) { door_launch_diagnostic("catalog-permission",0);return NULL; }
-    if(isolation_enabled())return isolated_start(g,level,user,name,columns,rows,now,session,epoch);
+Door *door_start(unsigned id,unsigned level,uint32_t user,const char *name,unsigned columns,unsigned rows,uint64_t now,unsigned long session,uint32_t epoch,DoorRequestError *error) {
+    *error=DOOR_REQUEST_START_FAILED;
+    if(!user || geteuid()==0) { door_launch_diagnostic("identity",0);*error=DOOR_REQUEST_DENIED;return NULL; }
+    doors_reap();errno=0;
+    const DoorSpec *g=door_core_find(&catalog,id);
+    if(!g || level<g->level) {
+        door_launch_diagnostic("catalog-permission",0);*error=g?DOOR_REQUEST_DENIED:DOOR_REQUEST_UNKNOWN;return NULL;
+    }
+    if(isolation_enabled()) {
+        Door *door=isolated_start(g,level,user,name,columns,rows,now,session,epoch);
+        if(!door && errno==EBUSY)*error=DOOR_REQUEST_FULL;
+        return door;
+    }
     Door *d=calloc(1,sizeof(*d));if(!d)return NULL;d->lock=-1;d->fd=-1;d->remote=-1;
     unsigned node=0;
-    if((g->slots && !door_slot(d,g,&node)) || (g->drop && !door_drop(d,g,user,level))) { int saved=errno;door_clean(d);errno=saved;return NULL; }
+    if(g->slots && !door_slot(d,g,&node)) {
+        if(errno==EBUSY)*error=DOOR_REQUEST_FULL;
+        door_clean(d);return NULL;
+    }
+    if(g->drop && !door_drop(d,g,user,level)) { door_clean(d);return NULL; }
     int master,slave;struct winsize ws={0};ws.ws_col=(unsigned short)columns;ws.ws_row=(unsigned short)rows;
     if(openpty(&master,&slave,NULL,NULL,&ws)) { door_clean(d);return NULL; }
     char idenv[64],nameenv[96],cols[32],lines[32],home[1100],nodeenv[48],dropenv[1240],gameenv[48];
@@ -171,7 +184,8 @@ void door_stop(Door *d) {
 int doors_isolation_config(const char *p) { (void)p;return 0; }
 int doors_config(const char *p) { return !p; }
 void doors_list(unsigned l,char *s,size_t n) { (void)l;snprintf(s,n,"GAMES\r\nEND GAMES\r\n"); }
-Door *door_start(unsigned i,unsigned l,uint32_t u,const char *s,unsigned c,unsigned r,uint64_t t,unsigned long session,uint32_t epoch) { (void)session;(void)epoch;(void)i;(void)l;(void)u;(void)s;(void)c;(void)r;(void)t;return NULL; }
+void doors_listing(unsigned level,DoorListing *listing) { (void)level;listing->count=0; }
+Door *door_start(unsigned i,unsigned l,uint32_t u,const char *s,unsigned c,unsigned r,uint64_t t,unsigned long session,uint32_t epoch,DoorRequestError *error) { *error=DOOR_REQUEST_START_FAILED;(void)session;(void)epoch;(void)i;(void)l;(void)u;(void)s;(void)c;(void)r;(void)t;return NULL; }
 int door_input(Door *d,unsigned char b) { (void)d;(void)b;return 0; }
 int door_room(Door *d) { (void)d;return 0; }
 int door_resize(Door *d,unsigned c,unsigned r) { (void)d;(void)c;(void)r;return 0; }

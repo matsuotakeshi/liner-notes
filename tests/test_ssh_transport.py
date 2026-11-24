@@ -76,7 +76,8 @@ for line in sys.stdin:
         ssh_port = port()
         options = ['--ssh-port', str(ssh_port), '--ssh-host-key', str(host),
                    '--ssh-member-keys', str(keys), '--ssh-timeout', '3',
-                   '--ssh-attempts', '4', '--doors', str(doors)]
+                   '--ssh-attempts', '4', '--doors', str(doors),
+                   '--ui-policy', 'MEMBERS', '--ui-allow', 'rtbbs,mmm']
         server = Server(binary, root/'notes', members=root/'members', admins=admins,
                         telnet=True, menu=True, language='en', options=options)
         transports = []
@@ -94,9 +95,9 @@ for line in sys.stdin:
             assert t.is_authenticated()
             return t
 
-        def screen(t):
+        def screen(t, marker=b'] > '):
             ch = t.open_session(timeout=10); ch.get_pty(term='xterm', width=80, height=24); ch.invoke_shell()
-            s = Screen(ch); s.until(); return s
+            s = Screen(ch); s.until(marker); return s
 
         telnet = Telnet(server.port)
         try:
@@ -228,6 +229,25 @@ for line in sys.stdin:
             while limited.is_active() and time.monotonic()<deadline: time.sleep(.05)
             assert not limited.is_active(), 'authentication attempts were not bounded'
             print('PASS key removal/unsafe permissions, handshake deadline and attempt limit')
+
+            selected = connect('bob')
+            mmm = screen(selected)
+            mmm.cmd('UI mmm', b'UI preference saved.')
+            mmm.until(b'MAIN>> ')
+            selected.close()
+            restored = connect('bob')
+            mmm = screen(restored, b'MAIN>> ')
+            mmm.cmd('games', b'GAMES>> ')
+            assert b'SSH_DOOR_USER=bob' in mmm.cmd('1', b'DOOR> ')
+            mmm.channel.resize_pty(width=100, height=30)
+            assert b'PTY 100 30' in mmm.cmd('size', b'DOOR> ')
+            assert b'SSH PTY test' in mmm.cmd('quit', b'GAMES>> ')
+            mmm.cmd('.', b'MAIN>> ')
+            mmm.cmd('ui rtbbs', b'UI PREF SAVED rtbbs')
+            mmm.until()
+            restored.close()
+            assert b'PONG' in screen(connect('bob')).cmd('PING')
+            print('PASS MMM over SSH: selection and reconnect, Door resize and return, RTBBS restore')
         finally:
             telnet.close()
             for t in transports: t.close()

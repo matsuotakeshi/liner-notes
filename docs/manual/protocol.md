@@ -26,6 +26,11 @@ RAW表示で使用します。RAWでもTelnet制御は維持します。
 |---|---|
 | FILEMETA id | FILE id size sha256、END FILE |
 | FILEGET id offset | FILEDATA id offset count base64 |
+| LINECONF [ROOMS [after]] | ROOM id title / CONFERENCE END NEXT id THROUGH id |
+| LINECONF HISTORY room [after] / LINECONF NEW [room [after]] | LINE id room user time name \| body / CONFERENCE END NEXT id THROUGH id |
+| LINECONF POST room text | CONFERENCE SAVED id |
+| LINECONF POSITION room / LINECONF SEEN room id | CONFERENCE POSITION room id |
+| LINECONF CREATE room title | CONFERENCE CREATED room |
 | FILESTART size sha256 name64 description64 | UPLOAD id |
 | FILESTARTIN size sha256 name64 description64 category64 | UPLOAD id |
 | FILEPUT id offset base64 | RECEIVED id next_offset |

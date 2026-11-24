@@ -1,0 +1,7 @@
+Line conference: persistent one-line messages in numbered rooms. Active members only.
+LINECONF [ROOMS [AFTER]] lists rooms. LINECONF HISTORY ROOM [AFTER] lists saved lines.
+LINECONF POST ROOM TEXT saves one UTF-8 line (maximum 512 bytes).
+LINECONF NEW [ROOM [AFTER]] lists unread lines. Omit ROOM or use 0 for all rooms.
+LINECONF POSITION ROOM shows your read marker. LINECONF SEEN ROOM ID marks all lines in that room through ID read. Use room 0 to mark the interval in all rooms.
+Listing and failed storage operations do not mark lines read. Use NEXT from the output as AFTER for the next page.
+LINECONF CREATE ROOM TITLE creates a room (administrator only).

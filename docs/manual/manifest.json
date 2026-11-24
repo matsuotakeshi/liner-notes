@@ -322,7 +322,7 @@
     },
     {
       "id": "conversation",
-      "title": "チャット・個別トーク・Gather",
+      "title": "チャット・個別トーク・Gather・一行会議",
       "chapter": 3,
       "sources": [
         "CHAT.md",
@@ -330,6 +330,14 @@
         "TALK.md",
         "help/ja/chat.txt",
         "help/ja/gather.txt",
+        "help/ja/lineconf.txt",
+        "help/en/lineconf.txt",
+        "src/conference_core.c",
+        "src/conference_core.h",
+        "src/session_conference.c",
+        "src/session_mmm_conference.c",
+        "tests/test_conference.py",
+        "tests/test_conference_core.c",
         "STAGE70.md",
         "src/activity.c",
         "src/activity_core.c",

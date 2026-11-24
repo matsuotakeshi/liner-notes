@@ -45,6 +45,7 @@ void session_rtbbs_result(Session *s,const OperationResult *completion,SessionRe
         rtbbs(s)->files.file_selected=0;rtbbs(s)->files.vault_mode=1;rtbbs(s)->mail_state.mail_mode=0;
     }
     mail_navigation_observe(&rtbbs(s)->mail_state.mail,session_impl_mail_event(completion->mail_action),completion->mail_id);
+    if(session_impl_conference_result(s,completion))return;
     if(session_impl_traversal_result(s,completion,now))return;
     if(session_impl_mail_batch_result(s,completion,now))return;
     if(session_impl_vault_children_result(s,completion,now))return;

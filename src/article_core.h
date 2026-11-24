@@ -121,6 +121,8 @@ ArticleOutcome article_restore(const ArticleActor *,uint32_t board,uint32_t arti
 typedef enum { ARTICLE_EMPTY, ARTICLE_VISIBLE, ARTICLE_CONCEALED, ARTICLE_WITHDRAWN } ArticleViewState;
 typedef struct {
     uint32_t id,board,parent;
+    uint32_t root;
+    uint64_t created;
     ArticleViewState state;
     int inspected_hidden;
     size_t body_size;
@@ -156,6 +158,8 @@ ArticleOutcome article_search(const ArticleActor *,uint32_t board,uint32_t start
  * return at most 8 rows, total=0. start=0 means 1; an empty continuation is
  * valid. No body reads, acknowledgement or check-time/session mutation. */
 typedef enum { ARTICLE_HERE, ARTICLE_ALL, ARTICLE_SUBTREE } ArticleScope;
+ArticleOutcome article_news_filtered(const ArticleActor *,uint32_t board,ArticleScope scope,
+                                     uint32_t start,uint64_t since,uint64_t until,int unread,ArticlePage *);
 ArticleOutcome article_news(const ArticleActor *,uint32_t board,ArticleScope scope,
                             uint32_t start,uint64_t since,uint64_t until,ArticlePage *out);
 /* Borrowed exact-author/literal-query filter. "*" means any author/no term.
@@ -213,7 +217,8 @@ ArticleOutcome article_unread(const ArticleActor *,uint32_t board,uint32_t threa
 typedef struct {
     ArticleSummary summary;
     uint32_t replies,latest,unread;
-    uint64_t updated;
+    uint64_t updated,created;
+    char author[33];
 } ArticleNoteRow;
 typedef struct {
     uint32_t total,next;
@@ -223,6 +228,11 @@ typedef struct {
 } ArticleNotesPage;
 ArticleOutcome article_notes(const ArticleActor *,uint32_t board,uint32_t start,
                              int unread_only,ArticleNotesPage *out);
+/* Bounded forward/backward scan of roots or replies in posting order.
+ * An optional query matches titles only. next is the inclusive continuation. */
+ArticleOutcome article_browse_notes(const ArticleActor *,uint32_t board,uint32_t root,
+                                    uint32_t start,int descending,int unread,
+                                    const char *query,ArticlePage *out);
 /* Catalog-order board discovery. start=0 means board 1; children_only filters
  * direct children of start (legacy menu-node listing). At most eight owned
  * rows; next is an inclusive catalog cursor. Visible locked boards keep title
@@ -238,6 +248,9 @@ typedef struct {
 typedef struct { uint32_t next; unsigned count; ArticleBoardRow rows[8]; } ArticleBoardsPage;
 ArticleOutcome article_boards(const ArticleActor *,uint32_t start,int children_only,ArticleBoardsPage *out);
 ArticleOutcome article_next_board(const ArticleActor *,uint32_t current,ArticleBoardRow *out);
+ArticleOutcome article_board_children(const ArticleActor *,uint32_t parent,uint32_t start,
+                                      ArticleBoardsPage *out);
+ArticleOutcome article_board_named(const ArticleActor *,const char *title,uint32_t *id);
 
 /* Import a visible article from the current board into the actor's own common
  * buffer. No posting/inspect override, read-state mutation or draft consumption.

@@ -8,6 +8,7 @@ int board_link_enabled(uint32_t board,uint32_t user);
 int board_start_config(const char *path,const char *members,const char *catalog,const char *admins);
 int board_save_disconnect(const BoardRequest *);
 int board_submit(const BoardRequest *request);
+void board_conference_session(int slot,unsigned long session,uint32_t user,uint32_t epoch);
 int board_poll(BoardResult *result);
 int board_completion_fd(void);
 void board_completion_drain(void);

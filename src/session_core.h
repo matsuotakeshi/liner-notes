@@ -7,6 +7,7 @@ typedef struct {
     int slot;
     int active;
     int structured; /* opt-in structured content in worker completions */
+    int login_required;
     int board_enabled;
     int member_mode;
     uint64_t connected_at;
@@ -21,7 +22,8 @@ typedef struct {
     uint32_t current;
     uint32_t user;
     uint32_t board;
-    uint32_t user_epoch;
+    uint32_t user_epoch,mail_notify_revision;
+    int mail_notify_deny;
     unsigned member_level;
     int admin,sigop;
     char username[33];
@@ -30,7 +32,8 @@ typedef struct {
  * retained. Domain workers still validate epoch, account state and ACL. */
 typedef struct { void *context; int (*enqueue)(void *,const OperationRequest *); } SessionOperationPort;
 typedef enum { SESSION_OPERATION_ACCEPTED,SESSION_OPERATION_INACTIVE,
-    SESSION_OPERATION_BUSY,SESSION_OPERATION_THROTTLED,SESSION_OPERATION_UNAVAILABLE } SessionOperationStatus;
+    SESSION_OPERATION_BUSY,SESSION_OPERATION_THROTTLED,SESSION_OPERATION_UNAVAILABLE,
+    SESSION_OPERATION_LOGIN_REQUIRED } SessionOperationStatus;
 SessionOperationStatus session_core_submit(SessionCore *,OperationRequest *,SessionOperationPort);
 /* Event-loop owner only. Init starts a fresh identity, not an authenticated user. */
 void session_core_init(SessionCore *,unsigned long id,int slot,int boards,int members);

@@ -35,6 +35,7 @@ void classic_input_normalize(const ClassicInput *c,char *line,size_t n) {
     for(size_t i=0;i<n;i++)if(classic_input_uppercase(c,line,i) && line[i]>='a' && line[i]<='z')line[i]=(char)(line[i]-32);
     if(c->editing || c->chatting || c->gather || c->talk || c->input || c->mail_input)return;
     if(!strncmp(line,"MAIL SCAN ",10))upper_word(line+10);
+    if(!strncmp(line,"LINECONF ",9)) { char *verb=line+9;while(*verb==' ')verb++;upper_word(verb); }
     if(!strncmp(line,"FIND ",5) || !strncmp(line,"SCAN ",5)) { char *scope=upper_word(line+5);if(!strncmp(line+5,"ASC ",4) || !strncmp(line+5,"DESC ",5))upper_word(scope); }
     if(!strncmp(line,"FINDFROM ",9)) { char *p=strchr(line+9,' ');if(p)upper_word(p+1); }
     if(!strncmp(line,"MEMBERPROFILE ",14) || !strncmp(line,"APPLICATIONSET ",15)) { char *p=strchr(line+(*line=='M'?14:15),' ');if(p)upper_word(p+1); }

@@ -6,9 +6,12 @@
 #include "operation_pages.h"
 #define BOARD_MEMBER_LIFECYCLE '{'
 #define BOARD_MAIL_TRANSFER '='
+enum { BOARD_BINARY_VAULT, BOARD_BINARY_MAIL, BOARD_BINARY_PERSONAL };
 #define BOARD_LINK '\x1e'
 /* Internal only: signed SSH key proof verified by the transport, never decoded from text. */
 #define BOARD_SSH_KEY '\x1d'
+#define BOARD_NOTE_VIEW '\x1c'
+#define BOARD_CONFERENCE '\x1b'
 #define BOARD_TITLE 80
 #include "content_limits.h"
 #include "mail_attachments.h"
@@ -18,7 +21,7 @@ typedef struct {
     unsigned long session,chat_target;
     int slot;
     char op;
-    int notes_unread, action, scope, zcontrol,descending;int structured;uint64_t since,until;
+    int notes_unread, action, scope, zcontrol,descending;int structured,append_signature;uint64_t since,until;
     uint32_t number;
     uint32_t cursor;
     unsigned ui_aux;uint32_t audit_article,audit_actor,mail_revision,mail_attachment; MailAttachments mail_attachments;
@@ -29,12 +32,15 @@ typedef struct {
     char username[33], password[129], new_password[129];
     char link_origin[65],link_article[65];
     char title[BOARD_TITLE+1], body[BOARD_BODY+1];
+    MmmScanTargets mmm_scanlist;
+    ConferenceRequest conference;
 } OperationRequest;
 typedef OperationRequest BoardRequest;
 /* Operation effects are produced beside domain results, never decoded from text.
  * text remains the legacy display payload. Zero feedback means no successful effect. */
 typedef struct {
     int failed,preferences_saved,checkpoint_saved,seen,ui_profile_saved;
+    DoorRequestError door_error;
     char article_access;uint32_t article_access_id;int audit_failed;
     int page_found; uint32_t page_next;
     int file_detail,file_board_info,file_menu,file_unlocked,file_copied;
@@ -46,7 +52,7 @@ typedef struct {
 typedef OperationFeedback BoardFeedback;
 typedef struct {
     int kind,state; /* 1=article, 2=mail; article state uses ArticleViewState */
-    uint32_t id,parent,board,sender,recipient;uint64_t at;size_t size;
+    uint32_t id,parent,board,sender,recipient,root;uint64_t at;size_t size;
     char author[33],recipient_name[33],title[81];
 } OperationContent;
 typedef OperationContent BoardContent;

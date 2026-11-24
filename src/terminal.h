@@ -11,7 +11,8 @@ typedef struct {
     void *context;
     char line[INPUT_LINE_MAX+2]; /* INPUT_LINE_MAX data bytes, optional raw CR, and terminator */
     size_t size;
-    int after_cr,escape,binary,uppercase;
+    int after_cr,escape,binary,uppercase,keys;
+    unsigned char key;
     unsigned escape_size;
 } Terminal;
 int terminal_init(Terminal *,TerminalMode,ByteSink,void *);
@@ -24,6 +25,7 @@ void terminal_set_binary(Terminal *,int);
 /* Decoded binary byte; no echo, CR translation, ANSI editing or EC/EL. */
 int terminal_binary_receive(Terminal *,unsigned char,unsigned char *);
 int terminal_receive(Terminal *,unsigned char,int secret);
+enum { TERMINAL_LINE=1, TERMINAL_KEY=2 };
 void terminal_clear(Terminal *);
 void terminal_dispose(Terminal *);
 #endif

@@ -1,13 +1,16 @@
 #include "session.h"
 #include "session_io.h"
+#include "zmodem_host.h"
 #include <string.h>
 #include <stdlib.h>
 #include "ui_profile.h"
 #include <openssl/crypto.h>
 
 SessionUiConfig session_ui_default(void) {
-    SessionUiConfig config={.count=1,.allowed=1,.policy=SESSION_UI_FIXED};
-    config.adapters[0]=session_ui_rtbbs();return config;
+    SessionUiConfig config={.count=2,.allowed=1,.policy=SESSION_UI_FIXED};
+    config.adapters[0]=session_ui_rtbbs();
+    config.adapters[1]=session_ui_mmm();
+    return config;
 }
 
 int session_ui_configure(SessionUiConfig *config,const char *policy,const char *name,const char *allow) {
@@ -58,6 +61,8 @@ const char *session_ui_name(const Session *s) { return s->ui_binding.active?s->u
 
 SessionUiSelection session_ui_preflight(const Session *s,const char *name) {
     if(!s->ui_binding.active || !name)return SESSION_UI_INVALID;
+    if(s->connection.legacy_connector || (*s->connection.connector_token &&
+        strcmp(name,s->ui_binding.active->name)))return SESSION_UI_DENIED;
     const SessionUiConfig *c=&s->ui_binding.config;
     unsigned i;
     for(i=0;i<c->count;i++)if(!strcmp(name,c->adapters[i]->name))break;
@@ -78,8 +83,29 @@ SessionUiSelection session_ui_select(Session *s,const char *name) {
     SessionUiSnapshot view=session_ui_snapshot(s);
     if(!session_ui_allocate(s,i))return SESSION_UI_INVALID;
     s->ui_binding.active->leave(s);s->ui_binding.active=c->adapters[i];s->ui_binding.state=s->ui_binding.states[i];
+    s->core.login_required=s->ui_binding.active->login_required;
     s->ui_binding.active->enter(s,0,view.menu,view.language);
+    if(s->core.user)s->ui_binding.active->mail_notify(s,s->core.user,s->core.mail_notify_deny,s->core.mail_notify_revision);
     return SESSION_UI_SELECTED;
+}
+
+int session_ui_legacy_connector(Session *s) {
+    const SessionUiAdapter *active=s->ui_binding.active;
+    if(!active->login_required || s->core.user || session_secret(s) || !active->can_leave(s))
+        return 0;
+    const SessionUiConfig *c=&s->ui_binding.config;
+    unsigned i=0;
+    while(i<c->count && c->adapters[i]!=session_ui_rtbbs())i++;
+    if(i==c->count || !session_ui_allocate(s,i))return 0;
+    Language language=session_ui_snapshot(s).language;
+    active->leave(s);
+    s->connection.legacy_connector=1;
+    s->ui_binding.active=c->adapters[i];
+    s->ui_binding.state=s->ui_binding.states[i];
+    /* The client protocol keeps the same required authentication as the MMM listener. */
+    s->ui_binding.active->enter(s,0,0,language);
+    session_impl_queue_text(s,"\r\nRAW\r\n");
+    return 1;
 }
 
 static void restore_choice(Session *s) {
@@ -98,6 +124,10 @@ void session_result(Session *s,const BoardResult *completion,uint64_t now) {
     int cancelled=s->ui_binding.active->keep_position(s,completion);
     SessionResultView view=session_core_receive(&s->core,completion,now,cancelled);
     if(view.status!=SESSION_RESULT_IGNORED && completion->auth)session_ui_discard_inactive(s);
+    if(view.status!=SESSION_RESULT_IGNORED && (completion->auth || completion->password_changed))
+        board_conference_session(s->core.slot,s->core.id,s->core.user,s->core.user_epoch);
+    if(view.status==SESSION_RESULT_OK && completion->mail_notify_user)
+        session_mail_notify(s,completion->mail_notify_user,completion->mail_notify_deny,completion->mail_notify_revision);
     if(view.status!=SESSION_RESULT_IGNORED)s->ui_binding.active->result(s,completion,view,now,cancelled);
     if(view.status==SESSION_RESULT_OK && (completion->auth>0 || completion->feedback.ui_profile_saved)) {
         memcpy(s->ui_binding.preferred,completion->ui_profile,sizeof(s->ui_binding.preferred));
@@ -186,8 +216,19 @@ void session_chat_kick(Session *s) { s->ui_binding.active->chat_kick(s); }
 void session_announce(Session *s,const char *text) { s->ui_binding.active->announce(s,text); }
 void session_notify(Session *s,MessageId id,uint32_t number,const char *body) { s->ui_binding.active->notify(s,id,number,body); }
 void session_mail_arrived(Session *s,uint32_t user) { s->ui_binding.active->mail_arrived(s,user); }
-void session_mail_notify(Session *s,uint32_t user,int deny,uint32_t revision) { s->ui_binding.active->mail_notify(s,user,deny,revision); }
+void session_mail_notify(Session *s,uint32_t user,int deny,uint32_t revision) {
+    if(!user || user!=s->core.user || revision<s->core.mail_notify_revision)return;
+    s->core.mail_notify_deny=deny;s->core.mail_notify_revision=revision;
+    s->ui_binding.active->mail_notify(s,user,deny,revision);
+}
 void session_transfer_receipt(Session *s,const char *text) { s->ui_binding.active->transfer_receipt(s,text); }
+int session_personal_received(Session *s,unsigned long session,uint32_t user,uint32_t epoch,const char *text,size_t size) {
+    if(!s->core.active || s->core.closing || !user || s->core.id!=session ||
+       s->core.user!=user || s->core.user_epoch!=epoch || !s->connection.zmodem ||
+       s->connection.zmodem_receive!=ZHOST_RECEIVE_PERSONAL || !s->ui_binding.active ||
+       !s->ui_binding.active->personal_receive)return 0;
+    return s->ui_binding.active->personal_receive(s,text,size);
+}
 void session_zmodem_finish(Session *s,int ok,unsigned id,uint64_t size,int recovery) {
     s->connection.zmodem=0;s->connection.zmodem_start=0;
     s->ui_binding.active->transfer_finish(s,ok,id,size,recovery);

@@ -35,6 +35,7 @@ typedef struct {
     int binary_menu;
     ConnectorReader binary_reader;
     char connector_token[65];
+    int legacy_connector;
     int connector_literal;
     ConnectorBlock connector_block;
 } SessionConnection;
@@ -73,10 +74,13 @@ int session_uppercase(const Session *,const char *,size_t);
 /* Caller retains a line while not ready; one accepted line per scheduler turn.
  * Secret input must not be echoed by adapters. Lines exclude CR/LF. */
 int session_line(Session *,const char *text,size_t size,uint64_t now);
+int session_keys(const Session *);
+void session_key(Session *,unsigned char,uint64_t now);
 void session_announce(Session *,const char *);
 void session_tick(Session *,uint64_t now);
 /* Runtime validates session/slot/transfer generation before delivering receipts. */
 void session_transfer_receipt(Session *,const char *);
+int session_personal_received(Session *,unsigned long session,uint32_t user,uint32_t epoch,const char *,size_t);
 void session_zmodem_finish(Session *,int success,unsigned id,uint64_t size,int recovery);
 void session_mail_arrived(Session *,uint32_t recipient);
 void session_mail_notify(Session *,uint32_t user,int deny,uint32_t revision);

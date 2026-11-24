@@ -95,6 +95,8 @@ typedef struct {
     Terminal terminal;
     unsigned char input[CAP],output[OUT_CAP];
     size_t used,queued,output_highwater;
+    unsigned long zsession;
+    uint32_t zuser,zepoch;
     Door *door;ZHost *zhost;int zgeneration,zresult,zrecovery;unsigned zid;uint64_t zsize,zend,zquiet,zstarted;
 } Connection;
 static Connection connections[SLOTS];
@@ -113,6 +115,7 @@ static ConnectionPolicy policy={.idle_seconds=600,.warning_seconds=60,.grace_sec
 static void stop(int sig) { (void)sig; stopping=1; }
 static void drop(Connection *c) {
     if(c->fd==INVALID)return; /* Unused slots contain no live secrets/resources. */
+    if(c->app.core.id)board_conference_session(c->app.core.slot,0,0,0);
     if(session_disconnect_preferences(&c->app,NULL)) {
         BoardRequest *q=calloc(1,sizeof(*q));
         if(q) { session_disconnect_preferences(&c->app,q);
@@ -173,12 +176,21 @@ static void notify_all(MessageId id,uint32_t number,const char *body) {
 }
 static void service_result(BoardResult *r) {
     if(r->service_action=='J') {
-        if(!r->service_number) { doors_list(r->service_next,r->text,sizeof(r->text));return; }
+        if(!r->service_number) {
+            if(r->structured) {
+                DoorListing listing={0};doors_listing(r->service_next,&listing);
+                OPERATION_PAGE(r,DOORS,doors,listing);
+            }
+            doors_list(r->service_next,r->text,sizeof(r->text));return;
+        }
         if(r->slot<0 || r->slot>=SLOTS) return;
         Connection *c=&connections[r->slot];Session *s=&c->app;
-        if(c->fd==INVALID || s->core.id!=r->session || !s->core.user || s->core.closing || !s->connection.binary_allowed || c->door) { door_launch_diagnostic("session-admission",0);(r->feedback.failed=1,strcpy(r->text,"ERR game unavailable\r\n"));return; }
-        c->door=door_start(r->service_number,r->service_next,s->core.user,s->core.username,s->connection.columns,s->connection.rows,now_ms(),s->core.id,s->core.user_epoch);
-        if(!c->door) { r->feedback.failed=1;strcpy(r->text,errno==EBUSY?"ERR game busy\r\n":"ERR game unavailable\r\n");return; }
+        if(c->fd==INVALID || s->core.id!=r->session || !s->core.user || s->core.closing || !s->connection.binary_allowed || c->door) { door_launch_diagnostic("session-admission",0);r->feedback.door_error=DOOR_REQUEST_DENIED;(r->feedback.failed=1,strcpy(r->text,"ERR game unavailable\r\n"));return; }
+        c->door=door_start(r->service_number,r->service_next,s->core.user,s->core.username,s->connection.columns,s->connection.rows,now_ms(),s->core.id,s->core.user_epoch,&r->feedback.door_error);
+        if(!c->door) {
+            r->feedback.failed=1;
+            strcpy(r->text,r->feedback.door_error==DOOR_REQUEST_FULL?"ERR game busy\r\n":"ERR game unavailable\r\n");return;
+        }
         s->connection.door=1;c->used=0;terminal_clear(&c->terminal);session_scan_pause(s);
         if(!session_notice(s,SESSION_NOTICE_DOOR,0,0,0,r->text,sizeof(r->text)))session_abort(s);
         return;
@@ -238,6 +250,12 @@ static void zadvance(Connection *c,uint64_t now) {
         if(now-c->zend>2000 && now-c->zquiet<500) { drop(c);return; }
         if(now-c->zquiet>=500) {
             c->zend=0;terminal_set_binary(&c->terminal,0);
+            if(c->zhost) {
+                size_t size;
+                const char *payload=zhost_personal_payload(c->zhost,&size);
+                c->zresult=payload && session_personal_received(s,c->zsession,c->zuser,c->zepoch,payload,size);
+                zhost_stop(c->zhost);c->zhost=NULL;
+            }
             session_zmodem_finish(s,c->zresult,c->zid,c->zsize,c->zrecovery);
         }
         return;
@@ -245,7 +263,16 @@ static void zadvance(Connection *c,uint64_t now) {
     if(!c->zhost) {
         if(next_zgeneration==INT_MAX) { drop(c);return; }
         c->zgeneration=next_zgeneration++;c->zstarted=now;
-        c->zhost=zhost_start(zhelper,s->connection.zmodem_receive,s->connection.zmodem_id,s->core.username,s->connection.zmodem_text,service_port,now,s->connection.zmodem_protocol);
+        c->zsession=s->core.id;c->zuser=s->core.user;c->zepoch=s->core.user_epoch;
+        unsigned ident=s->connection.zmodem_id;
+        const char *argument=s->connection.zmodem_text;
+        char personal[64];
+        if(s->connection.zmodem_receive==ZHOST_RECEIVE_PERSONAL) {
+            ident=(unsigned)c->zgeneration;
+            snprintf(personal,sizeof(personal),"%lu:%.5s",c->zsession,argument);
+            argument=personal;
+        }
+        c->zhost=zhost_start(zhelper,s->connection.zmodem_receive,ident,s->core.username,argument,service_port,now,s->connection.zmodem_protocol);
         if(!c->zhost) { c->zresult=0;c->zid=c->zsize=0;c->zrecovery=0;c->zend=c->zquiet=now;return; }
     }
     if(c->queued<=OUT_CAP/2) {
@@ -258,7 +285,10 @@ static void zadvance(Connection *c,uint64_t now) {
         }
         if(done) {
             zhost_receipt(c->zhost,&c->zid,&c->zsize,&c->zrecovery);
-            c->zresult=done>0;c->zend=c->zquiet=now;zhost_stop(c->zhost);c->zhost=NULL;
+            c->zresult=done>0;c->zend=c->zquiet=now;
+            if(done<0 || s->connection.zmodem_receive!=ZHOST_RECEIVE_PERSONAL) {
+                zhost_stop(c->zhost);c->zhost=NULL;
+            }
             OPENSSL_cleanse(c->input,c->used);c->used=0;return;
         }
     }
@@ -338,6 +368,7 @@ static void advance(Connection *c,uint64_t now) {
         unsigned old_width=c->terminal.telnet.width,old_height=c->terminal.telnet.height;
         size_t old_size=c->terminal.size;
         c->terminal.uppercase=session_uppercase(s,c->terminal.line,c->terminal.size);
+        c->terminal.keys=session_keys(s);
         int result=terminal_receive(&c->terminal,c->input[consumed++],session_secret(s));
         if(result>0 || c->terminal.size!=old_size) { connection_input(&c->clock,now); }
         if(c->terminal.mode==TERMINAL_TELNET && (old_width!=c->terminal.telnet.width || old_height!=c->terminal.telnet.height))
@@ -346,7 +377,8 @@ static void advance(Connection *c,uint64_t now) {
         if(session_secret(s) && c->terminal.mode==TERMINAL_TELNET && !telnet_echo(&c->terminal.telnet)) { drop(c); return; }
         if(result>0) {
             s->connection.binary_allowed=terminal_binary_ready(&c->terminal);
-            session_line(s,c->terminal.line,c->terminal.size,now);
+            if(result==TERMINAL_KEY)session_key(s,c->terminal.key,now);
+            else session_line(s,c->terminal.line,c->terminal.size,now);
             terminal_clear(&c->terminal);
             /* Do not accept passwords from Telnet clients declining remote echo. */
             if(session_secret(s) && c->terminal.mode==TERMINAL_TELNET && !telnet_echo(&c->terminal.telnet)) session_abort(s);

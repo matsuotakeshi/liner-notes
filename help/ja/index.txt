@@ -9,6 +9,7 @@ HELP EDITOR    共通エディタ・補助操作
 HELP DRAFT     下書きの保存と再開
 HELP FILES     ファイル保管庫
 HELP GATHER    Gather伝言板
+HELP LINECONF  一行会議
 HELP SETTINGS  言語・ページ送り・表示設定
 HELP MAIL      会員間メール
 HELP PROFILE   公開プロフィール

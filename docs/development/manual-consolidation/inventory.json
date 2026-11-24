@@ -6494,6 +6494,10 @@
     "help/ja/index.txt": [
       "navigation"
     ],
+    "help/ja/lineconf.txt": [
+      "conversation",
+      "protocol"
+    ],
     "help/ja/mail.txt": [
       "mail"
     ],
@@ -6557,6 +6561,7 @@
     "help/en/files.txt": "English equivalent of Japanese runtime HELP; compared with current implementation; consolidated into Japanese canonical chapters.",
     "help/en/gather.txt": "English equivalent of Japanese runtime HELP; compared with current implementation; consolidated into Japanese canonical chapters.",
     "help/en/index.txt": "English equivalent of Japanese runtime HELP; compared with current implementation; consolidated into Japanese canonical chapters.",
+    "help/en/lineconf.txt": "English runtime HELP for the shared line conference; see conversation and protocol.",
     "help/en/mail.txt": "English equivalent of Japanese runtime HELP; compared with current implementation; consolidated into Japanese canonical chapters.",
     "help/en/post.txt": "English equivalent of Japanese runtime HELP; compared with current implementation; consolidated into Japanese canonical chapters.",
     "help/en/profile.txt": "English equivalent of Japanese runtime HELP; compared with current implementation; consolidated into Japanese canonical chapters.",

@@ -81,21 +81,22 @@ int banner_load(const char *path) {
     return normalize(input,n,banner,sizeof(banner));
 }
 
-static const char *help_topics[]={"INDEX","READ","UNREAD","POST","DRAFT","SETTINGS","ACCOUNT","ADMIN","CONTENT","PROFILE","FILES","CHAT","MAIL","GATHER","SIGOP","EDITOR","ADMINMEMBERS","ADMINBOARDS","ADMINFILES","ADMINCONNECTIONS","ADMINSTORAGE"};
-static char helps[LANGUAGE_COUNT][21][32768];
+static const char *help_topics[]={"INDEX","READ","UNREAD","POST","DRAFT","SETTINGS","ACCOUNT","ADMIN","CONTENT","PROFILE","FILES","CHAT","MAIL","GATHER","LINECONF","SIGOP","EDITOR","ADMINMEMBERS","ADMINBOARDS","ADMINFILES","ADMINCONNECTIONS","ADMINSTORAGE"};
+enum { HELP_TOPICS=sizeof(help_topics)/sizeof(*help_topics) };
+static char helps[LANGUAGE_COUNT][HELP_TOPICS][32768];
 const char *help_text(Language language,const char *topic) {
     if(language<0 || language>=LANGUAGE_COUNT)return NULL;
     if(!*topic)topic="INDEX";
     if(!strcmp(topic,"TALK"))topic="CHAT";
-    for(unsigned i=0;i<21;i++)if(!strcmp(topic,help_topics[i]))return helps[language][i][0]?helps[language][i]:NULL;
+    for(unsigned i=0;i<HELP_TOPICS;i++)if(!strcmp(topic,help_topics[i]))return helps[language][i][0]?helps[language][i]:NULL;
     return NULL;
 }
 int help_load(const char *directory,int required) {
     memset(helps,0,sizeof(helps));
-    for(int l=0;l<LANGUAGE_COUNT;l++)for(unsigned i=0;i<21;i++) {
+    for(int l=0;l<LANGUAGE_COUNT;l++)for(unsigned i=0;i<HELP_TOPICS;i++) {
         char path[4096],topic[24];snprintf(topic,sizeof(topic),"%s",help_topics[i]);for(char *p=topic;*p;p++)if(*p>='A' && *p<='Z')*p+=32;
         int n=snprintf(path,sizeof(path),"%s/%s/%s.txt",directory,language_code((Language)l),topic);if(n<=0 || (size_t)n>=sizeof(path))return 0;
-        FILE *file=fopen(path,"rb");if(!file) { if(!required && errno==ENOENT)continue;fprintf(stderr,"help: cannot read %s\n",path);return 0; }
+        FILE *file=fopen(path,"rb");if(!file) { if(errno==ENOENT && (!required || !strcmp(help_topics[i],"LINECONF")))continue;fprintf(stderr,"help: cannot read %s\n",path);return 0; }
         unsigned char input[16385];size_t bytes=fread(input,1,sizeof(input),file);int bad=ferror(file);if(fclose(file))bad=1;
         if(bad || bytes>16384 || !normalize(input,bytes,helps[l][i],sizeof(helps[l][i]))) { fprintf(stderr,"help: invalid UTF-8, empty or oversized topic: %s\n",path);return 0; }
     }

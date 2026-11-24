@@ -4,6 +4,8 @@
 SessionOperationStatus session_core_submit(SessionCore *s,OperationRequest *q,SessionOperationPort port) {
     if(!s->active || s->closing)return SESSION_OPERATION_INACTIVE;
     if(s->pending || (s->wake && s->now<s->wake))return SESSION_OPERATION_BUSY;
+    if(s->login_required && !s->user && q->op!='a' && q->op!='g' && q->op!=BOARD_SSH_KEY)
+        return SESSION_OPERATION_LOGIN_REQUIRED;
     if((q->op=='a' || q->op=='g' || q->op==BOARD_SSH_KEY) && s->now<s->auth_after)return SESSION_OPERATION_THROTTLED;
     q->structured=s->structured;q->session=s->id;q->slot=s->slot;q->user=s->user;q->user_epoch=s->user_epoch;
     memcpy(q->board_grants,s->board_grants,sizeof(q->board_grants));
@@ -17,6 +19,7 @@ void session_core_init(SessionCore *s,unsigned long id,int slot,int boards,int m
     memset(s,0,sizeof(*s));s->active=1;s->id=id;s->slot=slot;s->board_enabled=boards;s->member_mode=members;s->board=1;
 }
 static void clear_identity(SessionCore *s) {
+    s->mail_notify_revision=0;s->mail_notify_deny=0;
     s->user=s->user_epoch=s->current=0;s->board=1;s->username[0]=0;s->member_level=0;s->admin=s->sigop=0;
     memset(s->board_grants,0,sizeof(s->board_grants));session_core_clear_vault_grants(s);
 }

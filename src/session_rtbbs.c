@@ -4,6 +4,7 @@
 #include <openssl/crypto.h>
 
 static void enter(Session *s,int initial,int menu,Language language) {
+    s->core.structured=0;
     if(!rtbbs(s)->initialized) { rtbbs(s)->initialized=1;rtbbs(s)->presentation.menu_mode=1; }
     if(initial) {
         rtbbs(s)->presentation.menu_mode=1;rtbbs(s)->reading.check.automatic=menu;
@@ -169,5 +170,6 @@ void session_impl_submit(Session *s,BoardRequest *q) {
     s->ui_binding.active->prepare_request(s,q);
     SessionOperationStatus result=session_submit(s,q);
     if(result==SESSION_OPERATION_THROTTLED)session_impl_emit(s,"ERR try later\r\n");
+    else if(result==SESSION_OPERATION_LOGIN_REQUIRED)session_impl_emit(s,"ERR login required\r\n");
     else if(result!=SESSION_OPERATION_ACCEPTED)session_impl_emit(s,"ERR board busy\r\n");
 }

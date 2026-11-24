@@ -44,6 +44,10 @@ liner-notes-admin transfers reconcile --root /var/db/liner-notes/spool pending-I
 
 受信途中のpending/retainedは前節の復帰・削除を使います。受信済みの不明データを通常のremoveで消すことは引き続き拒否します。
 
+## MMMパーソナルファイルの受信一時領域
+
+開発版の `pfile -b` は、正常終了や中断の後に受信一時データを消去します。プロセスの強制終了などで残った項目は `liner-notes-admin transfers list --root PATH` に `kind: personal-file` と表示されます。`active` は使用中です。`interrupted` の場合に限り `liner-notes-admin transfers remove --root PATH ID --apply` で消去できます。`PATH` は転送spool、`ID` は一覧の完全なIDです。パーソナルファイルには再開操作がありません。
+
 ## Solaris移植中のspool排他
 
 次期版のSolarisではspool直下に空の`.namespace-lock`を0600で保持します。これは転送データではなく、削除・復元の対象にできません。転送データを整理した後にも残る正常な管理ファイルです。手作業で削除・置換すると排他対象が変わるため操作しないでください。FreeBSD/Linuxでは従来のディレクトリflockを維持します。[Solarisの検証状況](install-solaris.md)を参照してください。

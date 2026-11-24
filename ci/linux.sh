@@ -48,7 +48,7 @@ runuser -u bbstest -- bash -c '
     fi
     exit 1
   fi
-  make CC=clang PYTHON=python3.11 SQLITE_CFLAGS= SQLITE_LIBS=-lsqlite3 test-zmodem LRZ=/home/bbstest/lrzsz-check/local/bin/lrz LSZ=/home/bbstest/lrzsz-check/local/bin/lsz
+  LINER_TEST_ZMODEM_SSH=1 make CC=clang PYTHON="$PWD/.web-venv/bin/python" SQLITE_CFLAGS= SQLITE_LIBS=-lsqlite3 test-zmodem LRZ=/home/bbstest/lrzsz-check/local/bin/lrz LSZ=/home/bbstest/lrzsz-check/local/bin/lsz
   # Match native Linux stack limits; Docker may inherit an unlimited stack.
   ulimit -s 8192
   make CC=clang PYTHON=python3.11 SQLITE_CFLAGS= SQLITE_LIBS=-lsqlite3 check test-stage67 test-stage68 test-stage69 test-stage70

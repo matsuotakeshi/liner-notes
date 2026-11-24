@@ -14,6 +14,8 @@ typedef struct { DoorSpec games[DOOR_CATALOG_LIMIT];unsigned count; } DoorCatalo
 /* Copy-owned, filtered metadata; independent of the configuration lifetime. */
 typedef struct { unsigned id,seconds;char title[161]; } DoorSummary;
 typedef struct { DoorSummary games[DOOR_CATALOG_LIMIT];unsigned count; } DoorListing;
+typedef enum { DOOR_REQUEST_NONE, DOOR_REQUEST_UNKNOWN, DOOR_REQUEST_DENIED,
+               DOOR_REQUEST_FULL, DOOR_REQUEST_START_FAILED } DoorRequestError;
 typedef int (*DoorPathCheck)(void *,const DoorSpec *);
 
 void door_core_clear(DoorCatalog *);
@@ -26,5 +28,6 @@ int door_core_add(DoorCatalog *,const char *,DoorPathCheck,void *);
 void door_core_list(const DoorCatalog *,unsigned,DoorListing *);
 /* Borrowed immutable spec; valid until catalog reload. No process is launched.
  * Platform adapter provides effective-root status and retains all PTY/slot checks. */
+const DoorSpec *door_core_find(const DoorCatalog *,unsigned id);
 const DoorSpec *door_core_launch(const DoorCatalog *,unsigned,unsigned,uint32_t,int);
 #endif

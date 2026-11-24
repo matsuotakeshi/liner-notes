@@ -32,6 +32,7 @@
 #include "extras.h"
 #include "profile_store.h"
 #include "mailbox.h"
+#include "chat_core.h"
 #include "mail_files.h"
 #include "messages.h"
 #include <openssl/crypto.h>
@@ -120,6 +121,14 @@ static uint32_t user_posts[(MEMBER_MAX+1)];
 static int version=4,format5;
 static uint32_t article_count;
 static int store=-1, failed, ending, running, body_read_failed;
+static ConferenceActor conference_sessions[CONNECTION_MAX];
+
+void board_conference_session(int slot,unsigned long session,uint32_t user,uint32_t epoch) {
+    if(!running || slot<0 || slot>=CONNECTION_MAX)return;
+    LOCK();
+    conference_sessions[slot]=(ConferenceActor){session,slot,user,epoch};
+    UNLOCK();
+}
 typedef struct UiSave { struct UiSave *next;uint64_t ticket;BoardRequest request; } UiSave;
 static UiSave *ui_head,*ui_tail;
 static struct { int state; uint64_t ticket; BoardRequest request; BoardResult result; } jobs[QUEUE];
@@ -338,7 +347,8 @@ static void display_article(const BoardRequest *q,uint32_t id,BoardResult *r,int
         r->selected=view.id;
         if(view.state==ARTICLE_VISIBLE) { r->feedback.article_access='R';r->feedback.article_access_id=view.id; }
         if(q->structured) { r->content.kind=1;r->content.state=view.state;r->content.id=view.id;r->content.parent=view.parent;r->content.board=view.board;
-            r->content.size=view.body_size;snprintf(r->content.author,sizeof(r->content.author),"%s",view.author);snprintf(r->content.title,sizeof(r->content.title),"%s",view.title); }
+            r->content.size=view.body_size;r->content.root=view.root;r->content.at=view.created;
+            snprintf(r->content.author,sizeof(r->content.author),"%s",view.author);snprintf(r->content.title,sizeof(r->content.title),"%s",view.title); }
         if(view.state==ARTICLE_WITHDRAWN)
             snprintf(r->text,sizeof(r->text),"WITHDRAWN %u PARENT %u\r\n",view.id,view.parent);
         else if(view.state==ARTICLE_CONCEALED)
@@ -488,6 +498,74 @@ static int extra_text(const char *text,size_t max,int empty) {
 static void post_result(ArticleOutcome result,BoardResult *r);
 
 static void member_result(MemberOutcome result,BoardResult *r);
+static void note_view(const BoardRequest *q,BoardResult *r) {
+    ArticleActor actor={q->user,q->user_epoch,q->board_grants};
+    ArticleOutcome result;
+    if(q->action=='g' || q->action=='G') {
+        MmmSignature signature;
+        result=q->action=='G'?mmm_signature_set(&actor,q->scope,q->body,&signature):mmm_signature_get(&actor,&signature);
+        if(result!=ARTICLE_OK)post_result(result,r);
+        else { r->service_number=(uint32_t)signature.automatic;strcpy(r->draft_body,signature.body); }
+        return;
+    }
+    if(q->action=='C' || q->action=='K' || q->action=='T') {
+        MemberActor member={q->user,q->user_epoch};
+        MemberCheckWindow window;
+        MemberOutcome status=q->action=='C'?member_core_check_begin(&member,MEMBER_CHECK_MMM,"",&window):
+            q->action=='T'?member_core_mmm_set(&member,q->until):
+            member_core_check_commit(&member,MEMBER_CHECK_MMM,"",q->until);
+        if(status!=MEMBER_CORE_OK)member_result(status,r);
+        else if(q->action=='C') {
+            r->since=window.since;r->until=window.until;
+            if(q->scope) {
+                MmmScanList page;
+                result=mmm_note_scanlist(&actor,&page);
+                if(result!=ARTICLE_OK)post_result(result,r);
+                else OPERATION_PAGE(r,MMM_SCANLIST,mmm_scanlist,page);
+            }
+        }
+        else { r->feedback.checkpoint_saved=1;r->since=q->until; }
+        return;
+    }
+    if(q->action=='S') {
+        ArticlePage page;
+        result=article_news_filtered(&actor,q->number,q->number?ARTICLE_HERE:ARTICLE_ALL,
+                                     q->cursor,q->since,q->until,q->notes_unread,&page);
+        /* An entry can become unreadable halfway through an ordered scan. */
+        if(result==ARTICLE_BOARD_DENIED && q->scope)result=ARTICLE_OK;
+        if(result==ARTICLE_OK)OPERATION_PAGE(r,ARTICLES,articles,page);
+    } else if(q->action=='B') {
+        ArticleBoardsPage page;
+        result=article_board_children(&actor,q->number,q->cursor,&page);
+        if(result==ARTICLE_OK)OPERATION_PAGE(r,BOARDS,boards,page);
+    } else if(q->action=='N') {
+        uint32_t id;
+        result=q->title[0]=='@'?mmm_note_label_resolve(&actor,q->title+1,&id):article_board_named(&actor,q->title,&id);
+        if(result==ARTICLE_OK)r->service_number=id;
+    } else if(q->action=='L') {
+        char label[MMM_LABEL_MAX+1];
+        result=mmm_note_label(&actor,q->number,q->scope?q->title:NULL,label);
+        if(result==ARTICLE_OK) {
+            r->service_number=q->number;
+            strcpy(r->service_text,label);
+            snprintf(r->text,sizeof(r->text),"BOARDLABEL %u %s\r\n",q->number,*label?label:"NONE");
+        }
+    } else if(q->action=='D') {
+        MmmScanList page;
+        result=mmm_note_scanlist(&actor,&page);
+        if(result==ARTICLE_OK)OPERATION_PAGE(r,MMM_SCANLIST,mmm_scanlist,page);
+    } else if(q->action=='W') {
+        result=mmm_note_scanlist_save(&actor,&q->mmm_scanlist);
+    } else {
+        ArticlePage page;
+        result=article_browse_notes(&actor,q->board,q->number,q->cursor,q->descending,
+                                    q->notes_unread,*q->title?q->title:NULL,&page);
+        if(result==ARTICLE_BOARD_DENIED && q->scope)result=ARTICLE_OK;
+        if(result==ARTICLE_OK)OPERATION_PAGE(r,ARTICLES,articles,page);
+    }
+    if(result!=ARTICLE_OK)post_result(result,r);
+}
+
 static void extra_execute(const BoardRequest *q,BoardResult *r) {
     if(q->action==1 || q->action==2) {
         ArticleActor actor={q->user,q->user_epoch,q->board_grants};
@@ -712,6 +790,22 @@ static void mail_transfer_execute(const BoardRequest *q,BoardResult *r) {
     if(context.outcome==MAIL_CORE_STORAGE)(r->feedback.failed=1,strcpy(r->text,"ERR vault storage\r\n"));
     else if(context.outcome!=MAIL_CORE_OK)mail_result(q,context.outcome,r);
 }
+/* The request opts in. The worker loads only the authenticated actor's
+ * current signature and validates the combined body before any durable write. */
+static const char *body_with_signature(const BoardRequest *q,BoardResult *r) {
+    if(!q->append_signature || !*q->body)return q->body;
+    MmmSignature signature;
+    ArticleActor actor={q->user,q->user_epoch,q->board_grants};
+    ArticleOutcome status=mmm_signature_get(&actor,&signature);
+    if(status!=ARTICLE_OK) { post_result(status,r);return NULL; }
+    if(!signature.automatic)return q->body;
+    size_t body=strlen(q->body),suffix=strlen(signature.body);
+    if(body+suffix>ln_limit("BODY",BOARD_BODY)) { post_result(ARTICLE_BODY_LIMIT,r);return NULL; }
+    memcpy(r->draft_body,q->body,body);
+    memcpy(r->draft_body+body,signature.body,suffix+1);
+    return r->draft_body;
+}
+
 static void mail_execute(const BoardRequest *q,BoardResult *r) {
     /* Preserve the completion kind even on quota refusal so a failed send
      * returns to the editor with its unsent text and draft revision intact. */
@@ -808,13 +902,14 @@ static void mail_execute(const BoardRequest *q,BoardResult *r) {
         size_t offset=0;for(unsigned i=0;i<item.attachments.count;i++)offset+=mail_attachment_text(q,item.attachments.ids[i],r->text+offset,sizeof(r->text)-offset);
         snprintf(r->text+offset,sizeof(r->text)-offset,mail_text(q,MSG_MAIL_ITEM,"MAIL ITEM %u FROM %s TO %s READ %u REPLY %u\r\nTITLE %s\r\nBODY\r\n%sMAIL END\r\n"),m->id,m->from,m->to,(unsigned)m->read,m->parent,m->title,r->draft_body);return;
     }
-    if(q->action=='D') {
-        MailOutcome result=mail_core_delete(&actor,id);
+    if(q->action=='D' || q->action=='K') {
+        MailOutcome result=q->action=='K'?mail_core_retract(&actor,id):mail_core_delete(&actor,id);
         if(result!=MAIL_CORE_OK) { mail_result(q,result,r);return; }
         snprintf(r->text,sizeof(r->text),mail_text(q,MSG_MAIL_DELETED,"MAIL DELETED %u\r\n"),id);return;
     }
     if(q->action=='S') {
-        MailWrite input={q->number,q->cursor,q->mail_revision,q->title,q->body,q->mail_attachments};
+        const char *body=body_with_signature(q,r);if(!body)return;
+        MailWrite input={q->number,q->cursor,q->mail_revision,q->title,body,q->mail_attachments};
         MailOutcome result=mail_core_send(&actor,&input,&id);
         if(result!=MAIL_CORE_OK) { mail_result(q,result,r);return; }
         r->mail_delivery=q->number;r->mail_id=id;
@@ -824,6 +919,45 @@ unavailable:r->feedback.failed=1;snprintf(r->text,sizeof(r->text),"%s",mail_text
 }
 #include "link_schema.h"
 #include "features64.inc"
+
+static int conference_guest(const char *login) {
+    const char guest[]="guest";
+    if(strlen(login)!=sizeof(guest)-1)return 0;
+    for(unsigned i=0;i<sizeof(guest)-1;i++) {
+        unsigned char ch=(unsigned char)login[i];
+        if(ch>='A' && ch<='Z')ch=(unsigned char)(ch+'a'-'A');
+        if(ch!=(unsigned char)guest[i])return 0;
+    }
+    return 1;
+}
+
+static ConferenceStatus conference_identity(void *unused,const ConferenceActor *actor,ConferenceIdentity *who) {
+    (void)unused;
+    if(actor->slot<0 || actor->slot>=CONNECTION_MAX)return CONFERENCE_EXPIRED;
+    LOCK();ConferenceActor live=conference_sessions[actor->slot];UNLOCK();
+    if(live.session!=actor->session || live.user!=actor->user || live.epoch!=actor->epoch)
+        return CONFERENCE_EXPIRED;
+
+    IdentityProvider auth=identity_legacy_provider();
+    Principal principal;
+    if(!auth.resolve(auth.context,actor->user,actor->epoch,&principal) ||
+       !members_active(actor->user) || members_pending(actor->user))return CONFERENCE_EXPIRED;
+    const char *login=members_name(actor->user);
+    const char *name=profile_value(actor->user,0);
+    if(strlen(name)>80 || !chat_core_text_valid(name))name=login;
+    snprintf(who->name,sizeof(who->name),"%s",name);
+    who->guest=conference_guest(login);
+    who->administrator=moderation_admin(actor->user);
+    return CONFERENCE_OK;
+}
+
+static void conference_execute(const BoardRequest *q,BoardResult *r) {
+    ConferenceActor actor={q->session,q->slot,q->user,q->user_epoch};
+    r->page.kind=OPERATION_PAGE_CONFERENCE;
+    ConferenceStatus status=conference_run(features_db,conference_identity,NULL,&actor,&q->conference,&r->page.data.conference);
+    if(status!=CONFERENCE_OK)r->feedback.failed=1;
+}
+
 static int append_article_record(uint32_t board,uint32_t parent,uint32_t user,
                                  const char *author,const char *title,const char *body,
                                  int remote,uint64_t remote_stamp,uint32_t *id) {
@@ -873,6 +1007,9 @@ static void post_result(ArticleOutcome result,BoardResult *r) {
     switch(result) {
     case ARTICLE_REVOKED: r->revoked=1;(r->feedback.failed=1,strcpy(r->text,"ERR session revoked\r\n"));break;
     case ARTICLE_LOGIN_REQUIRED: (r->feedback.failed=1,strcpy(r->text,"ERR login required\r\n"));break;
+    case ARTICLE_ADMIN_REQUIRED: (r->feedback.failed=1,strcpy(r->text,"ERR admin required\r\n"));break;
+    case ARTICLE_INVALID_QUERY: (r->feedback.failed=1,strcpy(r->text,"ERR command\r\n"));break;
+    case ARTICLE_SETTINGS_STORAGE: (r->feedback.failed=1,strcpy(r->text,"ERR settings storage\r\n"));break;
     case ARTICLE_BOARD_DENIED: (r->feedback.failed=1,strcpy(r->text,"ERR board unavailable\r\n"));break;
     case ARTICLE_POSTING_DENIED: (r->feedback.failed=1,strcpy(r->text,"ERR posting denied\r\n"));break;
     case ARTICLE_NOT_FOUND: (r->feedback.failed=1,strcpy(r->text,"ERR no parent\r\n"));break;
@@ -999,12 +1136,14 @@ static void execute(const BoardRequest *q,BoardResult *r) {
     r->ui_profile[0]=0;r->session=q->session; r->slot=q->slot;r->zcontrol=q->zcontrol; r->selected=0; r->auth=0; r->board=0; r->editing=0; r->user_epoch=0; r->account_user=0; r->account_epoch=0; r->revoked=0; r->password_changed=0; r->preferences=0; r->language=0; r->pager=0; r->draft_loaded=0; r->draft_revision=0; r->draft_parent=0;
     if(extras_broken() || profile_store_broken()) { (r->feedback.failed=1,strcpy(r->text,"ERR extras storage\r\n")); return; }
     if(members_broken()) { (r->feedback.failed=1,strcpy(r->text,"ERR member storage unavailable\r\n")); return; }
-    if(((q->op=='m' || q->op==BOARD_MAIL_TRANSFER || (q->op=='@' && q->action==1)) && !board_feature_enabled("mail")) || (q->op=='&' && !board_feature_enabled("chat")) || (strchr("@Y$^",q->op) && !(q->op=='@' && q->action==1) && !board_feature_enabled("vault"))) { (r->feedback.failed=1,strcpy(r->text,"ERR feature disabled\r\n"));return; }
+    if(((q->op=='m' || q->op==BOARD_MAIL_TRANSFER || (q->op=='@' && q->action==BOARD_BINARY_MAIL)) && !board_feature_enabled("mail")) || (q->op=='&' && !board_feature_enabled("chat")) || (strchr("@Y$^",q->op) && !(q->op=='@' && (q->action==BOARD_BINARY_MAIL || q->action==BOARD_BINARY_PERSONAL)) && !board_feature_enabled("vault"))) { (r->feedback.failed=1,strcpy(r->text,"ERR feature disabled\r\n"));return; }
     if(q->op=='a' || q->op=='g' || q->op==BOARD_SSH_KEY) { authentication_execute(q,r);return; }
     if(q->user && (moderation_suspended(q->user) || q->user_epoch!=moderation_epoch(q->user))) {
         r->revoked=1; (r->feedback.failed=1,strcpy(r->text,"ERR session revoked\r\n")); return;
     }
     if(q->op=='}') { advanced_execute(q,r);return; }
+    if(q->op==BOARD_NOTE_VIEW) { note_view(q,r);return; }
+    if(q->op==BOARD_CONFERENCE) { conference_execute(q,r);return; }
     if(q->op==BOARD_LINK) { link_execute(q,r);return; }
     if(q->op==BOARD_MEMBER_LIFECYCLE) {
         MemberActor actor={q->user,q->user_epoch};MemberChange change;
@@ -1171,6 +1310,7 @@ static void execute(const BoardRequest *q,BoardResult *r) {
         else if(q->op=='w') {
             r->draft_revision=revision;snprintf(r->text,sizeof(r->text),"DRAFT STORED %u\r\n",revision);
         } else if(q->op=='d') {
+            r->draft_revision=revision;
             if(revision)snprintf(r->text,sizeof(r->text),"DRAFT STORED %u\r\n",revision);
             else strcpy(r->text,"DRAFT NONE\r\n");
         } else if(!draft.revision)strcpy(r->text,"DRAFT NONE\r\n");
@@ -1318,7 +1458,9 @@ static void execute(const BoardRequest *q,BoardResult *r) {
         if(result!=ARTICLE_OK) { post_result(result,r);return; }
         if(entry.password_board && q->action=='t')(r->feedback.failed=1,strcpy(r->text,"ERR try later\r\n"));
         else if(entry.password_board) { r->service_action='1';r->service_number=entry.id;r->board_grant=entry.password_board;strcpy(r->text,"BOARD PASSWORD\r\n"); }
-        else { r->board=entry.id;if(entry.menu)r->service_action='7';snprintf(r->text,sizeof(r->text),"BOARD %u %.80s\r\n",entry.id,entry.title); }
+        else { r->board=entry.id;if(entry.menu)r->service_action='7';
+            if(q->structured)snprintf(r->service_text,sizeof(r->service_text),"%s",entry.title);
+            snprintf(r->text,sizeof(r->text),"BOARD %u %.80s\r\n",entry.id,entry.title); }
         return;
     }
     if(!catalog_read(q->board,q->user)) { (r->feedback.failed=1,strcpy(r->text,"ERR board unavailable\r\n")); return; }
@@ -1327,8 +1469,10 @@ static void execute(const BoardRequest *q,BoardResult *r) {
     }
     if(q->op=='P' || q->op=='e') {
         ArticleActor actor={q->user,q->user_epoch,q->board_grants};
+        const char *body=q->op=='P'?body_with_signature(q,r):q->body;
+        if(!body)return;
         ArticleOutcome result=q->op=='e'?article_prepare_post(&actor,q->board,q->number):
-            article_post(&actor,q->board,q->number,q->username,q->title,q->body,&r->selected);
+            article_post(&actor,q->board,q->number,q->username,q->title,body,&r->selected);
         if(result!=ARTICLE_OK) { post_result(result,r);return; }
         if(q->op=='P') { r->feedback.article_access='P';r->feedback.article_access_id=r->selected;snprintf(r->text,sizeof(r->text),"SAVED %u\r\n",r->selected); }
         else if(q->action=='?') { r->service_action='E';r->service_number=q->number?2:1; }
@@ -1498,6 +1642,7 @@ int board_start_config(const char *path,const char *members,const char *catalog,
     if(!access_prune(1)) { fprintf(stderr,"board access: retention failed\n");return 0; }
     for(uint32_t id=1;id<=article_count;id++) if(*extras_title(id)) strcpy((*article_at(id-1)).title,extras_title(id));
     if(!completion_open())return 0;
+    memset(conference_sessions,0,sizeof(conference_sessions));
 #ifdef _WIN32
     InitializeCriticalSection(&mutex); InitializeConditionVariable(&condition);
     worker=(HANDLE)_beginthreadex(NULL,32*1024*1024,work,NULL,0,NULL);

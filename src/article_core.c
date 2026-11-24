@@ -420,6 +420,8 @@ static ArticleOutcome read_article(const ArticleActor *actor,uint32_t id,int ins
     if(!body || capacity<=article.body_size)return ARTICLE_BUFFER_TOO_SMALL;
     if(!article_repository_body(id,body,capacity))return ARTICLE_STORAGE;
     out->state=ARTICLE_VISIBLE;out->inspected_hidden=hidden;
+    out->root=article.root;
+    out->created=article.created;
     out->body_size=article.body_size;
     memcpy(out->author,article.author,sizeof(out->author));
     memcpy(out->title,article.title,sizeof(out->title));
@@ -512,6 +514,62 @@ ArticleOutcome article_boards(const ArticleActor *actor,uint32_t start,int child
     return result;
 }
 
+static ArticleOutcome board_children(const ArticleActor *actor,uint32_t parent,uint32_t start,
+                                      ArticleBoardsPage *out) {
+    ArticleOutcome result=health();
+    if(result!=ARTICLE_OK)return result;
+    result=identity(actor,0);
+    if(result!=ARTICLE_OK)return result;
+    if(parent && !catalog_read(parent,actor->user))return ARTICLE_BOARD_DENIED;
+    unsigned char visited[CATALOG_MAX+1]={0};
+    for(uint32_t id=start?start:1;id;id=catalog_next(id)) {
+        if(id>CATALOG_MAX || !catalog_exists(id) || visited[id])return ARTICLE_STORAGE;
+        visited[id]=1;
+        if(catalog_parent(id)!=parent || !catalog_visible(id,actor->user))continue;
+        if(out->count==8) {
+            out->next=id;
+            break;
+        }
+        result=board_summary(actor,id,0,0,&out->rows[out->count]);
+        if(result!=ARTICLE_OK)return result;
+        out->count++;
+    }
+    return ARTICLE_OK;
+}
+
+ArticleOutcome article_board_children(const ArticleActor *actor,uint32_t parent,uint32_t start,
+                                      ArticleBoardsPage *out) {
+    if(!out)return ARTICLE_INVALID_READ;
+    memset(out,0,sizeof(*out));
+    policy_context(actor?actor->board_grants:NULL);
+    ArticleOutcome result=board_children(actor,parent,start,out);
+    policy_context(NULL);
+    if(result!=ARTICLE_OK)memset(out,0,sizeof(*out));
+    return result;
+}
+
+ArticleOutcome article_board_named(const ArticleActor *actor,const char *title,uint32_t *id) {
+    if(!id || !title || !*title)return ARTICLE_INVALID_QUERY;
+    *id=0;
+    ArticleOutcome result=health();
+    if(result!=ARTICLE_OK)return result;
+    result=identity(actor,0);
+    if(result!=ARTICLE_OK)return result;
+    policy_context(actor->board_grants);
+    uint32_t match=0;
+    for(uint32_t n=1;n<=CATALOG_MAX;n++) {
+        const char *name=catalog_title(n);
+        if(!catalog_visible(n,actor->user) || !name || strcmp(name,title))continue;
+        if(match) { result=ARTICLE_INVALID_QUERY;break; }
+        match=n;
+    }
+    policy_context(NULL);
+    if(result!=ARTICLE_OK)return result;
+    if(!match)return ARTICLE_BOARD_DENIED;
+    *id=match;
+    return ARTICLE_OK;
+}
+
 static ArticleOutcome next_unread_board(const ArticleActor *actor,uint32_t current,ArticleBoardRow *out) {
     ArticleOutcome result=health();
     if(result!=ARTICLE_OK)return result;
@@ -601,6 +659,51 @@ static void add_summary(ArticlePage *out,uint32_t id,const ArticleMetadata *arti
     memcpy(row->title,article->title,sizeof(row->title));
 }
 
+static ArticleOutcome browse_notes(const ArticleActor *actor,uint32_t board,uint32_t root,
+                                   uint32_t start,int descending,int unread,const char *query,
+                                   ArticlePage *out) {
+    ArticleOutcome result=health();
+    if(result!=ARTICLE_OK)return result;
+    result=identity(actor,0);
+    if(result!=ARTICLE_OK)return result;
+    if(!catalog_read(board,actor->user))return ARTICLE_BOARD_DENIED;
+    ArticleMetadata entry;
+    if(root) {
+        int visible=visible_summary(root,board,&entry);
+        if(visible<0)return ARTICLE_STORAGE;
+        if(!visible || entry.parent)return ARTICLE_NOT_FOUND;
+    }
+    uint32_t count=article_repository_count();
+    if(count>CONTENT_ID_MAX)return ARTICLE_STORAGE;
+    uint32_t id=start?start:(descending?count:1);
+    if(descending && id>count)id=count;
+    for(unsigned scanned=0;id && id<=count && out->count<8 && scanned<256;scanned++) {
+        int visible=visible_summary(id,board,&entry);
+        if(visible<0)return ARTICLE_STORAGE;
+        uint32_t current=id;
+        id=descending?id-1:id+1;
+        if(!visible || (root?(entry.root!=root || !entry.parent):entry.parent!=0))continue;
+        if(query && !strstr(entry.title,query))continue;
+        if(unread && members_seen(actor->user,current))continue;
+        if(members_broken())return ARTICLE_READ_STATE_STORAGE;
+        add_summary(out,current,&entry);
+    }
+    out->next=id<=count?id:0;
+    return ARTICLE_OK;
+}
+
+ArticleOutcome article_browse_notes(const ArticleActor *actor,uint32_t board,uint32_t root,
+                                    uint32_t start,int descending,int unread,const char *query,
+                                    ArticlePage *out) {
+    if(!out)return ARTICLE_INVALID_READ;
+    memset(out,0,sizeof(*out));
+    policy_context(actor?actor->board_grants:NULL);
+    ArticleOutcome result=browse_notes(actor,board,root,start,descending,unread,query,out);
+    policy_context(NULL);
+    if(result!=ARTICLE_OK)memset(out,0,sizeof(*out));
+    return result;
+}
+
 static ArticleOutcome page_articles(const ArticleActor *actor,uint32_t board,uint32_t start,
                                      const char *query,int search,ArticlePage *out) {
     ArticleOutcome result=health();
@@ -668,7 +771,7 @@ ArticleOutcome article_search(const ArticleActor *actor,uint32_t board,uint32_t 
 }
 
 static ArticleOutcome news_articles(const ArticleActor *actor,uint32_t board,ArticleScope scope,
-                                    uint32_t start,uint64_t since,uint64_t until,ArticlePage *out) {
+                                    uint32_t start,uint64_t since,uint64_t until,int unread,ArticlePage *out) {
     ArticleOutcome result=health();
     if(result!=ARTICLE_OK)return result;
     result=identity(actor,1);
@@ -691,21 +794,28 @@ static ArticleOutcome news_articles(const ArticleActor *actor,uint32_t board,Art
         if(hidden<0)return ARTICLE_STORAGE;
         if(hidden || !article.created || article.created<since ||
            (until && article.created>until))continue;
+        if(unread && members_seen(user,id))continue;
+        if(unread && members_broken())return ARTICLE_READ_STATE_STORAGE;
         add_summary(out,id,&article);
     }
     out->next=id<=count?id:0;
     return ARTICLE_OK;
 }
 
-ArticleOutcome article_news(const ArticleActor *actor,uint32_t board,ArticleScope scope,
-                            uint32_t start,uint64_t since,uint64_t until,ArticlePage *out) {
+ArticleOutcome article_news_filtered(const ArticleActor *actor,uint32_t board,ArticleScope scope,
+                                     uint32_t start,uint64_t since,uint64_t until,int unread,ArticlePage *out) {
     if(!out)return ARTICLE_INVALID_READ;
     memset(out,0,sizeof(*out));
     policy_context(actor?actor->board_grants:NULL);
-    ArticleOutcome result=news_articles(actor,board,scope,start,since,until,out);
+    ArticleOutcome result=news_articles(actor,board,scope,start,since,until,unread,out);
     policy_context(NULL);
     if(result!=ARTICLE_OK)memset(out,0,sizeof(*out));
     return result;
+}
+
+ArticleOutcome article_news(const ArticleActor *actor,uint32_t board,ArticleScope scope,
+                            uint32_t start,uint64_t since,uint64_t until,ArticlePage *out) {
+    return article_news_filtered(actor,board,scope,start,since,until,0,out);
 }
 
 static int filter_text(const char *text,size_t max) {
@@ -932,6 +1042,8 @@ static ArticleOutcome note_summary(uint32_t user,uint32_t board,uint32_t root,ui
         if(id==root) {
             row->summary.id=id;row->summary.board=board;row->summary.parent=0;
             memcpy(row->summary.title,article.title,sizeof(row->summary.title));
+            row->created=article.created;
+            memcpy(row->author,article.author,sizeof(row->author));
         } else row->replies++;
         if(id>row->latest) { row->latest=id;row->updated=article.created; }
         if(user) {

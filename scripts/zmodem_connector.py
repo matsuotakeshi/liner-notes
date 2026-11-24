@@ -89,10 +89,10 @@ def raw_terminal(fd):
             termios.tcsetattr(fd, termios.TCSANOW, saved)
 
 
-def child_limits():
+def child_limits(file_limit=MAX_BYTES):
     import resource
     os.umask(0o077)
-    for kind, value in ((resource.RLIMIT_FSIZE, MAX_BYTES),
+    for kind, value in ((resource.RLIMIT_FSIZE, file_limit),
                         (resource.RLIMIT_CORE, 0), (resource.RLIMIT_CPU, 60)):
         _, hard = resource.getrlimit(kind)
         value = value if hard == resource.RLIM_INFINITY else min(value, hard)
@@ -153,7 +153,8 @@ class TransferRelay:
 
 class ZmodemProcess:
     """A transfer engine can be replaced without changing publication workflows."""
-    def __init__(self, receiver='lrz', sender='lsz', timeout=120, process_group=True, protocol='z', filename=None, expected_size=None, x_variant='x'):
+    def __init__(self, receiver='lrz', sender='lsz', timeout=120, process_group=True, protocol='z', filename=None, expected_size=None, x_variant='x',
+                 file_limit=MAX_BYTES, lease_fd=None):
         if os.name != 'posix':
             raise TransferFailure('ZMODEM entry requires a POSIX host')
         if not 1 <= timeout <= 3600:
@@ -163,6 +164,8 @@ class ZmodemProcess:
         self.timeout = timeout
         self.process_group = process_group
         if protocol not in ('z','x','y'):raise TransferFailure('Unknown process protocol')
+        self.file_limit = file_limit
+        self.lease_fds = () if lease_fd is None else (lease_fd,)
         self.x_variant=x_variant;self.protocol=protocol;self.filename=filename;self.expected_size=expected_size
 
     @staticmethod
@@ -215,7 +218,8 @@ class ZmodemProcess:
                      '--quiet', '--escape', '--syslog=off', '--journal', str(journal)] + arguments,
                     cwd=directory, stdin=subprocess.PIPE, stdout=subprocess.PIPE,
                     stderr=subprocess.DEVNULL, env=env, close_fds=True,
-                    start_new_session=self.process_group, preexec_fn=child_limits)
+                    start_new_session=self.process_group, pass_fds=self.lease_fds,
+                    preexec_fn=lambda: child_limits(self.file_limit))
                 relay=TransferRelay(proc,input_fd,output_fd)
                 while not relay.done():
                     if relay.step():last_progress=time.monotonic()
@@ -290,7 +294,7 @@ class ZmodemProcess:
             raise TransferFailure('Receive directory must be empty')
         args=['--protect']
         if self.protocol=='x':
-            if self.filename is None or self.expected_size is None or not 0<=self.expected_size<=MAX_BYTES:raise TransferFailure('XMODEM requires filename and exact size')
+            if self.filename is None or self.expected_size is None or not 0<=self.expected_size<=self.file_limit:raise TransferFailure('XMODEM requires filename and exact size')
             args+=([] if self.x_variant=='s' else ['--with-crc'])+['--',safe_name(self.filename)]
         self._run(self.receiver, args, directory, input_fd, output_fd, authorize, True)
         path=staged_file(directory, required=True)
