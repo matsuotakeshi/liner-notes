@@ -97,7 +97,7 @@ do-install:
 	${INSTALL_DATA} ${WRKSRC}/menus/${section}-${lang}.txt ${STAGEDIR}${DATADIR}/menus/${section}-${lang}.txt.sample
 .endfor
 	${INSTALL_DATA} ${WRKSRC}/menus/${lang}.txt ${STAGEDIR}${DATADIR}/menus/${lang}.txt.sample
-.for topic in adminmembers adminboards adminfiles adminconnections adminstorage account admin chat content draft editor files gather index mail post read settings sigop unread profile
+.for topic in adminmembers adminboards adminfiles adminconnections adminstorage account admin chat content draft editor files gather index lineconf mail post read settings sigop unread profile
 	${INSTALL_DATA} ${WRKSRC}/help/${lang}/${topic}.txt ${STAGEDIR}${DATADIR}/help/${lang}/${topic}.txt.sample
 .endfor
 .endfor
