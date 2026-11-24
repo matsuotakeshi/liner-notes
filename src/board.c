@@ -1136,7 +1136,7 @@ static void execute(const BoardRequest *q,BoardResult *r) {
     r->ui_profile[0]=0;r->session=q->session; r->slot=q->slot;r->zcontrol=q->zcontrol; r->selected=0; r->auth=0; r->board=0; r->editing=0; r->user_epoch=0; r->account_user=0; r->account_epoch=0; r->revoked=0; r->password_changed=0; r->preferences=0; r->language=0; r->pager=0; r->draft_loaded=0; r->draft_revision=0; r->draft_parent=0;
     if(extras_broken() || profile_store_broken()) { (r->feedback.failed=1,strcpy(r->text,"ERR extras storage\r\n")); return; }
     if(members_broken()) { (r->feedback.failed=1,strcpy(r->text,"ERR member storage unavailable\r\n")); return; }
-    if(((q->op=='m' || q->op==BOARD_MAIL_TRANSFER || (q->op=='@' && q->action==1)) && !board_feature_enabled("mail")) || (q->op=='&' && !board_feature_enabled("chat")) || (strchr("@Y$^",q->op) && !(q->op=='@' && q->action==1) && !board_feature_enabled("vault"))) { (r->feedback.failed=1,strcpy(r->text,"ERR feature disabled\r\n"));return; }
+    if(((q->op=='m' || q->op==BOARD_MAIL_TRANSFER || (q->op=='@' && q->action==BOARD_BINARY_MAIL)) && !board_feature_enabled("mail")) || (q->op=='&' && !board_feature_enabled("chat")) || (strchr("@Y$^",q->op) && !(q->op=='@' && (q->action==BOARD_BINARY_MAIL || q->action==BOARD_BINARY_PERSONAL)) && !board_feature_enabled("vault"))) { (r->feedback.failed=1,strcpy(r->text,"ERR feature disabled\r\n"));return; }
     if(q->op=='a' || q->op=='g' || q->op==BOARD_SSH_KEY) { authentication_execute(q,r);return; }
     if(q->user && (moderation_suspended(q->user) || q->user_epoch!=moderation_epoch(q->user))) {
         r->revoked=1; (r->feedback.failed=1,strcpy(r->text,"ERR session revoked\r\n")); return;

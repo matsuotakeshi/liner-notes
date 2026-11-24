@@ -1,10 +1,12 @@
 """Manage private, inactive transfer staging without touching published payloads."""
-import argparse,contextlib,hashlib,json,os,re,shutil,stat,time,getpass,sys
+import argparse,contextlib,hashlib,json,os,re,shutil,stat,time,getpass,sys,tempfile
 from pathlib import Path
 from posix_locks import file_lock, namespace_lock
 
 NAME=re.compile(r"(?:pending-([a-f0-9]{64})|retained-([a-f0-9]{64})-[a-z0-9_]+)")
 LEGACY=re.compile(r'liner-zmodem-[a-zA-Z0-9_-]+')
+PFILE=re.compile(r'pfile-([1-9][0-9]{0,19})-([1-9][0-9]{0,9})-([a-z0-9_]{8})')
+
 def need(ok,message):
     if not ok:raise ValueError(message)
 def private(path,directory=False):
@@ -21,6 +23,69 @@ def entry_lock(root,name):
     work=root/name;private(work,True)
     with file_lock(work/'lock',create=False):
         private(work/'lock');yield work
+def personal_identity(work):
+    stat_dir = private(work, True)
+    meta = work/'transfer.json'
+    st = private(meta)
+    need(st.st_uid == stat_dir.st_uid and st.st_size <= 512, 'Invalid personal receive metadata')
+    match = PFILE.fullmatch(work.name)
+    need(match is not None, 'Invalid personal receive ID')
+    session, transfer = int(match[1]), int(match[2])
+    info = json.loads(meta.read_text(encoding='utf-8'))
+    need(info == {'id': work.name, 'session': session, 'transfer': transfer, 'uid': stat_dir.st_uid},
+         'Personal receive identity mismatch')
+    return stat_dir
+
+
+def remove_personal(work, original):
+    current = personal_identity(work)
+    need(os.path.samestat(original, current), 'Personal receive directory changed')
+    shutil.rmtree(work)
+
+
+@contextlib.contextmanager
+def personal_stage(root, session, generation):
+    """The receiver inherits the lease, protecting a live child after helper loss."""
+    need(0 < session < 2**64 and 0 < generation < 2**31, 'Invalid personal receive identity')
+    with root_lock(root) as root:
+        work = Path(tempfile.mkdtemp(prefix=f'pfile-{session}-{generation}-', dir=root))
+        try:
+            fd = os.open(work/'transfer.json', os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, 0o600)
+            with os.fdopen(fd, 'w', encoding='utf-8') as out:
+                json.dump({'id': work.name, 'session': session, 'transfer': generation, 'uid': os.geteuid()}, out)
+            data = work/'data'
+            data.mkdir(mode=0o700)
+            original = personal_identity(work)
+            lease = file_lock(work/'lock')
+        except (OSError, ValueError):
+            shutil.rmtree(work)
+            raise
+    with lease:
+        try:
+            yield data, lease.inheritable_fd
+        finally:
+            with root_lock(root):
+                remove_personal(work, original)
+
+
+def personal_spool_entry(work, action, apply):
+    need(action in ('list', 'show', 'remove'), 'Personal receives cannot be restored or resumed')
+    original = personal_identity(work)
+    need(private(work/'lock').st_uid == original.st_uid, 'Personal receive lock owner mismatch')
+    try:
+        with file_lock(work/'lock', create=False):
+            row = {'id':work.name, 'kind':'personal-file', 'phase':'interrupted'}
+            if action == 'remove':
+                if apply:
+                    remove_personal(work, original)
+                row.update(action=action, applied=apply)
+            return row
+    except BlockingIOError:
+        if action == 'remove':
+            raise
+        return {'id':work.name, 'kind':'personal-file', 'phase':'active'}
+
+
 def inspect(work):
     count=0;size=0
     for base,dirs,files in os.walk(work,followlinks=False):
@@ -119,6 +184,10 @@ def manage(root,action,name=None,apply=False):
         if action=='list':
             result=[]
             for p in sorted(root.iterdir()):
+                if PFILE.fullmatch(p.name):
+                    try:result.append(personal_spool_entry(p, action, apply))
+                    except (OSError, ValueError, KeyError) as error:result.append({'id':p.name,'phase':'invalid','error':str(error)})
+                    continue
                 if LEGACY.fullmatch(p.name):
                     try:
                         private(p,True)
@@ -138,6 +207,8 @@ def manage(root,action,name=None,apply=False):
             saved=json.loads(state.read_text(encoding='utf8'))
             return dict(id=name,phase='legacy-recovery',modifiable=False,
                         file={k:saved.get(k) for k in ('name','size','sha256','id','phase','connector','user','category')})
+        if PFILE.fullmatch(name or ''):
+            return personal_spool_entry(root/name, action, apply)
         with entry_lock(root,name) as work:
             if action=='show':return details(work)[0]
             row=inspect(work);key=row.pop('key')

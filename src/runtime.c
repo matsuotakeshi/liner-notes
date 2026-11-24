@@ -95,6 +95,8 @@ typedef struct {
     Terminal terminal;
     unsigned char input[CAP],output[OUT_CAP];
     size_t used,queued,output_highwater;
+    unsigned long zsession;
+    uint32_t zuser,zepoch;
     Door *door;ZHost *zhost;int zgeneration,zresult,zrecovery;unsigned zid;uint64_t zsize,zend,zquiet,zstarted;
 } Connection;
 static Connection connections[SLOTS];
@@ -248,6 +250,12 @@ static void zadvance(Connection *c,uint64_t now) {
         if(now-c->zend>2000 && now-c->zquiet<500) { drop(c);return; }
         if(now-c->zquiet>=500) {
             c->zend=0;terminal_set_binary(&c->terminal,0);
+            if(c->zhost) {
+                size_t size;
+                const char *payload=zhost_personal_payload(c->zhost,&size);
+                c->zresult=payload && session_personal_received(s,c->zsession,c->zuser,c->zepoch,payload,size);
+                zhost_stop(c->zhost);c->zhost=NULL;
+            }
             session_zmodem_finish(s,c->zresult,c->zid,c->zsize,c->zrecovery);
         }
         return;
@@ -255,7 +263,16 @@ static void zadvance(Connection *c,uint64_t now) {
     if(!c->zhost) {
         if(next_zgeneration==INT_MAX) { drop(c);return; }
         c->zgeneration=next_zgeneration++;c->zstarted=now;
-        c->zhost=zhost_start(zhelper,s->connection.zmodem_receive,s->connection.zmodem_id,s->core.username,s->connection.zmodem_text,service_port,now,s->connection.zmodem_protocol);
+        c->zsession=s->core.id;c->zuser=s->core.user;c->zepoch=s->core.user_epoch;
+        unsigned ident=s->connection.zmodem_id;
+        const char *argument=s->connection.zmodem_text;
+        char personal[64];
+        if(s->connection.zmodem_receive==ZHOST_RECEIVE_PERSONAL) {
+            ident=(unsigned)c->zgeneration;
+            snprintf(personal,sizeof(personal),"%lu:%.5s",c->zsession,argument);
+            argument=personal;
+        }
+        c->zhost=zhost_start(zhelper,s->connection.zmodem_receive,ident,s->core.username,argument,service_port,now,s->connection.zmodem_protocol);
         if(!c->zhost) { c->zresult=0;c->zid=c->zsize=0;c->zrecovery=0;c->zend=c->zquiet=now;return; }
     }
     if(c->queued<=OUT_CAP/2) {
@@ -268,7 +285,10 @@ static void zadvance(Connection *c,uint64_t now) {
         }
         if(done) {
             zhost_receipt(c->zhost,&c->zid,&c->zsize,&c->zrecovery);
-            c->zresult=done>0;c->zend=c->zquiet=now;zhost_stop(c->zhost);c->zhost=NULL;
+            c->zresult=done>0;c->zend=c->zquiet=now;
+            if(done<0 || s->connection.zmodem_receive!=ZHOST_RECEIVE_PERSONAL) {
+                zhost_stop(c->zhost);c->zhost=NULL;
+            }
             OPENSSL_cleanse(c->input,c->used);c->used=0;return;
         }
     }

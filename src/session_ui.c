@@ -1,5 +1,6 @@
 #include "session.h"
 #include "session_io.h"
+#include "zmodem_host.h"
 #include <string.h>
 #include <stdlib.h>
 #include "ui_profile.h"
@@ -221,6 +222,13 @@ void session_mail_notify(Session *s,uint32_t user,int deny,uint32_t revision) {
     s->ui_binding.active->mail_notify(s,user,deny,revision);
 }
 void session_transfer_receipt(Session *s,const char *text) { s->ui_binding.active->transfer_receipt(s,text); }
+int session_personal_received(Session *s,unsigned long session,uint32_t user,uint32_t epoch,const char *text,size_t size) {
+    if(!s->core.active || s->core.closing || !user || s->core.id!=session ||
+       s->core.user!=user || s->core.user_epoch!=epoch || !s->connection.zmodem ||
+       s->connection.zmodem_receive!=ZHOST_RECEIVE_PERSONAL || !s->ui_binding.active ||
+       !s->ui_binding.active->personal_receive)return 0;
+    return s->ui_binding.active->personal_receive(s,text,size);
+}
 void session_zmodem_finish(Session *s,int ok,unsigned id,uint64_t size,int recovery) {
     s->connection.zmodem=0;s->connection.zmodem_start=0;
     s->ui_binding.active->transfer_finish(s,ok,id,size,recovery);

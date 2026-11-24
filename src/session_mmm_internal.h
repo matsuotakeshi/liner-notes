@@ -85,6 +85,7 @@ void mmm_menu(Session *s,int requested);
 OperationRequest *mmm_request(Session *s,char op);
 int mmm_submit(Session *s,OperationRequest *q,MmmJob job);
 void mmm_clear_composition(MmmUi *m);
+void mmm_pfile_receive(Session *s,const char *bytes);
 void mmm_pfile_append(Session *s,const char *text,size_t size);
 int mmm_ui_text_valid(const char *text,size_t limit);
 void mmm_bad_service_command(Session *s);

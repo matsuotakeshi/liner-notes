@@ -3,6 +3,8 @@ import hashlib
 import json
 import pathlib
 import sys
+import time
+import subprocess
 import tempfile
 import os
 import stat
@@ -11,6 +13,8 @@ sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1] / 'scripts'))
 import vault_zmodem as gateway
 import posix_locks
 from zmodem_connector import safe_name, staged_file, TransferFailure
+from zmodem_host import normalize_personal_text
+from transfer_spool import manage, personal_stage
 
 
 def spool_contents(root):
@@ -112,4 +116,68 @@ def run():
     print('PASS: replaceable ZMODEM engine, hash verification, no publication after cancellation/revocation, lost commit recovery and bilingual messages')
 
 
-if __name__ == '__main__': run()
+def test_personal_content():
+    exact = (b'a'*78+b'\r\n')*128
+    assert normalize_personal_text(exact) == exact
+    assert normalize_personal_text(b'') == b''
+    assert normalize_personal_text(b'\xef\xbb\xbf'+ '一行\n二行\r三行'.encode()) == '一行\r\n二行\r\n三行\r\n'.encode()
+    for data in (exact+b'x', b'\n'*5121, b'\x00', b'\xc0\xaf', b'\x1b[2J', b'\xc2\x9b2J'):
+        try:
+            normalize_personal_text(data)
+        except ValueError:
+            continue
+        raise AssertionError('Received invalid personal text')
+
+
+def test_personal_spool():
+    with tempfile.TemporaryDirectory(prefix='personal-spool-') as temporary:
+        root = pathlib.Path(temporary)
+        with personal_stage(root, 7, 12) as (data, _):
+            (data/'in.txt').write_text('temporary', encoding='utf-8')
+            row, = manage(root, 'list')
+            assert row['phase'] == 'active'
+            try:
+                manage(root, 'remove', data.parent.name, True)
+            except BlockingIOError:
+                pass
+            else:
+                raise AssertionError('Removed another active transfer')
+        assert not spool_contents(root)
+        # Stop a helper without executing its finally block. The external
+        # receiver inherits the lease, so the staged file stays active.
+        proc = subprocess.Popen([sys.executable, '-c', '''
+from pathlib import Path
+import os, subprocess, sys
+from transfer_spool import personal_stage
+with personal_stage(sys.argv[1], 8, 13) as (data, lease):
+    program = 'for i in 1 2 3 4 5 6 7 8 9 10; do [ ! -f "$1" ] || exit; sleep 1; done'
+    child = subprocess.Popen(['/bin/sh', '-c', program, 'sh', sys.argv[1]+'/stop'],
+                             pass_fds=(lease,), stdout=subprocess.DEVNULL)
+    (data/'in.txt').write_text('interrupted')
+    print(child.pid, flush=True)
+    os._exit(0)
+''', str(root)], env={**os.environ, 'PYTHONPATH': str(pathlib.Path(gateway.__file__).parent)},
+                                stdout=subprocess.PIPE, text=True)
+        with proc.stdout:
+            int(proc.stdout.readline())
+        assert proc.wait(timeout=5) == 0
+        row, = manage(root, 'list')
+        assert row['phase']=='active'
+        (root/'stop').touch()
+        deadline = time.monotonic()+5
+        while time.monotonic()<deadline:
+            row, = manage(root, 'list')
+            if row['phase']=='interrupted':
+                break
+            time.sleep(.02)
+        assert row['phase']=='interrupted'
+        assert not manage(root, 'remove', row['id'])['applied']
+        assert manage(root, 'remove', row['id'], True)['applied']
+        (root/'stop').unlink()
+        assert not spool_contents(root)
+
+
+if __name__ == '__main__':
+    test_personal_content()
+    test_personal_spool()
+    run()

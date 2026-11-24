@@ -633,7 +633,7 @@ runtime test-adapters: src/session_mmm_internal.h src/mmm_notes.h src/mmm_notes_
 runtime test-adapters: src/session_ui.h src/session_state.h src/session_io.h
 
 .PHONY: test-session-ui-lifecycle
-test-session-ui-lifecycle: tests/test_session_ui_lifecycle.c src/session.c src/session_ui.c src/session_core.c src/connector_core.c src/terminal_pager.c src/session.h src/session_ui.h src/session_io.h
+test-session-ui-lifecycle: tests/test_session_ui_lifecycle.c src/session.c src/session_ui.c src/session_core.c src/connector_core.c src/terminal_pager.c src/session.h src/session_ui.h src/session_io.h src/zmodem_host.h
 	$(CC) $(CPPFLAGS) $(CFLAGS) $(LDFLAGS) -std=c11 -Wall -Wextra -Werror -Isrc tests/test_session_ui_lifecycle.c src/session.c src/session_ui.c src/session_core.c src/connector_core.c src/terminal_pager.c -lcrypto $(LDLIBS) -o test-session-ui-lifecycle
 	./test-session-ui-lifecycle
 check: test-session-ui-lifecycle

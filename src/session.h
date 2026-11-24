@@ -80,6 +80,7 @@ void session_announce(Session *,const char *);
 void session_tick(Session *,uint64_t now);
 /* Runtime validates session/slot/transfer generation before delivering receipts. */
 void session_transfer_receipt(Session *,const char *);
+int session_personal_received(Session *,unsigned long session,uint32_t user,uint32_t epoch,const char *,size_t);
 void session_zmodem_finish(Session *,int success,unsigned id,uint64_t size,int recovery);
 void session_mail_arrived(Session *,uint32_t recipient);
 void session_mail_notify(Session *,uint32_t user,int deny,uint32_t revision);
