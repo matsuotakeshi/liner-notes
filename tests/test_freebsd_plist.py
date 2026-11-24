@@ -1,14 +1,37 @@
 #!/usr/bin/env python3
-"""Match the generated canonical book and installed scripts against pkg-plist."""
+"""Match staged manual, HELP, scripts and services against pkg-plist."""
 from pathlib import Path
+import re
 import sys,tempfile
 
 ROOT = Path(__file__).resolve().parents[1]
 PLIST = ROOT / "ports/comms/liner-notes/pkg-plist"
 
 
+def check_help_samples(content):
+    makefile = PLIST.with_name("Makefile").read_text(encoding="utf-8")
+    languages = re.search(r"^\.for lang in +(.+)$", makefile, re.MULTILINE)
+    topics = re.search(r"^\.for topic in +(.+)$", makefile, re.MULTILINE)
+    assert languages and topics, "FreeBSD HELP install loops missing"
+    prefix = "@sample %%DATADIR%%/help/"
+    recipes = {
+        f"{prefix}{lang}/{topic}.txt.sample"
+        for lang in languages[1].split() for topic in topics[1].split()
+    }
+    sources = {
+        f"{prefix}{lang}/{path.name}.sample"
+        for lang in ("ja", "en") for path in (ROOT / "help" / lang).glob("*.txt")
+    }
+    listed = {line for line in content if line.startswith(prefix)}
+    for label, entries in (("install recipe", recipes), ("pkg-plist", listed)):
+        assert entries == sources, (f"FreeBSD HELP {label} mismatch",
+                                    sorted(sources - entries), sorted(entries - sources))
+    return len(sources)
+
+
 def main():
     content = PLIST.read_text(encoding="utf-8").splitlines()
+    help_count = check_help_samples(content)
     sys.path.insert(0,str(ROOT/'scripts/manual'))
     from build import build
     with tempfile.TemporaryDirectory(prefix='manual-plist-') as tmp:
@@ -32,7 +55,7 @@ def main():
         for entry in missing:
             print(f"UNLISTED FreeBSD stage file: {entry}", file=sys.stderr)
         raise SystemExit(1)
-    print(f"PASS: pkg-plist covers {len(expected)} staged manual/script/service files")
+    print(f"PASS: pkg-plist covers {len(expected)} staged manual/script/service files and {help_count} HELP samples")
 
 
 if __name__ == "__main__":
