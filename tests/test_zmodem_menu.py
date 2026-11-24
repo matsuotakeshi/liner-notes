@@ -1,7 +1,7 @@
 """Actual lrzsz over the runtime Telnet menu; no password in the helper."""
 from concurrent.futures import ThreadPoolExecutor
 from test_zmodem_workflows import spool_contents
-import hashlib,os,pathlib,select,shlex,socket,subprocess,sys,tempfile,time
+import hashlib,os,pathlib,select,shlex,subprocess,sys,tempfile,time
 sys.path.insert(0,str(pathlib.Path(__file__).resolve().parents[1]/'scripts'))
 from test_board import Server
 from test_runtime import Client
@@ -14,25 +14,38 @@ def transfer(c,executable,args,directory,base_options=None,prompt=b'] > ',deadli
     def send(data):
         c.send(data.replace(b'\xff',b'\xff\xff') if escape_iac else data)
     wire_start=len(c.wire)  # Exclude login traffic from synthetic failure evidence.
-    left,right=socket.socketpair()
-    proc=subprocess.Popen([executable]+(['--binary','--quiet','--escape','--syslog=off'] if base_options is None else base_options)+args,cwd=directory,stdin=right,stdout=right,stderr=subprocess.PIPE)
-    right.close();left.setblocking(False);pending=bytearray(c.buf);c.buf=b'';deadline=time.monotonic()+deadline_seconds
+    # A shared socketpair can reset on read if lsz exits with unread input.
+    # Independent pipes keep the final protocol bytes readable in that case.
+    proc=subprocess.Popen([executable]+(['--binary','--quiet','--escape','--syslog=off'] if base_options is None else base_options)+args,cwd=directory,stdin=subprocess.PIPE,stdout=subprocess.PIPE,stderr=subprocess.PIPE)
+    peer_input=proc.stdin.fileno()
+    peer_output=proc.stdout.fileno()
+    os.set_blocking(peer_input,False)
+    pending=bytearray(c.buf);c.buf=b'';deadline=time.monotonic()+deadline_seconds
+    input_open=output_open=True
     try:
         while proc.poll() is None:
             if time.monotonic()>deadline:raise AssertionError('peer timed out')
-            reads,writes,_=select.select([left,c.sock],[left] if pending else [],[],.02)
-            if left in writes:
-                try:n=left.send(pending);del pending[:n]
-                except BlockingIOError:pass
-            if left in reads:
-                data=left.recv(65536)
+            readers=[peer_output,c.sock] if output_open else [c.sock]
+            writers=[peer_input] if input_open and pending else []
+            reads,writes,_=select.select(readers,writers,[],.02)
+            if peer_input in writes:
+                try:
+                    n=os.write(peer_input,pending);del pending[:n]
+                except BlockingIOError:
+                    pass
+                except BrokenPipeError:
+                    input_open=False
+            if peer_output in reads:
+                data=os.read(peer_output,65536)
                 if data:
                     send(data)
                     if send_rate:time.sleep(len(data)/send_rate)
+                else:
+                    output_open=False
             if c.sock in reads:c.receive();pending.extend(c.buf);c.buf=b''
         # Drain the final OO/ack bytes emitted immediately before process exit.
-        while select.select([left],[],[],.05)[0]:
-            data=left.recv(65536)
+        while output_open and select.select([peer_output],[],[],.05)[0]:
+            data=os.read(peer_output,65536)
             if not data:break
             send(data)
         c.buf=bytes(pending)+c.buf
@@ -45,8 +58,9 @@ def transfer(c,executable,args,directory,base_options=None,prompt=b'] > ',deadli
                                   c.wire[wire_start:][-2048:])) from failure
         return proc.returncode,output,error
     finally:
-        left.close()
         if proc.poll() is None:proc.kill();proc.wait()
+        proc.stdin.close()
+        proc.stdout.close()
         proc.stderr.close()
 
 
