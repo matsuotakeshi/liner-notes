@@ -108,7 +108,9 @@ def personal_file_checks(server, bob, sender, source, spool):
         alice.cmd('.', editor)
         alice.cmd('g', editor)
         assert b'personal note' in alice.cmd('p', editor)
-        assert b'Saved #' in alice.cmd('w', main)
+        saved = alice.cmd('w', b'NOTES>> ')
+        assert b'Saved #' in saved, saved
+        alice.cmd('/', main)
 
         alice.cmd('mail', b'MAIL>> ')
         alice.cmd('send bob', b'Title> ')
