@@ -31,6 +31,19 @@ def add_note(client, board, title, body):
     client.cmd("/", MAIN)
 
 
+def restrict_board(client, board, title):
+    # BOARDSET has six fields. Keep the existing empty description.
+    wire = f"BOARDSET {board}|0|g7|member|{title}|".encode()
+    client.send(wire + b"\r\n")
+    expected = f"BOARD UPDATED {board}\r\n".encode()
+    for _ in range(4):
+        reply = client.until(b"\r\n")
+        if reply.startswith((b"BOARD UPDATED ", b"ERR ")):
+            assert reply == expected, (wire, reply)
+            return
+    raise AssertionError(("No BOARDSET reply", wire, reply))
+
+
 def run(binary):
     binary = str(Path(binary).resolve())
     with tempfile.TemporaryDirectory(prefix="ln-mmm-traversal-") as scratch:
@@ -98,11 +111,11 @@ def run(binary):
             # requesting its page. Inaccessible personal rows cannot select or
             # disclose inaccessible data, including after restarting.
             assert b"Retro item" in alice.cmd("new -n", NEW)
-            raw.cmd("BOARDSET 2|0|g7|member|Private sound", b"BOARD UPDATED 2\r\n")
+            restrict_board(raw, 2, "Private sound")
             denied = alice.cmd("more", NEW)
             assert b"Sound item" not in denied and b"General item" not in denied and b"No matching" in denied, denied
             alice.cmd(".", MAIN)
-            raw.cmd("BOARDSET 3|0|g7|member|Private retro", b"BOARD UPDATED 3\r\n")
+            restrict_board(raw, 3, "Private retro")
             assert b"unavailable" in alice.cmd("go @retro.g", MAIN)
             own = alice.cmd("scanlist", MAIN)
             assert b"No readable boards" in own and b"retro.g" not in own and b"synth" not in own, own
