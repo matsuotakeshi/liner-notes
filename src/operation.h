@@ -6,6 +6,7 @@
 #include "operation_pages.h"
 #define BOARD_MEMBER_LIFECYCLE '{'
 #define BOARD_MAIL_TRANSFER '='
+enum { BOARD_BINARY_VAULT, BOARD_BINARY_MAIL, BOARD_BINARY_PERSONAL };
 #define BOARD_LINK '\x1e'
 /* Internal only: signed SSH key proof verified by the transport, never decoded from text. */
 #define BOARD_SSH_KEY '\x1d'

@@ -2,11 +2,14 @@
 No password, journal path, or network listener is provided to this process.
 """
 import time
-import argparse,os,pathlib,signal,socket,sys,hashlib,tempfile
+import argparse,os,pathlib,signal,socket,sys,hashlib,tempfile,stat,unicodedata
 from transfer_connectors import Protocol,LineConnector,MailConnector,MailProtocol,download_begin,download_read,download_done,download_abort
 from zmodem_connector import ZmodemProcess,TransferFailure,safe_name,MAX_BYTES,MAX_BATCH_BYTES,MAX_BATCH_FILES
 from legacy_transfer import LegacyEngine
-from vault_zmodem import receive,send,runtime_receive,PublicationFailure
+from vault_zmodem import receive,send,runtime_receive,PublicationFailure,check_member
+from transfer_spool import personal_stage
+
+PERSONAL_MAX = 10240
 
 class LocalProtocol(Protocol):
     def __init__(self):
@@ -31,6 +34,66 @@ def batch_path(directory,name,ident):
         path=root/safe_name(prefix+tail);attempt+=1
     return path
 
+def personal_text(path):
+    fd = os.open(path, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK)
+    with os.fdopen(fd, 'rb') as source:
+        info = os.fstat(source.fileno())
+        if (not stat.S_ISREG(info.st_mode) or info.st_uid != os.geteuid() or
+                info.st_nlink != 1 or info.st_size > PERSONAL_MAX):
+            raise TransferFailure('Invalid personal file')
+        raw = source.read(PERSONAL_MAX+1)
+        if len(raw) != info.st_size:
+            raise TransferFailure('Personal file changed while reading')
+    return normalize_personal_text(raw)
+
+
+def normalize_personal_text(raw):
+    if len(raw) > PERSONAL_MAX:
+        raise TransferFailure('Personal file exceeds 10240 bytes')
+    text = raw.decode('utf-8-sig')
+    if any(ch not in '\r\n' and unicodedata.category(ch) == 'Cc' for ch in text):
+        raise TransferFailure('Control character in personal file')
+    text = text.replace('\r\n', '\n').replace('\r', '\n')
+    if text and not text.endswith('\n'):
+        text += '\n'
+    data = text.replace('\n', '\r\n').encode('utf-8')
+    if len(data) > PERSONAL_MAX:
+        raise TransferFailure('Normalized personal file exceeds 10240 bytes')
+    return data
+
+
+def receive_personal(connection, args, protocol):
+    identity, separator, count = args.text.partition(':')
+    if not separator or not identity.isascii() or not identity.isdecimal() or len(identity) > 20:
+        raise TransferFailure('Invalid personal receive session')
+    size = None
+    if protocol in ('x', 's', 'k'):
+        if not count.isascii() or not count.isdecimal() or len(count) > 5:
+            raise TransferFailure('XMODEM requires an exact byte count')
+        size = int(count)
+        if size > PERSONAL_MAX:
+            raise TransferFailure('Personal file exceeds 10240 bytes')
+    elif count:
+        raise TransferFailure('Unexpected personal receive argument')
+    def authorize():
+        check_member(connection)
+    authorize()
+    with personal_stage(args.spool_root, int(identity), args.ident) as (directory, lease_fd):
+        engine = ZmodemProcess(
+            args.receiver, args.sender, args.timeout, process_group=False,
+            protocol='x' if size is not None else protocol,
+            filename='personal.txt' if size is not None else None,
+            expected_size=size, x_variant=protocol,
+            file_limit=PERSONAL_MAX if size is None else size+1023,
+            lease_fd=lease_fd)
+        path = engine.receive(directory, 0, 1, authorize)
+        data = personal_text(path)
+    authorize()
+    for start in range(0, len(data), 500):
+        connection.protocol.send('PFILE '+data[start:start+500].hex())
+    connection.protocol.send(f'DONE OK 0 {len(data)}')
+
+
 def main():
     p=argparse.ArgumentParser()
     p.add_argument('--receiver',required=True);p.add_argument('--sender',required=True)
@@ -40,8 +103,8 @@ def main():
     args=p.parse_args();os.umask(0o077)
     protocol='z'
     if len(args.action)>2 and args.action[0] in 'xygmtsk' and args.action[1]=='-':protocol,args.action=args.action[0],args.action[2:]
-    if args.action not in ('receive','receive-in','receive-mail','receive-mail-many','receive-mail-many-resume','receive-many','receive-resume','receive-many-resume','receive-mail-resume','send-mail','send','batch','batch-mail'):p.error('Invalid action')
-    if protocol!='z' and args.action not in ('receive-in','receive-many','send','batch','receive-mail','receive-mail-many','send-mail','batch-mail'):p.error('Unsupported protocol action')
+    if args.action not in ('receive','receive-in','receive-mail','receive-mail-many','receive-mail-many-resume','receive-many','receive-resume','receive-many-resume','receive-mail-resume','send-mail','send','batch','batch-mail','receive-pfile'):p.error('Invalid action')
+    if protocol!='z' and args.action not in ('receive-in','receive-many','send','batch','receive-mail','receive-mail-many','send-mail','batch-mail','receive-pfile'):p.error('Unsupported protocol action')
     c=(MailConnector if args.action in ('receive-mail','receive-mail-many','receive-mail-many-resume','receive-mail-resume','send-mail','batch-mail') else LineConnector).__new__(MailConnector if args.action in ('receive-mail','receive-mail-many','receive-mail-many-resume','receive-mail-resume','send-mail','batch-mail') else LineConnector);c.protocol=LocalProtocol()
     if args.action in ('receive-mail','receive-mail-many','receive-mail-many-resume','receive-mail-resume','send-mail','batch-mail'):c.protocol=MailProtocol(c.protocol)
     def release_downloads():
@@ -58,6 +121,11 @@ def main():
     try:
         if not 1<=args.timeout<=3600:raise TransferFailure('Invalid timeout')
         c.protocol.send(f'IDLE {args.timeout}')
+        if args.action == 'receive-pfile':
+            if protocol not in ('z', 'x', 'y', 's', 'k'):
+                raise TransferFailure('Unsupported personal receive protocol')
+            receive_personal(c, args, protocol)
+            return 0
         filename=None;expected_size=None
         if protocol in ('x','t','s','k') and args.action in ('receive-in','receive-mail'):
             parts=(args.text if args.action=='receive-in' else '-|'+args.text).split('|',3)

@@ -20,6 +20,7 @@ int zhost_answer(ZHost *h,const char *s) { (void)h;(void)s;return 0; }
 void zhost_receipt(ZHost *h,unsigned *i,uint64_t *s,int *r) { (void)h;*i=*s=0;*r=0; }
 void zhost_stop(ZHost *h) { (void)h; }
 void zhost_reap(uint64_t n) { (void)n; }
+const char *zhost_personal_payload(ZHost *h,size_t *size) { (void)h;*size=0;return NULL; }
 int zhost_progress(ZHost *h,uint64_t *b,uint64_t *t) { (void)h;(void)b;(void)t;return 0; }
 #else
 #include <unistd.h>
@@ -28,7 +29,9 @@ int zhost_progress(ZHost *h,uint64_t *b,uint64_t *t) { (void)h;(void)b;(void)t;r
 #include <fcntl.h>
 #include <errno.h>
 #include <signal.h>
+#include <openssl/crypto.h>
 struct ZHost {
+    int personal,control_eof,personal_ok;size_t personal_size;char *payload;
     int progress,wire_drained;uint64_t progress_bytes,progress_total,idle;
     pid_t pid;int wire,control,waiting,done,eof,exited,status,recovery;
     uint64_t started,size;unsigned id;
@@ -52,7 +55,9 @@ void zhost_reap(uint64_t now) {
 }
 ZHost *zhost_start(const char *helper,int receive,unsigned id,const char *user,const char *text,unsigned port,uint64_t now,unsigned protocol) {
     zhost_reap(now);if(active>=ln_limit("TRANSFERS",ZMODEM_MAX) || !zhost_supported(helper))return NULL;
-    ZHost *h=calloc(1,sizeof(*h));if(!h)return NULL;
+    int personal=receive==ZHOST_RECEIVE_PERSONAL;
+    ZHost *h=calloc(1,sizeof(*h)+(personal?ZHOST_PERSONAL_MAX+1u:0));if(!h)return NULL;
+    h->personal=personal;if(personal)h->payload=(char *)(h+1);
     int wire[2],control[2];if(socketpair(AF_UNIX,SOCK_STREAM,0,wire)) { free(h);return NULL; }
     if(socketpair(AF_UNIX,SOCK_STREAM,0,control)) { close(wire[0]);close(wire[1]);free(h);return NULL; }
     /* Duplicate child endpoints above stdio/control before fork. */
@@ -66,7 +71,7 @@ ZHost *zhost_start(const char *helper,int receive,unsigned id,const char *user,c
         setpgid(0,0);dup2(wi,0);dup2(wi,1);dup2(ct,3);
         int nullfd=open("/dev/null",O_WRONLY);if(nullfd>=0)dup2(nullfd,2);
         for(int fd=4;fd<maxfd;fd++)close(fd);
-        const char *action=receive==12?"receive-mail-many-resume":receive==11?"receive-mail-many":receive==10?"batch-mail":receive==9?"receive-many-resume":receive==8?"receive-mail-resume":receive==7?"receive-resume":receive==6?"receive-many":receive==5?"send-mail":receive==4?"receive-mail":receive==3?"receive-in":receive==2?"batch":receive?"receive":"send";const char *codes[]={"z","x","y","g","m","t","s","k"};char selected[48];if(protocol>7)_exit(127);snprintf(selected,sizeof(selected),"%s-%s",codes[protocol],action);
+        const char *action=personal?"receive-pfile":receive==12?"receive-mail-many-resume":receive==11?"receive-mail-many":receive==10?"batch-mail":receive==9?"receive-many-resume":receive==8?"receive-mail-resume":receive==7?"receive-resume":receive==6?"receive-many":receive==5?"send-mail":receive==4?"receive-mail":receive==3?"receive-in":receive==2?"batch":receive?"receive":"send";const char *codes[]={"z","x","y","g","m","t","s","k"};char selected[48];if(protocol>7)_exit(127);snprintf(selected,sizeof(selected),"%s-%s",codes[protocol],action);
         execl(helper,helper,protocol?selected:action,number,user,text,service,(char *)NULL);_exit(127);
     }
     close(wi);close(ct);
@@ -93,6 +98,21 @@ int zhost_answer(ZHost *h,const char *text) {
     if(h->waiting!=2 || h->answer_size || strlen(text)>=sizeof(h->answer))return 0;
     strcpy(h->answer,text);h->answer_size=strlen(text);h->waiting=0;h->command_size=0;return 1;
 }
+static int hex_digit(char ch) {
+    if(ch>='0' && ch<='9')return ch-'0';
+    if(ch>='a' && ch<='f')return ch-'a'+10;
+    return -1;
+}
+static int personal_chunk(ZHost *h) {
+    size_t length=h->command_size-6;
+    if(!h->personal || !length || length%2 || length/2>ZHOST_PERSONAL_MAX-h->personal_size)return 0;
+    for(size_t i=6;i<h->command_size;i+=2) {
+        int hi=hex_digit(h->command[i]),lo=hex_digit(h->command[i+1]);
+        if(hi<0 || lo<0 || !(hi || lo))return 0;
+        h->payload[h->personal_size++]=(char)((hi<<4)|lo);
+    }
+    return 1;
+}
 int zhost_pump(ZHost *h,int (*write_bytes)(void *,const unsigned char *,size_t),void *context,uint64_t now) {
     if(!h->exited) {
         pid_t p=waitpid(h->pid,&h->status,WNOHANG);
@@ -107,11 +127,16 @@ int zhost_pump(ZHost *h,int (*write_bytes)(void *,const unsigned char *,size_t),
     if(n>0) { h->started=now;if(!write_bytes(context,data,(size_t)n))return -1; }
     else if(!n)h->eof=1;else if(!again())return -1;
     h->wire_drained=n<=0;
-    if(!h->waiting && !h->done) {
+    if(!h->waiting && (!h->done || h->personal) && !h->control_eof) {
         for(int budget=0;budget<1100;budget++) {
-            char ch;ssize_t k=read(h->control,&ch,1);if(k<0) { if(!again())return -1;break; }if(!k)break;
+            char ch;ssize_t k=read(h->control,&ch,1);if(k<0) { if(!again())return -1;break; }if(!k) { h->control_eof=1;break; }
+            if(h->done)return -1;
             if(ch=='\n') {
                 h->command[h->command_size]=0;
+                if(!strncmp(h->command,"PFILE ",6)) {
+                    if(!personal_chunk(h))return -1;
+                    h->command_size=0;h->started=now;continue;
+                }
                 if(!strncmp(h->command,"PROGRESS ",9)) {
                     char extra;if(sscanf(h->command,"PROGRESS %" SCNu64 " %" SCNu64 " %c",&h->progress_bytes,&h->progress_total,&extra)!=2 || h->progress_bytes>h->progress_total || h->progress_total>17179869184ULL)return -1;
                     h->progress=1;h->started=now;h->command_size=0;
@@ -119,11 +144,19 @@ int zhost_pump(ZHost *h,int (*write_bytes)(void *,const unsigned char *,size_t),
                     unsigned seconds;char extra;if(sscanf(h->command,"IDLE %u %c",&seconds,&extra)!=1 || seconds<1 || seconds>3600)return -1;
                     h->idle=(uint64_t)(seconds+5)*1000;h->command_size=0;
                 } else if(!strncmp(h->command,"DONE ",5)) {
-                    if(sscanf(h->command,"DONE OK %u %" SCNu64,&h->id,&h->size)==2)h->done=1;
+                    if(h->personal && strncmp(h->command,"DONE FAIL ",10)) {
+                        char expected[64];
+                        snprintf(expected,sizeof(expected),"DONE OK 0 %zu",h->personal_size);
+                        if(strcmp(h->command,expected))return -1;
+                        h->done=1;h->command_size=0;
+                    } else if(sscanf(h->command,"DONE OK %u %" SCNu64,&h->id,&h->size)==2)h->done=1;
                     else { h->done=-1;h->recovery=!strncmp(h->command,"DONE RECOVER ",13);if(h->recovery)fprintf(stderr,"ZMODEM recovery: %s\n",h->command+13);
                         const char *reasons[]={"NO_PENDING","MISMATCH","RECEIVER","TIMEOUT"};
                         for(int reason=0;reason<4;reason++)if(!strncmp(h->command,"DONE FAIL ",10) && !strcmp(h->command+10,reasons[reason])) { h->recovery=reason+2;fprintf(stderr,"ZMODEM failure: %s\n",reasons[reason]);break; } }
-                } else { h->waiting=1;if(strcmp(h->command,"ADMIN"))h->started=now; }
+                } else {
+                    if(h->personal && strcmp(h->command,"ADMIN"))return -1;
+                    h->waiting=1;if(strcmp(h->command,"ADMIN"))h->started=now;
+                }
                 break;
             }
             if((unsigned char)ch<32 || (unsigned char)ch==127 || h->command_size>=sizeof(h->command)-1)return -1;
@@ -131,8 +164,16 @@ int zhost_pump(ZHost *h,int (*write_bytes)(void *,const unsigned char *,size_t),
         }
     }
     if(now-h->started>(h->idle>600000?h->idle:600000)) { h->recovery=5;return -1; }
-    if(h->exited && h->eof)return h->done==1 && WIFEXITED(h->status) && WEXITSTATUS(h->status)==0?1:-1;
+    if(h->exited && h->eof && (!h->personal || h->control_eof)) {
+        int ok=h->done==1 && WIFEXITED(h->status) && WEXITSTATUS(h->status)==0;
+        h->personal_ok=h->personal && ok;
+        return ok?1:-1;
+    }
     return 0;
+}
+const char *zhost_personal_payload(ZHost *h,size_t *size) {
+    *size=h->personal_size;
+    return h->personal_ok?h->payload:NULL;
 }
 void zhost_receipt(ZHost *h,unsigned *id,uint64_t *size,int *recovery) { *id=h->id;*size=h->size;*recovery=h->recovery; }
 int zhost_progress(ZHost *h,uint64_t *bytes,uint64_t *total) {
@@ -147,6 +188,6 @@ void zhost_stop(ZHost *h) {
         kill(-h->pid,SIGTERM);
         for(int i=0;i<ZMODEM_MAX;i++)if(!retired[i].pid) { retired[i].pid=h->pid;retired[i].at=clock_now;break; }
     }
-    memset(h,0,sizeof(*h));free(h);
+    OPENSSL_cleanse(h,sizeof(*h)+(h->personal?ZHOST_PERSONAL_MAX+1u:0));free(h);
 }
 #endif

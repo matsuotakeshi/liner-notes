@@ -6,6 +6,7 @@
 #include "chat.h"
 #include "batch_protocol.h"
 #include "runtime_limits.h"
+#include "zmodem_host.h"
 #include "date_filter.h"
 #include <stdio.h>
 #include <string.h>
@@ -73,12 +74,42 @@ static void transfer(Session *s,int mode,uint32_t id,const char *text,int mail) 
     }
     OperationRequest *q=mmm_request(s,'@');
     if(!q)return;
-    q->action=mail;
+    q->action=mode==ZHOST_RECEIVE_PERSONAL?BOARD_BINARY_PERSONAL:
+              mail?BOARD_BINARY_MAIL:BOARD_BINARY_VAULT;
     if(!mmm_submit(s,q,JOB_TRANSFER))return;
     s->connection.zmodem_protocol=protocol;s->connection.zmodem_receive=mode;
     s->connection.zmodem_id=id;
     snprintf(s->connection.zmodem_text,sizeof(s->connection.zmodem_text),"%s",text);
     s->connection.zmodem_start=1;
+}
+
+void mmm_pfile_receive(Session *s,const char *bytes) {
+    unsigned protocol=s->connection.transfer_protocol;
+    if(protocol==1 || protocol==6 || protocol==7) {
+        unsigned length=0;
+        for(const char *p=bytes;*p;p++) {
+            if(*p<'0' || *p>'9' || length>MMM_PFILE_MAX) {
+                mmm_bad_service_command(s);return;
+            }
+            length=10*length+(unsigned)(*p-'0');
+        }
+        if(!*bytes || length>MMM_PFILE_MAX) {
+            mmm_say(s,"Use pfile -b bytes (0 to 10240) for XMODEM.\r\n",
+                      "XMODEMは pfile -b バイト数（0〜10240）で受信します。\r\n");
+            return;
+        }
+        char count[16];
+        snprintf(count,sizeof(count),"%u",length);
+        transfer(s,ZHOST_RECEIVE_PERSONAL,0,count,0);
+        return;
+    }
+    if(protocol!=0 && protocol!=2) {
+        mmm_say(s,"The selected protocol cannot receive a personal file.\r\n",
+                  "選択した方式ではパーソナルファイルを受信できません。\r\n");
+        return;
+    }
+    if(*bytes) { mmm_bad_service_command(s);return; }
+    transfer(s,ZHOST_RECEIVE_PERSONAL,0,"",0);
 }
 
 static int mail_command(Session *s,const char *name,char *arg) {

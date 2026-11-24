@@ -42,6 +42,7 @@ typedef struct {
     void (*mail_arrived)(Session *,uint32_t);
     void (*mail_notify)(Session *,uint32_t,int,uint32_t);
     void (*transfer_receipt)(Session *,const char *);
+    int (*personal_receive)(Session *,const char *,size_t);
     void (*transfer_finish)(Session *,int,unsigned,uint64_t,int);
     int (*notice)(const Session *,SessionNotice,unsigned,uint64_t,uint64_t,char *,size_t);
     void (*enter)(Session *,int initial,int menu,Language);

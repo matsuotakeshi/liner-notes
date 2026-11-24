@@ -29,7 +29,7 @@ static const struct {
     {"retitle","retitle NOTE TITLE",MMM_RETITLE,1},
     {"withdraw","withdraw NOTE confirm",MMM_WITHDRAW,1},
     {"manage","manage",MMM_MANAGE,1},
-    {"pfile","pfile [-t|-e|-d confirm]",MMM_PFILE,1},
+    {"pfile","pfile [-t|-e|-d confirm|-b [bytes]]",MMM_PFILE,1},
     {"regsign","regsign [-e|-t|-a|-n|-d confirm]",MMM_SIGNATURE,1},
     {"talk","talk [-c|-n]",MMM_TALK,1}
 };

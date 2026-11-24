@@ -1,6 +1,7 @@
 /* Real Session/registry/Core, fake worker queue and tiny non-RTBBS UI state.
  * No Session internals or RTBBS state headers are linked into this unit test. */
 #include "session.h"
+#include "zmodem_host.h"
 #include <assert.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -43,6 +44,10 @@ static void mail_notify(Session *s,uint32_t user,int deny,uint32_t revision) { (
 static void finish(Session *s,int ok,unsigned id,uint64_t size,int recovery) {
     (void)ok;(void)id;(void)size;(void)recovery;assert(!s->connection.zmodem && !s->connection.zmodem_start);simple(s);
 }
+static int receive_personal(Session *s,const char *text,size_t size) {
+    if(size>=sizeof(state(s)->draft))return 0;
+    memcpy(state(s)->draft,text,size);state(s)->draft[size]=0;return 1;
+}
 static int notice(const Session *s,SessionNotice kind,unsigned number,uint64_t bytes,uint64_t total,char *out,size_t size) {
     (void)s;(void)kind;(void)number;(void)bytes;(void)total;
     if(size<5)return 0;
@@ -54,7 +59,7 @@ static const SessionUiAdapter adapter={
     .name="first",.state_size=sizeof(State),.snapshot=snapshot,.cleanup=cleanup,
     .connector_line=connector,.binary_byte=binary,.prepare_request=prepare,.preferences=prefs,.signature=signature,
     .scan_pause=simple,.scan_stop=simple,.board_refresh=simple,.access_refresh=simple,.chat_kick=simple,.chat_event=chat_event,
-    .announce=text,.notify=notify,.mail_arrived=arrived,.mail_notify=mail_notify,.transfer_receipt=text,.transfer_finish=finish,
+    .announce=text,.notify=notify,.mail_arrived=arrived,.mail_notify=mail_notify,.transfer_receipt=text,.personal_receive=receive_personal,.transfer_finish=finish,
     .notice=notice,.enter=enter,.leave=simple,.can_leave=ready,.line=line,.keep_position=keep,.result=result,
     .emit=text,.prompt=simple,.menu=menu,.help=text,.uppercase=upper,.tick=tick,.door_finish=simple
 };
@@ -102,6 +107,16 @@ int main(void) {
     assert(session_line(&s,"hello",5,51));session_door_finish(&s);
     s.connection.zmodem=s.connection.zmodem_start=1;session_zmodem_finish(&s,1,4,8,0);
     assert(state(&s)->events==before+13 && first->events==old);
+    s.connection.zmodem=1;s.connection.zmodem_receive=ZHOST_RECEIVE_PERSONAL;
+    assert(session_ui_select(&s,"first")==SESSION_UI_BUSY);
+    assert(!session_personal_received(&s,76,12,3,"old session",11));
+    assert(!session_personal_received(&s,77,12,2,"old epoch",9));
+    assert(!session_personal_received(&s,77,11,3,"other member",12));
+    assert(!strcmp(state(&s)->draft,"private to second"));
+    assert(session_personal_received(&s,77,12,3,"new personal file",17));
+    session_zmodem_finish(&s,1,0,0,0);
+    assert(!session_personal_received(&s,77,12,3,"late",4));
+    assert(!strcmp(state(&s)->draft,"new personal file"));
     char out[32];assert(session_notice(&s,SESSION_NOTICE_DOOR,0,0,0,out,sizeof(out)) && !strcmp(out,"test"));
     OperationRequest *q=calloc(1,sizeof(*q));OperationResult *r=calloc(1,sizeof(*r));assert(q && r);
     assert(session_disconnect_preferences(&s,q) && q->user==12 && q->user_epoch==3);

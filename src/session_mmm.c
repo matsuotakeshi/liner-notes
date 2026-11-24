@@ -1,6 +1,7 @@
 #include "session_mmm_internal.h"
 #include "mmm_input.h"
 #include "editor_core.h"
+#include "zmodem_host.h"
 #include "editor_view.h"
 #include "form_flow_core.h"
 #include "members.h"
@@ -228,8 +229,9 @@ static void personal_file(Session *s,const char *arg) {
         char used[80];
         snprintf(used,sizeof(used),"Personal file: %zu / %u bytes\r\n",strlen(m->pfile),MMM_PFILE_MAX);
         session_impl_queue_text(s,used);
-        mmm_say(s,"-t: view  -e: edit  -d confirm: clear\r\n","-t 表示  -e 編集  -d confirm 消去\r\n");
-    } else if(!strcmp(arg,"-t"))session_impl_queue_text(s,m->pfile);
+        mmm_say(s,"-t: view  -e: edit  -d confirm: clear  -b [bytes]: receive\r\n","-t 表示  -e 編集  -d confirm 消去  -b [バイト数] 受信\r\n");
+    } else if(!strcmp(arg,"-b") || !strncmp(arg,"-b ",3))mmm_pfile_receive(s,arg[2]?arg+3:"");
+    else if(!strcmp(arg,"-t"))session_impl_queue_text(s,m->pfile);
     else if(!strcmp(arg,"-e")) {
         mmm_clear_composition(m);
         strcpy(m->body,m->pfile);m->pfile_editing=1;m->input=INPUT_EDITOR;
@@ -1016,7 +1018,10 @@ static void result(Session *s,const OperationResult *r,SessionResultView project
             int mode=s->connection.zmodem_receive;
             MessageId ready=mode==2 || mode==10?MSG_ZMODEM_BATCH_READY:
                 mode==6 || mode==11 || mode==12?MSG_ZMODEM_BATCH_UPLOAD_READY:MSG_ZMODEM_READY;
-            if(s->connection.zmodem_protocol)mmm_say(s,"Start terminal transfer using the selected protocol.\r\n","選択した方式で端末の転送を開始してください。\r\n");
+            if(mode==ZHOST_RECEIVE_PERSONAL)
+                mmm_say(s,"Start terminal transfer (personal file, one text file, max 10240 bytes).\r\n",
+                          "端末の転送を開始してください（パーソナルファイル、テキスト1件、最大10240バイト）。\r\n");
+            else if(s->connection.zmodem_protocol)mmm_say(s,"Start terminal transfer using the selected protocol.\r\n","選択した方式で端末の転送を開始してください。\r\n");
             else session_impl_queue_text(s,message_text(m->language,ready));
         }
         break;
@@ -1152,7 +1157,22 @@ static void mail_arrived(Session *s,uint32_t id) {
     NotificationAudience audience=mail_audience(s);
     notification_mail_arrived(&mmm_state(s)->notifications,&audience,id);
 }
+_Static_assert((int)MMM_PFILE_MAX==(int)ZHOST_PERSONAL_MAX,"Personal file limits differ");
+static int personal_receive(Session *s,const char *text,size_t size) {
+    MmmUi *m=mmm_state(s);
+    if(!text || size>MMM_PFILE_MAX || memchr(text,0,size))return 0;
+    OPENSSL_cleanse(m->pfile,sizeof(m->pfile));
+    memcpy(m->pfile,text,size);
+    return 1;
+}
 static void transfer_finish(Session *s,int ok,unsigned id,uint64_t size,int recovery) {
+    if(s->connection.zmodem_receive==ZHOST_RECEIVE_PERSONAL) {
+        if(ok)mmm_say(s,"Personal file received.\r\n","パーソナルファイルを受信しました。\r\n");
+        else mmm_say(s,"Personal file receive failed. Existing text kept.\r\n",
+                       "パーソナルファイルの受信に失敗しました。元の内容を保持しました。\r\n");
+        mmm_prompt(s);
+        return;
+    }
     char text[152];
     if(ok)snprintf(text,sizeof(text),mmm_local(s,"Transfer complete: %u (%llu bytes).\r\n",
                                           "転送完了: %u (%llu バイト)。\r\n"),id,(unsigned long long)size);
@@ -1254,7 +1274,7 @@ const SessionUiAdapter *session_ui_mmm(void) {
         .prepare_request=prepare,.preferences=preferences,.signature=signature,.scan_pause=noop,
         .scan_stop=noop,.board_refresh=refresh_board_list,.access_refresh=refresh_board_list,.chat_kick=chat_kick,.chat_event=mmm_chat_event,
         .announce=session_impl_queue_text,.notify=notify,.mail_arrived=mail_arrived,.mail_notify=mail_preference,
-        .transfer_receipt=transfer_receipt,.transfer_finish=transfer_finish,.notice=notice,
+        .personal_receive=personal_receive,.transfer_receipt=transfer_receipt,.transfer_finish=transfer_finish,.notice=notice,
         .enter=enter,.leave=noop,.can_leave=can_leave,.line=line,.keep_position=keep_position,.result=result,
         .emit=session_impl_queue_text,.prompt=mmm_prompt,.menu=mmm_menu,.help=help,.uppercase=uppercase,.tick=tick,.door_finish=door_finish,
     };
