@@ -1,8 +1,25 @@
 # Connector protocol boundary (LN-23/24)
 
 This unreleased refactor builds on connector buffer/binary Core and extracts the
-remaining negotiated-line adapter from Session. It does not implement SSH, MMM,
-a structured operation API for WebUI, or a new link protocol.
+remaining negotiated-line adapter from Session. The Web connector now also
+negotiates `core_views: 1` for typed reads. Older peers continue using the
+legacy RAW view requests.
+
+## Structured Web reads
+
+`CONNECTOR VIEW` accepts only the named read operations in the protocol manual.
+There is no wire field for the worker opcode, actor, authentication epoch, or
+board grants. Session supplies them through its existing single-pending-operation
+queue. Board selection and password prompts still run through the existing session
+flow. The worker projects authorized pages and bodies into operation results.
+The adapter returns those values with the caller's request nonce, after applying
+Core result status and navigation effects. An error or hidden article has no
+structured content. Mail attachment metadata is collected using participant ACLs.
+
+The HTTP and browser response shape remains compatible. Browser attachment rows
+use structured metadata; the legacy connector converts only attachment headers,
+never rows embedded in the message body. The terminal relay and existing paths
+for composition, management, chat, and transfer remain available.
 
 ## Responsibilities and lifetime
 

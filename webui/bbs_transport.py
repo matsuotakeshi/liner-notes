@@ -164,6 +164,23 @@ class Bridge:
             if body.startswith(echo):body=body[len(echo):]
         return {'text': body.decode('utf-8', errors='replace'), 'state': dict(self.state)}
 
+    async def view(self, kind, ident, cursor, path=''):
+        """Read a typed Core result on the current authenticated connection."""
+        nonce = secrets.token_hex(16)
+        result = await self.exchange(f'CONNECTOR VIEW {self.token} {nonce} {kind} {ident} {cursor}'
+                                     + (' '+path if path else ''))
+        marker = re.search(r'(?:^|(?<=\r\n))CONNECTOR VIEW '+nonce+r' ([^\r\n]+)\r\n', result['text'])
+        try:
+            payload = json.loads(marker[1]) if marker else None
+            if not isinstance(payload, dict) or not isinstance(payload.get('data'), dict) or not isinstance(payload.get('text'), str):
+                raise ValueError('Invalid structured response')
+        except ValueError as error:
+            await self.close()
+            raise BridgeError('Invalid core view reply') from error
+        result['text'] = result['text'][:marker.start()] + payload['text'] + result['text'][marker.end():]
+        result['data'] = payload['data']
+        return result
+
     async def command(self, command=None):
         async with self.lock: return await self.exchange(command)
 

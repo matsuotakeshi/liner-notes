@@ -95,6 +95,9 @@ async def exercise(bbs,tmp):
         r=await post(a,'compose',{'kind':'mail','title':'private','recipient':'bob','body':'私信本文','attachments':[attachment]});assert 'MAIL SENT 1' in r['text'],r
         r=await post(b,'query',{'kind':'mail'});assert r['data']['mail'][0]['title']=='private',r
         r=await post(b,'query',{'kind':'mail_read','id':1});assert r['data']['message']['body']=='私信本文\r\n',r
+        assert r['data']['message']['attachments']==[{'id':attachment,'size':len(payload),'name':'日本語.bin'}],r
+        denied=await post(outsider,'query',{'kind':'mail_read','id':1})
+        assert 'message' not in denied['data'] and '私信本文' not in denied['text'],denied
         r=await b.post(base+'download',json={'kind':'mail','id':attachment});assert r.status==200,await r.text();assert await r.read()==payload
         r=await outsider.post(base+'download',json={'kind':'mail','id':attachment});assert r.status==409,await r.text()
         # Resume a partially written core upload; HTTP must validate the original bytes.

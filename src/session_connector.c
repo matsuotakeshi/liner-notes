@@ -90,6 +90,7 @@ static void connector_link(Session *s,char *line) {
 int session_impl_connector_line(Session *s,char *line,size_t size) {
     ConnectorEnvelope envelope=connector_envelope(line,size,s->connection.connector_token);
     if(*s->connection.connector_token && link_wire_command(line)) { connector_link(s,line);return 1; }
+    if(envelope.kind==CONNECTOR_VIEW) { session_impl_web_view(s,envelope.payload);return 1; }
     if(envelope.kind==CONNECTOR_LINKBLOCK) {
         const char *end;uint32_t n;connector_block_clear(&s->connection.connector_block);
         if(!s->core.user || rtbbs(s)->editor.editing || session_secret(s) || rtbbs(s)->conversation.chatting || rtbbs(s)->conversation.gather.mode || !board_link_enabled(s->core.board,s->core.user) || !session_impl_number_arg(envelope.payload,&n,&end) || *end || !n || n>CONNECTOR_LINK_BLOCK_MAX) { session_impl_queue_text(s,"ERR link syntax\r\n");return 1; }

@@ -5,7 +5,7 @@
 /* Pure wire adapters: recognizing a token does NOT authorize an operation. */
 typedef enum { CONNECTOR_NONE, CONNECTOR_OPEN, CONNECTOR_SYNC,
     CONNECTOR_LITERAL, CONNECTOR_BLOCK, CONNECTOR_LINKBLOCK,
-    CONNECTOR_DATA, CONNECTOR_TRANSFER } ConnectorEnvelopeKind;
+    CONNECTOR_DATA, CONNECTOR_TRANSFER, CONNECTOR_VIEW } ConnectorEnvelopeKind;
 typedef struct {
     ConnectorEnvelopeKind kind;
     const char *payload;size_t size; /* borrows input until it is modified */
@@ -31,6 +31,6 @@ typedef struct {
     int admin,sigop,editing,secret,password_mode,mail,chat,talk,pager,gather,
         input,binary,door,members,feature_mail,feature_chat,feature_vault;
 } ConnectorState;
-/* Formats protocol 1 exactly. Never returns a partial successful response. */
+/* Formats protocol 1 with optional capability fields. Never returns a partial response. */
 int connector_state_format(const ConnectorState *,const char *,char *,size_t);
 #endif

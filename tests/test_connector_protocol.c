@@ -8,25 +8,25 @@
 static const char token[]="0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
 static const char nonce[]="0123456789abcdef0123456789abcdef";
 static void envelopes(void) {
-    const char *names[]={"LINKBLOCK","TRANSFER","BLOCK","DATA","LITERAL","OPEN","SYNC"};
-    ConnectorEnvelopeKind kinds[]={CONNECTOR_LINKBLOCK,CONNECTOR_TRANSFER,CONNECTOR_BLOCK,CONNECTOR_DATA,CONNECTOR_LITERAL,CONNECTOR_OPEN,CONNECTOR_SYNC};
+    const char *names[]={"LINKBLOCK","TRANSFER","BLOCK","DATA","VIEW","LITERAL","OPEN","SYNC"};
+    ConnectorEnvelopeKind kinds[]={CONNECTOR_LINKBLOCK,CONNECTOR_TRANSFER,CONNECTOR_BLOCK,CONNECTOR_DATA,CONNECTOR_VIEW,CONNECTOR_LITERAL,CONNECTOR_OPEN,CONNECTOR_SYNC};
     char line[256];
-    for(size_t i=0;i<7;i++) {
-        const char *suffix=i<4?" payload":i==6?" 0123456789abcdef0123456789abcdef":"";
+    for(size_t i=0;i<sizeof(kinds)/sizeof(kinds[0]);i++) {
+        const char *suffix=i<5?" payload":i==7?" 0123456789abcdef0123456789abcdef":"";
         snprintf(line,sizeof(line),"CONNECTOR %s %s%s",names[i],token,suffix);
         size_t size=strlen(line);ConnectorEnvelope e=connector_envelope(line,size,token);
         assert(e.kind==kinds[i]);
-        if(i<4)assert(e.size==7 && !memcmp(e.payload,"payload",7));
+        if(i<5)assert(e.size==7 && !memcmp(e.payload,"payload",7));
         for(size_t n=0;n<size;n++) {
             e=connector_envelope(line,n,token);
-            if(i>=4 || n<=size-7)assert(e.kind==CONNECTOR_NONE);
+            if(i>=5 || n<=size-7)assert(e.kind==CONNECTOR_NONE);
         }
-        if(i!=5) {
+        if(i!=6) {
             assert(connector_envelope(line,size,"").kind==CONNECTOR_NONE);
             char other[65];memset(other,'f',64);other[64]=0;
             assert(connector_envelope(line,size,other).kind==CONNECTOR_NONE);
         }
-        if(i>=4)assert(connector_envelope(line,size+1,token).kind==CONNECTOR_NONE);
+        if(i>=5)assert(connector_envelope(line,size+1,token).kind==CONNECTOR_NONE);
     }
     snprintf(line,sizeof(line),"CONNECTOR OPEN %s",token);line[15]='A';
     assert(connector_envelope(line,79,token).kind==CONNECTOR_NONE);
@@ -83,7 +83,7 @@ static void snapshot(void) {
         .editing=1,.editor_kind=109,.secret=1,.password_mode=2,.mail=1,.mail_current=8,.chat=1,.talk=1,
         .pager=1,.gather=1,.input=6,.confirmation=7,.binary=1,.door=1,.members=1,
         .feature_mail=1,.feature_chat=0,.feature_vault=1};
-    const char *expected="CONNECTOR STATE 0123456789abcdef0123456789abcdef {\"version\":1,\"transfer_block\":65536,\"connection\":77,\"user\":2,\"username\":\"alice\",\"board\":3,\"article\":4,\"admin\":1,\"sigop\":1,\"level\":5,\"editing\":1,\"editor_kind\":109,\"secret\":1,\"password_mode\":2,\"mail\":1,\"mail_current\":8,\"chat\":1,\"talk\":1,\"pager\":1,\"gather\":1,\"input\":6,\"confirmation\":7,\"binary\":1,\"door\":1,\"members\":1,\"features\":{\"mail\":1,\"chat\":0,\"vault\":1}}\r\n";
+    const char *expected="CONNECTOR STATE 0123456789abcdef0123456789abcdef {\"version\":1,\"transfer_block\":65536,\"core_views\":1,\"connection\":77,\"user\":2,\"username\":\"alice\",\"board\":3,\"article\":4,\"admin\":1,\"sigop\":1,\"level\":5,\"editing\":1,\"editor_kind\":109,\"secret\":1,\"password_mode\":2,\"mail\":1,\"mail_current\":8,\"chat\":1,\"talk\":1,\"pager\":1,\"gather\":1,\"input\":6,\"confirmation\":7,\"binary\":1,\"door\":1,\"members\":1,\"features\":{\"mail\":1,\"chat\":0,\"vault\":1}}\r\n";
     char out[2048];assert(connector_state_format(&q,nonce,out,sizeof(out)) && !strcmp(out,expected));
     size_t n=strlen(expected);
     assert(connector_state_format(&q,nonce,out,n+1));

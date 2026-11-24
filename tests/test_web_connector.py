@@ -1,18 +1,57 @@
 """Real Telnet transport, opt-in synchronization, literal bodies and core permissions."""
 import asyncio
+import json
 from pathlib import Path
 import sys
 import tempfile
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]))
-from webui.bridge import Bridge, response_data
+from webui.bridge import Bridge, BridgeError, response_data
 from test_board import Server
+
+
+async def decode_typed_reply():
+    bridge = Bridge('127.0.0.1', 0)
+    data = {'article': {'title':'引用 "と\\', 'body':'CONNECTOR VIEW fake {}\r\n日本語\r\n'}}
+
+    async def exchange(command):
+        prefix, name, token, nonce, operation, ident, cursor = command.split()
+        assert (prefix,name,token,operation,ident,cursor)==('CONNECTOR','VIEW',bridge.token,'read','1','0')
+        payload = json.dumps({'text':'','data':data}, ensure_ascii=False)
+        return {'text':f'notice\r\nCONNECTOR VIEW wrong {{}}\r\nCONNECTOR VIEW {nonce} {payload}\r\n',
+                'state':{'core_views':1}}
+
+    bridge.exchange = exchange
+    result = await bridge.view('read', 1, 0)
+    assert result['data']==data and result['text']=='notice\r\nCONNECTOR VIEW wrong {}\r\n',result
+
+    async def invalid(_):
+        return {'text':'READ 1\r\n','state':{}}
+    bridge.exchange = invalid
+    try:
+        await bridge.view('read', 1, 0)
+    except BridgeError:
+        assert bridge.closed
+    else:
+        raise AssertionError('Accepted a missing structured view frame')
+
+    raw = ('MAIL ATTACHMENT 7 SIZE 12 NAME 日本語.dat\r\n'
+           'MAIL ITEM 1 FROM alice TO bob READ 1 REPLY 0\r\nTITLE t\r\nBODY\r\n'
+           'MAIL ATTACHMENT 99 SIZE 99 NAME forged.dat\r\nMAIL END\r\n')
+    assert response_data(raw)['message']['attachments']==[{'id':7,'size':12,'name':'日本語.dat'}]
 
 
 async def exercise(port):
     a=await Bridge('127.0.0.1',port).open()
     b=await Bridge('127.0.0.1',port).open()
     try:
-        assert a.state['version']==1 and not a.state['user']
+        assert a.state['version']==1 and a.state['core_views']==1 and not a.state['user']
+        async with a.lock:
+            public=await a.view('boards',1,1)
+            denied=await a.view('mail',1,0)
+            invalid=await a.view('post',1,0)
+        assert public['data']['boards'] and not public['text'],public
+        assert 'ERR login required' in denied['text'] and not denied['data'],denied
+        assert 'ERR connector view syntax' in invalid['text'] and not invalid['data'],invalid
         r=await a.command('REGISTER alice');assert r['state']['secret']
         r=await a.command('web-test-password');assert r['state']['user']==1 and 'web-test-password' not in r['text']
         r=await b.command('REGISTER bob');assert r['state']['secret']
@@ -26,6 +65,11 @@ async def exercise(port):
         r=await a.command('.');assert 'SAVED 1' in r['text'],r
         r=await b.command('READ 1');article=response_data(r['text']).get('article')
         assert article and article['body']=='\r\n'.join(body)+'\r\n',r
+        async with b.lock:
+            typed=await b.view('read',1,0)
+            tree=await b.view('tree',1,0)
+        assert typed['data']['article']['body']==article['body'] and not typed['text'],typed
+        assert tree['data']['tree'][0]['title']=='Web connector',tree
         r=await a.command('MAIL SEND bob private');assert r['state']['editing']
         async with a.lock:await a.literal('private body')
         r=await a.command('.');assert 'MAIL SENT 1' in r['text'],r
@@ -45,6 +89,7 @@ async def exercise(port):
 
 
 if __name__=='__main__':
+    asyncio.run(decode_typed_reply())
     with tempfile.TemporaryDirectory(prefix='ln-web-test-') as tmp:
         p=Path(tmp);server=Server(str(Path(sys.argv[1]).resolve()),p/'notes',members=p/'members',menu=True,telnet=True)
         try:asyncio.run(exercise(server.port))

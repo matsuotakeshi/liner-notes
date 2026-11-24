@@ -13,7 +13,7 @@ typedef struct {
     int check_scope,news,date_valid,has_until;
     uint64_t since,until;
 } VaultQuery;
-typedef struct { size_t count;uint32_t next;VaultEntry rows[8]; } VaultQueryFiles;
+typedef struct { size_t count;uint32_t next;VaultEntry rows[8];uint64_t downloads[8]; } VaultQueryFiles;
 typedef struct { size_t count;uint64_t bytes;uint32_t ids[16]; } VaultQueryMatch;
 typedef struct { char name[49],display[81]; } VaultQueryChild;
 /* Keep the legacy whole-backend-page rule: seven already collected children

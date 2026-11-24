@@ -128,10 +128,11 @@ void vault_bridge_execute(IdentityProvider identity,uint32_t user,uint32_t epoch
         }
         r=vault_query_files(store,&p,&request,&page);
         if(r==VAULT_OK) {
-            OPERATION_PAGE(response,FILES,files,page);
             size_t pos=(size_t)(op==VAULT_CMD_LIST?snprintf(out,size,"FILES\r\n"):snprintf(out,size,"%s %s\r\n",op==VAULT_CMD_NEWS?"FILENEWS":op==VAULT_CMD_SEARCH?"FILESEARCH":"FILESIN",op==VAULT_CMD_NEWS && query[0]=='@'?"CHECK":argument));
             for(size_t i=0;i<page.count;i++) { pos+=(size_t)snprintf(out+pos,size-pos,"FILEITEM %u %u %s\r\n",page.rows[i].id,page.rows[i].size,page.rows[i].name);
-                pos+=(size_t)snprintf(out+pos,size-pos,"FILEDETAIL %u %s %llu %s\r\n",page.rows[i].id,page.rows[i].ascii?"ASCII":"BINARY",(unsigned long long)downloads_count(page.rows[i].id),page.rows[i].description); }
+                page.downloads[i]=downloads_count(page.rows[i].id);
+                pos+=(size_t)snprintf(out+pos,size-pos,"FILEDETAIL %u %s %llu %s\r\n",page.rows[i].id,page.rows[i].ascii?"ASCII":"BINARY",(unsigned long long)page.downloads[i],page.rows[i].description); }
+            OPERATION_PAGE(response,FILES,files,page);
             f->page_found=1;f->page_next=page.next;snprintf(out+pos,size-pos,"END NEXT %u\r\n",page.next);return;
         }
     } else if(op==VAULT_CMD_INFO) {

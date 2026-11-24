@@ -15,7 +15,7 @@ import time
 from urllib.parse import urlsplit, quote
 
 from aiohttp import web, WSMsgType
-from .bridge import Bridge, BridgeError, response_data
+from .bridge import Bridge, BridgeError, empty_view, response_data
 from .commands import COMMANDS, build_action, visible
 from .presentation import Presentation
 from .terminal import relay
@@ -132,7 +132,7 @@ def create_app(config):
         result['state']['vault_sigop']=session.vault_sigop
         result['state']['games']=session.games
         result['state']['link_management']=bool(cfg.get('link_control_socket')) and bool(result['state'].get('admin'))
-        result['data']=response_data(result['text'])
+        result['data']={**empty_view(),**result['data']} if 'data' in result else response_data(result['text'])
         result['csrf']=session.csrf
         result['actions']=[{k:v for k,v in item.items() if k!='command'} for item in COMMANDS.values() if visible(item,result['state'])]
         return result
@@ -210,12 +210,14 @@ def create_app(config):
     async def query(request):
         session=current(request,mutate=True);payload=await object_body(request);kind=payload['kind']
         # Explicit operations; all of these still pass the core's ACL checks.
-        number=int(payload.get('id',1));cursor=int(payload.get('cursor',1))
+        number=int(payload.get('id',1));cursor=int(payload.get('cursor',0 if kind in ('mail','tree') else 1))
         if not 0<=number<=2147483646 or not 0<=cursor<=2147483646:raise ValueError('Invalid number')
         commands={'boards':f'BOARDS {max(cursor,1)}','notes':f'NOTES {max(cursor,1)}','read':f'READ {number}',
                   'mail':'MAIL +' if cursor else 'MAIL LIST','mail_read':f'MAIL READ {number}','files':f'FILES {max(cursor,1)}',
-                  'profile':f'PROFILEID {number}','tree':f'TREE {number}','readglobal':f'READGLOBAL {number}'}
+                  'profile':f'PROFILEID {number}','tree':f'TREE {number}'+(f' {cursor}' if cursor else ''),
+                  'readglobal':f'READGLOBAL {number}'}
         if kind not in commands:raise ValueError('Invalid view')
+        path = ''
         if kind=='files' and payload.get('path'):
             path=payload['path']
             if not isinstance(path,str) or len(path.encode())>48 or any(ord(c)<32 for c in path) or '|' in path:raise ValueError('Invalid file board')
@@ -228,7 +230,10 @@ def create_app(config):
                 if 'ERR ' in selected['text'] or session.bridge.state.get('secret'):return response(session,selected)
             if session.bridge.state.get('mail') and kind not in ('mail','mail_read'):
                 await session.bridge.exchange('MAIL EXIT')
-            result=await session.bridge.exchange(commands[kind])
+            if session.bridge.state.get('core_views') == 1:
+                result=await session.bridge.view(kind,number,cursor,path)
+            else:
+                result=await session.bridge.exchange(commands[kind])
             if kind=='files':await file_role(session,payload.get('path','-'))
         return response(session,result)
 
