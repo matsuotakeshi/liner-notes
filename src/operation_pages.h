@@ -5,6 +5,7 @@
 #include "member_core.h"
 #include "vault_query_core.h"
 #include "door_core.h"
+#include "mmm_notes.h"
 /* Bounded, owned results copied only after Core authorization. No display-text
  * parsing, pointers into repositories, or extra unbounded body allocation. */
 typedef enum { OPERATION_PAGE_NONE,
@@ -25,7 +26,8 @@ typedef enum { OPERATION_PAGE_NONE,
     OPERATION_PAGE_FILE_CATEGORIES,
     OPERATION_PAGE_FILE_CHILDREN,
     OPERATION_PAGE_FILE_AUDIT,
-    OPERATION_PAGE_DOORS
+    OPERATION_PAGE_DOORS,
+    OPERATION_PAGE_MMM_SCANLIST
 } OperationPageKind;
 typedef struct {
     OperationPageKind kind;
@@ -48,6 +50,7 @@ typedef struct {
         VaultQueryChildren file_children;
         VaultQueryAudit file_audit;
         DoorListing doors;
+        MmmScanList mmm_scanlist;
     } data;
 } OperationPage;
 /* Producer adapters opt in through the request, preserving legacy output. */

@@ -19,6 +19,8 @@ TABLES={
  'guest_boards':'id INTEGER PRIMARY KEY,value INTEGER',
  'news_scoped':'user INTEGER,kind INTEGER,scope TEXT,stamp INTEGER NOT NULL,PRIMARY KEY(user,kind,scope)',
  'news':'user INTEGER,kind INTEGER,stamp INTEGER NOT NULL,PRIMARY KEY(user,kind)',
+ 'mmm_board_labels':'board INTEGER PRIMARY KEY CHECK(board BETWEEN 1 AND 1024),label TEXT NOT NULL UNIQUE CHECK(length(label) BETWEEN 1 AND 31)',
+ 'mmm_scanlist':'user INTEGER NOT NULL CHECK(user>0),position INTEGER NOT NULL CHECK(position BETWEEN 1 AND 64),board INTEGER NOT NULL CHECK(board BETWEEN 1 AND 1024),PRIMARY KEY(user,position),UNIQUE(user,board)',
  'delegated':'board INTEGER,gid INTEGER,PRIMARY KEY(board,gid)',
  'group_moves':'board INTEGER PRIMARY KEY,actor INTEGER,source INTEGER,destination INTEGER,done INTEGER',
  'applications':'user INTEGER,field TEXT,value TEXT,PRIMARY KEY(user,field)',

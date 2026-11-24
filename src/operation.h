@@ -30,6 +30,7 @@ typedef struct {
     char username[33], password[129], new_password[129];
     char link_origin[65],link_article[65];
     char title[BOARD_TITLE+1], body[BOARD_BODY+1];
+    MmmScanTargets mmm_scanlist;
 } OperationRequest;
 typedef OperationRequest BoardRequest;
 /* Operation effects are produced beside domain results, never decoded from text.

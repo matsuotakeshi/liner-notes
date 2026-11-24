@@ -13,7 +13,7 @@ static const struct {
     {"logout","logout",MMM_LOGOUT,1},
     {"notes","notes",MMM_NOTES,1},
     {"go","go board",MMM_GO,1},
-    {"open","open [-i] [-bNUMBER] [board]",MMM_OPEN,1},
+    {"open","open [-i|-s|-x|-bNUMBER] [#board|@label|title]",MMM_OPEN,1},
     {"post","post [board]",MMM_POST,1},
     {"mail","mail",MMM_MAIL,1},
     {"filer","filer [board]",MMM_FILER,1},
@@ -22,7 +22,9 @@ static const struct {
     {"profile","profile [id]",MMM_PROFILE,1},
     {"games","games",MMM_GAMES,1},
     {"new","new [-n]",MMM_NEW,1},
-    {"setsequencer","setsequencer [YYYY-MM-DD|reset]",MMM_SEQUENCER,1}
+    {"setsequencer","setsequencer [YYYY-MM-DD|reset]",MMM_SEQUENCER,1},
+    {"scanlist","scanlist [set #BOARD|@LABEL ... | reset | -d]",MMM_SCANLIST,1},
+    {"boardlabel","boardlabel BOARD [LABEL|NONE]",MMM_BOARDLABEL,1}
 };
 
 static int space(char ch) { return ch==' ' || ch=='\t'; }
@@ -44,6 +46,53 @@ static const char *number(const char *p, uint32_t *out) {
 int mmm_number(const char *text, uint32_t *out) {
     const char *end=number(text,out);
     return end && !*end;
+}
+
+static char *split_word(char *text) {
+    while(*text && !space(*text))text++;
+    if(*text)*text++=0;
+    while(space(*text))text++;
+    return text;
+}
+
+int mmm_open_parse(char *arg,MmmOpen *out) {
+    *out=(MmmOpen){.mode=MMM_OPEN_INDEX};
+    while(*arg=='-') {
+        char *next=split_word(arg);
+        if(!arg[1])return 0;
+        switch(fold(arg[1])) {
+        case 'i': if(arg[2])return 0;break;
+        case 's': case 'x':
+            if(arg[2] || out->mode!=MMM_OPEN_INDEX)return 0;
+            out->mode=fold(arg[1])=='s'?MMM_OPEN_NEW:MMM_OPEN_NEW_OR_INDEX;
+            break;
+        case 'b':
+            if(out->mode!=MMM_OPEN_INDEX || !mmm_number(arg+2,&out->article))return 0;
+            out->mode=MMM_OPEN_ARTICLE;
+            break;
+        default: return 0;
+        }
+        arg=next;
+    }
+    out->board=arg;
+    return 1;
+}
+
+int mmm_scanlist_parse(char *arg,MmmScanTargets *out) {
+    memset(out,0,sizeof(*out));
+    while(space(*arg))arg++;
+    while(*arg) {
+        if(out->count==MMM_SCAN_MAX)return 0;
+        char *next=split_word(arg);
+        MmmBoardTarget *target=&out->targets[out->count++];
+        if(*arg=='@') {
+            size_t n=strlen(arg+1);
+            if(!n || n>MMM_LABEL_MAX)return 0;
+            memcpy(target->label,arg+1,n+1);
+        } else if(!mmm_number(*arg=='#'?arg+1:arg,&target->board))return 0;
+        arg=next;
+    }
+    return out->count!=0;
 }
 
 MmmInput mmm_parse(char *line, int authenticated) {
