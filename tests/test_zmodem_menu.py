@@ -62,7 +62,8 @@ def run(binary,ctl,receiver,sender,rights=False):
         try:auth(a,'alice',True);auth(b,'bob',True)
         finally:a.close();b.close();s.close()
         admins=p/'admins';admins.write_text('1\n')
-        s=Server(binary,data,members=members,vault=vault,zhelper=helper,admins=admins,menu=True,telnet=True,language='en');c=Telnet(s.port);guest=Telnet(s.port)
+        s=Server(binary,data,members=members,vault=vault,zhelper=helper,admins=admins,menu=True,telnet=True,language='en',
+                 options=['--ui-policy','MEMBERS','--ui-allow','rtbbs,mmm']);c=Telnet(s.port);guest=Telnet(s.port)
         api=LineConnector('127.0.0.1',s.port,'alice',PASSWORD)
         def downloaded(ident):
             api.protocol.send(f'FILESTATS {ident}');count=None
@@ -151,6 +152,31 @@ def run(binary,ctl,receiver,sender,rights=False):
             c.cmd('UIN private|denied',b'1 GiB.\r\n');assert failed(c.until())
             assert not spool_contents(spool)
             c.cmd('0');c.cmd('LANG ja')
+            # Exercise the same native helpers with the independent MMM menu.
+            mmm = Telnet(s.port)
+            try:
+                mmm.until()
+                mmm.cmd('LOGIN bob', b'> ')
+                mmm.cmd(PASSWORD)
+                mmm.cmd('UI mmm', b'UI preference saved.')
+                mmm.until(b'MAIN>> ')
+                mmm.cmd('filer', b'FILER>> ')
+                payload = bytes(range(256)) * 8
+                name = 'mmm-zmodem.bin'
+                (source/name).write_bytes(payload)
+                mmm.cmd('put MMM transfer', b'1 GiB.\r\n')
+                code,out,err = transfer(mmm,sender,['--',name],source,prompt=b'FILER>> ')
+                assert code==0 and b'Transfer complete' in out,(code,out,err)
+                row = next(row for row in mmm.cmd('list', b'FILER>> ').splitlines() if name.encode() in row)
+                ident = int(row.split()[0].lstrip(b'#'))
+                mmm.cmd(f'get {ident}', b'1 GiB.\r\n')
+                code,out,err = transfer(mmm,receiver,['--restricted','--protect'],target,prompt=b'FILER>> ')
+                assert code==0 and b'Transfer complete' in out,(code,out,err)
+                assert (target/name).read_bytes()==payload
+                assert downloaded(ident)==1
+            finally:
+                mmm.close()
+
             # Authorization changes close the bound transfer; no partial upload becomes public.
             c.cmd('ZUPLOAD', '1GiBまで。\r\n'.encode());api.protocol.request('LEVEL 2 1' if rights else 'SUSPEND 2',lambda x:x.startswith(b'RIGHTS' if rights else b'SUSPENDED'))
             deadline=time.monotonic()+5

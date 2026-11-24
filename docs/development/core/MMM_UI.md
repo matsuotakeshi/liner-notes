@@ -39,7 +39,7 @@
 - 既存のWebUI等は従来のRAWハンドシェイクを使います。MMM既定の待受からRAWに入った接続にもCoreのログイン条件を適用し、その接続でのUI切替を禁止します。
 - MMMの新着基準は `news` のMMM専用種別に保存します。`new`（`-n` で連続表示）または `open -s/-x` で本文を表示した後の `off` がログイン時刻を自動保存します。`setsequencer` の上書きは接続中だけ使います。同じ秒の投稿を飛ばさないよう境界秒を含めます。会員による明示的な時刻設定では `TZ` の日付を使います。
 - `mmm_scanlist` は会員・順番・ボード番号、`mmm_board_labels` はボード番号とラベルの対応を保存します。既存DBには表を追加し、論理バックアップと持ち出しに含めます。ACL、入室パスワード、削除状態をクエリごとに検査します。
-- 端末統合試験は `make test-mmm-ui test-mmm-services test-mmm-traversal test-mmm-input` で実行できます。転送試験ではテスト用ヘルパーで引数と完了応答を検証します。
+- 端末統合試験は `make test-mmm-ui test-mmm-services test-mmm-traversal test-mmm-input` で実行できます。転送試験ではテスト用ヘルパーで引数と完了応答を検証します。既存の実ZMODEMとSSHの統合試験にもMMMの扱いを含めています。
 
 旧mmmの操作仕様は Revision 4.0 ユーザーマニュアルの `open`（「連続表示オプション」）、`new`、`scanlist`、`setsequencer`、`killmail`、`pfile` を参照しました。`-n` は連続表示です。Liner Notesの最大64ボード制限とボードACLも適用されます。パターンと除外指定は `mmm_scan_rules` に保存し、既存の巡回表と同じトランザクションに含めます。巡回中の展開結果にもACLを適用します。
 
