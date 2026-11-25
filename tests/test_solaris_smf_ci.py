@@ -46,6 +46,21 @@ class Fake:
 
 
 class SmfTests(unittest.TestCase):
+    def test_fixed_solaris_fixture_hostname(self):
+        with patch.dict(sys.modules, {"fcntl": SimpleNamespace()}), \
+             patch.object(control.sys, "argv", ["helper", "session"]), \
+             patch.object(control.sys, "platform", "sunos5"), \
+             patch.object(control.os, "geteuid", return_value=0, create=True), \
+             patch.dict(control.os.environ, {"SUDO_USER": "ci-test"}), \
+             patch.object(control, "trusted", side_effect=RuntimeError("trusted path check reached")):
+            with patch.object(control.socket, "gethostname", return_value="solaris-ci"):
+                with self.assertRaisesRegex(RuntimeError, "trusted path check reached"):
+                    control.main()
+            for hostname in ("solaris", "production"):
+                with self.subTest(hostname=hostname), patch.object(control.socket, "gethostname", return_value=hostname):
+                    with self.assertRaisesRegex(ValueError, "Fixed Solaris CI session only"):
+                        control.main()
+
     def test_manifest_preserves_contract_and_nonroot_identity(self):
         doc = ET.fromstring(prepare.manifest())
         service = doc.find("service")
