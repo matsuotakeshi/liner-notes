@@ -156,7 +156,8 @@ class PolicyTests(unittest.TestCase):
         results = run_parallel(targets, task)
         self.assertEqual(set(intervals), set(targets))
         self.assertLess(max(x[0] for x in intervals.values()), min(x[1] for x in intervals.values()))
-        self.assertEqual([x["status"] for x in results], ["passed", "failed", "passed"])
+        self.assertEqual({row["target"]: row["status"] for row in results},
+                         {"freebsd": "passed", "rocky": "failed", "debian": "passed"})
         self.assertFalse(all_passed(results, targets, SHA))
 
     def test_gate_rejects_missing_duplicate_failed_cancelled_and_wrong_sha(self):
