@@ -10,9 +10,9 @@
 | --- | --- | --- |
 | FreeBSD | takeshi@10.0.0.50 | /home/ci/.ssh/id_ed25519_freebsd_ci |
 | Rocky Linux | ci-test@10.0.0.51 | /home/ci/.ssh/id_ed25519_rocky_ci |
-| Ubuntu | ci-test@10.0.0.53 | /home/ci/.ssh/id_ed25519_ubuntu_ci |
+| Debian | ci-test@10.0.0.59 | /home/ci/.ssh/id_ed25519_debian_ci |
 
-鍵やRunner、VMを新設しません。Solarisは独立したmain限定のSolaris Native CIで検証し、この3OSゲートへ追加していません。pkg/RPM/DEB生成は従来の独立ワークフローのままです。
+DebianのSSHホスト鍵を親機の `ci` ユーザーの `known_hosts` に登録し、専用公開鍵をDebianの `ci-test` に登録します。Solarisは独立したmain限定のSolaris Native CIで検証し、この3OSゲートへ追加していません。pkg/RPM/DEB生成は従来の独立ワークフローのままです。
 
 ## 信頼境界と衝突防止
 
@@ -35,7 +35,7 @@ Runnerは5秒ごとに生存通知を送ります。リモートはEOF、45秒�
 
 ActionsログにOS別の開始・完了を表示し、Job summaryへ結果と所要時間をまとめます。`native-ci-results` Artifact（単体実行は `native-ci-OS-results`）には次を30日間保存します。
 
-- `freebsd.log` / `rocky.log` / `ubuntu.log`: OS別のビルド・回帰試験出力。
+- `freebsd.log` / `rocky.log` / `debian.log`: OS別のビルド・回帰試験出力。
 - `results.json`: source SHA、archive SHA-256、OS別結果、エラー、リモート作業先、開始/終了日時、合計所要時間。
 
 `tests_started_at` と `tests_finished_at` はすべてRunner時計で記録します。3OSの開始時刻の最大値が終了時刻の最小値より早ければ、実機試験が同時進行したことを確認できます。合計時間を以前の直列実行と比較します。試験時間は環境負荷で変わるため、速度を固定値で保証しません。

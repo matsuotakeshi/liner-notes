@@ -50,7 +50,7 @@ def build_command(target):
     elif target == 'freebsd':
         # The source Makefile uses portable make syntax, including FreeBSD make.
         command = ['make', 'PYTHON=' + sys.executable]
-    elif target in ('rocky', 'ubuntu'):
+    elif target in ('rocky', 'debian'):
         command = ['make', 'CC=clang', 'PYTHON=' + sys.executable, 'SQLITE_CFLAGS=', 'SQLITE_LIBS=-lsqlite3']
     else:
         raise ValueError('Unknown target')
@@ -77,7 +77,7 @@ def install_test_dependencies(target, python):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('--target', choices=('freebsd', 'rocky', 'ubuntu', 'solaris'), required=True)
+    parser.add_argument('--target', choices=('freebsd', 'rocky', 'debian', 'solaris'), required=True)
     args = parser.parse_args()
     from native_remote import verify_os
     verify_os(args.target)

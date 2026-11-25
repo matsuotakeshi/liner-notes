@@ -1,4 +1,4 @@
-name: Ubuntu Build and Test
+name: Debian Build and Test
 
 # Manual/reusable entry point shares the same worker and host exclusion.
 on:
@@ -11,7 +11,7 @@ concurrency:
   cancel-in-progress: false
 jobs:
   test:
-    name: Ubuntu Native Tests
+    name: Debian Native Tests
     if: ${{ github.repository == 'matsuotakeshi/liner-notes' && github.ref == 'refs/heads/main' }}
     runs-on: [self-hosted, Linux, X64]
     timeout-minutes: 60
@@ -20,12 +20,12 @@ jobs:
         with:
           persist-credentials: false
       - name: Run native suites through existing CI SSH accounts
-        run: python3 ci/native_ci.py --target ubuntu --output "$RUNNER_TEMP/native-results"
+        run: python3 ci/native_ci.py --target debian --output "$RUNNER_TEMP/native-results"
       - name: Retain OS logs and exact-commit results
         if: ${{ always() }}
         uses: actions/upload-artifact@v4
         with:
-          name: native-ci-ubuntu-results
+          name: native-ci-debian-results
           path: |
             ${{ runner.temp }}/native-results/*.log
             ${{ runner.temp }}/native-results/results.json

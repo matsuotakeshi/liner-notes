@@ -194,7 +194,7 @@ def main():
     bootstrap.add_argument("digest")
     bootstrap.add_argument("sha")
     run = sub.add_parser("worker")
-    run.add_argument("target", choices=["freebsd", "rocky", "ubuntu", "solaris"])
+    run.add_argument("target", choices=["freebsd", "rocky", "debian", "solaris"])
     run.add_argument("sha")
     run.add_argument("--suite", choices=("core", "ssh"), default="core")
     run.add_argument("--timeout", type=int, default=3300)

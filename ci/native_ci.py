@@ -22,10 +22,10 @@ ROOT = Path(__file__).resolve().parents[1]
 TARGETS = {
     "freebsd": ("takeshi@10.0.0.50", "/home/ci/.ssh/id_ed25519_freebsd_ci"),
     "rocky": ("ci-test@10.0.0.51", "/home/ci/.ssh/id_ed25519_rocky_ci"),
-    "ubuntu": ("ci-test@10.0.0.53", "/home/ci/.ssh/id_ed25519_ubuntu_ci"),
+    "debian": ("ci-test@10.0.0.59", "/home/ci/.ssh/id_ed25519_debian_ci"),
     "solaris": ("ci-test@10.0.0.52", "/home/ci/.ssh/id_ed25519_solaris_ci"),
 }
-DEFAULT_TARGETS = ("freebsd", "rocky", "ubuntu")
+DEFAULT_TARGETS = ("freebsd", "rocky", "debian")
 
 
 def timestamp():

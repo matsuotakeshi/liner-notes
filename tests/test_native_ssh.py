@@ -30,7 +30,7 @@ class NativeSsh(unittest.TestCase):
         self.assertNotIn('${{', command)
 
     def test_suite_is_distinct_and_does_not_repeat_full_regression(self):
-        for target in ('freebsd', 'rocky', 'ubuntu', 'solaris'):
+        for target in ('freebsd', 'rocky', 'debian', 'solaris'):
             self.assertEqual(commands_for(target, 'ssh'),
                              [[sys.executable, 'ci/native_ssh.py', '--target', target]])
             self.assertNotEqual(commands_for(target), commands_for(target, 'ssh'))
@@ -60,7 +60,7 @@ class NativeSsh(unittest.TestCase):
             prefix=Path(temporary)/'liner-notes-deps/libssh-0.12.2/local'
             metadata=prefix/'lib/pkgconfig/libssh.pc'
             metadata.parent.mkdir(parents=True);metadata.write_text('synthetic')
-            self.assertIsNone(native_ssh.private_solaris_dependency('ubuntu'))
+            self.assertIsNone(native_ssh.private_solaris_dependency('debian'))
             self.assertEqual(os.environ['PKG_CONFIG_PATH'],'/existing')
             self.assertEqual(native_ssh.private_solaris_dependency('solaris'),prefix)
             self.assertEqual(os.environ['PKG_CONFIG_PATH'],str(metadata.parent)+os.pathsep+'/existing')
@@ -88,7 +88,7 @@ class NativeSsh(unittest.TestCase):
                         native_ssh.solaris_stack_runtime(['gmake','CC=gcc'])
 
     def test_native_os_packages_are_read_only_and_pip_stays_in_venv(self):
-        for target in ('freebsd','solaris','ubuntu','rocky'):
+        for target in ('freebsd','solaris','debian','rocky'):
             with tempfile.TemporaryDirectory() as temporary, \
                  patch.object(native_ssh,'ROOT',Path(temporary)), \
                  patch.object(native_ssh.sys,'argv',['native_ssh','--target',target]), \
@@ -113,7 +113,7 @@ class NativeSsh(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temporary,patch.object(native_ssh.Path,'home',return_value=Path(temporary)):
             manifest=Path(temporary)/'liner-notes-deps/ssh-client-4.0.0/wheels/requirements.txt'
             manifest.parent.mkdir(parents=True);manifest.write_text('fixture')
-            for target,count in [('solaris',3),('freebsd',2),('ubuntu',2)]:
+            for target,count in [('solaris',3),('freebsd',2),('debian',2)]:
                 with patch.object(native_ssh.subprocess,'run') as run:
                     native_ssh.install_test_dependencies(target,'/private/venv/bin/python')
                 self.assertEqual(run.call_count,count)
