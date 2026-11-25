@@ -161,7 +161,7 @@ def main():
     import fcntl
     if (sys.argv[1:] != ["session"] or sys.platform != "sunos5"
             or os.geteuid() != 0 or os.environ.get("SUDO_USER") != "ci-test"
-            or socket.gethostname() != "solaris"):
+            or socket.gethostname() != "solaris-ci"):
         raise ValueError("Fixed Solaris CI session only")
     trusted(Path(__file__).resolve())
     trusted(MANIFEST)
