@@ -7,7 +7,7 @@ No production deployment or release is authorized by this work.
 
 `Embedded SSH Native Acceptance` is manual, exact-main only. It reuses the
 existing accounts, SSH/host keys, remote source checksum, host lock, heartbeat,
-bounded cleanup and log artifacts. `all` means FreeBSD/Rocky/Ubuntu; Solaris
+bounded cleanup and log artifacts. `all` means FreeBSD/Rocky/Debian; Solaris
 requires explicit selection and does not add another automatic daily run.
 It builds with libssh, runs the existing encrypted SSH/OpenSSH/Paramiko suite,
 and does not repeat `make check`. Its receipt includes `suite: ssh`; the

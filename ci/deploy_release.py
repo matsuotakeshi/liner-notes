@@ -177,7 +177,7 @@ def fresh_evidence(release):
                 verify_receipt(document, run_id, sha)
     native = artifact_json(artifacts['native'], 'results.json')
     require(native.get('ok') is True and native.get('source_sha') == sha and
-            {r.get('target') for r in native.get('results', [])} == {'freebsd', 'rocky', 'ubuntu'} and
+            {r.get('target') for r in native.get('results', [])} == {'freebsd', 'rocky', 'debian'} and
             all(r.get('source_sha') == sha and r.get('status') == 'passed' for r in native['results']), 'Native OS execution evidence is incomplete')
     solaris = artifact_json(artifacts['solaris'], 'results.json')
     require(solaris.get('ok') is True and solaris.get('source_sha') == sha and

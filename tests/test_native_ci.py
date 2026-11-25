@@ -60,7 +60,7 @@ class PolicyTests(unittest.TestCase):
         env = dict(GITHUB_REF="refs/heads/main", GITHUB_EVENT_NAME="schedule",
                    GITHUB_REPOSITORY="matsuotakeshi/liner-notes", GITHUB_SHA=SHA)
         require_trusted_main(env, SHA, SHA, "solaris")
-        for target in (None, "all", "freebsd", "rocky", "ubuntu"):
+        for target in (None, "all", "freebsd", "rocky", "debian"):
             with self.subTest(target=target), self.assertRaises(ValueError):
                 require_trusted_main(env, SHA, SHA, target)
         for key, bad in (("GITHUB_REF", "refs/heads/feature"),
@@ -97,7 +97,7 @@ class PolicyTests(unittest.TestCase):
             self.assertTrue(all(path.is_dir() for path in paths))
 
     def test_directory_command_preserves_other_os_and_rejects_injection(self):
-        for target in ("freebsd", "rocky", "ubuntu"):
+        for target in ("freebsd", "rocky", "debian"):
             self.assertEqual(remote_directory_command(target, "python3"),
                              'umask 077; mkdir -p "$HOME/ci" && mktemp -d "$HOME/ci/native-' + target + '-XXXXXXXX"')
         for python in ("python3", "/tmp/python3", "/usr/bin/python3;id", "/usr/bin/python3\n"):
@@ -109,7 +109,7 @@ class PolicyTests(unittest.TestCase):
     def test_native_directory_accepts_solaris_underscore_only(self):
         good = "/export/home/ci-test/ci/native-solaris-XX1U_6Wa"
         self.assertEqual(validate_remote_directory("solaris", good), good)
-        for target in ("freebsd", "rocky", "ubuntu"):
+        for target in ("freebsd", "rocky", "debian"):
             path = "/home/ci/ci/native-" + target + "-AbC01234"
             self.assertEqual(validate_remote_directory(target, path), path)
             with self.assertRaises(ValueError):
@@ -133,7 +133,7 @@ class PolicyTests(unittest.TestCase):
 
     def test_native_test_commands_are_preserved(self):
         self.assertEqual(commands_for("freebsd"), [["make", "-j2"], ["make", "check"]])
-        for target in ("rocky", "ubuntu"):
+        for target in ("rocky", "debian"):
             flags = ["CC=clang", "PYTHON=python3", "SQLITE_CFLAGS=", "SQLITE_LIBS=-lsqlite3"]
             self.assertEqual(commands_for(target), [["make", "-j2", *flags], ["make", *flags, "check"]])
 
@@ -152,7 +152,7 @@ class PolicyTests(unittest.TestCase):
                 raise RuntimeError("Simulated one-host failure")
             return dict(target=target, status="passed", source_sha=SHA)
 
-        targets = ["freebsd", "rocky", "ubuntu"]
+        targets = ["freebsd", "rocky", "debian"]
         results = run_parallel(targets, task)
         self.assertEqual(set(intervals), set(targets))
         self.assertLess(max(x[0] for x in intervals.values()), min(x[1] for x in intervals.values()))
@@ -160,7 +160,7 @@ class PolicyTests(unittest.TestCase):
         self.assertFalse(all_passed(results, targets, SHA))
 
     def test_gate_rejects_missing_duplicate_failed_cancelled_and_wrong_sha(self):
-        targets = ["freebsd", "rocky", "ubuntu"]
+        targets = ["freebsd", "rocky", "debian"]
         good = [dict(target=t, source_sha=SHA, status="passed") for t in targets]
         self.assertTrue(all_passed(good, targets, SHA))
         for bad in (good[:-1], good + [good[0]], [good[0], good[0], good[2]]):
@@ -176,14 +176,14 @@ class PolicyTests(unittest.TestCase):
             log.write_text("test output\n" + line)
             parse_result(log, "freebsd", SHA)
             for contents in ("", line + line, line.replace(SHA, "b" * 40),
-                             line.replace("freebsd", "ubuntu"), line.replace("passed", "failed")):
+                             line.replace("freebsd", "debian"), line.replace("passed", "failed")):
                 log.write_text(contents)
                 with self.assertRaises((ValueError, RuntimeError)):
                     parse_result(log, "freebsd", SHA)
 
     def test_workflows_keep_lan_on_main_and_share_exclusion(self):
         folder = ROOT / ".github/workflows"
-        names = ["multi-os-ci.yml", "freebsd-build-test.yml", "rocky-build-test.yml", "ubuntu-build-test.yml"]
+        names = ["multi-os-ci.yml", "freebsd-build-test.yml", "rocky-build-test.yml", "debian-build-test.yml"]
         for name in names:
             doc = yaml.load((folder / name).read_text(), Loader=yaml.BaseLoader)
             self.assertNotIn("pull_request", doc["on"])

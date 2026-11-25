@@ -6,7 +6,7 @@
 
 1. 最新mainからブランチを作り、実装・自動テスト・該当マニュアルを更新する。
 2. PRを作成し、適用されるGitHub-hosted必須CIとレビューを通す。
-3. mainへ統合後、同一SHAのFreeBSD・Rocky Linux・UbuntuネイティブCIを確認する。自宅Runnerは信頼済みmain専用とし、未審査PRを渡さない。
+3. mainへ統合後、同一SHAのFreeBSD・Rocky Linux・DebianネイティブCIを確認する。自宅Runnerは信頼済みmain専用とし、未審査PRを渡さない。
 4. 必要なpkg/RPM/DEB生成・導入/更新/削除・データ/設定保持の検証を行う。リリース候補は原則としてCI生成物を使い、ソースSHA・版・SHA-256を照合する。
 5. CI失敗の原因を解消または再検証し、Actionsログ/Artifactを報告に結び付ける。失敗の無視、テスト無効化、条件緩和で完了扱いにしない。
 

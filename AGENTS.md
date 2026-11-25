@@ -14,11 +14,11 @@ configuration or database structures merely to reconcile documentation.
 
 For every version, feature, fix, port and package change, follow the permanent
 policy in `CI_CD.md` and the development flow in `docs/CONTRIBUTING.md`.
-Reuse the existing GitHub Actions workflows, runner, SSH keys, verified host
+Reuse the existing GitHub Actions workflows, runner, dedicated SSH keys, verified host
 keys and CI accounts. Manual checks supplement CI; they never replace it.
 Work on a branch and open a PR. Require successful applicable GitHub-hosted
 checks before merging reviewed code to main, then verify the exact main commit
-with the existing FreeBSD, Rocky Linux and Ubuntu native CI. Investigate failures;
+with the existing FreeBSD, Rocky Linux and Debian native CI. Investigate failures;
 do not disable tests or weaken conditions to obtain a passing result.
 Documentation-only changes use the shared CI scope classifier: keep Canonical
 manual and lightweight checks, but do not build binaries/packages or contact

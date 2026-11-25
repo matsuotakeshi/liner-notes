@@ -10,7 +10,7 @@
 | 自宅 | 10.0.0.50 / FreeBSD | FreeBSD Build and Test |
 | 自宅 | 10.0.0.51 / Rocky Linux | Rocky Linux Build and Test |
 | 自宅 | 10.0.0.52 / Solaris 11.4 CBE | Solaris SSH Test（疎通のみ） |
-| 自宅 | 10.0.0.53 / Ubuntu Server | Ubuntu Build and Test |
+| 自宅 | 10.0.0.59 / Debian | Debian Build and Test |
 | 外部 | rocky.ysni.org / Rocky Linux | BBS本番局。OS再起動は許可されるが、更新対象はLiner Notesに限定 |
 | 外部 | debian.ysni.org / Debian | BBS本番局。OS再起動は許可されるが、更新対象はLiner Notesに限定 |
 | 外部 | srv.ysni.org / FreeBSD | **他サービスと本番共用。OS・SofChat・Apacheの停止／再起動は自動実行厳禁** |
@@ -18,7 +18,7 @@
 ## 既存Actionsの再利用
 
 - `Linux compatibility`：これまでどおりGitHub-hosted runnerでPR等のLinux互換性を検証。
-- `FreeBSD Build and Test` / `Rocky Linux Build and Test` / `Ubuntu Build and Test`：従来の`workflow_dispatch`を残し、`workflow_call`でCI統括から再利用。CI管理VMを起点にSSHで自宅検証ホストへソースを送り、`make`と`make check`を実行する。
+- `FreeBSD Build and Test` / `Rocky Linux Build and Test` / `Debian Build and Test`：従来の`workflow_dispatch`を残し、`workflow_call`でCI統括から再利用。CI管理VMを起点にSSHで自宅検証ホストへソースを送り、`make`と`make check`を実行する。
 - `Solaris SSH Test`：従来の手動実行を保持。Solarisは正式移植前なので必須CIゲートには入れない（接続できることとビルド成功は別）。
 - `Production SSH Connectivity Test`：外部3局への読み取り専用SSH接続の確認に利用。専用ユーザー`ln-deploy`、鍵認証と固定ホスト鍵照合を維持。
 
@@ -26,7 +26,7 @@
 
 ### Multi-OS Native CI (`.github/workflows/multi-os-ci.yml`)
 
-`main`へのpushで自動起動する。FreeBSD/Rocky/Ubuntuの3ワークフローを同じコミットで実行し、どれかが失敗・スキップ・キャンセルなら`release-gate`は失敗する。
+`main`へのpushで自動起動する。FreeBSD/Rocky/Debianの3ワークフローを同じコミットで実行し、どれかが失敗・スキップ・キャンセルなら`release-gate`は失敗する。
 
 ※ 公開リポジトリのPRコードを自宅Runnerで実行しないため、PRイベントでは起動しない。ブランチ保護を設定し、信頼済みコードのみmainへマージする。
 
