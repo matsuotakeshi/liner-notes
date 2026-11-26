@@ -12,6 +12,7 @@ void chat_apply_preferences(uint32_t,const ChatPreferences *);
 int chat_register(unsigned long,uint32_t,const char *,const char *,ChatNotify,void *,const ChatPreferences *);
 void chat_disconnect(unsigned long);
 void chat_online(unsigned long);
+int chat_presence(unsigned long,uint32_t,int,ChatPresence *);
 void chat_admin(unsigned long,int);
 int chat_memo(unsigned long,const char *);
 int chat_call(unsigned long,const char *,uint64_t);

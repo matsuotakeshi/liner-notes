@@ -18,7 +18,7 @@ class Reports(unittest.TestCase):
   self.assertIsNone(parse_report('CONNECTIONS\r\nCONNECTION broken\r\n'))
   self.assertEqual(response_data('MEMBERS\r\nMEMBER 2 bob active\r\nEND NEXT 0\r\n')['report']['rows'],[['2','bob','active']])
  def test_action_coverage(self):
-  admin={'user':1,'admin':True};member={'user':2};guest={'user':0}
+  admin={'user':1,'admin':True,'chat':1,'core_session_controls':1};member={'user':2};guest={'user':0}
   for key,item in COMMANDS.items():
    self.assertTrue(item['label']);self.assertIn(item['group'],{'board','mail','files','chat','gather','people','settings','help','games','admin'})
    if item['role']=='admin':self.assertFalse(visible(item,member));self.assertFalse(visible(item,guest))
@@ -27,5 +27,12 @@ class Reports(unittest.TestCase):
    # substitution is needed to execute its fields with explicit confirmation.
    args={f['name']:f['default'] or '1' for f in item['fields']}
    command,_=build_action(key,args,admin,True);self.assertTrue(command)
+
+ def test_chat_room_visibility(self):
+  item=COMMANDS['chat.room']
+  self.assertTrue(visible(item,{'user':2,'chat':1,'core_session_controls':1}))
+  self.assertFalse(visible(item,{'user':1,'admin':True,'chat':1}))
+  self.assertFalse(visible(item,{'user':1,'admin':True,'chat':0,'core_session_controls':1}))
+  self.assertFalse(visible(item,{'user':0,'chat':1,'core_session_controls':1}))
 
 if __name__=='__main__':unittest.main()

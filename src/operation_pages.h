@@ -11,6 +11,7 @@
 #include "connection_core.h"
 #include "download_core.h"
 #include "app_limits.h"
+#include "userlog.h"
 typedef struct { unsigned count,next; ActivityGather rows[4]; } OperationGatherPage;
 #define OPERATION_FILE_TEXT_BYTES (VAULT_CHUNK * 8)
 typedef struct {
@@ -45,6 +46,9 @@ typedef enum { OPERATION_PAGE_NONE,
     OPERATION_PAGE_CONNECTIONS,
     OPERATION_PAGE_DOWNLOAD_HISTORY,
     OPERATION_PAGE_DOWNLOAD_STATS,
+    OPERATION_PAGE_UPLOAD,
+    OPERATION_PAGE_USERLOG,
+    OPERATION_PAGE_USERSTATS,
     OPERATION_PAGE_CONFERENCE,
     OPERATION_PAGE_MMM_SCANLIST
 } OperationPageKind;
@@ -75,6 +79,8 @@ typedef struct {
         MemberApplication application;
         DownloadHistory download_history;
         DownloadStats download_stats;
+        VaultUpload upload;
+        UserlogReport userlog;
         struct { size_t count; ConnectionSummary rows[CONNECTION_MAX]; } connections;
         MmmScanList mmm_scanlist;
         ConferenceReply conference;

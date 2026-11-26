@@ -72,7 +72,7 @@ for key,label,cmd,fields in [
     ('check','新着巡回 / Check new files','CHECK FILES {path}',[F_PATH]),
     ('batch_add','一括選択へ追加 / Add selection','BATCH ADD {id}',[F_ID]),
     ('batch_remove','選択を解除 / Remove selection','BATCH REMOVE {id}',[F_ID]),
-    ('batch_match','ワイルドカード選択 / Match files','BATCH MATCH {text}',[('text','パターン / Pattern','*.zip')]),
+    ('batch_match','ワイルドカード選択 / Match files','BATCH MATCH {text}',[('text','パターン / Pattern','*.zip'),F_PATH]),
     ('batch_list','選択一覧 / Selected files','BATCH LIST',[]),
     ('batch_clear','選択をクリア / Clear selection','BATCH CLEAR',[])]:
     add('file.'+key,'files',label,cmd,fields)
@@ -99,6 +99,7 @@ add('talk','chat','個別トーク / Private talk','TALK {id}',[('id','接続番
 add('chat.open','chat','チャットへ入る / Join chat','CHAT')
 add('chat.exit','chat','チャットを出る / Leave chat','/LEAVE')
 add('chat.online','chat','接続者 / Online','W')
+add('chat.room','chat','チャット参加者 / Chat participants','W')
 add('chat.status','chat','状態 / Status','#')
 add('chat.memo','chat','メモ / Memo','``')
 add('chat.call','chat','SYSOP呼び出し / Call SYSOP','D')
@@ -212,6 +213,8 @@ for key,item in COMMANDS.items():
 
 
 def visible(item, state):
+    if item['id']=='chat.room' and (state.get('core_session_controls')!=1 or not state.get('chat')):
+        return False
     feature={'mail':'mail','chat':'chat','files':'vault'}.get(item['group'])
     if feature and state.get('features',{}).get(feature)==0:return False
     role = item['role']
@@ -272,15 +275,38 @@ CORE_UPDATES = {
 }
 
 
+SESSION_UPDATES = {
+    'chat.receive': (None,None,None,'value'),
+    'chat.mute': (None,None,None,'value'),
+    'chat.unmute': (None,None,None,'value'),
+    'file.batch_add': ('id',),
+    'file.batch_remove': ('id',),
+    'file.batch_clear': (),
+    'file.batch_match': (None,None,'path','text'),
+    'file.batch_copy': (None,None,None,'path'),
+    'file.upload_cancel': ('id',),
+    'mail.upload_cancel': ('id',),
+    'settings.lang': (None,None,None,'value'),
+    'settings.pager': (None,None,None,'value'),
+    'settings.dimensions': ('columns','rows'),
+    'settings.editor': (None,None,None,'value'),
+    'settings.checkmode': (None,None,None,'value'),
+    'settings.protocol': (None,None,None,'value'),
+    'settings.menu': (None,None,None,'value'),
+    'settings.load': (),
+}
+
+
 def core_update(key, args):
-    names = CORE_UPDATES[key]
+    names = SESSION_UPDATES[key] if key in SESSION_UPDATES else CORE_UPDATES[key]
     values = {field: args[name] for field, name in zip(('id', 'arg', 'title', 'body'), names) if name}
     for field in ('id', 'arg'):
         if field in values:
             if not re.fullmatch(r'[0-9]{1,10}', values[field]) or int(values[field])>0xffffffff:
                 raise BridgeError('Invalid number')
             values[field] = int(values[field])
-    if key in ('mail.notify', 'file.ascii', 'admin.board_guest', 'profile.visibility'):
+    if key in ('mail.notify','file.ascii','admin.board_guest','profile.visibility','chat.receive',
+               'settings.pager','settings.editor','settings.checkmode','settings.protocol','settings.menu'):
         values['body'] = values['body'].upper()
     # The domain's configuration parsers consume existing board specifications.
     if key == 'admin.board_set':

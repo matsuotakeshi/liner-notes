@@ -39,6 +39,8 @@ typedef struct {
     char connector_update_nonce[33];
     CheckTraversal connector_check;
     int connector_check_request;
+    int connector_chat_view;
+    int connector_batch_update,connector_menu_mode;
     uint32_t connector_check_user,connector_check_epoch;
     int connector_finish_editor;
     int legacy_connector;

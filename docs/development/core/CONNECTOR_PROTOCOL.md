@@ -175,3 +175,22 @@ authenticated session. `check_next`, `check_done` and `check_cancel` take zero
 ID and cursor. The result includes `data.check.active` and `data.check.finished`.
 Only a completed traversal can commit its checkpoint. Cancelling or ending
 the connection discards the traversal.
+
+`core_session_controls: 1` additionally advertises these typed operations:
+
+- Views: `chat_online`, `chat_room`, `chat_prefs`, `chat_status`,
+  `batch_list`, `userlog`, `userstats`, `upload_status`, `mail_upload`,
+  `article_draft` and `mail_draft`.
+- Updates: `chat.receive`, `chat.mute`, `chat.unmute`, the
+  `file.batch_*` selection/copy operations, `file.upload_cancel` and
+  `mail.upload_cancel`, and terminal preferences (`settings.lang`,
+  `settings.pager`, `settings.dimensions`, `settings.editor`,
+  `settings.checkmode`, `settings.protocol`, `settings.menu`, `settings.load`).
+
+Upload lookups authenticate each request and use the separate vault and mail
+attachment stores. Status is returned in `data.upload`. Cancellation requires
+confirmation. Existing transfer chunks and receipts retain their dedicated
+connector protocol. Restored drafts return the editable body and authorized
+attachment metadata in `data.draft` on the same connection that opened the
+editor. Batch copying checks each underlying file operation and preserves
+individual copy receipts on partial failure.

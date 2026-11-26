@@ -174,8 +174,11 @@ class Bridge:
     async def view(self, kind, ident, cursor, path=''):
         """Read a typed Core result on the current authenticated connection."""
         nonce = secrets.token_hex(16)
-        result = await self.exchange(f'CONNECTOR VIEW {self.token} {nonce} {kind} {ident} {cursor}'
-                                     + (' '+path if path else ''))
+        command = f'CONNECTOR VIEW {self.token} {nonce} {kind} {ident} {cursor}' + (' '+path if path else '')
+        if kind in ('article_draft','mail_draft'):
+            result = await self._exchange_lines([command],limit=2100000)
+        else:
+            result = await self.exchange(command)
         marker = re.search(r'(?:^|(?<=\r\n))CONNECTOR VIEW '+nonce+r' ([^\r\n]+)\r\n', result['text'])
         try:
             payload = json.loads(marker[1]) if marker else None

@@ -55,7 +55,10 @@ async def exercise(bbs,tmp):
         r=await post(a,'action',{'action':'admin.members','values':{}})
         assert r['data']['report']['title']=='MEMBERS' and len(r['data']['report']['rows'])==3,r
         r=await post(b,'action',{'action':'userstats','values':{}})
-        assert r['data']['report']['title']=='USERSTATS',r
+        assert not r['text'] and r['data']['report']['title']=='USERSTATS',r
+        r=await post(b,'action',{'action':'userlog'})
+        assert not r['text'] and r['data']['report']['title']=='USERLOG',r
+        assert r['data']['report']['rows'] and all(row[2]=='2' for row in r['data']['report']['rows']),r
         assert not any(x['id']=='admin.connections' for x in r['actions']),r
         info=await post(a,'query',{'kind':'boards'});assert info['state']['games']==[{'id':1,'title':'Web test game'}],info
         invalid=await a.post(base+'query',json=[]);assert invalid.status==400
@@ -109,7 +112,7 @@ async def exercise(bbs,tmp):
         r=await post(b,'query',{'kind':'read','id':1});assert r['data']['article']['body']==content.replace('\n','\r\n')+'\r\n',r
         await post(a,'action',{'action':'settings.editor','values':{'value':'LINE'}})
         r=await post(a,'compose',{'kind':'article','title':'Large draft','body':'\n'.join(['x'*4094]*64),'draft':True});assert r['mutation']['ok'] and r['mutation']['revision'] and not r['state']['editing'],r['text']
-        r=await post(a,'action',{'action':'board.resume','values':{}});assert len(r['preview'])>262144 and r['state']['editing'],r
+        r=await post(a,'action',{'action':'board.resume','values':{}});assert len(r['data']['draft']['body'])>=262000 and r['state']['editing'],r
         r=await post(a,'compose',{'kind':'editing','title':'Invalid','body':'\x85'});assert not r['mutation']['ok'] and r['state']['editing'],r
         preserved=await post(a,'input',{'line':'/PREVIEW'});assert 'Large draft' in preserved['text'] and 'x'*4094 in preserved['text'],preserved['text'][:150]
         r=await post(a,'compose',{'kind':'editing','title':'Resumed','body':'line editor /CANCEL\n.'});assert r['mutation']['ok'] and r['mutation']['id']==2,r
@@ -161,6 +164,22 @@ async def exercise(bbs,tmp):
         assert not r['text'] and any(row[1]==str(fid) and row[4]==str(len(payload)) for row in r['data']['report']['rows']),r
         r=await post(a,'action',{'action':'file.stats'})
         assert not r['text'] and [str(fid),'1'] in r['data']['report']['rows'],r
+        r=await post(a,'action',{'action':'file.batch_add','values':{'id':str(fid)}})
+        assert r['mutation']['ok'],r
+        r=await post(a,'action',{'action':'file.batch_list'})
+        assert not r['text'] and r['data']['report']['rows']==[[str(fid),'PENDING','PENDING']],r
+        r=await post(b,'action',{'action':'file.batch_list'})
+        assert not r['data']['report']['rows'],r
+        r=await post(a,'action',{'action':'file.batch_match','values':{'path':'games','text':'*.bin'}})
+        assert r['mutation']['ok'],r
+        r=await post(a,'action',{'action':'file.batch_list'})
+        assert not r['data']['report']['rows'],r
+        r=await post(a,'action',{'action':'file.batch_match','values':{'path':'-','text':'*.bin'}})
+        assert r['mutation']['ok'],r
+        r=await post(a,'action',{'action':'file.batch_list'})
+        assert [row[0] for row in r['data']['report']['rows']]==[str(fid)],r
+        r=await post(a,'action',{'action':'file.batch_remove','values':{'id':str(fid)}})
+        assert r['mutation']['ok'],r
         r=await post(a,'download-ticket',{'id':fid,'name':'日本語.bin'});url=origin+r['url']
         denied=await outsider.get(url);assert denied.status==404
         dl=await a.get(url);assert dl.status==200 and 'filename*=UTF-8' in dl.headers['Content-Disposition'];assert await dl.read()==payload
@@ -192,7 +211,7 @@ async def exercise(bbs,tmp):
         assert 'message' not in denied['data'] and '私信本文' not in denied['text'],denied
         r=await post(outsider,'compose',{'kind':'reply_mail','parent':1,'title':'Forbidden','body':'reply'});assert not r['mutation']['ok'],r
         r=await post(b,'compose',{'kind':'reply_mail','parent':1,'title':'Reply draft','body':'返事','draft':True});assert r['mutation']['ok'] and r['mutation']['revision'],r
-        r=await post(b,'action',{'action':'mail.resume','values':{}});assert r['state']['editing'] and 'Reply draft' in r['preview'],r
+        r=await post(b,'action',{'action':'mail.resume','values':{}});assert r['state']['editing'] and r['data']['draft']['title']=='Reply draft',r
         r=await post(b,'compose',{'kind':'editing','title':'Reply sent','body':'返事の本文'});assert r['mutation']['ok'] and r['mutation']['id']==2 and not r['state']['editing'],r
         r=await post(a,'query',{'kind':'mail_read','id':2});assert r['data']['message']['parent']==1 and r['data']['message']['body']=='返事の本文\r\n',r
         r=await post(a,'action',{'action':'mail.prev'})
@@ -200,6 +219,20 @@ async def exercise(bbs,tmp):
         r=await post(outsider,'action',{'action':'mail.delete','values':{'id':'2'},'confirmed':True});assert not r['mutation']['ok'],r
         r=await post(a,'action',{'action':'mail.delete','values':{'id':'2'},'confirmed':True});assert r['mutation']['ok'] and not r['state']['confirmation'],r
         r=await post(a,'action',{'action':'chat.open','values':{}});assert r['state']['chat'],r
+        r=await post(a,'action',{'action':'chat.online'})
+        assert not r['text'] and {row[1] for row in r['data']['report']['rows']}=={'alice','bob','carol'},r
+        r=await post(a,'action',{'action':'chat.room'})
+        assert not r['text'] and [row[1] for row in r['data']['report']['rows']]==['alice'],r
+        r=await post(a,'action',{'action':'chat.receive','values':{'value':'off'}})
+        assert r['mutation']['ok'],r
+        r=await post(a,'action',{'action':'chat.mute','values':{'value':'bob'}})
+        assert r['mutation']['ok'],r
+        r=await post(a,'action',{'action':'chat.preferences'})
+        assert not r['text'] and r['data']['report']['rows']==[['receive','OFF'],['muted','bob']],r
+        r=await post(a,'action',{'action':'chat.unmute','values':{'value':'bob'}})
+        assert r['mutation']['ok'],r
+        r=await post(a,'action',{'action':'chat.receive','values':{'value':'ON'}})
+        assert r['mutation']['ok'],r
         r=await post(a,'chat',{'body':'/LEAVE is text'});assert r['mutation']['ok'] and r['state']['chat'] and '/LEAVE is text' in r['text'],r
         r=await post(a,'action',{'action':'chat.exit','values':{}});assert not r['state']['chat'],r
         r=await b.post(base+'download',json={'kind':'mail','id':attachment});assert r.status==200,await r.text();assert await r.read()==payload
@@ -207,6 +240,11 @@ async def exercise(bbs,tmp):
         # Resume a partially written core upload; HTTP must validate the original bytes.
         raw=await post(a,'input',{'line':f'FILESTART {len(payload)} {digest} cmVzdW1lLmJpbg== -'})
         ident=int(raw['text'].split()[1]);await post(a,'input',{'line':f'FILEPUT {ident} 0 '+base64.b64encode(payload[:123]).decode()})
+        upload_query={'action':'file.upload_status','values':{'id':str(ident)}}
+        r=await post(a,'action',upload_query)
+        assert not r['text'] and r['data']['upload']==dict(id=ident,state='ACTIVE',received=123,size=len(payload),sha256=digest),r
+        r=await post(b,'action',upload_query)
+        assert r['text'].startswith('ERR ') and 'upload' not in r['data'],r
         r=await a.post(base+'upload',data=b'changed',headers={**headers,'X-Upload-Resume':str(ident)});assert r.status==409
         r=await a.post(base+'upload',data=payload,headers={**headers,'X-Upload-Resume':str(ident)});assert r.status==200,await r.text();assert (await r.json())['id']==ident
         r=await a.post(base+'upload',data=payload,headers={**headers,'X-Upload-Resume':str(ident)});assert r.status==200;assert (await r.json())['already_committed']
@@ -220,6 +258,20 @@ async def exercise(bbs,tmp):
             while marker not in data:
                 msg=await ws.receive(timeout=10);assert msg.type==aiohttp.WSMsgType.BINARY,msg;data+=msg.data
             return data
+        # Both stores enforce ownership and confirmed cancellation through the typed connector.
+        for prefix,area in (('FILE','file'),('MFILE','mail')):
+            raw=await post(a,'input',{'line':f'{prefix}START {len(payload)} {digest} '+enc('cancel.bin')+' -'})
+            cancel_id=str(int(raw['text'].split()[1]))
+            status={'action':area+'.upload_status','values':{'id':cancel_id}}
+            cancel={'action':area+'.upload_cancel','values':{'id':cancel_id},'confirmed':True}
+            r=await post(a,'action',status)
+            assert r['data']['upload']['state']=='ACTIVE',r
+            r=await post(b,'action',cancel)
+            assert not r['mutation']['ok'],r
+            r=await post(a,'action',cancel)
+            assert r['mutation']['ok'],r
+            r=await post(a,'action',status)
+            assert 'upload' not in r['data'] or r['data']['upload']['state']=='CANCELLED',r
         await terminal_until(b'RTBBS-PROBE')
         await ws.send_bytes(b'RAW\r\n');await terminal_until(b'RAW\r\n')
         await ws.send_bytes(b'LOGIN alice\r\n');await terminal_until(b'PASSWORD')
@@ -253,6 +305,20 @@ async def exercise(bbs,tmp):
         first=r['data']['file_text']['body']
         r=await post(b,'action',{**view_text,'cursor':r['data']['next']})
         assert first+r['data']['file_text']['body']==plain and not r['data']['next'],r
+        for selected_id in (str(fid),'999999'):
+            r=await post(a,'action',{'action':'file.batch_add','values':{'id':selected_id}})
+            assert r['mutation']['ok'],r
+        copy_batch={'action':'file.batch_copy','values':{'path':'games'},'confirmed':True}
+        r=await post(a,'action',copy_batch)
+        assert not r['mutation']['ok'],r
+        r=await post(a,'action',{'action':'file.batch_list'})
+        assert r['data']['report']['rows']==[[str(fid),'PENDING','DONE'],['999999','PENDING','PENDING']],r
+        r=await post(a,'action',{'action':'file.batch_remove','values':{'id':'999999'}})
+        assert r['mutation']['ok'],r
+        r=await post(a,'action',copy_batch)
+        assert r['mutation']['ok'],r
+        r=await post(a,'action',{'action':'file.batch_clear'})
+        assert r['mutation']['ok'],r
         r=await post(a,'action',{'action':'admin.connections'})
         assert not r['text'] and r['data']['report']['title']=='CONNECTIONS',r
         assert {'alice','bob','carol'}<={row[1] for row in r['data']['report']['rows']},r
@@ -265,11 +331,29 @@ async def exercise(bbs,tmp):
         r=await post(outsider,'action',{'action':'settings.prefs'})
         assert not r['text'] and r['data']['report']['title']=='PREFS',r
         assert r['data']['report']['fields']==[['status','NONE']],r
+        for action,values in (
+            ('settings.dimensions',{'columns':'100','rows':'30'}),
+            ('settings.editor',{'value':'LINE'}),
+            ('settings.pager',{'value':'ON'}),
+            ('settings.menu',{'value':'EXPERT'}),
+        ):
+            r=await post(outsider,'action',{'action':action,'values':values})
+            assert r['mutation']['ok'],r
         r=await post(outsider,'action',{'action':'settings.save'})
-        assert r['mutation']['ok'],r
+        assert r['mutation']['ok'] and r['text'].startswith('PREFS SAVED'),r
         r=await post(outsider,'action',{'action':'settings.prefs'})
         assert not r['text'] and r['data']['report']['title']=='PREFS',r
-        assert set(dict(r['data']['report']['fields']))=={'language','pager','editor','columns','rows'},r
+        saved=dict(r['data']['report']['fields'])
+        assert saved.get('language') in ('ja','en'),r
+        assert saved==dict(language=saved['language'],pager='ON',editor='LINE',columns='100',rows='30'),r
+        r=await post(outsider,'action',{'action':'settings.editor','values':{'value':'BETA'}})
+        assert r['mutation']['ok'],r
+        r=await post(outsider,'action',{'action':'settings.load'})
+        assert r['mutation']['ok'] and r['text'].startswith('PREFS LOADED'),r
+        r=await post(outsider,'action',{'action':'settings.save'})
+        assert r['mutation']['ok'] and r['text'].startswith('PREFS SAVED'),r
+        r=await post(outsider,'action',{'action':'settings.prefs'})
+        assert dict(r['data']['report']['fields'])==saved,r
         r=await post(b,'action',{'action':'board.check','values':{'scope':'ALL'}})
         assert r['data']['check']=={'active':True,'finished':False} and r['data']['next'],r
         r=await post(b,'action',{'action':'check.done'})

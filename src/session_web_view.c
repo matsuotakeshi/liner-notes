@@ -8,6 +8,8 @@
 #include "store_limits.h"
 #include "vault_bridge.h"
 #include "traversal_protocol.h"
+#include "chat.h"
+#include "batch_core.h"
 #include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -173,6 +175,37 @@ static void render_page(ViewOutput *out,const OperationPage *page) {
     case OPERATION_PAGE_UNREAD: key="matches";count=page->data.unread.count;next=page->data.unread.next;break;
     case OPERATION_PAGE_FILE_CHILDREN:
         key="file_boards";count=(unsigned)page->data.file_children.count;next=page->data.file_children.next;break;
+    case OPERATION_PAGE_USERLOG:
+    case OPERATION_PAGE_USERSTATS: {
+        const UserlogReport *r=&page->data.userlog;
+        if(page->kind==OPERATION_PAGE_USERSTATS) {
+            append(out,"\"report\":{\"kind\":\"table\",\"title\":\"USERSTATS\",\"columns\":["
+                       "\"user\",\"logins\",\"seconds\",\"timestamp\"],\"rows\":[[\"%u\",\"%llu\",\"%llu\",\"%llu\"]],\"next\":0}",
+                   r->user,(unsigned long long)r->logins,(unsigned long long)r->seconds,(unsigned long long)r->last);
+        } else {
+            append(out,"\"next\":%u,\"report\":{\"kind\":\"table\",\"title\":\"USERLOG\",\"columns\":["
+                       "\"id\",\"connection\",\"user\",\"event\",\"timestamp\",\"seconds\"],\"rows\":[",r->next);
+            for(unsigned i=0;i<r->count;i++) {
+                const UserlogRow *row=&r->rows[i];
+                append(out,"%s[\"%u\",\"%u\",\"%u\",\"%c\",\"%llu\",\"%llu\"]",i?",":"",
+                       row->id,row->connection,row->user,row->kind,
+                       (unsigned long long)row->at,(unsigned long long)row->seconds);
+            }
+            append(out,"],\"next\":%u}",r->next);
+        }
+        return;
+    }
+    case OPERATION_PAGE_UPLOAD: {
+        const VaultUpload *r=&page->data.upload;
+        const char *state=r->state==VAULT_UPLOAD_ACTIVE?"ACTIVE":
+                          r->state==VAULT_UPLOAD_COMMITTED?"COMMITTED":"CANCELLED";
+        char digest[65];vault_hex(r->sha256,digest);
+        append(out,"\"upload\":{\"id\":%u,\"state\":\"%s\",\"received\":%u,\"size\":%u,\"sha256\":\"%s\"},"
+                   "\"report\":{\"kind\":\"fields\",\"title\":\"UPLOADSTATUS\",\"fields\":["
+                   "[\"file\",\"%u\"],[\"status\",\"%s\"],[\"received\",\"%u\"],[\"bytes\",\"%u\"],[\"sha256\",\"%s\"]]}",
+               r->id,state,r->received,r->size,digest,r->id,state,r->received,r->size,digest);
+        return;
+    }
     case OPERATION_PAGE_FILE_TEXT: {
         const OperationFileText *r=&page->data.file_text;
         append(out,"\"next\":%u,\"file_text\":{\"id\":%u,\"body\":",r->next,r->id);
@@ -395,6 +428,84 @@ static void reply(Session *s,const char *nonce,const char *text,SessionResultVie
     view_reply(s,nonce,text,view,NULL);
 }
 
+/* Write the same VIEW envelope for session-owned snapshots. Keep report rows as
+ * strings to preserve complete IDs and match the report renderer contract. */
+static int report_start(ViewOutput *out,const char *nonce,const char *title,const char *columns) {
+    out->capacity=98304;out->text=malloc(out->capacity);
+    if(!out->text)return 0;
+    append(out,"CONNECTOR VIEW %s {\"text\":\"\",\"data\":{\"report\":{"
+               "\"kind\":\"table\",\"title\":\"%s\",\"columns\":[%s],\"rows\":[",nonce,title,columns);
+    return 1;
+}
+
+static void report_end(Session *s,ViewOutput *out) {
+    append(out,"],\"next\":0}}}\r\n");
+    if(out->failed)session_abort(s);
+    else session_impl_queue_text(s,out->text);
+    OPENSSL_cleanse(out->text,out->used);
+    free(out->text);
+}
+
+static void batch_report(Session *s,const char *nonce) {
+    const BatchSelection *batch=&rtbbs_const(s)->files.batch;
+    ViewOutput out={0};
+    if(!report_start(&out,nonce,"BATCH","\"file\",\"status\",\"copied\"")) { session_abort(s);return; }
+    for(unsigned i=0;i<batch->count;i++)
+        append(&out,"%s[\"%u\",\"%s\",\"%s\"]",i?",":"",batch->ids[i],
+               batch->done[i]?"DONE":"PENDING",batch->copied[i]?"DONE":"PENDING");
+    report_end(s,&out);
+}
+
+static void chat_report(Session *s,const char *nonce,const OperationResult *r,int preferences) {
+    ViewOutput out={0};
+    if(preferences) {
+        if(!report_start(&out,nonce,"TALK","\"setting\",\"value\"")) { session_abort(s);return; }
+        append(&out,"[\"receive\",\"%s\"]",r->chat_preferences.deny?"OFF":"ON");
+        for(unsigned i=0;i<sizeof(r->chat_preferences.muted)/sizeof(*r->chat_preferences.muted);i++) {
+            if(!r->chat_preferences.muted[i][0])continue;
+            append(&out,",[\"muted\",");string(&out,r->chat_preferences.muted[i]);append(&out,"]");
+        }
+    } else {
+        ChatPresence *presence=malloc(sizeof(*presence));
+        if(!presence) { session_abort(s);return; }
+        if(!chat_presence(s->core.id,s->core.user,r->chat_action=='W',presence)) {
+            free(presence);
+            reply(s,nonce,"CHAT ERROR target\r\n",(SessionResultView){.status=SESSION_RESULT_FAILED});return;
+        }
+        if(!report_start(&out,nonce,"ONLINE","\"connection\",\"login\",\"name\",\"memo\"")) {
+            free(presence);session_abort(s);return;
+        }
+        for(unsigned i=0;i<presence->count;i++) {
+            const ChatPresenceRow *row=&presence->rows[i];
+            append(&out,"%s[\"%lu\",",i?",":"",row->connection);string(&out,row->login);
+            append(&out,",");string(&out,row->name);append(&out,",");string(&out,row->memo);append(&out,"]");
+        }
+        free(presence);
+    }
+    report_end(s,&out);
+}
+
+static void draft_report(Session *s,const char *nonce,const OperationResult *r) {
+    size_t size=strlen(r->draft_body);
+    if(size>CONTENT_BODY) { session_abort(s);return; }
+    ViewOutput out={.capacity=32768+6*size};
+    out.text=malloc(out.capacity);
+    if(!out.text) { session_abort(s);return; }
+    append(&out,"CONNECTOR VIEW %s {\"text\":\"\",\"data\":{\"draft\":{\"title\":",nonce);
+    string(&out,r->draft_title);append(&out,",\"body\":");quoted(&out,r->draft_body,size);
+    append(&out,",\"attachments\":[");
+    for(unsigned i=0;i<r->content.file_count;i++) {
+        const MailFileInfo *file=&r->content.files[i];
+        append(&out,"%s{\"id\":%u,\"size\":%u,\"name\":",i?",":"",file->id,file->size);
+        string(&out,file->name);append(&out,"}");
+    }
+    append(&out,"]}}}\r\n");
+    if(out.failed)session_abort(s);
+    else session_impl_queue_text(s,out.text);
+    OPENSSL_cleanse(out.text,out.used);
+    free(out.text);
+}
+
 static SessionOperationStatus submit_view(Session *s,OperationRequest *q) {
     int structured=s->core.structured;
     if(!q->board)q->board=s->core.board;
@@ -496,12 +607,26 @@ static int additional_request(OperationRequest *q,const char *kind,uint32_t id,u
         q->op='A';q->audit_article=id;q->number=cursor;
         strcpy(q->title,arg);return 1;
     }
+    if(!strcmp(kind,"userlog") || !strcmp(kind,"userstats")) {
+        if(id>MEMBER_MAX || (*arg && (id || strcmp(arg,"ALL"))) || (!strcmp(kind,"userstats") && cursor))return 0;
+        q->op='!';q->action=!strcmp(kind,"userlog")?'U':'V';q->number=id;q->cursor=cursor;q->notes_unread=!!*arg;
+        return 1;
+    }
     if(!strcmp(kind,"profile_login")) {
         if(id || cursor || strlen(arg)>32 || strchr(arg,' ') || !session_impl_safe_text(arg))return 0;
         q->op='Z';q->action=7;strcpy(q->username,arg);return 1;
     }
     if(*arg)return 0;
-    if(!strcmp(kind,"connections") && !id && !cursor) { q->op='!';q->action='L'; }
+    if((!strcmp(kind,"chat_online") || !strcmp(kind,"chat_prefs") || !strcmp(kind,"chat_room")) && !id && !cursor) {
+        q->op='&';q->action=!strcmp(kind,"chat_prefs")?'p':!strcmp(kind,"chat_room")?'W':'O';
+    }
+    else if(!strcmp(kind,"chat_status") && !id && !cursor) { q->op='!';q->action='V'; }
+    else if((!strcmp(kind,"upload_status") || !strcmp(kind,"mail_upload")) && id && !cursor) {
+        q->op=!strcmp(kind,"mail_upload")?BOARD_MAIL_TRANSFER:'^';q->action='S';q->number=id;
+    }
+    else if(!strcmp(kind,"article_draft") && !id && !cursor)q->op='o';
+    else if(!strcmp(kind,"mail_draft") && !id && !cursor) { q->op='m';q->action='O'; }
+    else if(!strcmp(kind,"connections") && !id && !cursor) { q->op='!';q->action='L'; }
     else if(!strcmp(kind,"preferences") && !id && !cursor)q->op='V';
     else if(!strcmp(kind,"application") && id && id<=MEMBER_MAX && !cursor) { q->op='}';q->action='A';q->number=id; }
     else if((!strcmp(kind,"file_history") || !strcmp(kind,"file_stats")) && !id) {
@@ -633,11 +758,19 @@ void session_impl_web_view(Session *s,const char *payload) {
        strlen(nonce)!=32 || !used || (payload[used] && payload[used]!=' '))
         return;
     SessionResultView empty={.status=SESSION_RESULT_FAILED};
-    if(!session_impl_web_idle(s,0,0)) {
+    int chat_view=!strncmp(kind,"chat_",5);
+    int draft_upload=!strcmp(kind,"mail_upload") && rtbbs_const(s)->editor.editing;
+    if(!session_impl_web_idle(s,draft_upload,chat_view && rtbbs_const(s)->conversation.chatting)) {
         reply(s,nonce,"ERR connector busy\r\n",empty);return;
     }
     const char *path=payload+used+(payload[used]!=0);
     unsigned long id=strtoul(number,NULL,10),cursor=strtoul(start,NULL,10);
+    if(!strcmp(kind,"batch_list") && !id && !cursor && !*path) {
+        if(!s->core.user)reply(s,nonce,"ERR login required\r\n",empty);
+        else if(!board_feature_enabled("vault"))reply(s,nonce,"ERR feature disabled\r\n",empty);
+        else batch_report(s,nonce);
+        return;
+    }
     OperationRequest *q=calloc(1,sizeof(*q));
     if(!q) { reply(s,nonce,"ERR board busy\r\n",empty);return; }
     if(id<=CONTENT_ID_MAX && !cursor && !strncmp(kind,"check_",6)) {
@@ -646,11 +779,14 @@ void session_impl_web_view(Session *s,const char *payload) {
     if(id>CONTENT_ID_MAX || cursor>CONTENT_ID_MAX || !request(q,kind,(uint32_t)id,(uint32_t)cursor,path)) {
         free(q);reply(s,nonce,"ERR connector view syntax\r\n",empty);return;
     }
-    if(!s->core.board_enabled && q->op!='m' && q->op!='%' && q->op!='l' && q->op!='!' && q->op!=BOARD_CONFERENCE) {
+    if(!s->core.board_enabled && q->op!='m' && q->op!=BOARD_MAIL_TRANSFER && q->op!='%' && q->op!='l' && q->op!='!' && q->op!='&' && q->op!=BOARD_CONFERENCE) {
         free(q);reply(s,nonce,"ERR no board\r\n",empty);return;
     }
     SessionOperationStatus status=submit_view(s,q);
-    if(status==SESSION_OPERATION_ACCEPTED)memcpy(s->connection.connector_view_nonce,nonce,sizeof(nonce));
+    if(status==SESSION_OPERATION_ACCEPTED) {
+        memcpy(s->connection.connector_view_nonce,nonce,sizeof(nonce));
+        s->connection.connector_chat_view=chat_view;
+    }
     else reply(s,nonce,status==SESSION_OPERATION_LOGIN_REQUIRED?"ERR login required\r\n":"ERR board busy\r\n",empty);
     free(q);
 }
@@ -658,6 +794,13 @@ void session_impl_web_view(Session *s,const char *payload) {
 int session_impl_web_view_result(Session *s,const OperationResult *r,SessionResultView view) {
     char *nonce=s->connection.connector_view_nonce;
     if(!*nonce)return 0;
+    if(s->connection.connector_chat_view) {
+        s->connection.connector_chat_view=0;
+        if(view.status==SESSION_RESULT_OK && (r->chat_action=='O' || r->chat_action=='W' || r->chat_action=='p')) {
+            chat_report(s,nonce,r,r->chat_action=='p');
+            nonce[0]=0;return 1;
+        }
+    }
     if(s->connection.connector_check_request) {
         CheckTraversal *check=&s->connection.connector_check;
         const char *text=r->text;
@@ -676,6 +819,11 @@ int session_impl_web_view_result(Session *s,const OperationResult *r,SessionResu
         view_reply(s,nonce,text,view,check);
         s->connection.connector_check_request=0;nonce[0]=0;
         return 1;
+    }
+    if(view.status==SESSION_RESULT_OK && (r->draft_loaded || (r->mail_action=='O' && r->mail_to))) {
+        if(r->draft_loaded)session_impl_load_article_draft(s,r);
+        else { rtbbs(s)->mail_state.mail_mode=1;session_impl_load_mail_draft(s,r); }
+        draft_report(s,nonce,r);nonce[0]=0;return 1;
     }
     if(view.status==SESSION_RESULT_OK && (r->mail_action=='L' || r->mail_action=='R')) {
         rtbbs(s)->mail_state.mail_mode=1;

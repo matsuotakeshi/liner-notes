@@ -165,14 +165,18 @@ int session_impl_report_result(Session *s,const BoardResult *completion,uint64_t
     return 0;
 }
 
+void session_impl_load_article_draft(Session *s,const OperationResult *completion) {
+    memset(&rtbbs(s)->editor.draft,0,sizeof(rtbbs(s)->editor.draft)); session_impl_undo_clear(s);
+    rtbbs(s)->editor.draft.number=completion->draft_parent; strcpy(rtbbs(s)->editor.draft.title,completion->draft_title); strcpy(rtbbs(s)->editor.draft.body,completion->draft_body);
+    rtbbs(s)->presentation.classic_area=CM_MAIN;rtbbs(s)->presentation.ui.next=0; rtbbs(s)->presentation.ui.view=UI_HOME; rtbbs(s)->presentation.ui.board_title[0]=0;
+    rtbbs(s)->editor.draft_revision=completion->draft_revision;
+    rtbbs(s)->editor.editing=1;rtbbs(s)->editor.editor_input=0;rtbbs(s)->editor.editor_at=1;
+}
+
 int session_impl_article_result(Session *s,const BoardResult *completion,uint64_t now) {
     (void)now;
     if(completion->board) { if(completion->direct) rtbbs(s)->presentation.ui.board_title[0]=0; }
-    if(completion->draft_loaded) {
-        memset(&rtbbs(s)->editor.draft,0,sizeof(rtbbs(s)->editor.draft)); session_impl_undo_clear(s);
-        rtbbs(s)->editor.draft.number=completion->draft_parent; strcpy(rtbbs(s)->editor.draft.title,completion->draft_title); strcpy(rtbbs(s)->editor.draft.body,completion->draft_body);
-        rtbbs(s)->presentation.classic_area=CM_MAIN;rtbbs(s)->presentation.ui.next=0; rtbbs(s)->presentation.ui.view=UI_HOME; rtbbs(s)->presentation.ui.board_title[0]=0;
-    }
+    if(completion->draft_loaded)session_impl_load_article_draft(s,completion);
     if(completion->draft_revision) rtbbs(s)->editor.draft_revision=completion->draft_revision;
     if(completion->editing) { rtbbs(s)->editor.editing=1;rtbbs(s)->editor.editor_input=0;rtbbs(s)->editor.editor_at=1; }
     if(rtbbs(s)->files.file_selecting) { if(completion->feedback.file_detail) { rtbbs(s)->files.file_selected=rtbbs(s)->files.file_selecting;rtbbs(s)->presentation.classic_input=CI_FILE_ACTION; }rtbbs(s)->files.file_selecting=0; }

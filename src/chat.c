@@ -38,6 +38,9 @@ void chat_admin(unsigned long id,int enabled) { chat_core_admin(&room,id,enabled
 int chat_memo(unsigned long id,const char *text) { return chat_core_memo(&room,id,text); }
 int chat_call(unsigned long id,const char *text,uint64_t now) { return chat_core_call(&room,id,text,now); }
 void chat_online(unsigned long id) { chat_core_online(&room,id); }
+int chat_presence(unsigned long id,uint32_t user,int room_only,ChatPresence *out) {
+    return chat_core_presence(&room,id,user,room_only,out);
+}
 int chat_say(unsigned long id,const char *text,uint64_t now) { return chat_core_say(&room,id,text,now); }
 void chat_who(unsigned long id) { chat_core_who(&room,id); }
 int chat_target(unsigned long from,unsigned long to) { return chat_core_target(&room,from,to); }
