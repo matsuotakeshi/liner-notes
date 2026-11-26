@@ -23,6 +23,11 @@ def suite_timeout(target, suite):
     return 5400 if (target, suite) == ("solaris", "core") else DEFAULT_SUITE_TIMEOUT
 
 
+def validate_telnet_start_timeout(target, suite, seconds):
+    if seconds is not None and ((target, suite) != ("debian", "core") or not 10 <= seconds <= 120):
+        raise ValueError("Telnet startup override requires Debian core and 10 to 120 seconds")
+
+
 def unpack(directory, digest, sha):
     directory = Path(directory)
     archive = directory / "source.tar.gz"
@@ -118,13 +123,13 @@ def heartbeat(heartbeat_fd, state, lease, stopped):
 
 
 def run_commands(commands, heartbeat_fd, timeout=DEFAULT_SUITE_TIMEOUT, lease=45,
-                 stopped=lambda: False, heartbeat_state=None, *, target=None):
+                 stopped=lambda: False, heartbeat_state=None, *, telnet_start_timeout=10):
     """EOF, lost heartbeat, cancellation and timeouts all fail closed."""
     deadline = time.monotonic() + timeout
     state = heartbeat_state if heartbeat_state is not None else {'last': time.monotonic(), 'pending': b''}
     env = dict(os.environ, LINER_TEST_START_TIMEOUT="180",
                LINER_TEST_AUTH_TIMEOUT="30", LINER_TEST_STOP_TIMEOUT="30",
-               LINER_TEST_TELNET_START_TIMEOUT="30" if target == "debian" else "10")
+               LINER_TEST_TELNET_START_TIMEOUT=str(telnet_start_timeout))
     for command in commands:
         print("NATIVE_STEP " + json.dumps(command), flush=True)
         process = subprocess.Popen(command, stdin=subprocess.DEVNULL, env=env, start_new_session=True)
@@ -169,7 +174,7 @@ def host_lock(path, heartbeat_fd=None, timeout=1200, lease=45, stopped=lambda: F
         yield state
 
 
-def worker(target, sha, timeout, lease, suite="core"):
+def worker(target, sha, timeout, lease, suite="core", *, telnet_start_timeout=None):
     if (Path.cwd() / ".ci-source-sha").read_text(encoding="ascii").strip() != sha:
         raise ValueError("Extracted source commit differs")
     verify_os(target)
@@ -194,7 +199,7 @@ def worker(target, sha, timeout, lease, suite="core"):
                 subprocess.run(command, check=True, timeout=15)
         run_commands(commands_for(target, suite), sys.stdin.fileno(),
                      max(0, deadline-time.monotonic()), lease, lambda: cancelled, state,
-                     target=target)
+                     telnet_start_timeout=10 if telnet_start_timeout is None else telnet_start_timeout)
 
 
 def main():
@@ -210,6 +215,7 @@ def main():
     run.add_argument("--suite", choices=("core", "ssh", "package"), default="core")
     run.add_argument("--timeout", type=int)
     run.add_argument("--lease", type=int, default=45)
+    run.add_argument("--telnet-start-timeout", type=int)
     args = parser.parse_args()
     if args.mode == "unpack":
         unpack(args.directory, args.digest, args.sha)
@@ -220,7 +226,9 @@ def main():
         timeout = limit if args.timeout is None else args.timeout
         if not re.fullmatch(r"[0-9a-f]{40}", args.sha) or not 1 <= args.lease <= 300 or not 1 <= timeout <= limit:
             raise ValueError("Invalid worker limits or commit")
-        worker(args.target, args.sha, timeout, args.lease, args.suite)
+        validate_telnet_start_timeout(args.target, args.suite, args.telnet_start_timeout)
+        worker(args.target, args.sha, timeout, args.lease, args.suite,
+               telnet_start_timeout=args.telnet_start_timeout)
         result["status"] = "passed"
     except Exception as error:
         result["error"] = str(error)

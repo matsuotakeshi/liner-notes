@@ -3,6 +3,11 @@ name: Debian Build and Test
 # Manual/reusable entry point shares the same worker and host exclusion.
 on:
   workflow_dispatch:
+    inputs:
+      telnet_start_timeout_seconds:
+        description: Seconds to wait for the first Telnet prompt (10-120)
+        type: number
+        default: 10
   workflow_call:
 permissions:
   contents: read
@@ -20,7 +25,15 @@ jobs:
         with:
           persist-credentials: false
       - name: Run native suites through existing CI SSH accounts
-        run: python3 ci/native_ci.py --target debian --output "$RUNNER_TEMP/native-results"
+        env:
+          TELNET_START_TIMEOUT: ${{ inputs.telnet_start_timeout_seconds }}
+        run: |
+          set -eu
+          set -- --target debian --output "$RUNNER_TEMP/native-results"
+          if [ -n "$TELNET_START_TIMEOUT" ]; then
+            set -- "$@" --telnet-start-timeout "$TELNET_START_TIMEOUT"
+          fi
+          python3 ci/native_ci.py "$@"
       - name: Retain OS logs and exact-commit results
         if: ${{ always() }}
         uses: actions/upload-artifact@v4

@@ -94,6 +94,11 @@ FreeBSD pkg生成もCIアカウントの `~/ci/.liner-notes-native.lock` を共�
 
 OS別ログ、ソースSHA、アーカイブSHA-256、開始/終了日時、所要時間を `native-ci-results` Artifactへ保存します。実行手順と検証方法は [ネイティブCI並列実行](docs/development/release-ci/NATIVE_PARALLEL.md)を参照してください。文書のみの変更では上記の対象外判定を適用し、それ以外は従来の全試験を維持します。
 
+Debianの実Telnetクライアントが初期プロンプトを待つ時間を切り分ける場合は、
+`Debian Build and Test` をmainから手動実行し、`telnet_start_timeout_seconds`
+に10〜120秒を指定できます。既定は10秒です。手動実行の結果には指定秒数が記録されます。
+後続のTelnet操作とMulti-OS Native CIの待ち時間には影響しません。
+
 ## Solarisの日次検証
 
 Solaris Native CIの自動実行はmainへのpushごとではなく、毎日1回、UTC 19:23
