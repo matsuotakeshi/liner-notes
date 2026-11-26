@@ -108,7 +108,11 @@ def create_app(config):
             try:
                 if session.bridge.state.get('user') != session.member:
                     raise web.HTTPUnauthorized(text='Session expired')
-                return await handler(request)
+                reply = await handler(request)
+                member = session.bridge.state.get('user')
+                if member and member != session.member:
+                    raise web.HTTPUnauthorized(text='Session changed')
+                return reply
             finally:
                 if session.bridge.state.get('user') != session.member and sessions.pop(ident, None):
                     if session.terminal_ws is not None and session.terminal_ws.prepared:
@@ -636,6 +640,7 @@ def create_app(config):
         try:
             while not ws.closed and not session.bridge.closed:
                 if sessions.get(ident) is not session:break
+                if session.member and session.bridge.state.get('user') != session.member:break
                 text='' if session.guest_lock.locked() else session.bridge.idle_output()
                 if text:await ws.send_json({'text':text})
                 try:

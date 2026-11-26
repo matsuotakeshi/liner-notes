@@ -100,6 +100,22 @@ class TestSessionLifetime(unittest.IsolatedAsyncioTestCase):
         self.assertFalse(self.app['sessions'])
         self.assertTrue(self.bridge.closed)
 
+    async def test_interactive_logout_retires_the_member_connection(self):
+        self.install_dialogue()
+        reply = await self.auth()
+        headers = {'Cookie':next(iter(reply.cookies.values())).OutputString().split(';',1)[0],
+                   'X-CSRF-Token':(await reply.json())['csrf']}
+        async def sign_out(command):
+            self.assertEqual(command, 'LOGOUT')
+            self.bridge.state.update(user=0, username='')
+            return {'state':dict(self.bridge.state), 'text':'Logged out'}
+        self.bridge.exchange = sign_out
+        result = await self.client.post('/notes/api/input', headers=headers, json={'line':'LOGOUT'})
+        self.assertEqual(result.status, 200)
+        self.assertFalse((await result.json())['state']['user'])
+        self.assertFalse(self.app['sessions'])
+        self.assertTrue(self.bridge.closed)
+
     async def test_spool_failure_releases_admission(self):
         self.install_dialogue()
         reply = await self.auth()
