@@ -38,6 +38,16 @@ async def exercise(bbs,tmp):
         return c
     async def post(c,path,payload):
         r=await c.post(base+path,json=payload);assert r.status==200,(r.status,await r.text());return await r.json()
+    async def password_prompt(c):
+        # Registration and login impose a one-second BBS cooldown. Retry only
+        # the explicit rejection, which has not opened a password prompt.
+        deadline=asyncio.get_running_loop().time()+3
+        while True:
+            r=await post(c,'action',{'action':'settings.password'})
+            if r['text'].strip()!='ERR try later':return r
+            assert not r['state']['secret'] and not r['secret_challenge'],r
+            assert asyncio.get_running_loop().time()<deadline,r['text']
+            await asyncio.sleep(0.1)
     try:
         a=await client('alice');b=await client('bob');outsider=await client('carol')
         async with b.get(base+'link') as r:assert r.status==403
@@ -368,7 +378,7 @@ async def exercise(bbs,tmp):
         assert r['text'].startswith('CHECKPOINT SAVED'),r
         # The same-session challenge must never be sent as a line command or
         # accepted for a different prompt, account, or missing CSRF token.
-        r=await post(outsider,'action',{'action':'settings.password'})
+        r=await password_prompt(outsider)
         challenge=r['secret_challenge']
         assert r['state']['secret'] and challenge and 'CURRENT PASSWORD' in r['text'],r
         async with outsider.post(base+'input',json={'line':'web-test-password'}) as refused:
@@ -391,7 +401,8 @@ async def exercise(bbs,tmp):
         r=await post(outsider,'secret',{'challenge':confirm,'password':'web-other-password'})
         assert not r['state']['secret'] and not r['secret_challenge'] and 'PASSWORD CHANGED' in r['text'],r
         assert 'web-other-password' not in json.dumps(r),r
-        r=await post(b,'action',{'action':'settings.password'})
+        r=await password_prompt(b)
+        assert r['state']['secret'] and r['secret_challenge'] and 'CURRENT PASSWORD' in r['text'],r
         async with b.get(base+'session') as pending:
             assert pending.status==200 and (await pending.json())['secret_challenge']==r['secret_challenge']
         r=await post(b,'secret',{'challenge':r['secret_challenge'],'cancel':True})

@@ -400,7 +400,7 @@
   "src/session_web_update.c": "59c7380df763213e3caca3395df0604d47d40f1d7674bac545b3fa65ef7034e1",
   "src/session_web_view.c": "7c8b0eb0c6be3ab30d6c27264fc3e60790f0ed87a0c7153d647a225ff64bacb3",
   "tests/test_web_connector.py": "6eaf041984583da7a15d79edba0a606e95b4e038471846832a14eb0ba38a1975",
-  "tests/test_web_http.py": "b9c31c1fae3864e2c6fd9e8c3b2f6f94b37f2efb381ec3251dd4b8bf7fae3f00",
+  "tests/test_web_http.py": "532acbdc3b5b9a37395445551348f273b75633022bd8378189d7698e20fb2804",
   "ci/solaris_package.py": "855c0bdd34b4285b7a8cbf2cab373fbee247c3b3d82a33981b7719ab6e81dc5d",
   ".github/workflows/solaris-package.yml": "d69c66ac69829023039177bdcfc0e5f92158a9518d3148b14caddd5be99d4d66"
 }
