@@ -1350,6 +1350,7 @@ static void execute(const BoardRequest *q,BoardResult *r) {
             result=member_core_save_preferences(&actor,&input,&preferences);
         } else result=member_core_preferences(&actor,&preferences);
         if(result!=MEMBER_CORE_OK) { member_result(result,r);return; }
+        OPERATION_PAGE(r,PREFERENCES,preferences,preferences);
         if(!preferences.present) { strcpy(r->text,"PREFS NONE\r\n");return; }
         if(q->number==2) {
             MemberMenuMode menu_mode;result=member_core_menu_get(&actor,&menu_mode);

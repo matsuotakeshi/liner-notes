@@ -225,7 +225,10 @@ static void service_result(BoardResult *r) {
             row->rx=c->rx_bytes;row->tx=c->tx_bytes;row->queued=c->queued;
             row->columns=c->app.connection.columns;row->rows=c->app.connection.rows;
         }
-        if(!connection_protocol_list(rows,count,r->text,sizeof(r->text)))(r->feedback.failed=1,strcpy(r->text,"ERR connection report\r\n"));
+        if(r->structured) {
+            r->page.kind=OPERATION_PAGE_CONNECTIONS;r->page.data.connections.count=count;
+            memcpy(r->page.data.connections.rows,rows,count*sizeof(*rows));
+        } else if(!connection_protocol_list(rows,count,r->text,sizeof(r->text)))(r->feedback.failed=1,strcpy(r->text,"ERR connection report\r\n"));
     } else if(r->service_action=='A') { notify_all(MSG_ADMIN_NOTICE,0,r->service_text);strcpy(r->text,"ANNOUNCE SENT\r\n"); }
     else if(r->service_action=='K') {
         int found=0;for(int i=0;i<SLOTS;i++)if(connections[i].fd!=INVALID && connections[i].app.core.id==r->service_number) { drop(&connections[i]);found=1;break; }

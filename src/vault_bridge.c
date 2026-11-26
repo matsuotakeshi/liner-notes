@@ -79,7 +79,8 @@ void vault_bridge_execute(IdentityProvider identity,uint32_t user,uint32_t epoch
     if(op==VAULT_CMD_TEXT) {
         char *end;unsigned long offset=strtoul(argument,&end,10);r=vault_info(store,&p,id,&e);
         if(r==VAULT_OK && (*end || offset>e.size || !e.ascii))r=VAULT_INVALID;
-        if(r==VAULT_OK) { size_t used=(size_t)snprintf(out,size,"FILETEXT %u %lu\r\n",id,offset);unsigned chunks=0;
+        if(r==VAULT_OK) { size_t used=(size_t)snprintf(out,size,"FILETEXT %u %lu\r\n",id,offset);
+            size_t body_start=used;unsigned chunks=0;
             while(offset<e.size && chunks++<8) { unsigned char data[VAULT_CHUNK];size_t count;r=vault_read(store,&p,id,(uint32_t)offset,data,&count);if(r!=VAULT_OK || !count)break;
                 size_t consumed=0;
                 while(consumed<count && used+100<size) {
@@ -92,7 +93,16 @@ void vault_bridge_execute(IdentityProvider identity,uint32_t user,uint32_t epoch
                 }
                 offset+=(unsigned long)consumed;
             }
-            if(r==VAULT_OK) { f->page_found=1;f->page_next=offset<e.size?(uint32_t)offset:0;snprintf(out+used,size-used,"\r\nEND TEXT NEXT %lu\r\n",offset<e.size?offset:0);return; }
+            if(r==VAULT_OK) {
+                f->page_found=1;f->page_next=offset<e.size?(uint32_t)offset:0;
+                if(response->structured) {
+                    response->page.kind=OPERATION_PAGE_FILE_TEXT;
+                    OperationFileText *page=&response->page.data.file_text;
+                    page->id=id;page->next=f->page_next;page->size=used-body_start;
+                    memcpy(page->text,out+body_start,page->size);
+                }
+                snprintf(out+used,size-used,"\r\nEND TEXT NEXT %lu\r\n",offset<e.size?offset:0);return;
+            }
         }
     }
     if(op==VAULT_CMD_BOARDINFO) {
@@ -102,6 +112,20 @@ void vault_bridge_execute(IdentityProvider identity,uint32_t user,uint32_t epoch
     }
     if(op==VAULT_CMD_STATS || op==VAULT_CMD_HISTORY) {
         char *end;unsigned long cursor=strtoul(argument,&end,10);if(*end || cursor>UINT32_MAX) { (f->failed=1,snprintf(out,size,"ERR vault syntax\r\n"));return; }
+        if(response->structured) {
+            if(op==VAULT_CMD_HISTORY) {
+                DownloadHistory page;
+                if(download_core_history(&p,id,(uint32_t)cursor,&page)==DOWNLOAD_OK) {
+                    OPERATION_PAGE(response,DOWNLOAD_HISTORY,download_history,page);return;
+                }
+            } else {
+                DownloadStats page;
+                if(download_core_stats(store,&p,id,(uint32_t)cursor,&page)==DOWNLOAD_OK) {
+                    OPERATION_PAGE(response,DOWNLOAD_STATS,download_stats,page);return;
+                }
+            }
+            f->failed=1;snprintf(out,size,"ERR download report unavailable\r\n");return;
+        }
         f->page_found=downloads_report_page(store,&p,op==VAULT_CMD_HISTORY,id,(uint32_t)cursor,out,size,&f->page_next);f->failed=!f->page_found;return;
     }
     if(op==VAULT_CMD_BOARDSET) {

@@ -199,6 +199,7 @@ static void advanced_execute(const BoardRequest *q,BoardResult *r) {
         MemberActor actor={q->user,q->user_epoch};MemberApplication application;
         MemberOutcome result=member_core_application_get(&actor,q->number,&application);
         if(result!=MEMBER_CORE_OK) { member_result(result,r);return; }
+        OPERATION_PAGE(r,APPLICATION,application,application);
         size_t n=(size_t)snprintf(r->text,sizeof(r->text),"APPLICATION %u %s\r\n",application.profile.user,application.profile.name);
         for(unsigned f=0;f<PROFILE_FIELDS;f++)n+=(size_t)snprintf(r->text+n,sizeof(r->text)-n,"%s %s\r\n",profile_key(f),member_profile_value(&application.profile,f));
         const char *keys[]={"FROMBBS","SYSOPNOTE"};

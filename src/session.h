@@ -6,6 +6,7 @@
 #include "board.h"
 #include "session_core.h"
 #include "session_ui.h"
+#include "traversal_core.h"
 /* The adapter owns queuing/backpressure. write copies bytes synchronously and
  * returns 0 on failure. No OS handles, Telnet commands or HTTP frames here. */
 typedef struct {
@@ -36,6 +37,9 @@ typedef struct {
     ConnectorReader binary_reader;
     char connector_token[65],connector_view_nonce[33];
     char connector_update_nonce[33];
+    CheckTraversal connector_check;
+    int connector_check_request;
+    uint32_t connector_check_user,connector_check_epoch;
     int connector_finish_editor;
     int legacy_connector;
     int connector_literal;

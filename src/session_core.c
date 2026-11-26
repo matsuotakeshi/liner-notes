@@ -75,6 +75,7 @@ SessionResultView session_core_result(const OperationResult *r) {
     if(r->feedback.failed) { view.status=SESSION_RESULT_FAILED;return view; }
     view.status=SESSION_RESULT_OK;view.effects=&r->feedback;
     if(r->page.kind!=OPERATION_PAGE_NONE)view.page=&r->page;
+    if(r->sequence)view.sequence_next=r->sequence_next;
     if(r->content.kind) { view.content=&r->content;view.body=r->draft_body;view.attachments=&r->mail_attachments; }
     return view;
 }

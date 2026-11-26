@@ -60,6 +60,7 @@ typedef struct {
     const OperationFeedback *effects;
     const OperationContent *content;
     const OperationPage *page;
+    uint32_t sequence_next;
     const char *body;
     const MailAttachments *attachments;
 } SessionResultView;

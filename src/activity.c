@@ -80,6 +80,18 @@ static void activity_result(ActivityOutcome result,int admin,BoardResult *r) {
 void activity_execute(const BoardRequest *q,BoardResult *r) {
     int lang=q->scope;const char *error="ERR command\r\n";
     ActivityActor actor={q->user,q->user_epoch};ActivityOutcome outcome;
+    if(q->action=='G' && r->structured) {
+        OperationGatherPage page={0};unsigned cursor=q->cursor;
+        for(unsigned i=0;i<=4;i++) {
+            ActivityGather row;
+            outcome=activity_gather_read(&actor,cursor,&row);
+            if(outcome!=ACTIVITY_OK) { activity_result(outcome,0,r);return; }
+            if(row.end)break;
+            if(i==4) { page.next=cursor;break; }
+            page.rows[page.count++]=row;cursor=row.next;
+        }
+        OPERATION_PAGE(r,GATHER,gather,page);return;
+    }
     if(q->action=='G' || q->action=='g') {
         if(q->action=='g') {
             outcome=activity_gather_post(&actor,q->body);
