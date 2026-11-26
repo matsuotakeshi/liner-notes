@@ -6,6 +6,7 @@
 #include "store_limits.h"
 #include "vault_bridge.h"
 #include "vault.h"
+#include "batch_core.h"
 #include <openssl/crypto.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -27,6 +28,8 @@ static void update_reply(Session *s,const char *nonce,const char *text,int ok,
     session_impl_queue_text(s,record);
     free(record);
 }
+
+enum { WEB_BATCH_NONE, WEB_BATCH_MATCH, WEB_BATCH_COPY };
 
 static int number(const char *value,uint32_t *out) {
     if(!strcmp(value,"0")) { *out=0;return 1; }
@@ -266,6 +269,37 @@ static int compose(Session *s,OperationRequest *q,const char *kind,uint32_t boar
     return 1;
 }
 
+/* Validate the typed values before changing any session-local option. */
+static int local_setting(Session *s,const char *kind,uint32_t id,uint32_t arg,const char *value) {
+    SessionRtbbsState *ui=rtbbs(s);
+    if(!strcmp(kind,"settings.dimensions")) {
+        if(*value || id<20 || id>240 || arg<5 || arg>100)return 0;
+        session_dimensions(s,id,arg);return 1;
+    }
+    if(id || arg)return 0;
+    if(!strcmp(kind,"settings.lang"))return language_parse(value,&ui->presentation.ui.language);
+    if(!strcmp(kind,"settings.pager")) {
+        int on=switch_value(value);if(on<0)return 0;
+        ui->presentation.pager_enabled=on;return 1;
+    }
+    if(!strcmp(kind,"settings.editor")) {
+        if(strcmp(value,"BETA") && strcmp(value,"LINE"))return 0;
+        ui->editor.editor_line=!strcmp(value,"LINE");ui->editor.editor_input=0;ui->editor.editor_at=1;
+        return 1;
+    }
+    if(!strcmp(kind,"settings.checkmode")) {
+        if(strcmp(value,"AUTO") && strcmp(value,"MANUAL"))return 0;
+        ui->reading.check.automatic=!strcmp(value,"AUTO");return 1;
+    }
+    if(!strcmp(kind,"settings.protocol")) {
+        static const char *const names[]={"ZMODEM","XMODEM","YMODEM","YMODEM-G","MLINK","TEXT","XMODEM-SUM","XMODEM-1K"};
+        for(unsigned i=0;i<sizeof(names)/sizeof(*names);i++)if(!strcmp(value,names[i])) {
+            s->connection.transfer_protocol=i;return 1;
+        }
+    }
+    return 0;
+}
+
 void session_impl_web_update(Session *s,char *payload) {
     enum { NONCE,KIND,BOARD,ID,ARG,FLAG,ITEMS,NAME,TITLE,BODY,FIELDS };
     char *value[FIELDS]={payload};
@@ -278,10 +312,12 @@ void session_impl_web_update(Session *s,char *payload) {
     }
     const char *nonce=value[NONCE],*kind=value[KIND];
     int editing=!strcmp(kind,"editing"),chatting=!strcmp(kind,"chat_send");
-    if(!session_impl_web_idle(s,editing,chatting)) { update_reply(s,nonce,"ERR connector busy\r\n",0,0,0,0);return; }
+    int chat_pref=!strcmp(kind,"chat.receive") || !strcmp(kind,"chat.mute") || !strcmp(kind,"chat.unmute");
+    if(!session_impl_web_idle(s,editing,chatting || (chat_pref && rtbbs_const(s)->conversation.chatting))) { update_reply(s,nonce,"ERR connector busy\r\n",0,0,0,0);return; }
     OperationRequest *q=calloc(1,sizeof(*q));
     if(!q) { update_reply(s,nonce,"ERR board busy\r\n",0,0,0,0);return; }
     uint32_t board,id,arg,flag;
+    int batch_update=WEB_BATCH_NONE,menu_mode=-1;
     const char *error="ERR connector update syntax\r\n";
     q->board=s->core.board;
     if(!number(value[BOARD],&board) || board>=sizeof(q->board_grants)/sizeof(*q->board_grants) ||
@@ -298,6 +334,68 @@ void session_impl_web_update(Session *s,char *payload) {
             error="CHAT ERROR target\r\n";goto finish;
         }
         q->op='&';q->chat_target=conversation->talk_target;q->action=q->chat_target?'D':'S';
+    } else if(!strcmp(kind,"file.upload_cancel") || !strcmp(kind,"mail.upload_cancel")) {
+        if(board || !id || id>VAULT_ID_MAX || arg || !flag || *q->username ||
+           *q->title || *q->body || q->mail_attachments.count)goto finish;
+        q->op=!strcmp(kind,"mail.upload_cancel")?BOARD_MAIL_TRANSFER:'^';q->action='C';q->number=id;
+    } else if(chat_pref) {
+        if(board || id || arg || flag || *q->title || *q->username || q->mail_attachments.count)goto finish;
+        q->op='&';q->action='p';
+        if(!strcmp(kind,"chat.receive")) {
+            int on=switch_value(q->body);if(on<0)goto finish;
+            q->number=on?CHAT_PREF_RECEIVE_ON:CHAT_PREF_RECEIVE_OFF;
+            q->body[0]=0;
+        } else {
+            if(!*q->body || strlen(q->body)>32 || !text_valid(q->body,0))goto finish;
+            q->number=!strcmp(kind,"chat.mute")?CHAT_PREF_MUTE:CHAT_PREF_UNMUTE;
+        }
+    } else if(!strncmp(kind,"file.batch_",11)) {
+        if(!s->core.user) { error="ERR login required\r\n";goto finish; }
+        if(!board_feature_enabled("vault")) { error="ERR feature disabled\r\n";goto finish; }
+        if(board || arg || *q->username || q->mail_attachments.count)goto finish;
+        BatchSelection *batch=&rtbbs(s)->files.batch;
+        const char *op=kind+11;
+        if(!strcmp(op,"match")) {
+            size_t path=strlen(q->title),pattern=strlen(q->body);
+            if(id || flag || !path || path>48 || !pattern || pattern>80 ||
+               strchr(q->title,'|') || strchr(q->body,'|') || !text_valid(q->title,0) || !text_valid(q->body,0))goto finish;
+            memmove(q->body+path+1,q->body,pattern+1);
+            memcpy(q->body,q->title,path);q->body[path]='|';
+            q->op='Y';q->action=VAULT_CMD_MATCH;
+            batch_update=WEB_BATCH_MATCH;
+        } else if(!strcmp(op,"copy")) {
+            if(id || !flag || *q->title || !text_valid(q->body,0) || !batch->count)goto finish;
+            uint32_t next;int copying=batch_copy_begin(batch,q->body,&next);
+            if(copying<0)goto finish;
+            if(!copying) { update_reply(s,nonce,"BATCH COPY COMPLETE\r\n",1,0,0,0);error=NULL;goto finish; }
+            q->op='Y';q->action=VAULT_CMD_COPY;q->number=next;
+            batch_update=WEB_BATCH_COPY;
+        } else {
+            if(flag || *q->body || *q->title)goto finish;
+            if(!strcmp(op,"clear") && !id)batch_reset(batch);
+            else if(!strcmp(op,"remove") && id && id<=VAULT_ID_MAX)batch_remove(batch,id);
+            else if(!strcmp(op,"add") && id && id<=VAULT_ID_MAX) {
+                if(!batch_add(batch,id,ln_limit("BATCH_FILES",BATCH_CAPACITY)))goto finish;
+            } else goto finish;
+            update_reply(s,nonce,"BATCH UPDATED\r\n",1,0,0,0);error=NULL;goto finish;
+        }
+    } else if(!strcmp(kind,"settings.lang") || !strcmp(kind,"settings.pager") ||
+              !strcmp(kind,"settings.dimensions") || !strcmp(kind,"settings.editor") ||
+              !strcmp(kind,"settings.checkmode") || !strcmp(kind,"settings.protocol")) {
+        if(!s->core.user) { error="ERR login required\r\n";goto finish; }
+        if(board || flag || *q->username || *q->title || q->mail_attachments.count ||
+           !local_setting(s,kind,id,arg,q->body))goto finish;
+        update_reply(s,nonce,"PREFERENCES UPDATED\r\n",1,0,0,0);error=NULL;goto finish;
+    } else if(!strcmp(kind,"settings.load") || !strcmp(kind,"settings.menu")) {
+        if(board || id || arg || flag || *q->username || *q->title || q->mail_attachments.count)goto finish;
+        if(!strcmp(kind,"settings.load")) {
+            if(*q->body)goto finish;
+            q->op='V';q->number=2;
+        } else {
+            int mode=!strcmp(q->body,"BEGINNER")?0:!strcmp(q->body,"STANDARD")?1:!strcmp(q->body,"EXPERT")?2:-1;
+            if(mode<0)goto finish;
+            q->op='}';q->action='v';q->number=(uint32_t)mode;menu_mode=mode;
+        }
     } else if(!strncmp(kind,"conference.",11)) {
         if(board || flag || *q->title || *q->username || q->mail_attachments.count ||
            !conference_action(q,kind,id,arg))goto finish;
@@ -311,11 +409,13 @@ void session_impl_web_update(Session *s,char *payload) {
     if(!s->core.board_enabled && (q->op=='P' || q->op=='w' || strchr("suZhrY(",q->op))) {
         error="ERR no board\r\n";goto finish;
     }
-    if(q->op=='V') { q->number=1;session_impl_preferences_request(s,q); }
+    if(q->op=='V' && q->number==1)session_impl_preferences_request(s,q);
     SessionOperationStatus status=session_submit(s,q);
     if(status==SESSION_OPERATION_ACCEPTED) {
         memcpy(s->connection.connector_update_nonce,nonce,33);
         s->connection.connector_finish_editor=editing;
+        s->connection.connector_batch_update=batch_update;
+        s->connection.connector_menu_mode=menu_mode;
         if(q->op=='?')sysop_mail_submitted(&rtbbs(s)->conversation.sysop_mail,1);
         error=NULL;
     } else error=status==SESSION_OPERATION_LOGIN_REQUIRED?"ERR login required\r\n":"ERR board busy\r\n";
@@ -330,6 +430,32 @@ int session_impl_web_update_result(Session *s,const OperationResult *r,SessionRe
     int ok=result.status==SESSION_RESULT_OK;
     SessionRtbbsState *ui=rtbbs(s);
     const char *text=r->text;
+    int batch_update=s->connection.connector_batch_update;
+    if(ok && batch_update==WEB_BATCH_MATCH && r->feedback.batch_match) {
+        BatchIds ids={.count=r->feedback.count};
+        memcpy(ids.ids,r->feedback.ids,sizeof(ids.ids));
+        batch_replace(&ui->files.batch,&ids);
+        text="BATCH UPDATED\r\n";
+    } else if(ok && batch_update==WEB_BATCH_COPY && r->feedback.file_copied) {
+        uint32_t next=batch_copy_complete(&ui->files.batch);
+        if(next) {
+            OperationRequest *q=calloc(1,sizeof(*q));
+            if(q) {
+                q->op='Y';q->action=VAULT_CMD_COPY;q->number=next;q->board=s->core.board;
+                strcpy(q->body,ui->files.batch.copy_path);
+            }
+            int queued=q && session_submit(s,q)==SESSION_OPERATION_ACCEPTED;
+            free(q);if(queued)return 1;
+            ok=0;text="ERR board busy\r\n";
+        } else text="BATCH COPY COMPLETE\r\n";
+    }
+    s->connection.connector_batch_update=WEB_BATCH_NONE;
+    if(ok && s->connection.connector_menu_mode>=0) {
+        ui->presentation.menu_mode=s->connection.connector_menu_mode;ui->presentation.menu_shown=0;
+    }
+    s->connection.connector_menu_mode=-1;
+    if(ok && r->chat_action=='p')text="TALK PREFERENCES SAVED\r\n";
+    if(ok && r->preferences)session_impl_authentication_result(s,r,s->core.now);
     if(ok && (r->chat_action=='S' || r->chat_action=='D')) {
         MessageId message;
         const char *error=session_impl_chat_delivery(s,r,s->core.now,&message);

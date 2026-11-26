@@ -223,12 +223,18 @@ void vault_bridge_binary(IdentityProvider identity,const BoardRequest *q,BoardRe
     Principal p={0};
     if(!identity.resolve || !identity.resolve(identity.context,q->user,q->user_epoch,&p)) { r->feedback.failed=1;strcpy(r->text,"ERR login required\r\n");return; }
     TransferBackend backend=vault_transfer_backend(store);TransferRequest request={0};TransferReply reply={0};
-    request.operation=q->action=='R'?TRANSFER_READ:TRANSFER_WRITE;request.id=q->number;request.offset=q->cursor;
+    request.operation=q->action=='S'?TRANSFER_STATUS:q->action=='C'?TRANSFER_CANCEL:
+                      q->action=='R'?TRANSFER_READ:TRANSFER_WRITE;
+    request.id=q->number;request.offset=q->cursor;
     if(q->scope<0 || q->scope>VAULT_CHUNK) { r->feedback.failed=1;strcpy(r->text,"ERR vault syntax\r\n");return; }
     request.count=(size_t)q->scope;memcpy(request.bytes,q->body,request.count);
     VaultResult result=backend.execute(backend.context,&p,&request,&reply);
     if(result!=VAULT_OK) { r->feedback.failed=1;snprintf(r->text,sizeof(r->text),"%s\r\n",result==VAULT_DENIED?"ERR vault denied":result==VAULT_BUSY?"ERR vault busy":result==VAULT_NOT_FOUND?"ERR no file":result==VAULT_INVALID?"ERR vault syntax":"ERR vault storage");return; }
-    if(request.operation==TRANSFER_READ) {
+    if(request.operation==TRANSFER_STATUS) {
+        OPERATION_PAGE(r,UPLOAD,upload,reply.upload);
+    } else if(request.operation==TRANSFER_CANCEL) {
+        snprintf(r->text,sizeof(r->text),"UPLOAD CANCELLED %u\r\n",request.id);
+    } else if(request.operation==TRANSFER_READ) {
         unsigned char *data=(unsigned char *)r->text;data[0]='D';put_big(data+1,q->number);put_big(data+5,q->cursor);
         memcpy(data+9,reply.bytes,reply.count);r->binary_size=(unsigned)(9+reply.count);
     } else snprintf(r->text,sizeof(r->text),"RECEIVED %u %u\r\n",q->number,reply.received);

@@ -105,21 +105,47 @@ int userlog_disconnect(int slot,uint64_t now) {
     Live *l=&live[slot];if(!l->id)return 1;
     int ok=append('E',l,l->user && now>=l->start?now-l->start:0,NULL,l->user);return ok && userlog_maintain();
 }
-void userlog_report(uint32_t user,uint32_t cursor,int all,int stats,uint64_t now,char *out,size_t size) {
-    if(!enabled || journal.broken) { snprintf(out,size,!enabled?"ERR userlog disabled\r\n":"ERR userlog storage\r\n");return; }
-    if(user>MEMBER_MAX || cursor>count+1) { snprintf(out,size,"ERR command\r\n");return; }
+const char *userlog_snapshot(uint32_t user,uint32_t cursor,int all,int stats,uint64_t now,UserlogReport *page) {
+    memset(page,0,sizeof(*page));
+    if(!enabled || journal.broken)return !enabled?"ERR userlog disabled\r\n":"ERR userlog storage\r\n";
+    if(user>MEMBER_MAX || cursor>count+1)return "ERR command\r\n";
+    page->user=all?0:user;
     if(stats) {
-        uint64_t logins=0,elapsed=0,last=0;
-        for(uint32_t i=1;i<=MEMBER_MAX;i++)if(all || i==user) { logins+=totals[i].logins;elapsed+=totals[i].elapsed;if(totals[i].last>last)last=totals[i].last; }
-        for(unsigned i=0;i<CONNECTION_MAX;i++)if(live[i].user && (all || live[i].user==user) && now>=live[i].start && now-live[i].start>=live[i].elapsed)elapsed+=now-live[i].start-live[i].elapsed;
-        snprintf(out,size,"USERSTATS %u LOGINS %" PRIu64 " SECONDS %" PRIu64 " LAST %" PRIu64 "\r\nEND USERSTATS\r\n",all?0:user,logins,elapsed/1000,last);return;
+        uint64_t elapsed=0;
+        for(uint32_t i=all?1:user;i<=(all?MEMBER_MAX:user);i++) {
+            page->logins+=totals[i].logins;elapsed+=totals[i].elapsed;
+            if(totals[i].last>page->last)page->last=totals[i].last;
+        }
+        for(unsigned i=0;i<CONNECTION_MAX;i++)
+            if(live[i].user && (all || live[i].user==user) && now>=live[i].start && now-live[i].start>=live[i].elapsed)
+                elapsed+=now-live[i].start-live[i].elapsed;
+        page->seconds=elapsed/1000;
+        return NULL;
     }
-    size_t index=cursor?cursor-1:count,used=(size_t)snprintf(out,size,"USERLOG\r\n");unsigned shown=0,scanned=0;
-    while(index && shown<8 && scanned++<256) { Event *e=&events[--index];
+    size_t index=cursor?cursor-1:count;unsigned scanned=0;
+    while(index && page->count<8 && scanned++<256) {
+        const Event *e=&events[--index];
         if(e->kind=='T' || (!all && e->user!=user))continue;
-        used+=(size_t)snprintf(out+used,size-used,"USERROW %u %u %u %c %" PRIu64 " %" PRIu64 "\r\n",e->id,e->connection,e->user,e->kind,e->at,e->elapsed/1000);shown++;
+        page->rows[page->count++]=(UserlogRow){e->id,e->connection,e->user,e->kind,e->at,e->elapsed/1000};
     }
-    snprintf(out+used,size-used,"END NEXT %zu\r\n",index?index+1:0);
+    page->next=index?(uint32_t)(index+1):0;
+    return NULL;
+}
+void userlog_report(uint32_t user,uint32_t cursor,int all,int stats,uint64_t now,char *out,size_t size) {
+    UserlogReport page;
+    const char *error=userlog_snapshot(user,cursor,all,stats,now,&page);
+    if(error) { snprintf(out,size,"%s",error);return; }
+    if(stats) {
+        snprintf(out,size,"USERSTATS %u LOGINS %" PRIu64 " SECONDS %" PRIu64 " LAST %" PRIu64 "\r\nEND USERSTATS\r\n",
+                 page.user,page.logins,page.seconds,page.last);return;
+    }
+    size_t used=(size_t)snprintf(out,size,"USERLOG\r\n");
+    for(unsigned i=0;i<page.count;i++) {
+        const UserlogRow *e=&page.rows[i];
+        used+=(size_t)snprintf(out+used,size-used,"USERROW %u %u %u %c %" PRIu64 " %" PRIu64 "\r\n",
+                               e->id,e->connection,e->user,e->kind,e->at,e->seconds);
+    }
+    snprintf(out+used,size-used,"END NEXT %u\r\n",page.next);
 }
 /* Retain complete connection graphs plus lifetime totals. No live session is
  * discarded. The separate ledger lock survives atomic snapshot replacement. */

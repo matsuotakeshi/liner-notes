@@ -38,6 +38,7 @@ void chat_core_admin(ChatCore *core,unsigned long id,int enabled);
 int chat_core_memo(ChatCore *core,unsigned long id,const char *text);
 int chat_core_call(ChatCore *core,unsigned long id,const char *text,uint64_t now);
 void chat_core_online(ChatCore *core,unsigned long id);
+int chat_core_presence(ChatCore *,unsigned long id,uint32_t user,int room_only,ChatPresence *);
 int chat_core_say(ChatCore *core,unsigned long id,const char *text,uint64_t now);
 void chat_core_who(ChatCore *core,unsigned long id);
 int chat_core_target(ChatCore *core,unsigned long from,unsigned long to);

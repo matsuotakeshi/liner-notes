@@ -51,6 +51,8 @@ int session_impl_password_reset_command(Session *s,char *line);
 int session_impl_password_change_command(Session *s,char *line);
 int session_impl_account_command(Session *s,char *line);
 int session_impl_authentication_result(Session *s,const BoardResult *completion,uint64_t now);
+void session_impl_load_article_draft(Session *,const OperationResult *);
+void session_impl_load_mail_draft(Session *,const OperationResult *);
 int session_impl_password_prompt_result(Session *s,const BoardResult *completion,uint64_t now);
 int session_impl_account_flags_result(Session *s,const BoardResult *completion,uint64_t now);
 int session_impl_editor_preinput(Session *s,char **input,char *scratch);

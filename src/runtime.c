@@ -203,7 +203,15 @@ static void service_result(BoardResult *r) {
     if((!r->service_action || strchr("GgM",r->service_action)) && !r->board_refresh)return;
     if(r->service_action=='u') { userlog_table(r->service_number,r->service_next,!strcmp(r->service_text,"ALL"),now_ms(),r->text,sizeof(r->text));return; }
     if(r->service_action=='U' || r->service_action=='V') {
-        userlog_report(r->service_number,r->service_next,!strcmp(r->service_text,"ALL"),r->service_action=='V',now_ms(),r->text,sizeof(r->text));return;
+        int all=!strcmp(r->service_text,"ALL"),stats=r->service_action=='V';
+        if(r->structured) {
+            UserlogReport page;
+            const char *error=userlog_snapshot(r->service_number,r->service_next,all,stats,now_ms(),&page);
+            if(error) { r->feedback.failed=1;snprintf(r->text,sizeof(r->text),"%s",error); }
+            else if(stats) { OPERATION_PAGE(r,USERSTATS,userlog,page); }
+            else { OPERATION_PAGE(r,USERLOG,userlog,page); }
+        } else userlog_report(r->service_number,r->service_next,all,stats,now_ms(),r->text,sizeof(r->text));
+        return;
     }
     if(r->service_action=='b' || r->board_refresh) {
         for(int i=0;i<SLOTS;i++)if(connections[i].fd!=INVALID) {

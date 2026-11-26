@@ -776,6 +776,23 @@ static VaultResult mail_transfer_request(void *context,const Principal *unused,c
 }
 static void mail_transfer_execute(const BoardRequest *q,BoardResult *r) {
     MailTransferContext context={{q->user,q->user_epoch},MAIL_CORE_OK};
+    if(q->action=='S' || q->action=='C') {
+        TransferRequest request={.operation=q->action=='S'?TRANSFER_STATUS:TRANSFER_CANCEL,.id=q->number};
+        TransferReply reply;VaultResult status;
+        MailOutcome result=mail_core_transfer(&context.actor,&request,&reply,&status);
+        if(result!=MAIL_CORE_OK) { mail_result(q,result,r);return; }
+        if(status!=VAULT_OK) {
+            r->feedback.failed=1;
+            strcpy(r->text,status==VAULT_DENIED?"ERR vault denied\r\n":
+                              status==VAULT_BUSY?"ERR vault busy\r\n":
+                              status==VAULT_NOT_FOUND?"ERR no file\r\n":
+                              status==VAULT_INVALID?"ERR vault syntax\r\n":"ERR vault storage\r\n");
+            return;
+        }
+        if(q->action=='S') { OPERATION_PAGE(r,UPLOAD,upload,reply.upload); }
+        else snprintf(r->text,sizeof(r->text),"UPLOAD CANCELLED %u\r\n",q->number);
+        return;
+    }
     if(!strncmp(q->body,"FILE ",5)) {
         char *end;unsigned long id=strtoul(q->body+5,&end,10);
         if(end==q->body+5 || *end || !id || id>VAULT_ID_MAX) { (r->feedback.failed=1,strcpy(r->text,"ERR no file\r\n"));return; }
@@ -876,7 +893,9 @@ static void mail_execute(const BoardRequest *q,BoardResult *r) {
         }
         r->mail_revision=draft.revision;r->mail_attachments=draft.attachments;
         if(resume) { r->mail_to=draft.to;r->mail_parent=draft.parent;strcpy(r->draft_title,draft.title); }
-        size_t offset=0;for(unsigned i=0;i<draft.attachments.count;i++)offset+=mail_attachment_text(q,draft.attachments.ids[i],r->text+offset,sizeof(r->text)-offset,NULL);
+        size_t offset=0;for(unsigned i=0;i<draft.attachments.count;i++)
+            offset+=mail_attachment_text(q,draft.attachments.ids[i],r->text+offset,sizeof(r->text)-offset,
+                                         q->structured && resume?&r->content:NULL);
         snprintf(r->text+offset,sizeof(r->text)-offset,mail_text(q,MSG_MAIL_DRAFT_INFO,"MAIL DRAFT %u TO %s REPLY %u TITLE %s\r\n"),draft.revision,draft.recipient,draft.parent,draft.title);return;
     }
     if(q->action=='C') {
@@ -1238,7 +1257,11 @@ static void execute(const BoardRequest *q,BoardResult *r) {
             r->chat_action='K';r->chat_kick_user=removal.user;strcpy(r->text,removal.name);return;
         }
         ChatPreferenceAction action=CHAT_PREF_QUERY;const char *login=NULL;
-        if(q->action=='P') {
+        if(q->action=='p') {
+            if(q->number>CHAT_PREF_UNMUTE) { r->feedback.failed=1;strcpy(r->text,"ERR command\r\n");return; }
+            action=(ChatPreferenceAction)q->number;
+            if(action==CHAT_PREF_MUTE || action==CHAT_PREF_UNMUTE)login=q->body;
+        } else if(q->action=='P') {
             if(!strcmp(q->body,"/MUTES"))action=CHAT_PREF_QUERY;
             else if(!strcmp(q->body,"/TALK ON"))action=CHAT_PREF_RECEIVE_ON;
             else if(!strcmp(q->body,"/TALK OFF"))action=CHAT_PREF_RECEIVE_OFF;
@@ -1249,7 +1272,8 @@ static void execute(const BoardRequest *q,BoardResult *r) {
         MemberActor actor={q->user,q->user_epoch};
         MemberOutcome result=member_core_chat_preferences(&actor,action,login,&r->chat_preferences);
         if(result!=MEMBER_CORE_OK) {
-            if(result==MEMBER_CORE_INVALID)r->chat_action='E';else member_result(result,r);
+            if(result==MEMBER_CORE_INVALID && q->action!='p')r->chat_action='E';
+            else member_result(result,r);
             return;
         }
         r->chat_user=q->user;

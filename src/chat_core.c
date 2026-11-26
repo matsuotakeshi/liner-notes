@@ -103,6 +103,23 @@ int chat_core_call(ChatCore *core,unsigned long id,const char *text,uint64_t now
     for(int i=0;i<CONNECTION_MAX;i++)if(core->peers[i].used && core->peers[i].admin && core->peers[i].identity.connection!=id && core->peers[i].notify(core->peers[i].context,&e))delivered++;
     return delivered;
 }
+int chat_core_presence(ChatCore *core,unsigned long id,uint32_t user,int room_only,ChatPresence *out) {
+    out->count=0;
+    const ChatPeer *actor=find(core,id);
+    if(!actor || actor->identity.user!=user || (room_only && !actor->room))return 0;
+    for(unsigned i=0;i<CONNECTION_MAX;i++) {
+        const ChatPeer *p=&core->peers[i];
+        if(!p->used || (room_only && !p->room))continue;
+        ChatPresenceRow *row=&out->rows[out->count++];
+        row->connection=p->identity.connection;
+        strcpy(row->login,p->identity.login);strcpy(row->name,p->identity.name);
+        size_t length=strlen(p->identity.text);
+        if(length>=sizeof(row->memo))length=0;
+        memcpy(row->memo,p->identity.text,length);row->memo[length]=0;
+    }
+    return 1;
+}
+
 void chat_core_online(ChatCore *core,unsigned long id) {
     ChatPeer *p=find(core,id);if(!p)return;
     for(int i=0;i<CONNECTION_MAX;i++)if(core->peers[i].used) { ChatEvent e=core->peers[i].identity;e.kind='W';e.replay=1;p->notify(p->context,&e); }

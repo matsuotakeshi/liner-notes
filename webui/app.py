@@ -16,7 +16,7 @@ from urllib.parse import urlsplit, quote
 
 from aiohttp import web, WSMsgType
 from .bridge import Bridge, BridgeError, empty_view, response_data
-from .commands import COMMANDS, CORE_UPDATES, action_arguments, core_update, visible
+from .commands import COMMANDS, CORE_UPDATES, SESSION_UPDATES, action_arguments, core_update, visible
 from .presentation import Presentation
 from .terminal import relay
 from .transfers import ResumeRecords
@@ -233,6 +233,12 @@ def create_app(config):
     search_actions = ('board.search','board.author','mail.search')
     check_start = {'board.check':'ARTICLES {scope}','mail.check':'MAIL','file.check':'FILES {path}'}
     check_control = {'check.next':'check_next','check.done':'check_done','check.cancel':'check_cancel'}
+    session_views = {'chat.online':'chat_online','chat.room':'chat_room','chat.preferences':'chat_prefs',
+                     'chat.status':'chat_status','online':'chat_online','file.batch_list':'batch_list',
+                     'board.resume':'article_draft','mail.resume':'mail_draft'}
+    upload_views = {'file.upload_status':'upload_status','mail.upload_status':'mail_upload'}
+    connection_history = {'userlog':'userlog','userstats':'userstats',
+                          'admin.userlog':'userlog','admin.userstats':'userstats'}
 
     def search_positions(payload, state):
         cursor=payload.get('cursor',0)
@@ -249,10 +255,32 @@ def create_app(config):
             args,item=action_arguments(key,payload.get('values',{}),{**session.bridge.state,'vault_sigop':session.vault_sigop},payload.get('confirmed') is True)
             group=item['group']
             if session.bridge.state.get('chat') and group!='chat':raise BridgeError('Leave the chat before this operation')
-            typed = session.bridge.state.get('core_updates') == 1 and key in CORE_UPDATES
-            if typed and (key!='profile.handle' or session.bridge.state.get('user')):
+            state=session.bridge.state
+            if state.get('core_session_controls')==1:
+                if key in session_views:
+                    return response(session,await session.bridge.view(session_views[key],0,0))
+                if key in connection_history:
+                    cursor,_=search_positions(payload,state)
+                    return response(session,await session.bridge.view(connection_history[key],0,cursor,
+                                                                  'ALL' if key.startswith('admin.') else ''))
+                if key in upload_views:
+                    ident=args['id']
+                    if not re.fullmatch(r'[0-9]{1,10}',ident) or not 1<=int(ident)<=2147483646:
+                        raise ValueError('Invalid upload ID')
+                    return response(session,await session.bridge.view(upload_views[key],int(ident),0))
+                if key in SESSION_UPDATES:
+                    fields=core_update(key,args)
+                    result=await session.bridge.update(key,flag=item['confirm'],**fields)
+                    if key in ('file.upload_cancel','mail.upload_cancel') and result['mutation']['ok']:
+                        try:
+                            resumes.remove(session.bridge.state,'mail' if key.startswith('mail.') else 'public',fields['id'])
+                        except OSError:
+                            LOG.warning('Upload cancelled but its Web resume record could not be removed')
+                    return response(session,result)
+            typed = state.get('core_updates') == 1 and key in CORE_UPDATES
+            if typed and (key!='profile.handle' or state.get('user')):
                 return response(session,await session.bridge.update(key,flag=item['confirm'],**core_update(key,args)))
-            if session.bridge.state.get('mail') and group!='mail':await session.bridge.exchange('MAIL EXIT')
+            if state.get('mail') and group!='mail':await session.bridge.exchange('MAIL EXIT')
             command=item['command'].format(**args).rstrip()
             if session.bridge.state.get('core_operations')==1:
                 if key in check_start:
@@ -569,14 +597,23 @@ def create_app(config):
                     start=f'{prefix}START {total} {digest.hexdigest()} {b64(name)} {b64(description)}'
                     if category and not private:start=f'FILESTARTIN {total} {digest.hexdigest()} {b64(name)} {b64(description)} {b64(category)}'
                     if resume:
-                        ident=resume;result=await session.bridge.exchange(f'{prefix}STATUS {ident}')
-                        match=re.search(r'^UPLOADSTATUS '+str(ident)+r' (ACTIVE|COMMITTED|CANCELLED) (\d+) (\d+) ([a-f0-9]{64})\r?$',result['text'],re.M)
-                        if not match:raise BridgeError(result['text'].strip())
-                        if match[1]=='CANCELLED' or int(match[3])!=total or match[4]!=digest.hexdigest():raise BridgeError('Resume file differs or upload was cancelled')
-                        if match[1]=='COMMITTED':
+                        ident=resume
+                        if session.bridge.state.get('core_session_controls')==1:
+                            result=await session.bridge.view('mail_upload' if private else 'upload_status',ident,0)
+                            upload_state=result['data'].get('upload')
+                        else:
+                            result=await session.bridge.exchange(f'{prefix}STATUS {ident}')
+                            match=re.search(r'^UPLOADSTATUS '+str(ident)+r' (ACTIVE|COMMITTED|CANCELLED) (\d+) (\d+) ([a-f0-9]{64})\r?$',result['text'],re.M)
+                            upload_state=dict(id=ident,state=match[1],received=int(match[2]),size=int(match[3]),sha256=match[4]) if match else None
+                        if not upload_state:raise BridgeError(result['text'].strip())
+                        if (upload_state['id']!=ident or upload_state['state'] not in ('ACTIVE','COMMITTED')
+                                or upload_state['size']!=total or upload_state['sha256']!=digest.hexdigest()
+                                or not 0<=upload_state['received']<=total):
+                            raise BridgeError('Resume file differs or upload was cancelled')
+                        if upload_state['state']=='COMMITTED':
                             resumes.remove(session.bridge.state,status['kind'],ident)
                             return web.json_response({'id':ident,'size':total,'sha256':digest.hexdigest(),'already_committed':True})
-                        status['sent']=int(match[2])
+                        status['sent']=upload_state['received']
                     else:
                         result=await session.bridge.exchange(start);match=re.search(r'^UPLOAD (\d+)\r?$',result['text'],re.M)
                         if not match:raise BridgeError(result['text'].strip())

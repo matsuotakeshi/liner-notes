@@ -114,7 +114,22 @@ static void presence_and_call(void) {
     alice.count=0;chat_core_who(&first,1);assert(alice.count==1 && alice.events[0].kind=='E');
     alice.count=0;chat_core_disconnect(&first,2);assert(alice.count==1 && alice.events[0].kind=='X');
 }
+static void presence_snapshots(void) {
+    ChatCore core={0};ChatPreferences prefs={0};Sink a={0},b={0};
+    assert(chat_core_join(&core,7,1,"alice","Alice",notify,&a));
+    assert(chat_core_register(&core,9,2,"bob","Bob",notify,&b,&prefs));
+    assert(chat_core_memo(&core,9,"memo"));
+    ChatPresence presence;
+    assert(!chat_core_presence(&core,7,2,0,&presence) && !presence.count);
+    assert(!chat_core_presence(&core,9,2,1,&presence) && !presence.count);
+    assert(chat_core_presence(&core,7,1,1,&presence) && presence.count==1);
+    assert(presence.rows[0].connection==7 && !strcmp(presence.rows[0].login,"alice"));
+    assert(chat_core_presence(&core,7,1,0,&presence) && presence.count==2);
+    assert(!strcmp(presence.rows[1].memo,"memo"));
+}
+
 int main(void) {
+    presence_snapshots();
     isolation();persistence();privacy_and_preferences();presence_and_call();
     puts("PASS chat core: context isolation, durable-before-delivery, replay, private routing, preferences, presence, SYSOP cooldown");
     return 0;

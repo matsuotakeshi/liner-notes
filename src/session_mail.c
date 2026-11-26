@@ -30,16 +30,18 @@
 
 static void mail_list_request(const Session *s,BoardRequest *q);
 
+void session_impl_load_mail_draft(Session *s,const OperationResult *completion) {
+    memset(&rtbbs(s)->editor.draft,0,sizeof(rtbbs(s)->editor.draft));rtbbs(s)->editor.draft.op='m';rtbbs(s)->editor.draft.action='S';rtbbs(s)->editor.draft.number=completion->mail_to;rtbbs(s)->editor.draft.cursor=completion->mail_parent;rtbbs(s)->editor.draft.mail_attachments=completion->mail_attachments;
+    strcpy(rtbbs(s)->editor.draft.title,completion->draft_title);strcpy(rtbbs(s)->editor.draft.body,completion->draft_body);rtbbs(s)->mail_state.mail_revision=completion->mail_revision;rtbbs(s)->editor.editing=1;rtbbs(s)->editor.editor_input=0;rtbbs(s)->editor.editor_at=1;session_impl_undo_clear(s);
+}
+
 int session_impl_mail_result(Session *s,const BoardResult *completion,uint64_t now) {
     (void)now;
     if(rtbbs(s)->mail_state.mail_pending) {
         rtbbs(s)->mail_state.mail_pending=0;
         MailDraftEffect effect=mail_draft_effect(session_impl_mail_event(completion->mail_action),completion->mail_to,completion->mail_id,completion->mail_revision);
         if(effect==MAIL_DRAFT_ATTACH)rtbbs(s)->editor.draft.mail_attachments=completion->mail_attachments;
-        if(effect==MAIL_DRAFT_OPEN) {
-            memset(&rtbbs(s)->editor.draft,0,sizeof(rtbbs(s)->editor.draft));rtbbs(s)->editor.draft.op='m';rtbbs(s)->editor.draft.action='S';rtbbs(s)->editor.draft.number=completion->mail_to;rtbbs(s)->editor.draft.cursor=completion->mail_parent;rtbbs(s)->editor.draft.mail_attachments=completion->mail_attachments;
-            strcpy(rtbbs(s)->editor.draft.title,completion->draft_title);strcpy(rtbbs(s)->editor.draft.body,completion->draft_body);rtbbs(s)->mail_state.mail_revision=completion->mail_revision;rtbbs(s)->editor.editing=1;rtbbs(s)->editor.editor_input=0;rtbbs(s)->editor.editor_at=1;session_impl_undo_clear(s);
-        }
+        if(effect==MAIL_DRAFT_OPEN)session_impl_load_mail_draft(s,completion);
         if(effect==MAIL_DRAFT_SAVED) { OPENSSL_cleanse(&rtbbs(s)->editor.draft,sizeof(rtbbs(s)->editor.draft));rtbbs(s)->editor.editing=0;rtbbs(s)->editor.editor_upload=rtbbs(s)->editor.editor_confirm=rtbbs(s)->editor.editor_upload_question=0;rtbbs(s)->mail_state.mail_revision=0;session_impl_undo_clear(s); }
         if(effect==MAIL_DRAFT_SENT || effect==MAIL_DRAFT_RETRY) {
             if(effect==MAIL_DRAFT_SENT) { OPENSSL_cleanse(&rtbbs(s)->editor.draft,sizeof(rtbbs(s)->editor.draft));rtbbs(s)->editor.editing=0;rtbbs(s)->editor.editor_upload=rtbbs(s)->editor.editor_confirm=rtbbs(s)->editor.editor_upload_question=0; }
