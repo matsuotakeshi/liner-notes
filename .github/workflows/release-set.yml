@@ -16,6 +16,10 @@ on:
         description: "Require the optional SELinux RPM from this exact source commit"
         type: boolean
         default: false
+      require_solaris:
+        description: "Require the Solaris IPS archive tested at this exact source commit"
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -80,6 +84,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           SOURCE_SHA: ${{ github.event_name == 'workflow_dispatch' && inputs.source_sha || github.event.workflow_run.head_sha }}
           REQUIRE_SELINUX: ${{ github.event_name == 'workflow_dispatch' && inputs.require_selinux || false }}
+          REQUIRE_SOLARIS: ${{ github.event_name == 'workflow_dispatch' && inputs.require_solaris || false }}
         run: |
           set -euo pipefail
           if [[ ! "$SOURCE_SHA" =~ ^[0-9a-f]{40}$ ]]; then
@@ -156,6 +161,10 @@ jobs:
             printf 'SELinux component not included: exact-source workflow %s; no policy RPM verified.\n' \
               "$policy_result" >> "$GITHUB_STEP_SUMMARY"
             printf 'rocky10-selinux not-included %s\n' "$policy_result" >> RELEASE-SOURCES.txt
+          fi
+          if [[ "$REQUIRE_SOLARIS" == true ]]; then
+            fetch_platform "solaris11.4-amd64" "solaris-package.yml" "liner-notes-solaris-ips"
+            optional_args+=(--require-solaris)
           fi
           # A moving main must never be accepted as the current release set.
           test "$(gh api "repos/$GITHUB_REPOSITORY/git/ref/heads/main" --jq '.object.sha')" = "$SOURCE_SHA"

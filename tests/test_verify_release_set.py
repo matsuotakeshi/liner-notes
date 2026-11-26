@@ -11,7 +11,7 @@ import sys
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
 from release_manifest import create
-from verify_release_set import verify_set
+from verify_release_set import SOLARIS_ARCHIVE, SOLARIS_PLATFORM, verify_set
 import release_manifest
 
 SHA = "a" * 40
@@ -53,6 +53,44 @@ def fixture(root, platform, source_sha=SHA):
 
 
 class ReleaseSetTests(unittest.TestCase):
+    def test_solaris_optional_and_required_receipt(self):
+        with tempfile.TemporaryDirectory() as path:
+            root = Path(path)
+            for platform in SPECS:
+                fixture(root, platform)
+            self.assertNotIn(SOLARIS_PLATFORM, verify_set(root, SHA)["components"])
+            with self.assertRaisesRegex(ValueError, "Solaris IPS candidate directory"):
+                verify_set(root, SHA, require_solaris=True)
+
+            folder = root / SOLARIS_PLATFORM
+            folder.mkdir()
+            archive = folder / SOLARIS_ARCHIVE
+            payload = b"synthetic Solaris archive"
+            archive.write_bytes(payload)
+            receipt = folder / "SOLARIS-PACKAGE.json"
+            digest = hashlib.sha256(payload).hexdigest()
+            record = {"source_sha": SHA, "version": "0.74", "archive": SOLARIS_ARCHIVE,
+                      "sha256": digest, "acceptance": "passed"}
+            receipt.write_text(json.dumps(record))
+            result = verify_set(root, SHA, require_solaris=True)
+            self.assertEqual(set(result["platforms"]), set(SPECS))
+            component = result["components"][SOLARIS_PLATFORM]
+            self.assertEqual(component["source_sha"], SHA)
+            self.assertEqual(component["version"], "0.74")
+            self.assertEqual(component["packages"]["liner-notes"],
+                             {"filename": SOLARIS_ARCHIVE, "sha256": digest})
+
+            for key, value in (("source_sha", "b"*40), ("version", "0.75"),
+                               ("archive", "../" + SOLARIS_ARCHIVE), ("acceptance", "failed")):
+                with self.subTest(key=key):
+                    receipt.write_text(json.dumps(record | {key: value}))
+                    with self.assertRaisesRegex(ValueError, "Solaris IPS receipt"):
+                        verify_set(root, SHA)
+            receipt.write_text(json.dumps(record))
+            archive.write_bytes(b"tampered archive")
+            with self.assertRaisesRegex(ValueError, "Solaris IPS archive SHA-256"):
+                verify_set(root, SHA, require_solaris=True)
+
     def optional_fixture(self, root, source_sha=SHA):
         folder = root / "rocky10-selinux"
         folder.mkdir()

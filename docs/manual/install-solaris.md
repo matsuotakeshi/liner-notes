@@ -83,6 +83,55 @@ Doorを有効にするときは同じビルドの排他helperを本体と一緒�
 
 パッケージの管理範囲は `/opt/liner-notes` です。稼働設定は同梱の `share/liner-notes/config/*.sample` から必要なものだけを `/etc/liner-notes` にコピーします。データ、アカウント、SMF登録は別途準備します。サイト固有のメニュー・HELPなどは管理領域外に置いて設定から参照します。Pythonは候補のビルドに使ったシステム側の絶対パスが必要です。標準候補に内蔵SSHと認証付きDoor隔離は含めません。
 
+Solaris IPSの実機試験では、Solaris 11.4 CBE x86-64の隔離イメージでアーカイブの
+導入と削除、導入済みBBSでの記事操作、管理ツール起動、SMF定義の構文、削除時の
+外部設定保持を確認しました。[IPS実機試験](https://github.com/matsuotakeshi/liner-notes/actions/runs/45790433525)
+
+### GitHub ReleasesにIPSアーカイブがある版の導入
+
+対象版の `liner-notes-solaris11.4-amd64.p5p`、`SOLARIS-PACKAGE.json`、
+`SHA256SUMS` を同じ場所へ取得し、`SOLARIS-PACKAGE.json` の `source_sha`
+と `version` がそのリリースに一致することを確認します。以下は非グローバルゾーンを
+子イメージに持たないホストで、新規導入の計画を表示する例です。
+
+```sh
+(
+  set -eu
+  archive=liner-notes-solaris11.4-amd64.p5p
+  expected=$(awk -v name="$archive" '$2 == name {print $1}' SHA256SUMS)
+  test -n "$expected"
+  test "$(digest -a sha256 "$archive")" = "$expected"
+  version=$(python3 -c 'import json; print(json.load(open("SOLARIS-PACKAGE.json"))["version"])')
+  pkgrepo list -s "./$archive" "application/liner-notes@$version"
+  pkg install -nv -g "./$archive" "pkg://linernotes/application/liner-notes@$version"
+)
+```
+
+表示された版と操作対象を確認してから、管理者が `-nv` を外して導入します。
+子イメージがある場合のpublisher設定は[OracleのIPSアーカイブ手順](https://docs.oracle.com/cd/E37838_01/html/E61051/pkgcreate.html)に従います。
+
+専用アカウント `liner_notes` と、そこから書き込める `/var/opt/liner-notes`・
+`/var/log/liner-notes` を用意します。初回は同梱の `solaris.json.sample` と
+`limits.conf.sample` を `/etc/liner-notes` にそれぞれ拡張子 `.sample` を外して
+配置します。既存の設定やDBは保存したうえで再利用してください。設定は管理者が
+所有し、サービスのグループに読み取りを許可します。パッケージとは別にSMFを
+登録します。以下は準備後の操作例です。
+
+```sh
+FMRI=svc:/application/liner-notes:default
+MANIFEST=/opt/liner-notes/share/smf/liner-notes.xml
+/opt/liner-notes/libexec/liner-notes-smf check /etc/liner-notes/solaris.json
+svccfg validate "$MANIFEST"
+svccfg import "$MANIFEST"
+svcadm enable -s "$FMRI"
+svcs -xv "$FMRI"
+telnet 127.0.0.1 2222
+```
+
+起動に失敗したら `svcs -L "$FMRI"` でログの場所を確認します。削除する場合は
+設定とデータをバックアップし、先にSMFを停止・登録解除してからIPSを削除します。
+本番構成での更新・切り戻しは、別途バックアップからの復元を含めて検証してください。
+
 ## 現在の制約
 
 - CIは限定ヘルパーを通じて試験用FMRIだけを管理します。OS再起動後の自動起動と、本番構成での導入・更新・復元は未検証です。FreeBSDのrc.dやLinuxのsystemdの手順をそのまま使用しないでください。

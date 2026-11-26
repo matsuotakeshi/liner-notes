@@ -5,6 +5,7 @@ This reads existing CI artifacts only. It never installs, deploys or runs the
 built packages. CI run origin and signing must be authenticated separately.
 """
 import argparse
+import hashlib
 import json
 import re
 from pathlib import Path
@@ -13,6 +14,8 @@ from types import SimpleNamespace
 from release_manifest import verify
 
 PLATFORMS = ("freebsd15", "rocky10", "debian13")
+SOLARIS_PLATFORM = "solaris11.4-amd64"
+SOLARIS_ARCHIVE = "liner-notes-solaris11.4-amd64.p5p"
 HEX_SHA = re.compile(r"[0-9a-f]{40}\Z")
 CHECKSUM = re.compile(r"([0-9a-f]{64})  ((?:\./)?[A-Za-z0-9_.+~:-]+)\Z")
 
@@ -50,7 +53,27 @@ def check_build_info(root, source_sha):
         raise ValueError("Build provenance commit differs from release set")
 
 
-def verify_set(root, source_sha, require_selinux=False):
+def verify_solaris(folder, source_sha, version):
+    if folder.is_symlink() or not folder.is_dir():
+        raise ValueError("Missing or unsafe Solaris IPS candidate directory")
+    receipt = folder / "SOLARIS-PACKAGE.json"
+    archive = folder / SOLARIS_ARCHIVE
+    if any(path.is_symlink() or not path.is_file() for path in (receipt, archive)):
+        raise ValueError("Missing or unsafe Solaris IPS archive or acceptance receipt")
+    record = json.loads(receipt.read_text(encoding="ascii"))
+    expected = {"source_sha": source_sha, "version": version,
+                "archive": SOLARIS_ARCHIVE, "acceptance": "passed"}
+    if not isinstance(record, dict) or any(record.get(key) != value for key, value in expected.items()):
+        raise ValueError("Solaris IPS receipt does not match the release commit, version or acceptance")
+    with archive.open("rb") as stream:
+        digest = hashlib.file_digest(stream, "sha256").hexdigest()
+    if archive.stat().st_size == 0 or record.get("sha256") != digest:
+        raise ValueError("Solaris IPS archive SHA-256 or size mismatch")
+    return {"source_sha": source_sha, "version": version, "acceptance": "passed",
+            "packages": {"liner-notes": {"filename": SOLARIS_ARCHIVE, "sha256": digest}}}
+
+
+def verify_set(root, source_sha, require_selinux=False, *, require_solaris=False):
     if not HEX_SHA.fullmatch(source_sha):
         raise ValueError("A complete lowercase source SHA is required")
     base = Path(root).resolve(strict=True)
@@ -94,6 +117,9 @@ def verify_set(root, source_sha, require_selinux=False):
         }
     elif require_selinux:
         raise ValueError("Required SELinux candidate component was not generated")
+    solaris = base / SOLARIS_PLATFORM
+    if require_solaris or solaris.exists() or solaris.is_symlink():
+        summary["components"][SOLARIS_PLATFORM] = verify_solaris(solaris, source_sha, summary["version"])
     return summary
 
 
@@ -104,9 +130,12 @@ def main():
     p.add_argument("--output")
     p.add_argument("--require-selinux", action="store_true",
                    help="Reject a release set without its exact-SHA optional policy RPM")
+    p.add_argument("--require-solaris", action="store_true",
+                   help="Require an accepted, exact-version Solaris IPS archive")
     args = p.parse_args()
     try:
-        result = verify_set(args.root, args.source_sha, args.require_selinux)
+        result = verify_set(args.root, args.source_sha, args.require_selinux,
+                            require_solaris=args.require_solaris)
         if args.output:
             dest = Path(args.output)
             if dest.is_symlink() or dest.exists():
@@ -117,7 +146,9 @@ def main():
         print("PASS: all three OS release-candidate manifests agree on " +
               result["source_sha"] + " version " + result["version"])
         print("SELinux component: " + ("verified " + result["components"]["rocky10-selinux"]["version"]
-              if result["components"] else "not included; no policy RPM verified"))
+              if "rocky10-selinux" in result["components"] else "not included; no policy RPM verified"))
+        if SOLARIS_PLATFORM in result["components"]:
+            print("Solaris component: verified " + result["components"][SOLARIS_PLATFORM]["version"])
     except (OSError, ValueError, UnicodeError, json.JSONDecodeError) as err:
         p.exit(1, "Release set rejected: " + str(err) + "\n")
 

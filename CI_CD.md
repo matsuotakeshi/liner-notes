@@ -80,6 +80,13 @@ Self-hosted Runnerと自宅検証VMには、レビュー済みでmainへ統合�
 
 FreeBSDの配布用Portsは、`liner-notes-freebsd15-ports-distribution` Artifactから取得します。CIはpkgに使用したソースと生成済みの `distinfo` のハッシュ・サイズを照合し、pkgと統合マニュアルを同梱します。Gitの作業ツリーには、ソースアーカイブ自身を参照する `distinfo` を置きません。
 
+Solaris IPSを同梱するリリースでは、候補コミットのmainで `Solaris IPS Package CI` を手動実行します。
+成功後に `Release Set Verification` を同じ `source_sha` と `require_solaris=true` で実行します。
+Release Setは実機試験の成功、ソースSHA、版、アーカイブ名、SHA-256を照合し、
+`RELEASE-SET.json` の `components["solaris11.4-amd64"]` に記録します。
+GitHub Releasesにはその実行の `.p5p`、`SOLARIS-PACKAGE.json` と、アーカイブを含めた
+`SHA256SUMS` を掲載します。自動の3 OS検証は引き続きSolarisの手動実行と独立です。
+
 パッケージ生成・検証、GitHub Release公開、本番配備は別の操作です。リリース依頼だけでは本番更新を許可しません。本番更新には必要なCI、リリース前検査、バックアップ・復元確認、対象と作業内容についての明示的承認が必要です。前検査の成功だけでは配備を開始しません。
 
 運用ルールの変更もブランチ・PR・CIを通します。既存ルールと矛盾があれば、過去の検証記録を残しつつ現行規則を整理します。未実装の自動配備や未検証のOS対応を、利用可能・検証済みとは記載しません。
