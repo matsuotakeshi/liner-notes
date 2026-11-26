@@ -99,7 +99,7 @@
   "src/door_lock.c": "6e6e2798a5c626767a89f2cb1ef8f8cc79f13caaba879e45155f13c6bc421e34",
   "scripts/posix_locks.py": "657d3bbe77a63e9ee0a2e586f2aa8528ba1401cbbc9f879a0302ab81b1fbcfca",
   "scripts/build-lrzsz.py": "3abff4444b43dd70b1d3b143e4ca8e8faae402db0806c9074bd51e5a198895f0",
-  "ci/native_ci.py": "023ed7b819cc982ab375299d64f3148c224f9cb920b344edd180fbafa84450f8",
+  "ci/native_ci.py": "64e1c06b4bf7a40c8884ad7897287e8b850ab435ff3ee33c09ff3d6dfef04c47",
   "ci/deploy_release.py": "8626ab69b83781196b5ec625b5909e0a971ad884de6fb393119f65448cd77964",
   "scripts/deploy_policy.py": "650baa5a8246e859158791d93c4f64cc3b5bc6003f1fa25608f06a13c870e958",
   "scripts/deploy_host.py": "e77ba50264824a71c0ef81b0fbfac2773c7915207f9ea3e46a35c3e0c64ee461",
@@ -115,7 +115,7 @@
   "ci/freebsd_package_lease.py": "3e9c9cd0ba429b1a16c84a415a74fec57d6573e9c536e4e2a352e84985843712",
   ".github/workflows/freebsd-package.yml": "053e797e3864290b76b82ca3133f4e98666454473ceee6b78da4e6bbf8fb661f",
   "CI_CD.md": "c832523e91b32447b4a3575acc6c6aa6e5a58ec090aa607749d93bba7610524d",
-  ".github/workflows/native-ci-lint.yml": "deeb90a2aeffe8fb5bee7eebf77844ab6d6dbf3d50b78c24d4690a13ad50d3e1",
+  ".github/workflows/native-ci-lint.yml": "7710675bd5b73dc75aa125260fc3c26b2438db89fd2fe197b43af88d7ee419a6",
   "scripts/release_manifest.py": "35ea4b812c9ef6a69b09db52ff08dce61e9433d2ffe8b971c97b230f4635c970",
   "scripts/verify_release_set.py": "4322ffce4f92a9625b076435b2d0029d48c68319943fef7b46d5f7ce30d8b890",
   "tests/test_release_manifest.py": "08b5c8cab61c4556d1ac5e6137e252e195c76c0572fd72577bce92a1529b3791",
@@ -350,7 +350,7 @@
   "scripts/structured_db.py": "17fea547120955b7d3cd3bfc321316f3b3079b658e8a26a3472058058391e44d",
   "scripts/database_tools.py": "13f25671e2a0b4b396aab6ea2e898fe2abc7d69ab431e34bbe860e9189986672",
   "help/en/adminstorage.txt": "ced73fe9634e4e55c7750f59aa7d06c038a8ee87bcc3568154055a7779c06522",
-  "ci/native_remote.py": "25ca6ff7d1fcc0d0d05d814f3a8a6ee21f2d2ea5b12bd45d75fa97e07144e912",
+  "ci/native_remote.py": "781030c03e989c3a0c69354cb33cd38f6c63df4799a1ce98051ac663798d3746",
   "ci/native_ssh.py": "be71f00bc2d853da9ecce25ffa17ef6b390a8a4a9757c3f3d2b00a31a10e3d96",
   "ci/selinux_ssh.py": "c9cfe6811df99bf298c53422aee70b5c908a8d233ccefaaca3fb0a3855777c80",
   ".github/workflows/embedded-ssh-native.yml": "40030e017551c704653336dace4ea8943600254f4658ea3be6938abb0a2baaef",
@@ -400,5 +400,7 @@
   "src/session_web_update.c": "4c6e2723cdd98981713c754076d62d1d26c2f690074a707c6216b044cd22395e",
   "src/session_web_view.c": "d0cee803c39dd29c6c8a2b690330f29de228eac4eadd8fc557f0660d9883cc8d",
   "tests/test_web_connector.py": "6eaf041984583da7a15d79edba0a606e95b4e038471846832a14eb0ba38a1975",
-  "tests/test_web_http.py": "42c235d9efa33a041a69131a0012bfe79fe0e73380be3dff1f43dade83c76c2f"
+  "tests/test_web_http.py": "42c235d9efa33a041a69131a0012bfe79fe0e73380be3dff1f43dade83c76c2f",
+  "ci/solaris_package.py": "d9d1b10c7631758d0cb76725c5a86b242f753f46094ec3d9b0128369cd69dbcc",
+  ".github/workflows/solaris-package.yml": "d69c66ac69829023039177bdcfc0e5f92158a9518d3148b14caddd5be99d4d66"
 }
