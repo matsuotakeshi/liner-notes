@@ -355,6 +355,7 @@ test-stage72: test-doors test-web
 # The optional link tests need link-requirements.txt; web tests need aiohttp.
 .PHONY: test-stage73
 test-stage73: all
+	$(PYTHON) tests/test_db_backup_inventory.py
 	$(PYTHON) tests/test_stage73_database.py ./runtime
 	$(PYTHON) tests/test_serial_connector.py ./runtime
 	$(PYTHON) tests/test_web_reports.py

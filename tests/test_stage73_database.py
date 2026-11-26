@@ -54,6 +54,8 @@ def run_version(binary,version):
   with closing(sqlite3.connect(db)) as original:
    saved=original.execute('SELECT user,profile FROM ui_preferences ORDER BY user').fetchall()
    assert saved==[(1,'rtbbs')],('source UI preference',version,saved)
+  companion='liner.sqlite-operator-notes'
+  (source/companion).write_bytes(b'operator notes\x00\xff')
   before=hashlib.sha256(db.read_bytes()).digest()
   copy=p/'structured'
   # A service account may own its data directory while /var/db is read-only.
@@ -65,6 +67,7 @@ def run_version(binary,version):
   admin('db-structure','--root',source,'--database',db,'--board','notes','--members','members',copy,success=False)
   for round in range(2):
    current=copy if round==0 else p/'restored'
+   assert (current/companion).read_bytes()==(source/companion).read_bytes()
    with closing(sqlite3.connect(current/'liner.sqlite')) as d:
     assert d.execute('SELECT version FROM storage_meta').fetchone()==(5,)
     assert d.execute('SELECT count(*) FROM article_records').fetchone()[0]==2
