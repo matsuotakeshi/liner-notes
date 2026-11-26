@@ -7,8 +7,13 @@ import sys
 import tempfile
 
 from test_board import Server
+from test_members import auth
 from test_mmm_ui import GATE, MAIN, NOTES, OPEN, PASSWORD, key, post
+from test_runtime import Client as Raw
 from test_telnet import Client, disconnected
+
+
+SECRET = "MASH-demo-password"
 
 
 def select_notes_ui(client, name):
@@ -25,23 +30,32 @@ def run(binary):
         catalog = root / "catalog"
         catalog.write_text("1|0|all|member|Public\n2|1|g1|g1|Private title\n"
                            "3|0|all|member|Topics\n", encoding="utf-8")
+        runtime = str(Path(binary).resolve())
+        notes, members = root / "notes", root / "members"
+        storage = ["--database-structured", str(root / "data.db")]
+        # Start without an administrator list and register Alice first (ID 1).
+        with closing(Server(runtime, notes, members=members, catalog=catalog, options=storage)) as seed:
+            for name in ("alice", "bob"):
+                with closing(Raw(seed.port)) as client:
+                    auth(client, name, create=True, password=SECRET)
+
         admins = root / "admins"
         admins.write_text("1\n", encoding="ascii")
         server = stack.enter_context(closing(Server(
-            str(Path(binary).resolve()), root / "notes", members=root / "members",
-            admins=admins, catalog=catalog, telnet=True, menu=True, language="en",
-            options=["--database-structured", str(root / "data.db"), "--ui-default", "mash",
-                     "--ui-allow", "rtbbs,mmm,mash", "--ui-policy", "MEMBERS"],
+            runtime, notes, members=members, admins=admins, catalog=catalog,
+            telnet=True, menu=True, language="en",
+            options=storage + ["--ui-default", "mash", "--ui-allow", "rtbbs,mmm,mash",
+                               "--ui-policy", "MEMBERS"],
         )))
 
-        def connect(name, register=True):
+        def connect(name):
             client = stack.enter_context(closing(Client(server.port)))
             greeting = client.until(GATE)
             connection = re.search(rb"RTBBS-PROBE (\d+)", greeting)[1]
             assert b"Login required" in client.cmd("bbs", GATE)
             assert b"unavailable" in client.cmd("ui mmm", GATE)
-            client.cmd(("register " if register else "login ") + name, PASSWORD)
-            assert b"MASH | 1 Mail" in client.cmd("MASH-demo-password", MAIN)
+            client.cmd("login " + name, PASSWORD)
+            assert b"MASH | 1 Mail" in client.cmd(SECRET, MAIN)
             return client, connection
 
         mash, _ = connect("alice")
@@ -127,7 +141,7 @@ def run(binary):
         assert b"Sequencer: 0 (session)" in mash.cmd("sets reset", MAIN)
         mash.send(b"bye\r\n")
         disconnected(mash)
-        again, _ = connect("alice", register=False)
+        again, _ = connect("alice")
         assert b"MASH original" not in again.cmd("pfile -t", MAIN)
         print("PASS: MASH numbering, command usage, ACL, telegram, news, PLINK, shared MMM state and UI isolation")
 
