@@ -340,6 +340,7 @@ test-web: runtime vaultctl
 	$(PYTHON) tests/test_web_connector.py ./runtime
 	$(PYTHON) tests/test_web_blocks.py ./runtime ./vaultctl
 	$(PYTHON) tests/test_web_http.py ./runtime ./vaultctl
+	$(PYTHON) tests/test_web_conference.py ./runtime
 	$(PYTHON) tests/test_web_transfers.py ./runtime ./vaultctl
 	$(PYTHON) tests/test_web_install.py
 	$(PYTHON) tests/test_web_errors.py

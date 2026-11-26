@@ -7,11 +7,11 @@ let selectedFileBoard='-';
 let currentArticle = null, currentMessage = null, draftDirty = false;
 const notices = [], chatHistory = [];
 const words = {
-  home:['ホーム','Home'], board:['掲示板','Boards'], mail:['メール','Mail'], files:['ファイル保管庫','Files'], chat:['チャット・トーク','Chat & talk'], gather:['Gather伝言板','Gather'], people:['会員・プロフィール','Members'], settings:['個人設定','Settings'], admin:['管理','Administration'], games:['ゲーム','Games'], terminal:['端末','Terminal'], help:['ヘルプ','Help'], workspace:['ワークスペース','WORKSPACE'], theme:['表示テーマ','Appearance'], write:['投稿する','Write a note'], notifications:['お知らせ','Notifications'], guest:['ゲスト','Guest'], online:['接続中','Connected'], offline:['未接続','Disconnected'], login:['ログイン','Sign in'], logout:['ログアウト','Sign out'], register:['会員登録','Register'], cancel:['キャンセル','Cancel'], execute:['実行する','Apply'], confirm:['内容を確認して実行','Confirm and apply'], empty:['表示する項目はありません。','There is nothing to show yet.'], load:['読み込み中…','Loading…'], more:['続きを表示','Show more'], reply:['返信する','Reply'], title:['題名','Subject'], body:['本文','Body'], send:['投稿・送信','Publish / send'], draft:['下書きに保存','Save draft'], recipient:['宛先のログイン名','Recipient login'], search:['検索','Search'], result:['操作結果','Result'], refresh:['更新','Refresh'], operations:['その他の操作','More actions'], browse:['掲示板をひらく','Explore boards'], recent:['会話のある場所','Places to connect'], news:['システムからのお知らせ','From the system'], welcome:['おかえりなさい','Welcome back'], boardSub:['ひとつのことばから、会話が枝分かれしていく。','A note becomes a thread. A thread becomes a conversation.'], mailSub:['あなたと相手だけの、静かなやりとり。','A private conversation, just between you and the recipient.'], filesSub:['共有ファイルを探す、届ける、受け取る。','Find, share and collect community files.'], settingsSub:['いつもの使い方を、あなたに合わせて。','Make this space work your way.'], unknown:['完了を確認できません。結果を確認してから再操作してください。','Completion was not confirmed. Check the result before trying again.'], leave:['現在の入力を完了または中止してから移動してください。','Finish or cancel the current dialogue before navigating.'], connection:['接続する','Connect'], save:['保存','Save'], close:['閉じる','Close'], count:['件','items'], upload:['登録する','Upload'], download:['ダウンロード','Download'], description:['説明','Description'], selection:['選択したファイルを取得','Download selected'], contact:['管理者へ連絡','Contact SYSOP'], viewProfile:['投稿者のプロフィール','Author profile'], markRead:['既読にする','Mark read'], tools:['操作を選ぶ','Choose an action'], input:['入力を続ける','Continue dialogue'], preview:['プレビュー','Preview'], back:['一覧へ戻る','Back to list'], fileBoard:['登録先ボード（ルートは -）','Destination board (- for root)'], attachments:['添付ファイル','Attachments'], loginName:['ログイン名','Login name'], password:['パスワード','Password'], attachmentHint:['ここで選んだファイルを送信・下書き保存時にアップロードします。最大16ファイル。','Selected files are uploaded when sending or saving a draft. Up to 16 files.'], plainTextHint:['本文はプレーンテキストで保存します。','The body is saved as plain text.'], uploadFiles:['ファイルを登録する','Upload files'], uploadHint:['一度に16ファイルまで。各1GiB。登録先と説明を確認してください。','Up to 16 files, 1 GiB each. Check the destination and description.']
+  home:['ホーム','Home'], board:['掲示板','Boards'], mail:['メール','Mail'], files:['ファイル保管庫','Files'], chat:['チャット・トーク','Chat & talk'], gather:['Gather伝言板','Gather'], conference:['一行会議','Line conference'], people:['会員・プロフィール','Members'], settings:['個人設定','Settings'], admin:['管理','Administration'], games:['ゲーム','Games'], terminal:['端末','Terminal'], help:['ヘルプ','Help'], workspace:['ワークスペース','WORKSPACE'], theme:['表示テーマ','Appearance'], write:['投稿する','Write a note'], notifications:['お知らせ','Notifications'], guest:['ゲスト','Guest'], online:['接続中','Connected'], offline:['未接続','Disconnected'], login:['ログイン','Sign in'], logout:['ログアウト','Sign out'], register:['会員登録','Register'], cancel:['キャンセル','Cancel'], execute:['実行する','Apply'], confirm:['内容を確認して実行','Confirm and apply'], empty:['表示する項目はありません。','There is nothing to show yet.'], load:['読み込み中…','Loading…'], more:['続きを表示','Show more'], reply:['返信する','Reply'], title:['題名','Subject'], body:['本文','Body'], send:['投稿・送信','Publish / send'], draft:['下書きに保存','Save draft'], recipient:['宛先のログイン名','Recipient login'], search:['検索','Search'], result:['操作結果','Result'], refresh:['更新','Refresh'], operations:['その他の操作','More actions'], browse:['掲示板をひらく','Explore boards'], recent:['会話のある場所','Places to connect'], news:['システムからのお知らせ','From the system'], welcome:['おかえりなさい','Welcome back'], boardSub:['ひとつのことばから、会話が枝分かれしていく。','A note becomes a thread. A thread becomes a conversation.'], mailSub:['あなたと相手だけの、静かなやりとり。','A private conversation, just between you and the recipient.'], filesSub:['共有ファイルを探す、届ける、受け取る。','Find, share and collect community files.'], settingsSub:['いつもの使い方を、あなたに合わせて。','Make this space work your way.'], unknown:['完了を確認できません。結果を確認してから再操作してください。','Completion was not confirmed. Check the result before trying again.'], leave:['現在の入力を完了または中止してから移動してください。','Finish or cancel the current dialogue before navigating.'], connection:['接続する','Connect'], save:['保存','Save'], close:['閉じる','Close'], count:['件','items'], upload:['登録する','Upload'], download:['ダウンロード','Download'], description:['説明','Description'], selection:['選択したファイルを取得','Download selected'], contact:['管理者へ連絡','Contact SYSOP'], viewProfile:['投稿者のプロフィール','Author profile'], markRead:['既読にする','Mark read'], tools:['操作を選ぶ','Choose an action'], input:['入力を続ける','Continue dialogue'], preview:['プレビュー','Preview'], back:['一覧へ戻る','Back to list'], fileBoard:['登録先ボード（ルートは -）','Destination board (- for root)'], attachments:['添付ファイル','Attachments'], loginName:['ログイン名','Login name'], password:['パスワード','Password'], attachmentHint:['ここで選んだファイルを送信・下書き保存時にアップロードします。最大16ファイル。','Selected files are uploaded when sending or saving a draft. Up to 16 files.'], plainTextHint:['本文はプレーンテキストで保存します。','The body is saved as plain text.'], uploadFiles:['ファイルを登録する','Upload files'], uploadHint:['一度に16ファイルまで。各1GiB。登録先と説明を確認してください。','Up to 16 files, 1 GiB each. Check the destination and description.']
 };
 const t = key => words[key]?.[lang === 'en' ? 1 : 0] || key;
 const label = text => {if(/^[A-Z0-9_-]+(?: \/ [A-Z0-9_-]+)+$/.test(text))return text;const parts=text.split(' / ');return lang==='en' && parts.length>1?parts.slice(1).join(' / '):parts[0];};
-const icons={home:'⌂',board:'▤',mail:'✉',files:'▱',chat:'◌',gather:'▥',people:'♧',settings:'⚙',admin:'◇',games:'♧',terminal:'›_',help:'?'};
+const icons={home:'⌂',board:'▤',mail:'✉',files:'▱',chat:'◌',gather:'▥',conference:'≡',people:'♧',settings:'⚙',admin:'◇',games:'♧',terminal:'›_',help:'?'};
 function el(tag,attrs={},...children){const e=document.createElement(tag);for(const [k,v] of Object.entries(attrs)){if(k.startsWith('on'))e.addEventListener(k.slice(2).toLowerCase(),v);else if(k==='class')e.className=v;else if(k==='text')e.textContent=v;else if(k==='checked')e.checked=!!v;else if(v!==null && v!==undefined)e.setAttribute(k,String(v));}for(const c of children.flat())if(c!==null&&c!==undefined)e.append(c instanceof Node?c:document.createTextNode(String(c)));return e;}
 function button(text,handler,kind='secondary-button'){return el('button',{class:kind,type:'button',onClick:handler},text);}
 function toast(text,error=false){const node=el('div',{class:'toast'+(error?' error':'')},text);$('#toasts').append(node);setTimeout(()=>node.remove(),error?11000:5000);}
@@ -25,7 +25,7 @@ function main(...children){$('#main').replaceChildren(...children.flat().filter(
 function translate(){document.documentElement.lang=lang;document.querySelectorAll('[data-i18n]').forEach(e=>e.textContent=t(e.dataset.i18n));}
 function clearPrivateView(){notices.length=0;chatHistory.length=0;boards=[];notes=[];mail=[];files=[];currentArticle=null;currentMessage=null;selectedBoard=1;selectedTitle='';$('#notice-count').textContent='0';$('#notices').replaceChildren();$('#notice-drawer').hidden=true;}
 function setStatus(){const user=state.user;$('#account-name').textContent=user?state.username:t('guest');$('#avatar').textContent=user?state.username[0].toUpperCase():'G';$('#account-detail').textContent=connected?(user?(state.admin?'SYSOP':(state.sigop||state.vault_sigop)?'SIGOP':'MEMBER')+' · #'+user:t('online')):t('offline');$('#status').textContent=connected?t('online'):t('offline');$('#connection-dot').classList.toggle('online',connected);$('#login-button').hidden=!!user;$('#new-post').textContent=lang==='ja'?'投稿先を選ぶ':'Choose board & post';breadcrumbs();}
-function nav(){const root=$('#navigation');root.replaceChildren();for(const key of ['home','board','mail','files','chat','gather','people','settings','games','terminal','help','admin']){if(key==='games'&&!state.games?.length)continue;if(key==='admin'&&!state.admin&&!state.sigop&&!state.vault_sigop)continue;if(['mail','chat','files'].includes(key)&&state.features?.[key==='files'?'vault':key]===0)continue;root.append(button('',()=>navigate(key),'nav-item'+(view===key?' active':'')).appendChild(el('span',{},icons[key])).parentNode);const last=root.lastChild;last.append(el('span',{},t(key)+(!state.user&&['mail','files','chat','gather','settings'].includes(key)?' 🔒':'')));if(!state.user&&['mail','files','chat','gather','settings'].includes(key))last.title=lang==='ja'?'ログインが必要です':'Sign-in required';last.setAttribute('aria-current',view===key?'page':'false');}setStatus();}
+function nav(){const root=$('#navigation');root.replaceChildren();for(const key of ['home','board','mail','files','chat','gather','conference','people','settings','games','terminal','help','admin']){if(key==='conference'&&state.core_conference!==1)continue;if(key==='games'&&!state.games?.length)continue;if(key==='admin'&&!state.admin&&!state.sigop&&!state.vault_sigop)continue;if(['mail','chat','files'].includes(key)&&state.features?.[key==='files'?'vault':key]===0)continue;root.append(button('',()=>navigate(key),'nav-item'+(view===key?' active':'')).appendChild(el('span',{},icons[key])).parentNode);const last=root.lastChild;last.append(el('span',{},t(key)+(!state.user&&['mail','files','chat','gather','conference','settings'].includes(key)?' 🔒':'')));if(!state.user&&['mail','files','chat','gather','conference','settings'].includes(key))last.title=lang==='ja'?'ログインが必要です':'Sign-in required';last.setAttribute('aria-current',view===key?'page':'false');}setStatus();}
 async function api(path,data,options={}){busy++;try{const headers={...options.headers};if(data!==undefined){headers['Content-Type']='application/json';if(csrf)headers['X-CSRF-Token']=csrf;}const r=await fetch('api/'+path,{method:data===undefined?'GET':'POST',credentials:'same-origin',headers,body:data===undefined?undefined:JSON.stringify(data),...options});const type=r.headers.get('Content-Type')||'';const result=type.includes('json')?await r.json():{error:await r.text()};if(!r.ok)throw new Error(result.error||r.statusText);if(result.csrf)csrf=result.csrf;if(result.state){if(state.user!==result.state.user)clearPrivateView();state=result.state;actions=result.actions||actions;connected=true;nav();}return result;}catch(error){toast(error.message,true);throw error;}finally{busy--;}}
 async function handleResult(r,{show=true}={}){if(currentArticle&&/^(?:HIDDEN |WITHDRAWN |WITHDRAW SAVED )/m.test(r.text||'')){currentArticle=null;main(heading('board',selectedTitle,[button('← '+t('back'),()=>boardPage())]));}if((r.mutation?.ok===false||r.text&&/^(ERR |MAIL ERROR|CHAT ERROR)/m.test(r.text))&&!r.data?.article&&!r.data?.message)toast(r.text.trim(),true);if(show&&r.text){const prior=$('#main > .result');if(prior)prior.remove();($('#chat-results')||$('#main')).append(collectionResult(r)||messageResult(r.text,r.data?.report));}dialogue(r.text);return r;}
 function showDialog(title,content){$('#dialog-title').textContent=title;$('#dialog-body').replaceChildren(content);if(!$('#dialog').open)$('#dialog').showModal();}
@@ -39,7 +39,7 @@ function authDialog(register=false){
 
 async function connect(){try{let r;const res=await fetch('api/session');if(res.ok){r=await res.json();state=r.state;csrf=r.csrf;actions=r.actions;connected=true;}else r=await api('session',{});nav();listen();await navigate('home',true);}catch{connected=false;nav();main(heading('home'),empty(lang==='ja'?'BBSへ接続できません。サーバーが対応版か確認してください。':'Unable to connect. Check the BBS connector version.'),button(t('connection'),connect));}}
 function listen(){socket?.close();const url=new URL('api/events',location.href);url.protocol=location.protocol==='https:'?'wss:':'ws:';const token=csrf;socket=new WebSocket(url,['liner-notes-v1','csrf.'+csrf]);socket.onmessage=e=>{if(csrf!==token)return;const event=JSON.parse(e.data);if(event.closed){connected=false;setStatus();toast(t('offline'));return;}if(event.text){notices.push({at:new Date(),text:event.text});if(notices.length>100)notices.shift();$('#notice-count').textContent=notices.length;if(view==='chat')appendChat(event.text);if(view==='terminal')$('#terminal-output')?.append(document.createTextNode(event.text));}};socket.onerror=()=>{ /* HTTP actions remain available; status is checked on next request. */ };}
-async function navigate(key,force=false){if(!state.user&&['mail','files','chat','gather','settings','games'].includes(key)){loginRequired(t(key));return;}if(!force&&(state.editing||state.secret||state.input||state.confirmation||state.gather)){toast(t('leave'),true);return;}if(!force&&state.chat&&key!=='chat'){if(!confirm(lang==='ja'?'チャットを退出して移動しますか？':'Leave chat and continue?'))return;await api('input',{line:'/LEAVE'});}if(view==='terminal')closeTerminal();view=key;document.body.classList.remove('menu-open');nav();main(heading(key),el('div',{class:'loading'},t('load')));try{if(key==='home')await home();else if(key==='board')await boardPage();else if(key==='mail')await mailPage();else if(key==='files')await filesPage();else if(key==='chat')chatPage();else if(key==='gather')await gatherPage();else if(key==='terminal')terminalPage();else if(key==='games'){actionPage('games');$('#main').append(button(lang==='ja'?'ゲーム用端末を開く':'Open game terminal',()=>navigate('terminal'),'primary-button'));}else if(key==='help')helpPage();else if(key==='settings'){actionPage(key);await execute('settings.prefs');}else actionPage(key);}catch(error){main(heading(key),empty(error.message),button(t('refresh'),()=>navigate(key,true)));}setStatus();}
+async function navigate(key,force=false){if(!state.user&&['mail','files','chat','gather','conference','settings','games'].includes(key)){loginRequired(t(key));return;}if(!force&&(state.editing||state.secret||state.input||state.confirmation||state.gather)){toast(t('leave'),true);return;}if(!force&&state.chat&&key!=='chat'){if(!confirm(lang==='ja'?'チャットを退出して移動しますか？':'Leave chat and continue?'))return;await api('input',{line:'/LEAVE'});}if(view==='terminal')closeTerminal();view=key;document.body.classList.remove('menu-open');nav();main(heading(key),el('div',{class:'loading'},t('load')));try{if(key==='home')await home();else if(key==='board')await boardPage();else if(key==='mail')await mailPage();else if(key==='files')await filesPage();else if(key==='chat')chatPage();else if(key==='gather')await gatherPage();else if(key==='conference')await conferencePage();else if(key==='terminal')terminalPage();else if(key==='games'){actionPage('games');$('#main').append(button(lang==='ja'?'ゲーム用端末を開く':'Open game terminal',()=>navigate('terminal'),'primary-button'));}else if(key==='help')helpPage();else if(key==='settings'){actionPage(key);await execute('settings.prefs');}else actionPage(key);}catch(error){main(heading(key),empty(error.message),button(t('refresh'),()=>navigate(key,true)));}setStatus();}
 function boardList(items,handler){return el('div',{class:'list'},items.length?items.map(b=>el('button',{class:'list-item'+(+b.id===selectedBoard?' active':''),onClick:()=>handler(b)},el('span',{class:'board-symbol'},'#'),el('span',{class:'item-copy'},el('strong',{},b.title),el('small',{},'#'+b.id+' · '+(b.write==='yes'?(lang==='ja'?'投稿できます':'Posting allowed'):(lang==='ja'?'閲覧':'Read only')))),+b.unread?el('span',{class:'badge'},b.unread):el('span',{class:'muted'},'›'))):empty());}
 async function loadBoards(){let cursor=1,r;const collected=new Map(),seen=new Set();do{r=await api('query',{kind:'boards',cursor});for(const b of r.data.boards)collected.set(+b.id,b);seen.add(cursor);cursor=r.data.next;}while(cursor&&!seen.has(cursor)&&collected.size<1024);boards=[...collected.values()];return r;}
 
@@ -141,6 +141,99 @@ function helpPage(){main(heading('help'),card(el('div',{class:'card-pad'},el('h2
 $('.brand').onclick=e=>{e.preventDefault();navigate('home');};
 $('#account-button').onclick=async()=>{if(!connected)return connect();if(!state.user)return authDialog();if(confirm(t('logout')+'?')){await api('logout',{});closeTerminal();socket?.close();clearPrivateView();toast(messages.goodbye||t('logout'));state={};csrf='';connected=false;await connect();}};
 $('#login-button').onclick=()=>authDialog();$('#new-post').onclick=()=>composeDialog({selectBoard:true});$('#menu-toggle').onclick=()=>document.body.classList.toggle('menu-open');$('#help-footer').onclick=()=>navigate('help');$('#language').onclick=async()=>{lang=lang==='ja'?'en':'ja';localStorage.setItem('ln-web-language',lang);translate();messages=await api('messages?lang='+lang);await navigate(view,true);};$('#theme').onclick=()=>{const theme=document.documentElement.dataset.theme==='dark'?'light':'dark';document.documentElement.dataset.theme=theme;localStorage.setItem('ln-web-theme',theme);};$('#notification-button').onclick=()=>{$('#notice-drawer').hidden=false;$('#notices').replaceChildren(...notices.map(n=>el('div',{class:'notice-item'},el('small',{},n.at.toLocaleTimeString()),el('p',{},n.text))));};$('#close-notices').onclick=()=>$('#notice-drawer').hidden=true;window.addEventListener('beforeunload',e=>{if(draftDirty){e.preventDefault();e.returnValue='';}});document.documentElement.dataset.theme=localStorage.getItem('ln-web-theme')||'light';translate();connect();
+
+async function conferencePage() {
+  const actor = state.user;
+  const withinPage = () => view === 'conference' && state.user === actor;
+  const tr = (ja,en) => lang === 'ja' ? ja : en;
+  async function read(action, values={}) {
+    const result = await api('conference',{action,...values});
+    if (!result.data.conference) throw new Error(result.text.trim() || t('empty'));
+    return result.data.conference;
+  }
+  async function change(action, values) {
+    const result = await api('conference',{action,...values});
+    if (!result.mutation?.ok) {
+      toast(result.text.trim() || t('unknown'),true);
+      return false;
+    }
+    return true;
+  }
+  const roomSelector = el('select',{'aria-label':tr('会議室','Conference room')});
+  const rows = el('div',{class:'card-pad'});
+  let roomCursor = 0, unread = false, loading = false;
+  async function rooms() {
+    const page = await read('rooms',{cursor:roomCursor});
+    if (!withinPage()) return;
+    for (const room of page.rooms) roomSelector.append(el('option',{value:room.id},room.title));
+    roomCursor = page.next;
+    moreRooms.hidden = !roomCursor;
+  }
+  const moreRooms = button(tr('会議室をさらに表示','More rooms'),async () => {
+    moreRooms.disabled = true;
+    try { await rooms(); } finally { moreRooms.disabled = false; }
+  });
+  await rooms();
+  if (!withinPage()) return;
+  const tabs = el('div',{class:'button-row'},roomSelector,moreRooms,
+    button(tr('履歴','History'),() => load(false)),
+    button(tr('未読','Unread'),() => load(true)));
+
+  function mutationForm(fields, label, action, values, completed) {
+    const form = el('form',{},...fields,el('button',{type:'submit',class:'primary-button'},label));
+    form.onsubmit = async event => {
+      event.preventDefault();
+      const submit = form.querySelector('button');
+      submit.disabled = true;
+      try {
+        if (await change(action,values(form)) && withinPage()) {
+          form.reset();
+          await completed();
+        }
+      } finally { submit.disabled = false; }
+    };
+    return form;
+  }
+  const post = mutationForm([
+    el('label',{},tr('発言（512バイトまで）','Message (up to 512 bytes)'),
+      el('input',{name:'body',required:true,autocomplete:'off'}))
+  ], t('send'), 'post', form => ({room:Number(roomSelector.value),body:form.elements.body.value}),
+  () => { toast(tr('発言を保存しました。','Message saved.')); return load(unread); });
+  const manage = state.admin ? mutationForm([
+    el('label',{},tr('会議室番号','Room number'),el('input',{name:'room',type:'number',min:1,max:1500,required:true})),
+    el('label',{},t('title'),el('input',{name:'title',required:true}))
+  ], tr('会議室を追加','Create room'), 'create',
+  form => ({room:Number(form.elements.room.value),body:form.elements.title.value}), conferencePage) : null;
+
+  async function load(mode,cursor=0) {
+    if (loading) return;
+    loading = true;
+    tabs.querySelectorAll('button,select').forEach(item => item.disabled = true);
+    const room = Number(roomSelector.value);
+    unread = mode;
+    try {
+      const page = await read(mode?'unread':'history',{room,cursor});
+      if (!withinPage()) return;
+      const lines = page.lines.map(line => el('article',{class:'article'},
+        el('div',{class:'article-meta'},line.name+' · '+line.time),
+        el('div',{class:'article-body'},line.text)));
+      const controls = [];
+      if (mode && page.through) controls.push(button(tr('ここまで既読にする','Mark read through here'),async () => {
+        if (await change('seen',{room,cursor:page.through}) && withinPage()) await load(true);
+      }));
+      if (page.next) controls.push(button(t('more'),() => load(mode,page.next)));
+      rows.replaceChildren(...(lines.length?lines:[empty()]),el('div',{class:'button-row'},controls));
+    } finally {
+      loading = false;
+      tabs.querySelectorAll('button,select').forEach(item => item.disabled = false);
+    }
+  }
+  roomSelector.onchange = () => load(unread);
+  main(heading('conference',tr('投稿・履歴・未読を端末版と共有します。','Messages, history and unread positions are shared with terminal users.')),
+    card(el('div',{class:'card-pad'},tabs)),card(rows),card(el('div',{class:'card-pad'},post)),
+    manage?card(el('div',{class:'card-pad'},manage)):null);
+  if (roomSelector.value) await load(false);
+}
 
 async function gatherPage(){if(!state.user){actionPage('gather');return;}const r=await api('gather',{});const form=el('form',{},el('label',{},lang==='ja'?'伝言（1行70文字・10行まで）':'Message (70 characters × 10 lines)',el('textarea',{name:'body',rows:5})),el('button',{type:'submit',class:'primary-button'},t('send')));form.onsubmit=async e=>{e.preventDefault();const submit=form.querySelector('button');submit.disabled=true;try{const result=await api('gather',{body:form.elements.body.value});if(result.mutation?.ok??result.text.includes('GATHER SAVED')){toast(lang==='ja'?'伝言を保存しました。':'Message saved.');await gatherPage();}else await handleResult(result);}finally{submit.disabled=false;}};const retained=r.text.replace(/^Gather world\r\n/,'').replace(/GATHER END NEXT \d+\r\n$/,'').trim();main(heading('gather'),card(el('div',{class:'card-pad'},retained?el('pre',{class:'article-body'},retained):empty())),card(el('div',{class:'card-pad'},form)));dialogue(r.text);}
 

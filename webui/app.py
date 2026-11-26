@@ -250,6 +250,32 @@ def create_app(config):
             raise BridgeError('Use the Web transfer controls or the terminal for this command')
         return response(session,await session.bridge.command(line))
 
+    async def conference(request):
+        session = current(request, mutate=True)
+        payload = await object_body(request)
+        action = payload.get('action')
+        room, cursor = payload.get('room', 0), payload.get('cursor', 0)
+        if (type(room) is not int or not 0 <= room <= 1500
+                or type(cursor) is not int or not 0 <= cursor <= 2147483646):
+            raise ValueError('Invalid conference room or position')
+        async with session.bridge.lock:
+            state = session.bridge.state
+            if not state.get('user'):
+                raise web.HTTPForbidden(text='Sign in to use line conference')
+            if state.get('core_conference') != 1:
+                raise BridgeError('This BBS backend does not support the Web line conference')
+            if action in ('rooms', 'history', 'unread', 'position'):
+                return response(session, await session.bridge.view('conf_'+action, room, cursor))
+            if action not in ('post', 'seen', 'create'):
+                raise ValueError('Invalid conference action')
+            body = payload.get('body', '')
+            maximum = 80 if action == 'create' else 512
+            if (not isinstance(body, str) or len(body.encode()) > maximum
+                    or any(ord(c) < 32 or 127 <= ord(c) <= 159 for c in body)):
+                raise ValueError('Invalid conference text')
+            return response(session, await session.bridge.update('conference.'+action,
+                                 id=room, arg=cursor, body=body))
+
     async def chat_send(request):
         session=current(request,mutate=True);payload=await object_body(request)
         body=payload.get('body')
@@ -577,7 +603,7 @@ def create_app(config):
     app.cleanup_ctx.append(lifetime)
     app.router.add_get(base,index)
     app.router.add_get(base+'assets/{name}',asset)
-    for path,handler in [('session',new_session),('logout',logout),('auth',authenticate),('action',operate),('query',query),('input',input_line),('compose',compose),('gather',gather),('chat',chat_send),('upload',upload),('download',download)]:app.router.add_post(base+'api/'+path,handler)
+    for path,handler in [('session',new_session),('logout',logout),('auth',authenticate),('action',operate),('query',query),('input',input_line),('compose',compose),('gather',gather),('conference',conference),('chat',chat_send),('upload',upload),('download',download)]:app.router.add_post(base+'api/'+path,handler)
     app.router.add_get(base+'api/session',session_info)
     app.router.add_get(base+'api/link',link_control)
     app.router.add_post(base+'api/link',link_control)

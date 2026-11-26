@@ -62,6 +62,28 @@ static void stamp_text(ViewOutput *out,uint64_t stamp) {
     string(out,formatted);
 }
 
+static void render_conference(ViewOutput *out,const ConferenceReply *page) {
+    append(out,"\"conference\":{\"room\":%u,\"next\":%u,\"through\":%u,",page->room,page->next,page->position);
+    if(page->action==CONFERENCE_LIST) {
+        append(out,"\"rooms\":[");
+        for(unsigned i=0;i<page->count;i++) {
+            const ConferenceRoom *room=&page->rows.rooms[i];
+            append(out,"%s{\"id\":%u,\"title\":",i?",":"",room->id);
+            string(out,room->title);append(out,"}");
+        }
+    } else {
+        append(out,"\"lines\":[");
+        for(unsigned i=0;i<page->count;i++) {
+            const ConferenceLine *line=&page->rows.lines[i];
+            append(out,"%s{\"id\":%u,\"room\":%u,\"user\":%u,\"time\":",i?",":"",line->id,line->room,line->user);
+            stamp_text(out,line->time);
+            append(out,",\"name\":");string(out,line->name);
+            append(out,",\"text\":");string(out,line->text);append(out,"}");
+        }
+    }
+    append(out,"]}");
+}
+
 static void render_page(ViewOutput *out,const OperationPage *page) {
     unsigned count=0;
     uint32_t next=0;
@@ -72,6 +94,7 @@ static void render_page(ViewOutput *out,const OperationPage *page) {
     case OPERATION_PAGE_TREE: key="tree";count=page->data.tree.count;next=page->data.tree.next;break;
     case OPERATION_PAGE_MAIL: key="mail";count=page->data.mail.count;next=page->data.mail.next;break;
     case OPERATION_PAGE_FILES: key="files";count=(unsigned)page->data.files.count;next=page->data.files.next;break;
+    case OPERATION_PAGE_CONFERENCE: render_conference(out,&page->data.conference);return;
     case OPERATION_PAGE_PROFILE: {
         const MemberProfile *p=&page->data.profile;
         append(out,"\"profile\":{\"id\":%u,\"login\":",p->user);string(out,p->name);
@@ -184,7 +207,14 @@ static int request(OperationRequest *q,const char *kind,uint32_t id,uint32_t cur
         if(strlen(path)>48 || strchr(path,'|') || !session_impl_safe_text(path))return 0;
         strcpy(q->title,path);
     } else if(*path)return 0;
-    else if(!strcmp(kind,"boards") || !strcmp(kind,"notes")) {
+    else if(!strncmp(kind,"conf_",5)) {
+        q->op=BOARD_CONFERENCE;q->conference.room=id;q->conference.cursor=cursor;
+        if(!strcmp(kind,"conf_rooms") && !id)q->conference.action=CONFERENCE_LIST;
+        else if(!strcmp(kind,"conf_history") && id)q->conference.action=CONFERENCE_HISTORY;
+        else if(!strcmp(kind,"conf_unread"))q->conference.action=CONFERENCE_UNREAD;
+        else if(!strcmp(kind,"conf_position") && id && !cursor)q->conference.action=CONFERENCE_POSITION;
+        else return 0;
+    } else if(!strcmp(kind,"boards") || !strcmp(kind,"notes")) {
         q->op=kind[0]=='b'?'b':'O';q->number=cursor?cursor:1;
     } else if(!strcmp(kind,"mail")) {
         q->op='m';q->action='L';q->number=MAIL_LIST_ALL;q->cursor=cursor;
@@ -231,7 +261,7 @@ void session_impl_web_view(Session *s,const char *payload) {
     if(id>CONTENT_ID_MAX || cursor>CONTENT_ID_MAX || !request(q,kind,(uint32_t)id,(uint32_t)cursor,path)) {
         free(q);reply(s,nonce,"ERR connector view syntax\r\n",empty);return;
     }
-    if(!s->core.board_enabled && q->op!='m') {
+    if(!s->core.board_enabled && q->op!='m' && q->op!=BOARD_CONFERENCE) {
         free(q);reply(s,nonce,"ERR no board\r\n",empty);return;
     }
     int structured=s->core.structured;
@@ -251,7 +281,9 @@ int session_impl_web_view_result(Session *s,const OperationResult *r,SessionResu
         if(r->mail_action=='L')
             mail_navigation_filter(&rtbbs(s)->mail_state.mail,MAIL_LIST_ALL,NULL,r->mail_next);
     }
-    reply(s,nonce,r->text,view);
+    const char *text=r->page.kind==OPERATION_PAGE_CONFERENCE?
+        session_impl_conference_error(r->page.data.conference.status):r->text;
+    reply(s,nonce,text,view);
     nonce[0]=0;
     return 1;
 }

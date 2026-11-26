@@ -84,7 +84,7 @@ static void snapshot(void) {
         .editing=1,.editor_kind=109,.secret=1,.password_mode=2,.mail=1,.mail_current=8,.chat=1,.talk=1,
         .pager=1,.gather=1,.input=6,.confirmation=7,.binary=1,.door=1,.members=1,
         .feature_mail=1,.feature_chat=0,.feature_vault=1};
-    const char *expected="CONNECTOR STATE 0123456789abcdef0123456789abcdef {\"version\":1,\"transfer_block\":65536,\"core_views\":1,\"core_updates\":1,\"input_limit\":4096,\"connection\":77,\"user\":2,\"username\":\"alice\",\"board\":3,\"article\":4,\"admin\":1,\"sigop\":1,\"level\":5,\"editing\":1,\"editor_kind\":109,\"secret\":1,\"password_mode\":2,\"mail\":1,\"mail_current\":8,\"chat\":1,\"talk\":1,\"pager\":1,\"gather\":1,\"input\":6,\"confirmation\":7,\"binary\":1,\"door\":1,\"members\":1,\"features\":{\"mail\":1,\"chat\":0,\"vault\":1}}\r\n";
+    const char *expected="CONNECTOR STATE 0123456789abcdef0123456789abcdef {\"version\":1,\"transfer_block\":65536,\"core_views\":1,\"core_updates\":1,\"core_conference\":1,\"input_limit\":4096,\"connection\":77,\"user\":2,\"username\":\"alice\",\"board\":3,\"article\":4,\"admin\":1,\"sigop\":1,\"level\":5,\"editing\":1,\"editor_kind\":109,\"secret\":1,\"password_mode\":2,\"mail\":1,\"mail_current\":8,\"chat\":1,\"talk\":1,\"pager\":1,\"gather\":1,\"input\":6,\"confirmation\":7,\"binary\":1,\"door\":1,\"members\":1,\"features\":{\"mail\":1,\"chat\":0,\"vault\":1}}\r\n";
     char out[2048];assert(connector_state_format(&q,nonce,out,sizeof(out)) && !strcmp(out,expected));
     size_t n=strlen(expected);
     assert(connector_state_format(&q,nonce,out,n+1));
