@@ -86,11 +86,15 @@ def build_arguments():
             "SQLITE_LIBS=" + " ".join(sqlite_libs)]
 
 
-def test():
+def configure_build():
+    """Use the same compiler for the runtime and test-side C helpers."""
     flags = build_arguments()
-    for assignment in flags[1:]:
-        key, value = assignment.split("=", 1)
-        os.environ[key] = value
+    os.environ.update(assignment.split("=", 1) for assignment in flags[1:])
+    return flags
+
+
+def test():
+    flags = configure_build()
     capabilities = {"build": "not-tested", "lock_lifetime": "not-tested",
                     "smf_manifest": "not-tested", "smf_lifecycle": "unverified: no SMF management authorization",
                     "core": "not-tested", "door": "not-tested",

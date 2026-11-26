@@ -9,7 +9,7 @@ import re
 import shutil
 import sys
 
-from solaris_ci import ROOT, build_arguments, run
+from solaris_ci import ROOT, configure_build, run
 
 PUBLISHER = "linernotes"
 NAME = "application/liner-notes"
@@ -61,7 +61,7 @@ def build():
     manifest = work / "liner-notes.p5m"
     archive = work / ARCHIVE
 
-    run(build_arguments() + ["-j2", "all"])
+    run(configure_build() + ["-j2", "all"])
     run([sys.executable, "scripts/install-solaris.py", "--destdir", str(stage), "--python", sys.executable])
     # Keep the live configuration tree completely outside package ownership.
     # IPS can salvage local files if it removes the directory containing them.

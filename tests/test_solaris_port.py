@@ -2,6 +2,7 @@
 """Hosted-only Solaris build/CI contracts. Does not contact a VM."""
 from pathlib import Path
 import importlib.util
+import os
 import shutil
 import subprocess
 import sys
@@ -21,6 +22,15 @@ spec.loader.exec_module(build_lrzsz)
 
 
 class SolarisContracts(unittest.TestCase):
+    def test_native_compiler_is_available_to_board_fault_helper(self):
+        flags = ["gmake", "CC=/usr/gcc/15/bin/gcc", "CPPFLAGS=-D__EXTENSIONS__=1"]
+        with patch.object(solaris_ci, "build_arguments", return_value=flags), \
+             patch.dict(os.environ, {"CC": "cc"}):
+            self.assertEqual(solaris_ci.configure_build(), flags)
+            # The board fault subprocess reads CC from the test environment.
+            self.assertEqual(os.environ["CC"], "/usr/gcc/15/bin/gcc")
+            self.assertEqual(os.environ["CPPFLAGS"], "-D__EXTENSIONS__=1")
+
     @unittest.skipUnless(shutil.which("cc") or shutil.which("gcc"), "host C preprocessor required")
     def test_door_lock_feature_namespaces(self):
         # Exercise the actual source preamble, not a duplicated macro model.
