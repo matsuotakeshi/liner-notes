@@ -7,6 +7,8 @@ import tempfile
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]))
 from webui.bridge import Bridge, BridgeError, response_data
 from test_board import Server
+from test_mmm_ui import MAIN, OPEN, NOTES, post
+from test_telnet import Client
 
 
 async def decode_typed_reply():
@@ -69,6 +71,23 @@ async def decode_typed_reply():
         raise AssertionError('Accepted a missing Core update result')
 
 
+def mash_post(port):
+    client = Client(port)
+    try:
+        client.until()
+        client.cmd("LOGIN bob", b"> ")
+        client.cmd("web-test-password", b"] > ")
+        client.cmd("UI mash", MAIN)
+        assert b"Web connector" in client.cmd("open -b1 #1", OPEN)
+        client.send(b"w")
+        client.until(b"Title> ")
+        post(client, b"MASH Web cross-reply", b"Terminal response read from Web Core", OPEN)
+        client.send(b"q")
+        client.until(NOTES)
+    finally:
+        client.close()
+
+
 async def exercise(port):
     a=await Bridge('127.0.0.1',port).open()
     b=await Bridge('127.0.0.1',port).open()
@@ -113,6 +132,11 @@ async def exercise(port):
         await asyncio.sleep(1.05)
         r=await b.command('PASSWD');assert r['state']['secret'],r
         r=await b.command('/CANCEL');assert not r['state']['secret'],r
+        await asyncio.to_thread(mash_post, port)
+        async with a.lock:
+            response=await a.view('read',2,0)
+        assert response['data']['article']['body']=='Terminal response read from Web Core\r\n',response
+        assert response['data']['article']['parent']==1,response
         print('PASS Web connector: real Telnet, password secrecy, member ACL, literal 4096-byte lines, article/mail bodies and chat synchronization')
     finally:await a.close();await b.close()
 
@@ -120,6 +144,7 @@ async def exercise(port):
 if __name__=='__main__':
     asyncio.run(decode_typed_reply())
     with tempfile.TemporaryDirectory(prefix='ln-web-test-') as tmp:
-        p=Path(tmp);server=Server(str(Path(sys.argv[1]).resolve()),p/'notes',members=p/'members',menu=True,telnet=True)
+        p=Path(tmp);server=Server(str(Path(sys.argv[1]).resolve()),p/'notes',members=p/'members',menu=True,telnet=True,
+                                     options=["--ui-policy","MEMBERS","--ui-allow","rtbbs,mash"])
         try:asyncio.run(exercise(server.port))
         finally:server.close()
