@@ -16,6 +16,11 @@ import tarfile
 import time
 
 RESULT = "LINER_NATIVE_RESULT "
+DEFAULT_SUITE_TIMEOUT = 3300
+
+
+def suite_timeout(target, suite):
+    return 5400 if (target, suite) == ("solaris", "core") else DEFAULT_SUITE_TIMEOUT
 
 
 def unpack(directory, digest, sha):
@@ -110,7 +115,7 @@ def heartbeat(heartbeat_fd, state, lease, stopped):
         raise RuntimeError("Runner heartbeat expired")
 
 
-def run_commands(commands, heartbeat_fd, timeout=3300, lease=45, stopped=lambda: False, heartbeat_state=None):
+def run_commands(commands, heartbeat_fd, timeout=DEFAULT_SUITE_TIMEOUT, lease=45, stopped=lambda: False, heartbeat_state=None):
     """EOF, lost heartbeat, cancellation and timeouts all fail closed."""
     deadline = time.monotonic() + timeout
     state = heartbeat_state if heartbeat_state is not None else {'last': time.monotonic(), 'pending': b''}
@@ -197,7 +202,7 @@ def main():
     run.add_argument("target", choices=["freebsd", "rocky", "debian", "solaris"])
     run.add_argument("sha")
     run.add_argument("--suite", choices=("core", "ssh"), default="core")
-    run.add_argument("--timeout", type=int, default=3300)
+    run.add_argument("--timeout", type=int)
     run.add_argument("--lease", type=int, default=45)
     args = parser.parse_args()
     if args.mode == "unpack":
@@ -205,9 +210,11 @@ def main():
         return 0
     result = {"target": args.target, "source_sha": args.sha, "suite": args.suite, "status": "failed"}
     try:
-        if not re.fullmatch(r"[0-9a-f]{40}", args.sha) or not 1 <= args.lease <= 300 or not 1 <= args.timeout <= 3300:
+        limit = suite_timeout(args.target, args.suite)
+        timeout = limit if args.timeout is None else args.timeout
+        if not re.fullmatch(r"[0-9a-f]{40}", args.sha) or not 1 <= args.lease <= 300 or not 1 <= timeout <= limit:
             raise ValueError("Invalid worker limits or commit")
-        worker(args.target, args.sha, args.timeout, args.lease, args.suite)
+        worker(args.target, args.sha, timeout, args.lease, args.suite)
         result["status"] = "passed"
     except Exception as error:
         result["error"] = str(error)

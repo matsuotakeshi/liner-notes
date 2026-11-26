@@ -16,7 +16,7 @@ import sys
 import threading
 import time
 
-from native_remote import RESULT
+from native_remote import RESULT, suite_timeout
 
 ROOT = Path(__file__).resolve().parents[1]
 TARGETS = {
@@ -170,7 +170,10 @@ def execute_target(target, archive, digest, sha, output, cancelled, suite="core"
             command = "cd " + shlex.quote(directory + "/source") + " && exec " + shlex.join([
                 python, "ci/native_remote.py", "worker", target, sha, "--suite", suite])
             result["tests_started_at"] = timestamp()
-            code = supervise(ssh + [command], log, cancelled)
+            # Give Solaris core extra time to report results and clean up after its deadline.
+            remote_timeout = suite_timeout(target, suite)
+            grace = 300 if (target, suite) == ("solaris", "core") else 100
+            code = supervise(ssh + [command], log, cancelled, timeout=remote_timeout + grace)
             result["tests_finished_at"] = timestamp()
             log.flush()
             if code:

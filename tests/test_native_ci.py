@@ -29,6 +29,27 @@ SHA = "a" * 40
 
 
 class PolicyTests(unittest.TestCase):
+    def test_only_solaris_core_receives_the_longer_worker_budget(self):
+        for target, suite, limit in (
+            ("solaris", "core", 5400),
+            ("solaris", "ssh", 3300),
+            ("freebsd", "core", 3300),
+            ("rocky", "core", 3300),
+            ("debian", "core", 3300),
+        ):
+            command = ["native_remote.py", "worker", target, SHA, "--suite", suite]
+            for options, expected in (([], limit), (["--timeout", "60"], 60),
+                                      (["--timeout", str(limit + 1)], None)):
+                with self.subTest(target=target, suite=suite, options=options), \
+                     patch.object(sys, "argv", command + options), \
+                     patch.object(native_remote, "worker") as worker, \
+                     patch("sys.stdout", new_callable=io.StringIO):
+                    self.assertEqual(native_remote.main(), int(expected is None))
+                    if expected is None:
+                        worker.assert_not_called()
+                    else:
+                        worker.assert_called_once_with(target, SHA, expected, 45, suite)
+
     def test_native_sets_bounded_io_waits(self):
         child = Mock()
         child.poll.return_value = 0
