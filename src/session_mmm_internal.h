@@ -7,7 +7,8 @@
 
 typedef enum {
     MAIN_SCREEN, NOTES_SCREEN, BOARD_SCREEN, INDEX_SCREEN, OPEN_SCREEN, MAIL_SCREEN,
-    FILER_SCREEN, CHAT_SCREEN, TERM_SCREEN, GAMES_SCREEN, NEW_SCREEN, MANAGE_SCREEN, TALK_SCREEN
+    FILER_SCREEN, CHAT_SCREEN, TERM_SCREEN, GAMES_SCREEN, NEW_SCREEN, MANAGE_SCREEN, TALK_SCREEN,
+    MASH_OTHERS_SCREEN
 } MmmScreen;
 typedef enum {
     INPUT_NONE, INPUT_LOGIN, INPUT_PASSWORD, INPUT_BOARD_PASSWORD, INPUT_TITLE,
@@ -40,6 +41,8 @@ typedef struct {
     unsigned depth;
     uint32_t board_target, lock, target, next, page_start, rows[8];
     unsigned row_count;
+    uint32_t note_parent;
+    int topics;
     uint32_t root, article, reply_number, browse_root, number_seen, search_next;
     int descending, unread, search_responses;
     char search[81], board_title[81];

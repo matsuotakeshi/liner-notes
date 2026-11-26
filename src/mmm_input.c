@@ -9,7 +9,7 @@ static const struct {
     {"login","login [id]",MMM_LOGIN,0},
     {"register","register id",MMM_REGISTER,0},
     {"off","off [-n]",MMM_OFF,0},
-    {"ui","ui [rtbbs|mmm|reset]",MMM_UI,0},
+    {"ui","ui [rtbbs|mmm|mash|reset]",MMM_UI,0},
     {"logout","logout",MMM_LOGOUT,1},
     {"notes","notes",MMM_NOTES,1},
     {"go","go board",MMM_GO,1},
@@ -36,6 +36,42 @@ static const struct {
 
 static int space(char ch) { return ch==' ' || ch=='\t'; }
 static char fold(char ch) { return ch>='A' && ch<='Z'?(char)(ch+'a'-'A'):ch; }
+
+MashInput mash_parse(const char *line) {
+    static const struct { const char *name, *usage; MashCommand command; } commands[]={
+        {"bbs","bbs",MASH_BBS}, {"setup","setup",MASH_SETUP},
+        {"pprof","pprof [ID]",MASH_PROFILES}, {"whoami","whoami",MASH_MY_PROFILE},
+        {"who","who",MASH_WHO}, {"w","who",MASH_WHO},
+        {"map","map",MASH_MAP}, {"manual","manual",MASH_MANUAL},
+        {"cmdlst","cmdlst",MASH_COMMANDS}, {"others","others",MASH_OTHERS},
+        {"readnews","readnews [-n]",MASH_NEWS},
+        {"sets","sets [YYYY-MM-DD|reset]",MASH_SEQUENCER}, {"bye","bye",MASH_BYE},
+        {"!","! CONNECTION TEXT",MASH_WIRE}, {"$","$ [TEXT]",MASH_SYSOP},
+        {"version","version",MASH_VERSION}, {"v","version",MASH_VERSION},
+        {"c","chat",MASH_CHAT}
+    };
+    while(space(*line))line++;
+    const char *end=line;
+    while(*end && !space(*end))end++;
+    const char *arg=end;
+    while(space(*arg))arg++;
+    for(unsigned i=0;i<sizeof(commands)/sizeof(*commands);i++) {
+        const char *name=commands[i].name;
+        if((size_t)(end-line)!=strlen(name))continue;
+        const char *p=line;
+        while(p!=end && fold(*p)==*name) { p++;name++; }
+        if(p==end)return (MashInput){commands[i].command,arg,commands[i].usage};
+    }
+    return (MashInput){0};
+}
+
+const char *mash_menu_command(int others,uint32_t n) {
+    static const char *const main[]={NULL,"mail","bbs","setup","pprof","filer",
+        "others","off","whoami","manual","map",NULL,"readnews -n","new -n","talk -n"};
+    static const char *const online[]={NULL,"who","chat","talk","games"};
+    if(others)return n<sizeof(online)/sizeof(*online)?online[n]:NULL;
+    return n<sizeof(main)/sizeof(*main)?main[n]:NULL;
+}
 
 static const char *number(const char *p, uint32_t *out) {
     uint32_t n=0;

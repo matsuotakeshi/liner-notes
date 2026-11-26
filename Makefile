@@ -704,11 +704,13 @@ check: test-conference-core test-conference
 runtime test-adapters: src/mmm_input.h
 test-mmm-ui: runtime
 	$(PYTHON) tests/test_mmm_ui.py ./runtime
+	$(PYTHON) tests/test_mash_ui.py ./runtime
 check: test-mmm-ui
 
 .PHONY: test-mmm-services
 test-mmm-services: runtime vaultctl
 	$(PYTHON) tests/test_mmm_services.py ./runtime ./vaultctl
+	$(PYTHON) tests/test_mmm_services.py ./runtime ./vaultctl mash
 check: test-mmm-services
 
 .PHONY: test-mmm-traversal

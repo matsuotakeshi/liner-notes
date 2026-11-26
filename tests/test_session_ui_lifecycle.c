@@ -64,6 +64,12 @@ static const SessionUiAdapter adapter={
     .emit=text,.prompt=simple,.menu=menu,.help=text,.uppercase=upper,.tick=tick,.door_finish=simple
 };
 const SessionUiAdapter *session_ui_rtbbs(void) { return &adapter; }
+const SessionUiAdapter *session_ui_mash(void) {
+    static SessionUiAdapter adapter;
+    adapter=*session_ui_mmm();
+    adapter.name="mash";
+    return &adapter;
+}
 const SessionUiAdapter *session_ui_mmm(void) {
     static SessionUiAdapter second;
     second=adapter;second.name="mmm";return &second;

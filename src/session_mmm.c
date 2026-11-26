@@ -25,6 +25,10 @@ void mmm_say(Session *s,const char *en,const char *ja) {
     session_impl_queue_text(s,mmm_local(s,en,ja));
 }
 
+static int is_mash(const Session *s) {
+    return s->ui_binding.active==session_ui_mash();
+}
+
 void mmm_prompt(Session *s) {
     const MmmUi *m=mmm_view(s);
     if(s->core.pending || s->core.closing || !s->core.active || s->connection.door ||
@@ -50,8 +54,9 @@ void mmm_prompt(Session *s) {
     if(m->input!=INPUT_NONE) { session_impl_queue_text(s,inputs[m->input]);return; }
     if(!s->core.user) { session_impl_queue_text(s,"LOGIN>> ");return; }
     static const char *const screens[]={"MAIN>> ","NOTES>> ","NOTES>> ","INDEX> ","OPEN> ",
-        "MAIL>> ","FILER>> ","CHAT>> ","TERM>> ","GAMES>> ","NEW>> ","MANAGE>> ","TALK) "};
-    if(m->screen==TALK_SCREEN && m->conference_room)session_impl_queue_text(s,"TALK> ");
+        "MAIL>> ","FILER>> ","CHAT>> ","TERM>> ","GAMES>> ","NEW>> ","MANAGE>> ","TALK) ","OTHERS>> "};
+    if(m->topics && (m->screen==INDEX_SCREEN || m->screen==OPEN_SCREEN))session_impl_queue_text(s,"NEWS> ");
+    else if(m->screen==TALK_SCREEN && m->conference_room)session_impl_queue_text(s,"TALK> ");
     else session_impl_queue_text(s,screens[m->screen]);
 }
 
@@ -61,15 +66,32 @@ void mmm_menu(Session *s,int requested) {
                               "ログインが必要です。login ID / register ID / ?\r\n");return; }
     switch(mmm_view(s)->screen) {
     case MAIN_SCREEN:
+        if(is_mash(s)) {
+            mmm_say(s,"MASH | 1 Mail   2 Bulletin boards   3 Setup   4 Profiles   5 Library\r\n"
+                      "6 Online commands   7 Exit   8 My profile   9 Manual   10 Board map\r\n"
+                      "12 News   13 New articles   14 Line conference   ? Help\r\n",
+                      "MASH | 1 メール   2 掲示板   3 通信環境   4 プロフィール   5 ライブラリ\r\n"
+                      "6 オンライン操作   7 終了   8 自分の情報   9 マニュアル   10 掲示板マップ\r\n"
+                      "12 ニュース   13 記事の新着   14 一行会議   ? ヘルプ\r\n");
+            break;
+        }
         mmm_say(s,"1 Mail   2 Notes   3 Filer   4 Chat   5 Settings   6 Games   7 Exit\r\nnew: recent notes   talk: line conference   ? Help\r\n",
               "1 メール   2 ノート   3 保管庫   4 チャット   5 設定   6 ゲーム   7 終了\r\nnew: 新着巡回   talk: 一行会議   ? ヘルプ\r\n");break;
+    case MASH_OTHERS_SCREEN:
+        mmm_say(s,"1 Connections   2 Chat   3 Line conference   4 Games (Liner Notes)\r\n"
+                  "! CONNECTION TEXT / $ [TEXT] / cmdlst / .\r\n",
+                  "1 接続一覧   2 チャット   3 一行会議   4 ゲーム（Liner Notes拡張）\r\n"
+                  "! 接続番号 本文 / $ [本文] / cmdlst / .\r\n");break;
     case NOTES_SCREEN: mmm_say(s,"Number: select   L: more   .: up   /: main\r\n",
                              "番号で選択   L: 続き   .: 上へ   /: メイン\r\n");break;
     case BOARD_SCREEN: mmm_say(s,"1 Open   2 Post   3 Sub-boards   .: back\r\ndraft / retitle NOTE TITLE / withdraw NOTE confirm\r\n",
                              "1 読む   2 投稿   3 子ボード   .: 戻る\r\ndraft 下書き / retitle 番号 題名 / withdraw 番号 confirm\r\n");break;
     case INDEX_SCREEN: mmm_say(s,"Number: open   Space/BS: page   f/F: find/continue   w: post   q: close\r\n",
                              "番号で開く   空白/BS: ページ   f/F: 検索/続行   w: 投稿   q: 閉じる\r\n");break;
-    case OPEN_SCREEN: mmm_say(s,"Space/BS: response  +/-: base note  =/*: first/last  l/L: unread  f/F: find  s: save to personal file  w: reply  i: index  q: close\r\n",
+    case OPEN_SCREEN:
+        if(is_mash(s))mmm_say(s,"p: parent article (Liner Notes extension)\r\n",
+                              "p: 親記事へ移動（Liner Notes拡張）\r\n");
+        mmm_say(s,"Space/BS: response  +/-: base note  =/*: first/last  l/L: unread  f/F: find  s: save to personal file  w: reply  i: index  q: close\r\n",
                             "空白/BS: レス  +/-: ベース  =/*: 先頭/末尾  l/L: 未読  f/F: 検索  s: 個人ファイルに保存  w: 返信  i: 索引  q: 閉じる\r\n");break;
     case MAIL_SCREEN:
         mmm_say(s,"inbox / sent / unread / more / read ID / send USER / reply ID / delete ID confirm\r\nfind TEXT / news YYYY-MM-DD / notify [on|off] / killmail ID confirm / protocol [name]\r\nfiles / resume / get ID / getall MAIL / upload / uploadbatch / resumebatch   .: back\r\n",
@@ -95,6 +117,9 @@ void mmm_menu(Session *s,int requested) {
 static void help(Session *s,const char *topic) {
     (void)topic;
     mmm_menu(s,1);
+    if(s->core.user && is_mash(s) && mmm_view(s)->screen==MAIN_SCREEN)
+        mmm_say(s,"manual: quick guide / cmdlst: commands / COMMAND -?: usage\r\n",
+                  "manual: 操作案内 / cmdlst: コマンド一覧 / コマンド -?: 書式\r\n");
     if(s->core.user && (mmm_view(s)->screen==MAIN_SCREEN || mmm_view(s)->screen==NOTES_SCREEN))
         mmm_say(s,"notes / go / open / post / mail / filer / chat / term / profile / games / scanlist / new [-n] / setsequencer / logout / off [-n] / ui\r\n",
               "notes / go / open / post / mail / filer / chat / term / profile / games / scanlist / new [-n] / setsequencer / logout / off [-n] / ui\r\n");
@@ -422,7 +447,8 @@ static void application_value(Session *s,const char *line) {
 static void return_to_parent(Session *s) {
     MmmUi *m=mmm_state(s);
     m->row_count=0;m->next=0;
-    if(m->screen==BOARD_SCREEN)boards(s,0);
+    if(m->screen==MASH_OTHERS_SCREEN)m->screen=MAIN_SCREEN;
+    else if(m->screen==BOARD_SCREEN)boards(s,0);
     else if(m->depth) { m->parent=m->ancestors[--m->depth];boards(s,0); }
     else m->screen=MAIN_SCREEN;
 }
@@ -441,7 +467,7 @@ static void choose_profile(Session *s,char *arg) {
     if(!*arg) {
         static const char *const policies[]={"FIXED","MEMBERS","ALL"};
         char summary[96];
-        snprintf(summary,sizeof(summary),"UI mmm / %s / DEFAULT %s\r\n",
+        snprintf(summary,sizeof(summary),"UI %s / %s / DEFAULT %s\r\n",session_ui_name(s),
                  policies[c->policy],c->adapters[c->default_index]->name);
         session_impl_queue_text(s,summary);
         for(unsigned i=0;i<c->count;i++) {
@@ -537,16 +563,37 @@ static void boardlabel_command(Session *s,char *arg) {
     }
 }
 
+static void open_mail(Session *s) {
+    MmmUi *m=mmm_state(s);
+    m->screen=MAIL_SCREEN;m->service_next=0;
+    mmm_mail_list(s,MAIL_LIST_INBOX,0);
+}
+
+static void open_setup(Session *s) {
+    mmm_state(s)->screen=TERM_SCREEN;
+    mmm_menu(s,1);mmm_simple_operation(s,'V',0,2,JOB_PREF);
+}
+
+static void command(Session *s,char *text);
+
 static void number_menu(Session *s,uint32_t n) {
     MmmUi *m=mmm_state(s);
     if(!s->core.user)return;
-    if(m->screen==MAIN_SCREEN && n==1) { m->screen=MAIL_SCREEN;m->service_next=0;mmm_mail_list(s,MAIL_LIST_INBOX,0); }
+    if(is_mash(s) && (m->screen==MAIN_SCREEN || m->screen==MASH_OTHERS_SCREEN)) {
+        const char *entry=mash_menu_command(m->screen==MASH_OTHERS_SCREEN,n);
+        if(entry) {
+            char line[24];snprintf(line,sizeof(line),"%s",entry);command(s,line);
+        } else if(n==11 && m->screen==MAIN_SCREEN)
+            mmm_say(s,"This menu number was a site-local download.\r\n",
+                      "この番号は原典局独自のダウンロード項目です。\r\n");
+        else mmm_bad_service_command(s);
+        return;
+    }
+    if(m->screen==MAIN_SCREEN && n==1)open_mail(s);
     else if(m->screen==MAIN_SCREEN && n==2) { m->parent=0;m->depth=0;boards(s,0); }
     else if(m->screen==MAIN_SCREEN && n==3) { m->screen=FILER_SCREEN;m->service_next=0;mmm_file_enter(s,m->file_path); }
     else if(m->screen==MAIN_SCREEN && n==4)mmm_chat_request(s,'J',0,"");
-    else if(m->screen==MAIN_SCREEN && n==5) {
-        m->screen=TERM_SCREEN;mmm_menu(s,1);mmm_simple_operation(s,'V',0,2,JOB_PREF);
-    }
+    else if(m->screen==MAIN_SCREEN && n==5)open_setup(s);
     else if(m->screen==MAIN_SCREEN && n==6)mmm_games(s,0);
     else if(m->screen==MAIN_SCREEN && n==7)mmm_off(s,0);
     else if(m->screen==NOTES_SCREEN && n<=m->row_count) { m->action=OPEN_BOARD_MENU;board(s,m->rows[n-1]); }
@@ -556,9 +603,101 @@ static void number_menu(Session *s,uint32_t n) {
     else mmm_say(s,"Choose a listed number.\r\n","一覧にある番号を入力してください。\r\n");
 }
 
+static int mash_command(Session *s,const char *text) {
+    MashInput input=mash_parse(text);
+    if(input.command==MASH_UNKNOWN)return 0;
+    const char *arg=input.argument;
+    if(!strcmp(arg,"-?")) {
+        session_impl_queue_text(s,input.usage);session_impl_queue_text(s,"\r\n");
+        return 1;
+    }
+    MmmUi *m=mmm_state(s);
+    switch(input.command) {
+    case MASH_PROFILES:
+        if(*arg)mmm_profile(s,arg);
+        else {
+            m->screen=TERM_SCREEN;
+            mmm_say(s,"Profiles: profile [ID] / find TEXT / findfield FIELD TEXT / .\r\n",
+                      "プロフィール: profile [会員ID] / find 語句 / findfield 項目 語句 / .\r\n");
+        }
+        return 1;
+    case MASH_NEWS:
+        if(!*arg || !strcmp(arg,"-n")) {
+            /* The reserved label resolves through the same ACL as a named board. */
+            char news[32];snprintf(news,sizeof(news),"%s @mash-news",*arg?"-n -a":"-i");
+            m->topics=1;open_command(s,news);
+            return 1;
+        }
+        break;
+    case MASH_SEQUENCER:
+        if(strlen(arg)<=10) {
+            char sequence[32];snprintf(sequence,sizeof(sequence),"setsequencer %s",arg);
+            command(s,sequence);return 1;
+        }
+        break;
+    case MASH_SYSOP:
+        if(!*arg)arg=mmm_local(s,"Please contact me.","応答をお願いします。");
+        if(chat_text_valid(arg) && board_feature_enabled("chat")) {
+            mmm_chat_request(s,'C',0,arg);return 1;
+        }
+        break;
+    case MASH_WIRE: {
+        size_t offset=strcspn(arg," \t");
+        char destination[11];
+        if(!offset || offset>=sizeof(destination))break;
+        memcpy(destination,arg,offset);destination[offset]=0;
+        const char *message=arg+offset;
+        message+=strspn(message," \t");
+        uint32_t id;
+        if(mmm_number(destination,&id) && chat_text_valid(message) && board_feature_enabled("chat")) {
+            mmm_chat_request(s,'D',id,message);return 1;
+        }
+        break;
+    }
+    default:
+        if(*arg)break;
+        switch(input.command) {
+        case MASH_BBS: case MASH_MAP:
+            m->parent=0;m->depth=0;boards(s,0);break;
+        case MASH_SETUP: open_setup(s);break;
+        case MASH_MY_PROFILE: mmm_profile(s,"");break;
+        case MASH_WHO: case MASH_CHAT:
+            if(board_feature_enabled("chat"))
+                mmm_chat_request(s,input.command==MASH_WHO?'O':'J',0,"");
+            else mmm_say(s,"Chat and presence are disabled.\r\n","チャットと接続一覧は無効です。\r\n");
+            break;
+        case MASH_OTHERS: m->screen=MASH_OTHERS_SCREEN;mmm_menu(s,1);break;
+        case MASH_BYE: mmm_off(s,0);break;
+        case MASH_VERSION: session_impl_queue_text(s,LINER_VERSION_TEXT "\r\n");break;
+        case MASH_MANUAL:
+            mmm_say(s,"Choose a number or enter a command. / returns to main. . goes back.\r\n"
+                      "Use cmdlst for the command list. In an open article, p reads its parent.\r\n",
+                      "番号またはコマンドを入力。/ で主メニュー、. で戻ります。\r\n"
+                      "cmdlst でコマンド一覧。記事を読んでいるときは p で親記事へ移動します。\r\n");
+            break;
+        case MASH_COMMANDS:
+            session_impl_queue_text(s,"bbs / mail / filer / setup / pprof / whoami / who / map / manual / cmdlst\r\n"
+                                      "others / readnews [-n] / new [-n] / talk [-n] / chat / off / bye / sets / ! / $ / version\r\n"
+                                      "open / go / post / pfile / regsign / games (Liner Notes) / ui / COMMAND -?\r\n");
+            break;
+        default: return 0;
+        }
+        return 1;
+    }
+    mmm_bad_service_command(s);
+    return 1;
+}
+
 static void command(Session *s,char *text) {
     MmmUi *m=mmm_state(s);
-    if(s->core.user && mmm_service_line(s,text))return;
+    if(s->core.user && is_mash(s) && m->screen==CHAT_SCREEN) {
+        if(!strcmp(text,"/w")) { mmm_chat_request(s,'O',0,"");return; }
+        if((*text=='!' || *text=='$') && mash_command(s,text))return;
+    }
+    if(s->core.user && is_mash(s) &&
+       (m->screen==MAIN_SCREEN || m->screen==MASH_OTHERS_SCREEN || m->screen==NOTES_SCREEN ||
+        m->screen==BOARD_SCREEN) && mash_command(s,text))return;
+    if(s->core.user && m->screen!=MASH_OTHERS_SCREEN && mmm_service_line(s,text))return;
     MmmInput input=mmm_parse(text,s->core.user!=0);
     if(input.usage && input.command>MMM_AMBIGUOUS) {
         const char *name,*usage;
@@ -598,14 +737,14 @@ static void command(Session *s,char *text) {
         break;
     case MMM_NOTES: m->parent=0;m->depth=0;boards(s,0);break;
     case MMM_GO: if(*input.argument)enter_board(s,input.argument,OPEN_BOARD_MENU);else help(s,"go");break;
-    case MMM_OPEN: open_command(s,input.argument);break;
+    case MMM_OPEN: m->topics=0;open_command(s,input.argument);break;
     case MMM_POST: enter_board(s,input.argument,OPEN_POST);break;
     case MMM_UI: choose_profile(s,input.argument);break;
-    case MMM_MAIL: number_menu(s,1);break;
+    case MMM_MAIL: open_mail(s);break;
     case MMM_FILER:
         m->screen=FILER_SCREEN;m->service_next=0;mmm_file_enter(s,*input.argument?input.argument:m->file_path);break;
     case MMM_CHAT: mmm_chat_request(s,'J',0,"");break;
-    case MMM_TERM: number_menu(s,5);break;
+    case MMM_TERM: open_setup(s);break;
     case MMM_PROFILE: mmm_profile(s,input.argument);break;
     case MMM_GAMES: mmm_games(s,0);break;
     case MMM_NEW:
@@ -710,7 +849,7 @@ static void key(Session *s,unsigned char ch) {
         if(m->continuous && ch!=' ' && ch!=17 && ch!=19)mmm_stream_pause(s);
         else if(m->stream_paused && (ch=='c' || ch=='C')) { m->stream_paused=0;m->continuous=1; }
         else if(m->stream_paused && (ch=='q' || ch=='/' || ch==4)) {
-            m->stream_paused=m->stream_is_board=0;m->screen=MAIN_SCREEN;mmm_menu(s,1);
+            m->stream_paused=m->stream_is_board=m->topics=0;m->screen=MAIN_SCREEN;mmm_menu(s,1);
         }
         mmm_prompt(s);return;
     }
@@ -723,9 +862,19 @@ static void key(Session *s,unsigned char ch) {
         else mmm_say(s,"No further title matches.\r\n","これ以上一致する題名はありません。\r\n");
     } else {
         m->search_next=0;m->search_responses=0;
-        if(ch=='q' || ch==4) { m->screen=BOARD_SCREEN;mmm_menu(s,1); }
+        if(ch=='q' || ch==4) {
+            m->screen=m->topics?MAIN_SCREEN:BOARD_SCREEN;m->topics=0;
+            mmm_menu(s,1);
+        }
         else if(ch=='?' || ch=='&')help(s,"");
-        else if(ch=='w')prepare_post(s,index?0:m->root);
+        else if(ch=='p' && !index && is_mash(s)) {
+            if(m->note_parent)read_article(s,m->note_parent);
+            else mmm_say(s,"This is a base note.\r\n","この記事には親記事がありません。\r\n");
+        }
+        else if(ch=='w') {
+            uint32_t parent=is_mash(s)?m->article:m->root;
+            prepare_post(s,index?0:parent);
+        }
         else if(ch=='s' && !index && m->article) {
             OperationRequest *q=mmm_request(s,'Z');
             if(q) { q->action=5;q->number=m->article;mmm_submit(s,q,JOB_PFILE_APPEND); }
@@ -829,6 +978,10 @@ static void render_article(Session *s,const OperationContent *c,const char *body
     snprintf(title,sizeof(title),"%s #%u / #%u  %s\r\n%s\r\n",
              c->parent?"Response":"Base note",c->id,c->root,c->author,c->title);
     session_impl_queue_text(s,title);
+    if(is_mash(s) && c->parent) {
+        snprintf(title,sizeof(title),"Parent #%u (p)\r\n",c->parent);
+        session_impl_queue_text(s,title);
+    }
     session_impl_queue_text(s,body);
     OperationRequest *q=mmm_request(s,'s');
     if(q) { q->board=c->board;q->number=c->id;mmm_submit(s,q,JOB_SEEN); }
@@ -899,8 +1052,9 @@ static void result(Session *s,const OperationResult *r,SessionResultView project
         if(job==JOB_STREAM_READ) { mmm_prompt(s);return; }
         if(job==JOB_STREAM_SEEN) { m->stream_seen=0;mmm_stream_pause(s); }
         if(job==JOB_NAMED || job==JOB_BOARD || job==JOB_UNLOCK ||
-           job==JOB_NEW_BEGIN || job==JOB_NEW_PAGE || job==JOB_OPEN_WINDOW)
-            m->continuous=m->stream_paused=m->stream_is_board=0;
+           job==JOB_NEW_BEGIN || job==JOB_NEW_PAGE || job==JOB_OPEN_WINDOW) {
+            m->continuous=m->stream_paused=m->stream_is_board=m->topics=0;
+        }
         if(job==JOB_OFF)
             mmm_say(s,"Could not save the sequencer. Retry off, or use off -n.\r\n",
                   "巡回時刻を保存できません。off で再試行するか、off -n で終了してください。\r\n");
@@ -929,7 +1083,7 @@ static void result(Session *s,const OperationResult *r,SessionResultView project
         }
         else {
             snprintf(m->board_title,sizeof(m->board_title),"%.80s",r->service_text);
-            m->screen=BOARD_SCREEN;m->article=m->root=m->search_next=0;m->search_responses=0;m->search[0]=0;
+            m->screen=BOARD_SCREEN;m->article=m->root=m->note_parent=m->search_next=0;m->search_responses=0;m->search[0]=0;
             if(m->action==OPEN_POST)prepare_post(s,0);
             else if(m->action==OPEN_INDEX)index_page(s,0);
             else if(m->action==OPEN_BASE)browse(s,BROWSE_EXACT,0,m->target,0,0);
@@ -944,7 +1098,7 @@ static void result(Session *s,const OperationResult *r,SessionResultView project
     case JOB_READ: case JOB_OPEN_READ:
         if(projection.content && projection.content->state==ARTICLE_VISIBLE) {
             const OperationContent *c=projection.content;
-            m->root=c->root;m->article=c->id;m->screen=OPEN_SCREEN;
+            m->root=c->root;m->article=c->id;m->note_parent=c->parent;m->screen=OPEN_SCREEN;
             if(job==JOB_OPEN_READ) {
                 m->sequence_read=1;m->search_next=0;m->search_responses=0;m->search[0]=0;m->page_start=0;
             }
@@ -1099,7 +1253,7 @@ static SessionUiSnapshot snapshot(const Session *s) {
 static void enter(Session *s,int initial,int interactive,Language language) {
     (void)interactive;
     MmmUi *m=mmm_state(s);
-    m->language=language;m->screen=MAIN_SCREEN;
+    m->language=language;m->screen=MAIN_SCREEN;m->topics=0;
     s->core.structured=1;
     if(s->core.user && !m->login_at) {
         time_t started=time(NULL);m->login_at=started>0?(uint64_t)started:0;
@@ -1216,7 +1370,7 @@ void mmm_stream_step(Session *s) {
     else if(!m->stream_is_board && m->scan_custom && m->scan_at+1<m->scan_count) {
         mmm_next_scan_board(s);mmm_new_page(s,0);
     } else {
-        m->continuous=m->stream_is_board=0;m->screen=MAIN_SCREEN;
+        m->continuous=m->stream_is_board=m->topics=0;m->screen=MAIN_SCREEN;
         mmm_say(s,"End of continuous reading.\r\n","連続読み出しを終了しました。\r\n");mmm_prompt(s);
     }
 }
@@ -1268,16 +1422,25 @@ static int notice(const Session *s,SessionNotice kind,unsigned number,uint64_t b
     return n>=0 && (size_t)n<capacity;
 }
 
+/* A separate adapter identity gives each dialect its own session-owned state. */
+#define NOTES_ADAPTER(profile) { \
+        .name=profile,.state_size=sizeof(MmmUi),.login_required=1,.keys=keys,.key=key, \
+        .snapshot=snapshot,.cleanup=cleanup,.connector_line=unsupported_line,.binary_byte=unsupported_binary, \
+        .prepare_request=prepare,.preferences=preferences,.signature=signature,.scan_pause=noop, \
+        .scan_stop=noop,.board_refresh=refresh_board_list,.access_refresh=refresh_board_list,.chat_kick=chat_kick,.chat_event=mmm_chat_event, \
+        .announce=session_impl_queue_text,.notify=notify,.mail_arrived=mail_arrived,.mail_notify=mail_preference, \
+        .personal_receive=personal_receive,.transfer_receipt=transfer_receipt,.transfer_finish=transfer_finish,.notice=notice, \
+        .enter=enter,.leave=noop,.can_leave=can_leave,.line=line,.keep_position=keep_position,.result=result, \
+        .emit=session_impl_queue_text,.prompt=mmm_prompt,.menu=mmm_menu,.help=help,.uppercase=uppercase,.tick=tick,.door_finish=door_finish, \
+}
+
 const SessionUiAdapter *session_ui_mmm(void) {
-    static const SessionUiAdapter adapter={
-        .name="mmm",.state_size=sizeof(MmmUi),.login_required=1,.keys=keys,.key=key,
-        .snapshot=snapshot,.cleanup=cleanup,.connector_line=unsupported_line,.binary_byte=unsupported_binary,
-        .prepare_request=prepare,.preferences=preferences,.signature=signature,.scan_pause=noop,
-        .scan_stop=noop,.board_refresh=refresh_board_list,.access_refresh=refresh_board_list,.chat_kick=chat_kick,.chat_event=mmm_chat_event,
-        .announce=session_impl_queue_text,.notify=notify,.mail_arrived=mail_arrived,.mail_notify=mail_preference,
-        .personal_receive=personal_receive,.transfer_receipt=transfer_receipt,.transfer_finish=transfer_finish,.notice=notice,
-        .enter=enter,.leave=noop,.can_leave=can_leave,.line=line,.keep_position=keep_position,.result=result,
-        .emit=session_impl_queue_text,.prompt=mmm_prompt,.menu=mmm_menu,.help=help,.uppercase=uppercase,.tick=tick,.door_finish=door_finish,
-    };
+    static const SessionUiAdapter adapter=NOTES_ADAPTER("mmm");
     return &adapter;
 }
+
+const SessionUiAdapter *session_ui_mash(void) {
+    static const SessionUiAdapter adapter=NOTES_ADAPTER("mash");
+    return &adapter;
+}
+#undef NOTES_ADAPTER

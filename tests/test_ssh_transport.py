@@ -77,7 +77,7 @@ for line in sys.stdin:
         options = ['--ssh-port', str(ssh_port), '--ssh-host-key', str(host),
                    '--ssh-member-keys', str(keys), '--ssh-timeout', '3',
                    '--ssh-attempts', '4', '--doors', str(doors),
-                   '--ui-policy', 'MEMBERS', '--ui-allow', 'rtbbs,mmm']
+                   '--ui-policy', 'MEMBERS', '--ui-allow', 'rtbbs,mmm,mash']
         server = Server(binary, root/'notes', members=root/'members', admins=admins,
                         telnet=True, menu=True, language='en', options=options)
         transports = []
@@ -243,11 +243,27 @@ for line in sys.stdin:
             assert b'PTY 100 30' in mmm.cmd('size', b'DOOR> ')
             assert b'SSH PTY test' in mmm.cmd('quit', b'GAMES>> ')
             mmm.cmd('.', b'MAIN>> ')
-            mmm.cmd('ui rtbbs', b'UI PREF SAVED rtbbs')
-            mmm.until()
+            switched = mmm.cmd('ui mash', b'UI preference saved.')
+            assert b'MASH | 1 Mail' in switched, switched[-1500:]
+            mmm.until(b'MAIN>> ')
             restored.close()
+            selected = connect('bob')
+            mash = screen(selected, b'MAIN>> ')
+            assert b'Board map' in mash.cmd('?', b'MAIN>> ')
+            assert b'SSH article body' in mash.cmd('open -b1 #1', b'OPEN> ')
+            mash.channel.sendall(b'q')
+            mash.until(b'NOTES>> ')
+            mash.cmd('/', b'MAIN>> ')
+            mash.cmd('6', b'OTHERS>> ')
+            mash.cmd('4', b'GAMES>> ')
+            assert b'SSH_DOOR_USER=bob' in mash.cmd('1', b'DOOR> ')
+            assert b'SSH PTY test' in mash.cmd('quit', b'GAMES>> ')
+            mash.cmd('.', b'MAIN>> ')
+            mash.cmd('ui rtbbs', b'UI PREF SAVED rtbbs')
+            mash.until()
+            selected.close()
             assert b'PONG' in screen(connect('bob')).cmd('PING')
-            print('PASS MMM over SSH: selection and reconnect, Door resize and return, RTBBS restore')
+            print('PASS MMM and MASH over SSH: selection and reconnect, Door resize and return, RTBBS restore')
         finally:
             telnet.close()
             for t in transports: t.close()

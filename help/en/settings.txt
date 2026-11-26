@@ -18,3 +18,5 @@ D in Settings displays actual language, editor, menu verbosity, paging, screen d
 
 Line numbering (editor M / /M) and PROTOCOL are included in PREFS SAVE/LOAD, login restoration and normal disconnect saving. Abrupt process failure or revoked credentials can prevent a save.
 UI lists the active UI, station policy and permitted profiles. UI name selects a permitted UI; UI RESET returns to the station default and clears your saved preference. Members save selections immediately; guests use them for this connection only. Switch at the main menu after finishing editing, transfers, chat or games. Only RTBBS is currently installed; RAW is not a separate UI.
+
+UI shows available profiles. UI mash selects MASH when the station permits it. The default is RTBBS unless configured otherwise. In MASH, log in, use 9 for the guide, cmdlst for commands and COMMAND -? for syntax.

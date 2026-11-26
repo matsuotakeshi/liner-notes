@@ -27,7 +27,7 @@ def login(client, name, register=False):
     assert ("Logged in: " + name).encode() in client.cmd(SECRET, MAIN)
 
 
-def run(binary, vaultctl):
+def run(binary, vaultctl, profile="mmm"):
     binary, vaultctl = (str(Path(path).resolve()) for path in (binary, vaultctl))
     with tempfile.TemporaryDirectory(prefix="ln-mmm-services-") as tmp:
         root = Path(tmp)
@@ -54,7 +54,7 @@ def run(binary, vaultctl):
             return Server(binary, root / "notes", members=root / "members", vault=vault,
                           zhelper=helper, telnet=True, menu=True, language="en",
                           options=["--database", str(database), "--doors", str(doors),
-                                   "--ui-default", "mmm", "--ui-allow", "rtbbs,mmm"])
+                                   "--ui-default", profile, "--ui-allow", "rtbbs," + profile])
 
         def checkpoints():
             with closing(sqlite3.connect(database.as_uri() + "?mode=ro", uri=True)) as db:
@@ -119,7 +119,7 @@ def run(binary, vaultctl):
                 alice.cmd(".", MAIN)
 
                 alice.cmd("chat", CHAT)
-                bob.cmd("4", CHAT)
+                bob.cmd("c" if profile=="mash" else "4", CHAT)
                 assert b"hello room" in alice.cmd("hello room", CHAT)
                 assert b"alice: hello room" in bob.until(CHAT)
                 # Public and private messages share a per-connection rate limit.
@@ -149,7 +149,9 @@ def run(binary, vaultctl):
                 assert b"LANG ja  SIZE 100 30" in alice.cmd("save", TERM)
                 alice.cmd(".", MAIN)
 
-                listing = bob.cmd("6", GAMES)
+                if profile=="mash":
+                    bob.cmd("6", b"OTHERS>> ")
+                listing = bob.cmd("4" if profile=="mash" else "6", GAMES)
                 assert b"Fixture game" in listing and b"Restricted" not in listing
                 if os.name == "posix" and os.geteuid() != 0:
                     assert b"Unknown game number" in bob.cmd("99", GAMES)
@@ -185,7 +187,7 @@ def run(binary, vaultctl):
             alice.cmd(".", MAIN)
             assert b"Sequencer: 0" in alice.cmd("setsequencer reset", MAIN)
             assert checkpoints() == saved
-        print("PASS: MMM mail drafts, filer, transfer handoff, chat, settings, Door and sequencer restart")
+        print(f"PASS: {profile} mail drafts, filer, transfer handoff, chat, settings, Door and sequencer restart")
 
 
 if __name__ == "__main__":

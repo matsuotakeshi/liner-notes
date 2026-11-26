@@ -17,6 +17,18 @@ typedef struct {
     int usage;
 } MmmInput;
 
+typedef enum {
+    MASH_UNKNOWN, MASH_BBS, MASH_SETUP, MASH_PROFILES, MASH_MY_PROFILE,
+    MASH_WHO, MASH_MAP, MASH_MANUAL, MASH_COMMANDS, MASH_OTHERS, MASH_NEWS,
+    MASH_SEQUENCER, MASH_BYE, MASH_WIRE, MASH_SYSOP, MASH_VERSION, MASH_CHAT
+} MashCommand;
+typedef struct {
+    MashCommand command;
+    const char *argument, *usage;
+} MashInput;
+
+MashInput mash_parse(const char *);
+const char *mash_menu_command(int others, uint32_t number);
 MmmInput mmm_parse(char *line, int authenticated);
 int mmm_number(const char *text, uint32_t *out);
 /* range defaults to every line. An empty left/right endpoint also means

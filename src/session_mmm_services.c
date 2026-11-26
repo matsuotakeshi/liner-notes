@@ -570,7 +570,9 @@ void mmm_file_result(Session *s,const OperationResult *r,const OperationPage *pa
 int mmm_chat_event(Session *s,const ChatEvent *e) {
     const MmmUi *m=mmm_view(s);
     if((e->kind=='I' || e->kind=='C') && (m->input || m->application.step || s->core.pending))return 0;
-    if(strchr("LOJS",e->kind) && !m->chatting)return 1;
+    if(strchr("LJS",e->kind) && !m->chatting)return 1;
+    /* MASH telegrams also have a sender acknowledgement outside the room. */
+    if(e->kind=='O' && !m->chatting && s->ui_binding.active!=session_ui_mash())return 1;
     char text[CHAT_TEXT+160];
     switch(e->kind) {
     case 'I': snprintf(text,sizeof(text),"[wire %lu %s] %s\r\n",e->connection,e->name,e->text);break;
@@ -598,6 +600,14 @@ void mmm_chat_result(Session *s,const OperationResult *r,uint64_t now) {
     case 'O': chat_online(s->core.id);ok=1;break;
     case 'S': ok=chat_say(s->core.id,r->text,now);break;
     case 'D': ok=chat_private(s->core.id,r->chat_target,r->text,now);break;
+    case 'C':
+        ok=chat_call(s->core.id,r->text,now);
+        if(ok>0)mmm_say(s,"SYSOP notified.\r\n","SYSOPへ通知しました。\r\n");
+        else if(!ok) {
+            mmm_say(s,"No SYSOP available.\r\n","応答可能なSYSOPはいません。\r\n");
+            return;
+        }
+        break;
     }
     if(ok<=0)mmm_say(s,"Chat operation unavailable.\r\n","チャット操作を実行できません。\r\n");
 }
