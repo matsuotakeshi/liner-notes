@@ -55,6 +55,7 @@ jobs:
               mkdir -p /build/liner-notes
               cp -a /source/. /build/liner-notes/
               cd /build/liner-notes
+              version=$(python3 -c "import json; print(json.load(open(\"docs/manual/manifest.json\", encoding=\"utf-8\"))[\"version\"])")
               python3 scripts/build-rpm.py /build/rpm-work
               declare -A packages=()
               while IFS= read -r -d "" rpmfile; do
@@ -73,9 +74,11 @@ jobs:
               for name in liner-notes liner-notes-web liner-notes-link; do
                 test -s "/out/${packages[$name]}"
                 rpm -qp --scripts "/out/${packages[$name]}" >/dev/null
+                actual=$(rpm -qp --qf "%{VERSION}-%{RELEASE}" "/out/${packages[$name]}")
+                case "$actual" in "$version-1"|"$version-1".*) ;; *) exit 1 ;; esac
               done
               python3 scripts/release_manifest.py create \
-                --platform rocky10 --version 0.74.1-1 --source-sha "$SOURCE_SHA" \
+                --platform rocky10 --version "$version-1" --source-sha "$SOURCE_SHA" \
                 --directory /out \
                 --package "liner-notes=${packages[liner-notes]}" \
                 --package "liner-notes-web=${packages[liner-notes-web]}" \

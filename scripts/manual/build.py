@@ -69,7 +69,7 @@ def build(out):
             h=re.search(r'<h[23] id="([^"]+)">(.*?)</h[23]>',chunk,re.S)
             entries.append(dict(url=p['id']+'.html'+('#'+h[1] if h else ''),title=p['title']+(' / '+plain(h[2]) if h else ''),text=re.sub(r'\s+',' ',plain(chunk)).strip()))
         hashes[p['id']]=dict(markdown=sha(book/(p['id']+'.md')),html=sha(book/(p['id']+'.html')))
-    home='<h1>Liner Notes 統合マニュアル</h1><p>現行安定版 '+m['version']+' の機能・操作・設定を、目的別にまとめた一冊です。文書改訂 '+m['revision']+'。</p><p><a href="install-freebsd.html">FreeBSD導入</a> · <a href="install-linux.html">Linux導入</a> · <a href="accounts.html">利用を始める</a> · <a href="troubleshooting.html">困ったとき</a></p>'
+    home='<h1>Liner Notes 統合マニュアル</h1><p>対象バージョン '+m['version']+' の機能・操作・設定を、目的別にまとめた一冊です。文書改訂 '+m['revision']+'。</p><p><a href="install-freebsd.html">FreeBSD導入</a> · <a href="install-linux.html">Linux導入</a> · <a href="accounts.html">利用を始める</a> · <a href="troubleshooting.html">困ったとき</a></p>'
     for no,title in enumerate(m['chapters'],1):
         home+=f'<section class="manual-group"><h2>第{no}章 {html.escape(title)}</h2><ul class="manual-catalog">'
         home+=''.join('<li><a href="'+p['id']+'.html"><strong>'+html.escape(p['title'])+'</strong></a></li>' for p in pages if p['chapter']==no)
@@ -79,7 +79,7 @@ def build(out):
     home=home.replace('../downloads/','https://linernotes.site/downloads/')
     (book/'index.html').write_text(shell('統合目次',home),encoding='utf8',newline='\n')
     (book/'en').mkdir()
-    eng='<h1>Liner Notes manual</h1><p>This is the canonical manual for stable version '+m['version']+', revised '+m['revision']+'. The full manual is currently in Japanese. The application supports Japanese and English; an English translation of the book is not yet provided.</p><p><a href="../index.html">Open the seven-chapter manual</a></p><ol>'+''.join('<li><a href="../'+next(p['id'] for p in pages if p['chapter']==n)+'.html">'+t+'</a></li>' for n,t in enumerate(['Overview','Installation and updates','User guide','Administrator and SIGOP guide','Connections and integrations','Configuration and technical reference','Troubleshooting'],1))+'</ol><p>Historical implementation reports are kept in the development repository and are not included in book navigation or search.</p>'
+    eng='<h1>Liner Notes manual</h1><p>This is the canonical manual for version '+m['version']+', revised '+m['revision']+'. The full manual is currently in Japanese. The application supports Japanese and English; an English translation of the book is not yet provided.</p><p><a href="../index.html">Open the seven-chapter manual</a></p><ol>'+''.join('<li><a href="../'+next(p['id'] for p in pages if p['chapter']==n)+'.html">'+t+'</a></li>' for n,t in enumerate(['Overview','Installation and updates','User guide','Administrator and SIGOP guide','Connections and integrations','Configuration and technical reference','Troubleshooting'],1))+'</ol><p>Historical implementation reports are kept in the development repository and are not included in book navigation or search.</p>'
     (book/'en/index.html').write_text(shell('English guide',eng,lang='en',depth='en/'),encoding='utf8',newline='\n')
     (book/'search-data.js').write_text('window.LINER_MANUAL_SEARCH='+json.dumps(entries,ensure_ascii=False).replace('<','\\u003c')+';\n',encoding='utf8',newline='\n')
     legacy=json.loads((DOC/'legacy-urls.json').read_text(encoding='utf8'));redirects=[]

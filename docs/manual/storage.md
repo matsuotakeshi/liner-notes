@@ -4,7 +4,7 @@
 
 `--database` を指定したSQLiteが正式保存先です。WALと確定処理を使い、成功応答より前に書き込みを確定します。排他ロックにより同じ保存領域への競合起動や保守を拒否します。保存先を指定しない旧Liner Notesファイル運用とは区別します。
 
-新規に `--database-structured` または `database_mode=structured` を選ぶとschema 3を作ります。通常の `--database` は既存schema 1/2/3をそのまま読み、自動変換しません。空でない旧保存領域へ新規構築用フラグを付けるだけでは移行できません。
+新規に `--database-structured` または `database_mode=structured` を選ぶとschema 5を作ります。通常の `--database` は既存schema 1～5をそのまま読み、自動変換しません。空でない旧保存領域へ新規構築用フラグを付けるだけでは移行できません。
 
 | 形式 | 主な内容 |
 |---|---|
@@ -26,10 +26,9 @@ structured形式は `db-backup` の形式情報に記録され、`db-restore` / 
 
 SQLを直接編集する運用には対応しません。業務検査・履歴・権限を通すBBSと[管理ツール](backup-recovery.md)を使用してください。稼働中SQLiteの単体ファイルコピーだけではWALを含めた整合バックアップになりません。
 
-## 次期版候補：schema 5の項目別保存
+## schema 5の項目別保存
 
-この節は開発候補の変更で、上記の正式版0.74.1とは区別します。新規structured DBは
-schema 5となり、メール添付は順序付きの `mail_attachments`、会員グループは
+0.75の新規structured DBはschema 5となり、メール添付は順序付きの `mail_attachments`、会員グループは
 `member_event_groups` へ保存します。会員の設定・削除・既読・下書き・パスワード変更の
 補助項目も専用の列に分けます。保管庫とメール添付保管領域のメタデータは
 `vault_records` へ保存し、それぞれのファイル番号を混同しません。本文・ファイル本体、

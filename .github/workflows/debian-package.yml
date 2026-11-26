@@ -50,6 +50,7 @@ jobs:
               mkdir -p /build/liner-notes
               cp -a /source/. /build/liner-notes/
               cd /build/liner-notes
+              version=$(dpkg-parsechangelog -S Version)
               dpkg-buildpackage -b -us -uc
               cp /build/liner-notes_[0-9]*_amd64.deb /build/liner-notes-web_*.deb \
                 /build/liner-notes-link_*.deb /out/
@@ -84,11 +85,11 @@ jobs:
               sha256sum ./*.deb > SHA256SUMS
               sha256sum -c SHA256SUMS
               python3 /build/liner-notes/scripts/release_manifest.py create \
-                --platform debian13 --version 0.74.1-1 --source-sha "$SOURCE_SHA" \
+                --platform debian13 --version "$version" --source-sha "$SOURCE_SHA" \
                 --directory /out \
-                --package liner-notes=liner-notes_0.74.1-1_amd64.deb \
-                --package liner-notes-web=liner-notes-web_0.74.1-1_all.deb \
-                --package liner-notes-link=liner-notes-link_0.74.1-1_all.deb
+                --package "liner-notes=liner-notes_${version}_amd64.deb" \
+                --package "liner-notes-web=liner-notes-web_${version}_all.deb" \
+                --package "liner-notes-link=liner-notes-link_${version}_all.deb"
               python3 /build/liner-notes/scripts/release_manifest.py verify \
                 --platform debian13 --source-sha "$SOURCE_SHA" \
                 --manifest /out/RELEASE-MANIFEST.json

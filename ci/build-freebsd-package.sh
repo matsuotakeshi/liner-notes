@@ -136,7 +136,8 @@ case "$version" in
     ""|*[!0-9.]*) echo "Unrecognized FreeBSD port version" >&2; exit 1 ;;
 esac
 
-# The port distfile must be the exact Git archive, never the old v0.74 archive.
+# The distribution distinfo is generated from the immutable source archive in
+# the copied port. It cannot be included in the source archive it checksums.
 make -C "$port_dir" BATCH=yes \
     PORTSDIR=/usr/ports DISTDIR="$work/distfiles" \
     PYTHON_VERSION=python3.12 STRICT_DEPENDS=yes makesum
@@ -184,4 +185,5 @@ printf "%s  %s\n" "$(sha256 -q "$work/artifacts/$pkg_name")" "$pkg_name" > "$wor
 LINER_FREEBSD_PACKAGE_CI=1 python3 "$work/source/ci/test-freebsd-deploy-resolver.py" "$work" "$revision"
 stage_dir=$(make -C "$port_dir" -V STAGEDIR)
 LINER_FREEBSD_PACKAGE_CI=1 python3 "$work/source/ci/test-freebsd-package-upgrade.py" "$work" "$package" "$stage_dir" "$revision"
+cp "$port_dir/distinfo" "$work/artifacts/distinfo"
 echo "PASS: FreeBSD 15 pkg from source commit $revision"

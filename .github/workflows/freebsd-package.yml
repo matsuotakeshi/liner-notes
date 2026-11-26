@@ -85,6 +85,45 @@ jobs:
             --manifest "$RUNNER_TEMP/freebsd-pkg-artifacts/RELEASE-MANIFEST.json"
           test -f "$RUNNER_TEMP/freebsd-pkg-artifacts/SHA256SUMS"
           echo "FreeBSD candidate and private-root update checks; no host installation or production updates."
+      - name: Assemble the Ports overlay from the verified candidate
+        shell: bash
+        run: |
+          set -euo pipefail
+          artifacts="$RUNNER_TEMP/freebsd-pkg-artifacts"
+          version=$(python3 -c 'import json; print(json.load(open("docs/manual/manifest.json", encoding="utf-8"))["version"])')
+          name="liner-notes-$version"
+          bundle="liner-notes-ports-$version"
+          source="$RUNNER_TEMP/freebsd-source.tar.gz"
+          digest=$(sha256sum "$source" | cut -d' ' -f1)
+          grep -Fx "source_sha=$GITHUB_SHA" "$artifacts/BUILD-INFO.txt"
+          grep -Fx "source_archive_sha256=$digest" "$artifacts/BUILD-INFO.txt"
+          grep -Fx "SHA256 ($name.tar.gz) = $digest" "$artifacts/distinfo"
+          grep -Fx "SIZE ($name.tar.gz) = $(wc -c < "$source")" "$artifacts/distinfo"
+          python3 scripts/release_manifest.py verify --platform freebsd15 \
+            --version "$version" --source-sha "$GITHUB_SHA" --manifest "$artifacts/RELEASE-MANIFEST.json"
+          out="$RUNNER_TEMP/freebsd-distribution"
+          root="$out/$bundle"
+          mkdir -p "$root/comms" "$root/distfiles" "$root/packages" "$root/docs"
+          cp -R ports/comms/liner-notes "$root/comms/"
+          cp "$artifacts/distinfo" "$root/comms/liner-notes/distinfo"
+          cp "$source" "$root/distfiles/$name.tar.gz"
+          cp "$artifacts/$name.pkg" "$root/packages/"
+          cp -R docs/book "$root/docs/"
+          cp "$artifacts/BUILD-INFO.txt" "$root/"
+          cd "$out"
+          cp "${bundle}/distfiles/$name.tar.gz" .
+          tar -czf "$bundle.tar.gz" "$bundle"
+          sha256sum "$name.tar.gz" "$bundle.tar.gz" > SHA256SUMS
+          sha256sum -c SHA256SUMS
+      - name: Upload FreeBSD source and Ports candidate archives
+        uses: actions/upload-artifact@v4
+        with:
+          name: liner-notes-freebsd15-ports-distribution
+          path: |
+            ${{ runner.temp }}/freebsd-distribution/*.tar.gz
+            ${{ runner.temp }}/freebsd-distribution/SHA256SUMS
+          if-no-files-found: error
+          retention-days: 14
       - name: Upload FreeBSD candidate pkg and checksums
         uses: actions/upload-artifact@v4
         with:

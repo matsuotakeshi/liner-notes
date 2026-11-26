@@ -15,10 +15,12 @@ if [[ "$ID" != debian || "$VERSION_ID" != 13 || -d /run/systemd/system ]]; then
 fi
 
 packages=(liner-notes liner-notes-web liner-notes-link)
+version=$(dpkg-parsechangelog -S Version)
+case "$version" in *-1) next_version="${version%-1}-2" ;; *) exit 1 ;; esac
 /usr/bin/liner-notes-doctor --check-doors --lang en --json > /tmp/liner-notes-doctor.json
 python3 -c 'import json; r=json.load(open("/tmp/liner-notes-doctor.json")); assert r["read_only"] and r["exit_code"] == 0'
 for package in "${packages[@]}"; do
-  test "$(dpkg-query -W -f='${Version}' "$package")" = 0.74.1-1
+  test "$(dpkg-query -W -f='${Version}' "$package")" = "$version"
 done
 
 # Local changes must survive a dpkg revision upgrade without conffile prompts.
@@ -44,10 +46,10 @@ with sqlite3.connect('/var/lib/liner-notes/ci-package-upgrade.sqlite') as db:
 PY
 
 # Build a second Debian revision of the same source, inside this container.
-# Original 0.74.1-1 artifacts in /out remain unchanged and are the only
+# Original artifacts in /out remain unchanged and are the only
 # versioned candidates uploaded by the release manifest workflow.
-cat > /tmp/liner-notes-ci-changelog <<'EOF'
-liner-notes (0.74.1-2) unstable; urgency=medium
+cat > /tmp/liner-notes-ci-changelog <<EOF
+liner-notes ($next_version) unstable; urgency=medium
 
   * CI-only disposable packaging-revision upgrade rehearsal.
 
@@ -57,12 +59,12 @@ cat debian/changelog >> /tmp/liner-notes-ci-changelog
 mv /tmp/liner-notes-ci-changelog debian/changelog
 dpkg-buildpackage -b -us -uc
 python3 ci/test-deploy-package-adapter.py debian13 \
-  /build/liner-notes_0.74.1-2_amd64.deb \
-  /build/liner-notes-web_0.74.1-2_all.deb \
-  /build/liner-notes-link_0.74.1-2_all.deb
+  "/build/liner-notes_${next_version}_amd64.deb" \
+  "/build/liner-notes-web_${next_version}_all.deb" \
+  "/build/liner-notes-link_${next_version}_all.deb"
 
 for package in "${packages[@]}"; do
-  test "$(dpkg-query -W -f='${Version}' "$package")" = 0.74.1-2
+  test "$(dpkg-query -W -f='${Version}' "$package")" = "$next_version"
 done
 sha256sum -c "$config_digests"
 test "$(cat /var/lib/liner-notes/package-removal-test)" = keep
@@ -72,4 +74,4 @@ with sqlite3.connect('/var/lib/liner-notes/ci-package-upgrade.sqlite') as db:
     assert db.execute('PRAGMA integrity_check').fetchone() == ('ok',)
     assert db.execute('SELECT value FROM ci_marker').fetchone() == ('kept-across-upgrade',)
 PY
-echo 'PASS: isolated Debian 13 same-source revision 0.74.1-1 -> 0.74.1-2, conffiles, SQLite fixture and link-key retained'
+echo "PASS: isolated Debian 13 same-source revision $version -> $next_version, conffiles, SQLite fixture and link-key retained"

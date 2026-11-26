@@ -31,6 +31,6 @@ Webは別ユーザー `liner_notes_web` で動きます。Web用spoolだけを�
 LinuxのRPMは `/usr`、ソース配置の既定は `/usr/local`、設定は `/etc/liner-notes`、データは `/var/lib/liner-notes` です。[Linuxの配置表](install-linux.md)を参照してください。BBS・Web・リンク・ゲームの保存先は分離します。
 
 
-次期版では、内部のDoor排他helperを`PREFIX/libexec/liner-notes-door-lock`へ
+0.75では、内部のDoor排他helperを`PREFIX/libexec/liner-notes-door-lock`へ
 配置します（通常0755、setuid/setgidなし）。Solarisでは必須で、FreeBSD/Linuxの
 native flock利用時には起動しません。管理者や利用者が直接実行するコマンドではありません。

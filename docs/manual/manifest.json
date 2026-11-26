@@ -1,7 +1,7 @@
 {
-  "version": "0.74.1",
-  "revision": "2026-11-20",
-  "source_commit": "v0.74.1",
+  "version": "0.75",
+  "revision": "2026-11-24",
+  "source_commit": "v0.75",
   "chapters": [
     "Liner Notesの概要",
     "インストールと更新",

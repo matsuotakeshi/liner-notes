@@ -16,13 +16,16 @@ if [[ "$ID" != rocky || "$VERSION_ID" != 10* || -d /run/systemd/system ]]; then
 fi
 
 packages=(liner-notes liner-notes-web liner-notes-link)
+version=$(awk '$1 == "Version:" {print $2}' linux/rpm/liner-notes.spec)
+test -n "$version"
 dnf install -y --setopt=install_weak_deps=False epel-release
 dnf install -y --setopt=install_weak_deps=False \
-  /out/liner-notes-0.74.1-1*.x86_64.rpm \
-  /out/liner-notes-web-0.74.1-1*.x86_64.rpm \
-  /out/liner-notes-link-0.74.1-1*.x86_64.rpm
+  /out/liner-notes-"$version"-1*.x86_64.rpm \
+  /out/liner-notes-web-"$version"-1*.x86_64.rpm \
+  /out/liner-notes-link-"$version"-1*.x86_64.rpm
 for package in "${packages[@]}"; do
-  rpm -q --qf '%{VERSION}-%{RELEASE}\n' "$package" | grep -Eq '^0\.74\.1-1(\.|$)'
+  actual=$(rpm -q --qf '%{VERSION}-%{RELEASE}' "$package")
+  case "$actual" in "$version-1"|"$version-1".*) ;; *) exit 1 ;; esac
 done
 /usr/bin/liner-notes-doctor --check-doors --lang en --json > /tmp/liner-notes-doctor.json
 python3 -c 'import json; r=json.load(open("/tmp/liner-notes-doctor.json")); assert r["read_only"] and r["exit_code"] == 0'
@@ -79,7 +82,8 @@ test "${#upgrade_packages[@]}" -eq 3
 python3 ci/test-deploy-package-adapter.py rocky10 "${upgrade_packages[@]}"
 
 for package in "${packages[@]}"; do
-  rpm -q --qf '%{VERSION}-%{RELEASE}\n' "$package" | grep -Eq '^0\.74\.1-2(\.|$)'
+  actual=$(rpm -q --qf '%{VERSION}-%{RELEASE}' "$package")
+  case "$actual" in "$version-2"|"$version-2".*) ;; *) exit 1 ;; esac
 done
 sha256sum -c "$config_hashes"
 test "$(cat /var/lib/liner-notes/package-removal-test)" = keep
@@ -94,4 +98,4 @@ dnf remove -y --setopt=install_weak_deps=False "${packages[@]}"
 test "$(cat /var/lib/liner-notes/package-removal-test)" = keep
 test -s /var/lib/liner-notes-link/ci-link-key
 test -s /var/lib/liner-notes/ci-package-upgrade.sqlite
-echo 'PASS: disposable Rocky 10 RPM 0.74.1-1 -> 0.74.1-2, modified configs, SQLite and synthetic link-key preserved'
+echo "PASS: disposable Rocky 10 RPM $version-1 -> $version-2, modified configs, SQLite and synthetic link-key preserved"

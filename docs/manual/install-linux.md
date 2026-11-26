@@ -33,10 +33,10 @@ Web用`python3-aiohttp`は検証機ではEPELから、`python3-cryptography`はb
 RPMスクリプトでpipや外部ネットワークからライブラリを取得することはありません。
 
 ```sh
-dnf install ./liner-notes-0.74.1-*.x86_64.rpm
+dnf install ./liner-notes-0.75-*.x86_64.rpm
 # 必要な場合のみ追加する（debuginfo/debugsourceは通常不要）。
-dnf install ./liner-notes-web-0.74.1-*.x86_64.rpm
-dnf install ./liner-notes-link-0.74.1-*.x86_64.rpm
+dnf install ./liner-notes-web-0.75-*.x86_64.rpm
+dnf install ./liner-notes-link-0.75-*.x86_64.rpm
 
 systemctl start liner-notes
 systemctl status liner-notes
@@ -62,9 +62,9 @@ journalctl -u liner-notes-web -n 50
 SELinuxを無効にして解決する手順は採用しません。なお本体サービスは検証環境で
 `unconfined_service_t`として動作しました。専用のSELinux制約ポリシーを追加したという意味ではありません。
 
-### 次期版の任意SELinux RPMと配布候補の確認
+### 任意SELinux RPMと配布候補の確認
 
-次期版の `liner-notes-selinux` は本体とは別に導入する任意RPMです。本体の版と
+0.75の `liner-notes-selinux` は本体とは別に導入する任意RPMです。本体の版と
 ポリシーの版は独立しており、たとえば本体0.75とポリシー0.1.0が同じソースコミットから
 作られます。同じ版番号であることではなく、40桁のソースSHAが一致することを確認します。
 専用ドメインの動作検証とラベルの扱いは[SELinuxの運用](security.md)を参照してください。
@@ -113,7 +113,7 @@ GitHub ActionsのRelease Set Verificationは、同じmainコミットで成功�
 
 ```sh
 sudo dnf install clang gcc make openssl-devel sqlite-devel python3.11 git tar gzip telnet
-git clone --branch v0.74.1 https://github.com/matsuotakeshi/liner-notes.git
+git clone --branch v0.75 https://github.com/matsuotakeshi/liner-notes.git
 cd liner-notes
 make CC=clang PYTHON=python3.11
 ```
@@ -169,9 +169,9 @@ sudo -u liner_notes /usr/local/bin/liner-notes-vaultctl init /var/lib/liner-note
 
 `LINER_NOTES_OPTIONS`へ`--vault-dir /var/lib/liner-notes/vault`を追加します。ZMODEM用のlrz/lszは別途必要です。LP64のCRC修正を含む0.13.1は、従来と同じ`python3.11 scripts/build-lrzsz.py 新しいビルド先`で構築できます。既存のビルド先は上書きしません。
 
-次期版の取得補助では、公式アーカイブの通信失敗を最大3回まで再試行します。
+0.75の取得補助では、公式アーカイブの通信失敗を最大3回まで再試行します。
 TLS証明書の検証失敗・SHA-256不一致・サイズ上限超過はそのままエラーとし、検査を省略しません。
-事前取得とビルドを分ける場合は次を使用します（`--download-archive`は次期版で追加）。
+事前取得とビルドを分ける場合は次を使用します（`--download-archive`は0.75で追加）。
 
 ```sh
 python3.11 scripts/build-lrzsz.py --download-archive cache/lrzsz-0.13.1.tar.gz
