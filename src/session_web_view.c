@@ -175,6 +175,20 @@ static void render_page(ViewOutput *out,const OperationPage *page) {
     case OPERATION_PAGE_UNREAD: key="matches";count=page->data.unread.count;next=page->data.unread.next;break;
     case OPERATION_PAGE_FILE_CHILDREN:
         key="file_boards";count=(unsigned)page->data.file_children.count;next=page->data.file_children.next;break;
+    case OPERATION_PAGE_USERTABLE: {
+        const UserlogSessionPage *page_data=&page->data.usertable;
+        append(out,"\"next\":%u,\"report\":{\"kind\":\"table\",\"title\":\"USERTABLE\",\"columns\":["
+                   "\"connection\",\"user\",\"login_at\",\"logout_at\",\"seconds\",\"logins\",\"transport\"],\"rows\":[",page_data->next);
+        for(unsigned i=0;i<page_data->count;i++) {
+            const UserlogSessionRow *row=&page_data->rows[i];
+            append(out,"%s[\"%u\",\"%u\",\"%llu\",\"%llu\",\"%llu\",\"%llu\",",i?",":"",
+                   row->connection,row->user,(unsigned long long)row->login_at,(unsigned long long)row->logout_at,
+                   (unsigned long long)row->seconds,(unsigned long long)row->ordinal);
+            string(out,row->transport);append(out,"]");
+        }
+        append(out,"],\"next\":%u}",page_data->next);
+        return;
+    }
     case OPERATION_PAGE_USERLOG:
     case OPERATION_PAGE_USERSTATS: {
         const UserlogReport *r=&page->data.userlog;
@@ -607,9 +621,10 @@ static int additional_request(OperationRequest *q,const char *kind,uint32_t id,u
         q->op='A';q->audit_article=id;q->number=cursor;
         strcpy(q->title,arg);return 1;
     }
-    if(!strcmp(kind,"userlog") || !strcmp(kind,"userstats")) {
+    if(!strcmp(kind,"userlog") || !strcmp(kind,"userstats") || !strcmp(kind,"usertable")) {
         if(id>MEMBER_MAX || (*arg && (id || strcmp(arg,"ALL"))) || (!strcmp(kind,"userstats") && cursor))return 0;
-        q->op='!';q->action=!strcmp(kind,"userlog")?'U':'V';q->number=id;q->cursor=cursor;q->notes_unread=!!*arg;
+        q->op='!';q->action=!strcmp(kind,"usertable")?'u':!strcmp(kind,"userstats")?'V':'U';
+        q->number=id;q->cursor=cursor;q->notes_unread=!!*arg;
         return 1;
     }
     if(!strcmp(kind,"profile_login")) {

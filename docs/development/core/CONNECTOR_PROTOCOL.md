@@ -194,3 +194,16 @@ connector protocol. Restored drafts return the editable body and authorized
 attachment metadata in `data.draft` on the same connection that opened the
 editor. Batch copying checks each underlying file operation and preserves
 individual copy receipts on partial failure.
+
+`core_runtime_controls: 1` adds the `usertable` view and the
+`admin.announce`, `admin.disconnect`, `admin.shutdown`,
+`admin.shutdown_cancel`, and `admin.shutdown_now` updates. The Activity Core
+authorizes each operation and retains its existing audit behavior. Updates
+require the confirmation flag. Shutdown seconds are limited to 1–86400
+for a scheduled shutdown. The `usertable` result reuses the existing session
+ledger and return cursor.
+
+The Web HTTP adapter exposes `POST api/secret` for an active password prompt.
+It checks the same session, CSRF token, and single-use prompt challenge before
+passing the password or cancellation to the existing BBS password dialogue.
+The terminal and the Web sign-in form keep their own existing entry points.

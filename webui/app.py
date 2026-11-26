@@ -16,7 +16,7 @@ from urllib.parse import urlsplit, quote
 
 from aiohttp import web, WSMsgType
 from .bridge import Bridge, BridgeError, empty_view, response_data
-from .commands import COMMANDS, CORE_UPDATES, SESSION_UPDATES, action_arguments, core_update, visible
+from .commands import COMMANDS, CORE_UPDATES, RUNTIME_UPDATES, SESSION_UPDATES, action_arguments, core_update, visible
 from .presentation import Presentation
 from .terminal import relay
 from .transfers import ResumeRecords
@@ -39,6 +39,8 @@ class WebSession:
     downloads: dict = field(default_factory=dict)
     vault_sigop: bool = False
     games: list = field(default_factory=list)
+    secret_mode: int = 0
+    secret_challenge: str = ''
 
 
 def create_app(config):
@@ -133,6 +135,13 @@ def create_app(config):
         result['state']['games']=session.games
         result['state']['link_management']=bool(cfg.get('link_control_socket')) and bool(result['state'].get('admin'))
         result['data']={**empty_view(),**result['data']} if 'data' in result else response_data(result['text'])
+        mode=result['state'].get('password_mode',0) if result['state'].get('secret') else 0
+        if mode!=session.secret_mode:
+            session.secret_mode=mode
+            session.secret_challenge=''
+        if mode and not session.secret_challenge:
+            session.secret_challenge=secrets.token_urlsafe(24)
+        result['secret_challenge']=session.secret_challenge
         result['csrf']=session.csrf
         result['actions']=[{k:v for k,v in item.items() if k!='command'} for item in COMMANDS.values() if visible(item,result['state'])]
         return result
@@ -152,7 +161,10 @@ def create_app(config):
         result.set_cookie(cookie,ident,httponly=True,secure=secure,samesite='Strict',path=base)
         return result
 
-    async def session_info(request):return response(current(request,terminal_ok=True))
+    async def session_info(request):
+        session=current(request,terminal_ok=True)
+        async with session.bridge.lock:
+            return response(session)
 
     async def logout(request):
         session=current(request,mutate=True,terminal_ok=True)
@@ -256,6 +268,13 @@ def create_app(config):
             group=item['group']
             if session.bridge.state.get('chat') and group!='chat':raise BridgeError('Leave the chat before this operation')
             state=session.bridge.state
+            if state.get('secret'):raise BridgeError('Finish or cancel the current password prompt first')
+            if state.get('core_runtime_controls')==1:
+                if key=='usertable':
+                    cursor,_=search_positions(payload,state)
+                    return response(session,await session.bridge.view('usertable',0,cursor))
+                if key in RUNTIME_UPDATES:
+                    return response(session,await session.bridge.update(key,flag=item['confirm'],**core_update(key,args)))
             if state.get('core_session_controls')==1:
                 if key in session_views:
                     return response(session,await session.bridge.view(session_views[key],0,0))
@@ -386,11 +405,34 @@ def create_app(config):
     async def input_line(request):
         session=current(request,mutate=True);payload=await object_body(request);line=payload.get('line','')
         if not isinstance(line,str):raise ValueError('Invalid input')
-        # The Web console is for line interaction. Raw transfer/game bytes use their own routes.
-        in_text=any(session.bridge.state.get(k) for k in ('editing','secret','chat','gather'))
-        if not in_text and re.match(r'(?i)\s*(CONNECTOR|RAW|MENU|QUIT|TRANSFER|DOOR|Z(?:UPLOAD|DOWNLOAD|RESUME|MAIL)[A-Z]*|(?:MAIL)?(?:UPLOAD|DOWNLOAD)[A-Z]*)\b',line):
-            raise BridgeError('Use the Web transfer controls or the terminal for this command')
-        return response(session,await session.bridge.command(line))
+        # The Web console is for line interaction. Passwords have a separate
+        # endpoint so an obsolete form cannot become an ordinary BBS command.
+        async with session.bridge.lock:
+            if session.bridge.state.get('secret'):raise BridgeError('Use the password prompt')
+            in_text=any(session.bridge.state.get(k) for k in ('editing','chat','gather'))
+            if not in_text and re.match(r'(?i)\s*(CONNECTOR|RAW|MENU|QUIT|TRANSFER|DOOR|Z(?:UPLOAD|DOWNLOAD|RESUME|MAIL)[A-Z]*|(?:MAIL)?(?:UPLOAD|DOWNLOAD)[A-Z]*)\b',line):
+                raise BridgeError('Use the Web transfer controls or the terminal for this command')
+            return response(session,await session.bridge.exchange(line))
+
+    async def secret_input(request):
+        session=current(request,mutate=True);payload=await object_body(request)
+        challenge=payload.get('challenge')
+        cancel=payload.get('cancel',False)
+        password=payload.get('password','')
+        if not isinstance(challenge,str) or not re.fullmatch(r'[A-Za-z0-9_-]{32}',challenge):
+            raise ValueError('Invalid password prompt')
+        if type(cancel) is not bool or (cancel and password) or not isinstance(password,str):
+            raise ValueError('Invalid password input')
+        if not cancel and (not 8<=len(password.encode('utf-8'))<=128 or any(ord(c)<32 or ord(c)==127 for c in password)):
+            raise ValueError('Password must be 8–128 bytes without controls')
+        async with session.bridge.lock:
+            state=session.bridge.state
+            if (not state.get('secret') or not session.secret_mode or state.get('password_mode')!=session.secret_mode
+                    or not secrets.compare_digest(challenge,session.secret_challenge)):
+                raise BridgeError('Password prompt expired')
+            session.secret_challenge=''
+            result=await session.bridge.exchange('/CANCEL' if cancel else password)
+            return response(session,result)
 
     async def conference(request):
         session = current(request, mutate=True)
@@ -444,6 +486,7 @@ def create_app(config):
         attachments=payload.get('attachments',[])
         if not isinstance(attachments,list) or len(attachments)>16 or any(type(x) is not int or not 1<=x<=2147483646 for x in attachments):raise ValueError('Invalid attachments')
         async with session.bridge.lock:
+            if session.bridge.state.get('secret'):raise BridgeError('Finish or cancel the current password prompt first')
             if session.bridge.state.get('core_updates') == 1:
                 if kind not in ('article','mail','reply_mail','editing'):raise ValueError('Invalid compose kind')
                 if kind=='editing' and not session.bridge.state.get('editing'):raise BridgeError('No active editor')
@@ -759,7 +802,7 @@ def create_app(config):
     app.cleanup_ctx.append(lifetime)
     app.router.add_get(base,index)
     app.router.add_get(base+'assets/{name}',asset)
-    for path,handler in [('session',new_session),('logout',logout),('auth',authenticate),('action',operate),('query',query),('input',input_line),('compose',compose),('gather',gather),('conference',conference),('chat',chat_send),('upload',upload),('download',download)]:app.router.add_post(base+'api/'+path,handler)
+    for path,handler in [('session',new_session),('logout',logout),('auth',authenticate),('action',operate),('query',query),('input',input_line),('secret',secret_input),('compose',compose),('gather',gather),('conference',conference),('chat',chat_send),('upload',upload),('download',download)]:app.router.add_post(base+'api/'+path,handler)
     app.router.add_get(base+'api/session',session_info)
     app.router.add_get(base+'api/link',link_control)
     app.router.add_post(base+'api/link',link_control)

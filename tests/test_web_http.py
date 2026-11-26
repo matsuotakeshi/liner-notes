@@ -38,6 +38,16 @@ async def exercise(bbs,tmp):
         return c
     async def post(c,path,payload):
         r=await c.post(base+path,json=payload);assert r.status==200,(r.status,await r.text());return await r.json()
+    async def password_prompt(c):
+        # Registration and login impose a one-second BBS cooldown. Retry only
+        # the explicit rejection, which has not opened a password prompt.
+        deadline=asyncio.get_running_loop().time()+3
+        while True:
+            r=await post(c,'action',{'action':'settings.password'})
+            if r['text'].strip()!='ERR try later':return r
+            assert not r['state']['secret'] and not r['secret_challenge'],r
+            assert asyncio.get_running_loop().time()<deadline,r['text']
+            await asyncio.sleep(0.1)
     try:
         a=await client('alice');b=await client('bob');outsider=await client('carol')
         async with b.get(base+'link') as r:assert r.status==403
@@ -59,6 +69,10 @@ async def exercise(bbs,tmp):
         r=await post(b,'action',{'action':'userlog'})
         assert not r['text'] and r['data']['report']['title']=='USERLOG',r
         assert r['data']['report']['rows'] and all(row[2]=='2' for row in r['data']['report']['rows']),r
+        r=await post(b,'action',{'action':'usertable'})
+        report=r['data']['report']
+        assert not r['text'] and report['title']=='USERTABLE' and r['state']['core_runtime_controls']==1,r
+        assert report['rows'] and all(row[1]=='2' and row[2].isdigit() for row in report['rows']),r
         assert not any(x['id']=='admin.connections' for x in r['actions']),r
         info=await post(a,'query',{'kind':'boards'});assert info['state']['games']==[{'id':1,'title':'Web test game'}],info
         invalid=await a.post(base+'query',json=[]);assert invalid.status==400
@@ -362,6 +376,47 @@ async def exercise(bbs,tmp):
         assert r['data']['check']=={'active':True,'finished':True},r
         r=await post(b,'action',{'action':'check.done'})
         assert r['text'].startswith('CHECKPOINT SAVED'),r
+        # The same-session challenge must never be sent as a line command or
+        # accepted for a different prompt, account, or missing CSRF token.
+        r=await password_prompt(outsider)
+        challenge=r['secret_challenge']
+        assert r['state']['secret'] and challenge and 'CURRENT PASSWORD' in r['text'],r
+        async with outsider.post(base+'input',json={'line':'web-test-password'}) as refused:
+            assert refused.status==409,await refused.text()
+        async with outsider.post(base+'action',json={'action':'settings.prefs'}) as refused:
+            assert refused.status==409,await refused.text()
+        async with outsider.post(base+'secret',json={'challenge':challenge,'cancel':True},headers={'X-CSRF-Token':'wrong'}) as refused:
+            assert refused.status==403,await refused.text()
+        async with b.post(base+'secret',json={'challenge':challenge,'password':'web-test-password'}) as refused:
+            assert refused.status==409,await refused.text()
+        r=await post(outsider,'secret',{'challenge':challenge,'password':'web-test-password'})
+        next_challenge=r['secret_challenge']
+        assert r['state']['secret'] and next_challenge!=challenge and 'NEW PASSWORD' in r['text'],r
+        assert 'web-test-password' not in json.dumps(r),r
+        async with outsider.post(base+'secret',json={'challenge':challenge,'password':'web-other-password'}) as refused:
+            assert refused.status==409,await refused.text()
+        r=await post(outsider,'secret',{'challenge':next_challenge,'password':'web-other-password'})
+        confirm=r['secret_challenge']
+        assert r['state']['secret'] and confirm!=next_challenge and 'CONFIRM PASSWORD' in r['text'],r
+        r=await post(outsider,'secret',{'challenge':confirm,'password':'web-other-password'})
+        assert not r['state']['secret'] and not r['secret_challenge'] and 'PASSWORD CHANGED' in r['text'],r
+        assert 'web-other-password' not in json.dumps(r),r
+        r=await password_prompt(b)
+        assert r['state']['secret'] and r['secret_challenge'] and 'CURRENT PASSWORD' in r['text'],r
+        async with b.get(base+'session') as pending:
+            assert pending.status==200 and (await pending.json())['secret_challenge']==r['secret_challenge']
+        r=await post(b,'secret',{'challenge':r['secret_challenge'],'cancel':True})
+        assert not r['state']['secret'] and not r['secret_challenge'] and 'CANCELLED' in r['text'],r
+
+        action={'action':'admin.shutdown','values':{'seconds':'300','text':'HTTP test maintenance'}}
+        async with b.post(base+'action',json={**action,'confirmed':True}) as denied:
+            assert denied.status==409,await denied.text()
+        async with a.post(base+'action',json=action) as denied:
+            assert denied.status==409,await denied.text()
+        r=await post(a,'action',{**action,'confirmed':True})
+        assert r['mutation']['ok'] and 'SHUTDOWN SCHEDULED 300' in r['text'],r
+        r=await post(a,'action',{'action':'admin.shutdown_cancel','confirmed':True})
+        assert r['mutation']['ok'] and 'SHUTDOWN CANCELLED' in r['text'],r
         print('PASS Web HTTP: CSRF/Origin, session isolation, 256KiB drafts, Gather, literal posts, mail/privacy, public/private files with SHA256, one-use downloads, resume/retry, terminal login and real PTY door return')
     finally:
         await asyncio.gather(*(c.close() for c in clients));await runner.cleanup()
