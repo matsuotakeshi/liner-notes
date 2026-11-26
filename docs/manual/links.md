@@ -133,7 +133,10 @@ liner-notes-link reset-peer --config /usr/local/etc/liner-notes/link.toml 相手
 
 Linuxでは `scripts/install-linux.py` のラッパーを使用し、コネクタ用Pythonに
 `link-requirements.txt` を導入します。設定例の `/var/db` を運用方針に合わせて
-`/var/lib` 等へ変更します。Solarisは将来候補であり、この版では未検証です。
+`/var/lib` 等へ変更します。Solaris 11.4 x86-64では専用venvを用いて、3局スター・
+リング、mTLS、再送、再起動、チェックポイントを実機CIで確認しました。
+設定例の保存先は `/var/opt/liner-notes/link` です。
+パッケージによる導入範囲は[Solarisへの導入](install-solaris.md)を参照してください。
 
 ## 削除伝播とローカル非表示
 

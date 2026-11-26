@@ -93,7 +93,7 @@
   "linux/selinux/selinux_labels.py": "d8c3a3664c5781bfe5fa9174fe8369e5c0adba89630d794db9eb8f62af7b521d",
   "ci/selinux_root.py": "8150d379508604d01312ac73c27a112c97e89ea36b2561b19fc3d941e1c227b4",
   "ci/selinux_native.py": "bdfdaf868962704fdf55bb7f048c1ece59a943b1962f2e47552bc8de6d6cfd7e",
-  "ci/solaris_ci.py": "0d64c1b39e7a367435813365e5dfcd978efe9da0dd55b13751bbf7ed6f6602c8",
+  "ci/solaris_ci.py": "e9cf988d5ac4c0c6f3e46864c6ad82bbedb7b580d47cc9387f94b5a777d3c536",
   "scripts/install-solaris.py": "2369f175461bfe2101380209212a236ba57aa7ebdad9267a25f95c98c57c17f5",
   "scripts/link_maintenance.py": "ee76d893e80f536f65bcf869348d7a083eafc3f0d5280dcd35de431dbfc16c30",
   "src/door_lock.c": "6e6e2798a5c626767a89f2cb1ef8f8cc79f13caaba879e45155f13c6bc421e34",
@@ -401,6 +401,6 @@
   "src/session_web_view.c": "d0cee803c39dd29c6c8a2b690330f29de228eac4eadd8fc557f0660d9883cc8d",
   "tests/test_web_connector.py": "6eaf041984583da7a15d79edba0a606e95b4e038471846832a14eb0ba38a1975",
   "tests/test_web_http.py": "42c235d9efa33a041a69131a0012bfe79fe0e73380be3dff1f43dade83c76c2f",
-  "ci/solaris_package.py": "d9d1b10c7631758d0cb76725c5a86b242f753f46094ec3d9b0128369cd69dbcc",
+  "ci/solaris_package.py": "855c0bdd34b4285b7a8cbf2cab373fbee247c3b3d82a33981b7719ab6e81dc5d",
   ".github/workflows/solaris-package.yml": "d69c66ac69829023039177bdcfc0e5f92158a9518d3148b14caddd5be99d4d66"
 }

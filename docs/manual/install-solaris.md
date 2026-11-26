@@ -58,7 +58,15 @@ SMFは専用ユーザー・グループ`liner_notes`、`basic`権限、初期状
 
 SMFのcontractモデルで子プロセスを追跡し、停止は`:kill`で当該サービスのcontract内に限定します。起動直後の異常終了を開始失敗として返し、起動後の契約終了・障害処理はsvc.startdへ委ねます。標準出力・エラーはSMFのサービスログへ出します。PID名を使った全システム一括終了はしません。
 
-`svcs`のonline状態だけでBBSへのログイン成功を判断せず、待受と実接続も確認します。SMF登録・自動起動・異常終了後の状態遷移は実機試験待ちです。初回承認で設置するCI専用helperは、固定の試験サービスだけを扱い、BBSと開始methodは非rootのCIユーザー・basic権限で実行します。既存サービスがあれば上書きせず拒否し、CI切断・期限切れでも自分が登録したサービスだけを停止・削除します。準備済みhelperの欠落やソース不一致は試験失敗とします。この試験で確認する有効設定の保持と、OS再起動による自動起動実証は別で、OS再起動は実施しません。`svccfg validate`成功は登録・稼働成功とは別です。
+`svccfg validate`でマニフェストの構文を検査します。SMFへの登録後は `svcs` で
+online状態を確認し、待受ポートとBBSへの実接続も確かめます。
+
+専用SMF試験では、マニフェストを無効状態で登録し、有効化後にTelnetで接続しました。
+停止・再起動、実行中プロセスの異常終了からの自動復旧、不正な起動設定による
+maintenance状態と設定修正後の復帰、試験用登録の削除を確認しました。
+試験は固定のFMRIに限定し、BBSと起動メソッドは非rootのCIユーザーの `basic`
+権限で実行します。OS再起動後の自動起動は未検証です。
+[0.75のSolaris Native CI](https://github.com/matsuotakeshi/liner-notes/actions/runs/45760676614)
 
 Doorを有効にするときは同じビルドの排他helperを本体と一緒に配置してください。ビルド領域では本体と同じディレクトリ、導入後は本体から見た`../libexec/liner-notes-door-lock`を使用します。PATHやデータディレクトリから探しません。所有者がrootまたは実行ユーザーでない、他者が書き込める、setuid/setgid付き、実行できないhelperは拒否します。実体の親ディレクトリも所有者と書込権を検査します（root所有のstickyな一時ディレクトリだけは例外）。`liner-notes-doctor --check-doors`でも、SolarisでDoorを設定している場合に配置・権限を読み取り専用で診断します。欠落・不正時はDoor設定を持つ本体の起動を拒否します。
 
@@ -67,7 +75,7 @@ Doorを有効にするときは同じビルドの排他helperを本体と一緒�
 - Solaris 11.4 CBE x86-64、GCC15、Python3.13.9で本体・管理コマンドのビルドと基本BBS回帰全体、SQLiteの別コピー変換・バックアップ・復元、doctor 33件と原本非変更、C/Python排他寿命、SMF staging・定義検証が成功しました。DoorはNAWS・複数接続/枠・異常終了/切断/子孫回収、WebUIはHTTP・CSRF・私信・転送・実PTY、BBS間リンクは3局スター/リング・mTLS・再送・再起動・チェックポイントまで成功しています。
 - lrzsz0.13.1による実送受信、バイナリ・空ファイル、SHA-256一致、日英メニュー、メール添付、一括転送、通信切断後の途中再開、同じ接続からの再試行、保存済み登録先を使うZRESUMEが成功しました。転送子プロセス24並列と制限超過拒否・停止回収、タイムアウト後の端末属性の完全復元、転送中の会員権限取り消しも検証しています。これは自動試験の範囲であり、Solarisでの本番規模の同時大容量転送性能を保証するものではありません。
 - WebUI・リンクの検証では、専用venvへaiohttp3.14.5を導入し、既存のcryptography46.0.3と組み合わせて成功しました。system PythonとOSパッケージは変更していません。
-- 0.75の[Solaris Native CI](https://github.com/matsuotakeshi/liner-notes/actions/runs/45760676614)では、SMFに試験用サービスを登録し、起動・Telnet接続、停止・再起動、異常終了後の復旧と登録の後片付けを確認しました。内蔵SSHは[別の実機試験](https://github.com/matsuotakeshi/liner-notes/actions/runs/45770691991)で確認しています。
+- 内蔵SSHの暗号化接続は、libsshを有効にした[専用の実機試験](https://github.com/matsuotakeshi/liner-notes/actions/runs/45770691991)で確認しました。
 
 ## Solaris IPSパッケージ（開発候補）
 
