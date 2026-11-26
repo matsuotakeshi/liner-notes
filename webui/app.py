@@ -200,7 +200,39 @@ def create_app(config):
         'profile.find': ('profile_find','{field} {query}','PROFILESFROM {cursor} {query}'),
         'profile.group': ('profile_group','','PROFILESFROM {cursor} *'),
     }
+    extra_views = {
+        'board.unread': ('article_unread','','UNREAD 0 {cursor}','board'),
+        'profile.self': ('profile_login','','PROFILE',''),
+        'profile.view': ('profile_login','{login}','PROFILE {login}',''),
+        'settings.prefs': ('preferences','','PREFS',''),
+        'admin.application': ('application','','APPLICATION {user}','user'),
+        'admin.connections': ('connections','','CONNECTIONS',''),
+        'board.new': ('article_new','','NEW','board'),
+        'board.prev': ('article_prev','','PREV','article'),
+        'board.next': ('article_next','','NEXT','article'),
+        'board.parent': ('article_parent','','PARENT','article'),
+        'board.child': ('article_child','','CHILD','article'),
+        'board.scan': ('article_scan','{order} {scope} {author} {query}','SCAN {order} {scope} {author} {query}','board'),
+        'mail.scan': ('mail_scan','{order}','MAIL SCAN {order}',''),
+        'mail.prev': ('mail_previous','','MAIL P','mail_current'),
+        'mail.next': ('mail_next','','MAIL N',''),
+        'mail.repeat': ('mail_read','','MAIL L','mail_current'),
+        'mail.attachments': ('mail_files','','MAIL FILES {cursor}',''),
+        'file.children': ('file_children','{path}','FILECHILDREN {path}',''),
+        'file.detail': ('file_detail','','FILE {id}','id'),
+        'file.text': ('file_text','','FILETYPE {id} {cursor}','id'),
+        'file.audit': ('file_audit','','FILEAUDIT {cursor}',''),
+        'file.history': ('file_history','','FILEHISTORY 0 {cursor}',''),
+        'file.stats': ('file_stats','','FILESTATS 0 {cursor}',''),
+        'admin.audit': ('article_audit','','AUDIT {cursor}',''),
+        'admin.audit_article': ('article_audit','','AUDIT {cursor} ARTICLE {id}','id'),
+        'admin.audit_actor': ('article_audit','{login}','AUDIT {cursor} ACTOR {login}',''),
+        'admin.members': ('member_list','','MEMBERS {cursor}',''),
+        'admin.applications': ('applications','','APPLICATIONS {cursor}',''),
+    }
     search_actions = ('board.search','board.author','mail.search')
+    check_start = {'board.check':'ARTICLES {scope}','mail.check':'MAIL','file.check':'FILES {path}'}
+    check_control = {'check.next':'check_next','check.done':'check_done','check.cancel':'check_cancel'}
 
     def search_positions(payload, state):
         cursor=payload.get('cursor',0)
@@ -222,7 +254,28 @@ def create_app(config):
                 return response(session,await session.bridge.update(key,flag=item['confirm'],**core_update(key,args)))
             if session.bridge.state.get('mail') and group!='mail':await session.bridge.exchange('MAIL EXIT')
             command=item['command'].format(**args).rstrip()
-            if key in discovery:
+            if session.bridge.state.get('core_operations')==1:
+                if key in check_start:
+                    _,board=search_positions(payload,session.bridge.state)
+                    scope=check_start[key].format(**args)
+                    return response(session,await session.bridge.view('check_start',board,0,scope))
+                if key in check_control:
+                    return response(session,await session.bridge.view(check_control[key],0,0))
+            if key in extra_views:
+                state=session.bridge.state
+                cursor,board=search_positions(payload,state)
+                kind,path,continuation,source=extra_views[key]
+                if state.get('core_operations')==1:
+                    if source in ('id','user'):
+                        value=args[source]
+                        if not re.fullmatch(r'[0-9]{1,10}',value) or not 1<=int(value)<=2147483646:
+                            raise ValueError('Invalid target ID')
+                        ident=int(value)
+                    else:
+                        ident=board if source=='board' else state.get(source,0)
+                    return response(session,await session.bridge.view(kind,ident,cursor,path.format(**args)))
+                if cursor:command=continuation.format(cursor=cursor,**args)
+            elif key in discovery:
                 cursor,board=search_positions(payload,session.bridge.state)
                 kind,parameters,continuation=discovery[key]
                 if session.bridge.state.get('core_discovery')==1:
@@ -427,6 +480,11 @@ def create_app(config):
             if not 1<=len(lines)<=10 or any(len(line)>70 or line in ('//','/CANCEL') or any(ord(c)<32 or ord(c)==127 for c in line) for line in lines):raise ValueError('Gather allows 10 lines of 70 characters; // and /CANCEL are reserved')
         async with session.bridge.lock:
             if any(session.bridge.state.get(k) for k in ('editing','secret','chat','gather','input')):raise BridgeError('Finish the current dialogue first')
+            if lines is None and session.bridge.state.get('core_operations')==1:
+                cursor=payload.get('cursor',0)
+                if type(cursor) is not int or not 0<=cursor<=2147483646:
+                    raise ValueError('Invalid Gather position')
+                return response(session,await session.bridge.view('gather',0,cursor))
             if lines is not None and session.bridge.state.get('core_updates') == 1:
                 return response(session,await session.bridge.update('gather',body=''.join(line+'\r\n' for line in lines)))
             if session.bridge.state.get('mail'):await session.bridge.exchange('MAIL EXIT')

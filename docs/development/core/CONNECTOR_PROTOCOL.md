@@ -148,3 +148,30 @@ For file searches a board of `-` means the root. File lists and subtree
 lists reuse the existing `files` view. The shorter legacy commands remain
 available when the peer has no discovery capability. Date scans here are
 read-only queries. The interactive `CHECK` workflow owns checkpoint changes.
+
+`core_operations: 1` adds the following authenticated, typed views. Applicable
+access and visibility are enforced by the same worker operations as the terminal.
+Use the result's `data.next` to resume a paginated view.
+
+- `article_unread`, `article_new`: optional board ID; `article_prev`,
+  `article_next`, `article_parent`, `article_child`: current article ID.
+- `article_scan` uses the board ID or 0 and `ASC|DESC scope author query`.
+  `mail_scan` uses ID 0 and `ASC` or `DESC`. Both return an item and the
+  next item cursor with the same filters and direction.
+- `mail_next`: next unread, ID 0; `mail_previous`: current owned mail ID;
+  `mail_files`: owner upload list, ID 0.
+- `file_children`: file-board path; `file_detail` and `file_text`: file ID.
+  For `file_text`, the cursor is a byte offset, and the existing UTF-8/control
+  filtering is applied before rendering. `file_audit` reports local changes.
+  `file_history` and `file_stats` report authorized download events and counts.
+- `member_list`, `applications`: ID 0; `application`: member ID;
+  `article_audit`: optional article ID or actor login; `preferences`, `gather`:
+  ID 0. `profile_login` takes the optional profile login as its trailing argument.
+- `connections` returns the current local connections for an administrator, ID 0.
+
+`check_start` accepts an optional anchored board ID, cursor 0 and the existing
+ARTICLES, MAIL or FILES scope. The connector holds the browsing window for that
+authenticated session. `check_next`, `check_done` and `check_cancel` take zero
+ID and cursor. The result includes `data.check.active` and `data.check.finished`.
+Only a completed traversal can commit its checkpoint. Cancelling or ending
+the connection discards the traversal.

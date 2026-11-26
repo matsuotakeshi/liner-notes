@@ -94,6 +94,18 @@ async def exercise(bbs,tmp):
         bad=await b.post(base+'action',json={'action':'board.search','values':{'query':'Web'},'cursor':True})
         assert bad.status==400,await bad.text()
         r=await post(b,'query',{'kind':'notes'});assert r['data']['notes'][0]['title']=='Web article',r
+        r=await post(b,'action',{'action':'board.unread'})
+        assert r['state']['core_operations']==1 and [row['id'] for row in r['data']['matches']]==['1'],r
+        r=await post(b,'action',{'action':'board.check','values':{'scope':'HERE'}})
+        assert r['data']['check']=={'active':True,'finished':True} and r['data']['matches'][0]['id']=='1',r
+        r=await post(b,'action',{'action':'check.cancel'})
+        assert r['data']['check']=={'active':False,'finished':False},r
+        r=await post(b,'action',{'action':'check.done'})
+        assert r['text'].startswith('ERR ') and not r['data']['check']['active'],r
+        r=await post(b,'action',{'action':'board.check','values':{'scope':'HERE'}})
+        assert r['data']['matches'][0]['id']=='1',r
+        r=await post(b,'action',{'action':'check.done'})
+        assert r['text'].startswith('CHECKPOINT SAVED') and not r['data']['check']['active'],r
         r=await post(b,'query',{'kind':'read','id':1});assert r['data']['article']['body']==content.replace('\n','\r\n')+'\r\n',r
         await post(a,'action',{'action':'settings.editor','values':{'value':'LINE'}})
         r=await post(a,'compose',{'kind':'article','title':'Large draft','body':'\n'.join(['x'*4094]*64),'draft':True});assert r['mutation']['ok'] and r['mutation']['revision'] and not r['state']['editing'],r['text']
@@ -105,8 +117,18 @@ async def exercise(bbs,tmp):
         r=await post(b,'action',{'action':'board.retitle','values':{'id':'3','text':'Retitled'}});assert r['mutation']['ok'],r
         r=await post(outsider,'action',{'action':'board.withdraw','values':{'id':'3'},'confirmed':True});assert not r['mutation']['ok'],r
         r=await post(b,'action',{'action':'board.seen','values':{'id':'3'}});assert r['mutation']['ok'],r
+        r=await post(b,'query',{'kind':'read','id':3})
+        assert r['data']['article']['id']==3,r
+        r=await post(b,'action',{'action':'board.parent'})
+        assert not r['text'] and r['data']['article']['id']==1,r
+        scan={'action':'board.scan','values':{'order':'DESC','scope':'HERE','author':'*','query':'*'},'search_board':1}
+        r=await post(b,'action',scan)
+        assert r['data']['article']['id']==3 and r['data']['next']==2,r
+        r=await post(b,'action',{**scan,'cursor':r['data']['next']})
+        assert r['data']['article']['id']==2,r
         r=await post(a,'gather',{'body':'Web Gather\n日本語の伝言'});assert r['mutation']['ok'] and 'GATHER SAVED' in r['text'],r
-        r=await post(b,'gather',{});assert '日本語の伝言' in r['text'],r
+        r=await post(b,'gather',{})
+        assert not r['text'] and r['data']['gather'][0]['body']=='Web Gather\r\n日本語の伝言\r\n',r
         payload=bytes(range(256))*13+b'\x00\xff';digest=hashlib.sha256(payload).hexdigest();enc=lambda x:base64.b64encode(x.encode()).decode()
         headers={'X-File-Name':enc('日本語.bin'),'X-File-Description':enc('Web test'),'X-File-Board':'-'}
         r=await a.post(base+'upload',data=payload,headers=headers);assert r.status==200,await r.text();v=await r.json();fid=v['id'];assert v['sha256']==digest
@@ -124,14 +146,29 @@ async def exercise(bbs,tmp):
         assert not r['text'] and any(row['path']=='games/child' and row['title']=='Child files' for row in r['data']['file_boards']),r
         r=await post(b,'action',{'action':'file.news','values':{'path':'-','date':'2001-02-29'}})
         assert r['text'].startswith('ERR ') and not r['data']['files'],r
+        r=await post(b,'action',{'action':'file.detail','values':{'id':str(fid)}})
+        assert not r['text'] and dict(r['data']['report']['fields'])['sha256']==digest,r
+        r=await post(b,'action',{'action':'file.text','values':{'id':str(fid)}})
+        assert r['text'].startswith('ERR ') and 'file_text' not in r['data'],r
+        r=await post(b,'action',{'action':'file.children','values':{'path':'games'}})
+        assert not r['text'] and r['data']['file_boards']==[{'path':'games/child','title':'Child files'}],r
         r=await post(a,'action',{'action':'file.desc','values':{'id':str(fid),'text':'更新した説明'}});assert r['mutation']['ok'],r
+        r=await post(a,'action',{'action':'file.audit'})
+        assert not r['text'] and r['data']['report']['title']=='FILEAUDIT',r
         r=await post(outsider,'action',{'action':'file.desc','values':{'id':str(fid),'text':'Unauthorized'}});assert not r['mutation']['ok'],r
         r=await b.post(base+'download',json={'id':fid});assert r.status==200,await r.text();assert await r.read()==payload
+        r=await post(a,'action',{'action':'file.history'})
+        assert not r['text'] and any(row[1]==str(fid) and row[4]==str(len(payload)) for row in r['data']['report']['rows']),r
+        r=await post(a,'action',{'action':'file.stats'})
+        assert not r['text'] and [str(fid),'1'] in r['data']['report']['rows'],r
         r=await post(a,'download-ticket',{'id':fid,'name':'日本語.bin'});url=origin+r['url']
         denied=await outsider.get(url);assert denied.status==404
         dl=await a.get(url);assert dl.status==200 and 'filename*=UTF-8' in dl.headers['Content-Disposition'];assert await dl.read()==payload
         again=await a.get(url);assert again.status==404
         r=await a.post(base+'upload?kind=mail',data=payload,headers=headers);assert r.status==200,await r.text();attachment=(await r.json())['id']
+        for client,expected in ((a,[str(attachment)]),(b,[])):
+            r=await post(client,'action',{'action':'mail.attachments'})
+            assert not r['text'] and [row[0] for row in r['data']['report']['rows']]==expected,r
         r=await outsider.post(base+'download',json={'kind':'mail','id':attachment});assert r.status==409,await r.text()
         r=await post(outsider,'compose',{'kind':'mail','title':'Forbidden','recipient':'bob','body':'private','attachments':[attachment]});assert not r['mutation']['ok'],r
         r=await post(a,'compose',{'kind':'mail','title':'private','recipient':'bob','body':'私信本文','attachments':[attachment]});assert r['mutation']['ok'] and r['mutation']['id']==1,r
@@ -158,6 +195,8 @@ async def exercise(bbs,tmp):
         r=await post(b,'action',{'action':'mail.resume','values':{}});assert r['state']['editing'] and 'Reply draft' in r['preview'],r
         r=await post(b,'compose',{'kind':'editing','title':'Reply sent','body':'返事の本文'});assert r['mutation']['ok'] and r['mutation']['id']==2 and not r['state']['editing'],r
         r=await post(a,'query',{'kind':'mail_read','id':2});assert r['data']['message']['parent']==1 and r['data']['message']['body']=='返事の本文\r\n',r
+        r=await post(a,'action',{'action':'mail.prev'})
+        assert not r['text'] and r['data']['message']['id']==1,r
         r=await post(outsider,'action',{'action':'mail.delete','values':{'id':'2'},'confirmed':True});assert not r['mutation']['ok'],r
         r=await post(a,'action',{'action':'mail.delete','values':{'id':'2'},'confirmed':True});assert r['mutation']['ok'] and not r['state']['confirmation'],r
         r=await post(a,'action',{'action':'chat.open','values':{}});assert r['state']['chat'],r
@@ -202,6 +241,37 @@ async def exercise(bbs,tmp):
         r=await post(b,'action',{**search,'cursor':r['data']['next']})
         assert not r['text'] and [int(row['id']) for row in r['data']['matches']]==searchable[9:],r
         assert r['data']['next']==0,r
+        plain='visible line\n'*700
+        r=await a.post(base+'upload',data=plain.encode(),headers={**headers,'X-File-Name':enc('view.txt')})
+        assert r.status==200,await r.text()
+        text_id=str((await r.json())['id'])
+        r=await post(a,'action',{'action':'file.ascii','values':{'id':text_id,'value':'ON'}})
+        assert r['mutation']['ok'],r
+        view_text={'action':'file.text','values':{'id':text_id}}
+        r=await post(b,'action',view_text)
+        assert r['data']['next'] and not r['text'],r
+        first=r['data']['file_text']['body']
+        r=await post(b,'action',{**view_text,'cursor':r['data']['next']})
+        assert first+r['data']['file_text']['body']==plain and not r['data']['next'],r
+        r=await post(a,'action',{'action':'admin.connections'})
+        assert not r['text'] and r['data']['report']['title']=='CONNECTIONS',r
+        assert {'alice','bob','carol'}<={row[1] for row in r['data']['report']['rows']},r
+        r=await post(a,'action',{'action':'admin.members'})
+        assert not r['text'] and [row[1] for row in r['data']['report']['rows']]==['alice','bob','carol'],r
+        r=await post(a,'action',{'action':'admin.applications'})
+        assert not r['text'] and not r['data']['report']['rows'],r
+        r=await post(a,'action',{'action':'admin.audit_article','values':{'id':str(searchable[0])}})
+        assert not r['text'] and any(row[4:6]==['HIDE',str(searchable[0])] for row in r['data']['report']['rows']),r
+        r=await post(a,'action',{'action':'settings.prefs'})
+        assert not r['text'] and r['data']['report']['title']=='PREFS',r
+        r=await post(b,'action',{'action':'board.check','values':{'scope':'ALL'}})
+        assert r['data']['check']=={'active':True,'finished':False} and r['data']['next'],r
+        r=await post(b,'action',{'action':'check.done'})
+        assert r['text'].startswith('ERR ') and r['data']['check']['active'],r
+        r=await post(b,'action',{'action':'check.next'})
+        assert r['data']['check']=={'active':True,'finished':True},r
+        r=await post(b,'action',{'action':'check.done'})
+        assert r['text'].startswith('CHECKPOINT SAVED'),r
         print('PASS Web HTTP: CSRF/Origin, session isolation, 256KiB drafts, Gather, literal posts, mail/privacy, public/private files with SHA256, one-use downloads, resume/retry, terminal login and real PTY door return')
     finally:
         await asyncio.gather(*(c.close() for c in clients));await runner.cleanup()

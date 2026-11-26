@@ -7,6 +7,7 @@
 #include "profile_store.h"
 #include "store_limits.h"
 #include "vault_bridge.h"
+#include "traversal_protocol.h"
 #include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -85,6 +86,79 @@ static void render_conference(ViewOutput *out,const ConferenceReply *page) {
     append(out,"]}");
 }
 
+static void render_report(ViewOutput *out,const OperationPage *page) {
+    const char *title,*columns;
+    unsigned count;uint32_t next;
+    switch(page->kind) {
+    case OPERATION_PAGE_MEMBERS:
+        title="MEMBERS";columns="\"user\",\"login\",\"status\"";
+        count=page->data.members.count;next=page->data.members.next;break;
+    case OPERATION_PAGE_ARTICLE_AUDIT:
+        title="AUDIT";columns="\"id\",\"date\",\"user\",\"login\",\"event\",\"target\",\"board\"";
+        count=page->data.article_audit.count;next=page->data.article_audit.next;break;
+    case OPERATION_PAGE_FILE_AUDIT:
+        title="FILEAUDIT";columns="\"id\",\"file\",\"date\",\"event\",\"user\",\"before\",\"after\"";
+        count=(unsigned)page->data.file_audit.count;next=page->data.file_audit.next;break;
+    case OPERATION_PAGE_DOWNLOAD_HISTORY:
+        title="FILEHISTORY";columns="\"id\",\"file\",\"user\",\"timestamp\",\"bytes\",\"protocol\"";
+        count=(unsigned)page->data.download_history.count;next=(uint32_t)page->data.download_history.next;break;
+    case OPERATION_PAGE_DOWNLOAD_STATS:
+        title="FILESTATS";columns="\"file\",\"downloads\"";
+        count=(unsigned)page->data.download_stats.count;next=(uint32_t)page->data.download_stats.next;break;
+    default:
+        title="MAIL FILES";columns="\"file\",\"bytes\",\"name\",\"status\"";
+        count=page->data.mail_files.count;next=page->data.mail_files.next;break;
+    }
+    append(out,"\"next\":%u,\"report\":{\"kind\":\"table\",\"title\":\"%s\",\"columns\":[%s],\"rows\":[",next,title,columns);
+    for(unsigned i=0;i<count;i++) {
+        append(out,"%s[",i?",":"");
+        switch(page->kind) {
+        case OPERATION_PAGE_MEMBERS: {
+            const MemberSummary *r=&page->data.members.rows[i];
+            append(out,"\"%u\",",r->id);string(out,r->name);
+            append(out,",");string(out,r->state==MEMBER_STATE_PENDING?"pending":r->state==MEMBER_STATE_SUSPENDED?"suspended":"active");
+            break;
+        }
+        case OPERATION_PAGE_ARTICLE_AUDIT: {
+            const ArticleAuditRow *r=&page->data.article_audit.rows[i];
+            static const char *const actions[]={"HIDE","RESTORE","WITHDRAW","RETITLE","AUTHOR","CHAT_KICK","SUSPEND","RESUME"};
+            append(out,"\"%u\",",r->sequence);stamp_text(out,r->time);
+            append(out,",\"%u\",",r->actor);string(out,r->actor_name);
+            append(out,",");string(out,(unsigned)r->action<sizeof(actions)/sizeof(*actions)?actions[r->action]:"?");
+            append(out,",\"%u\",\"%u\"",r->target,r->board);
+            break;
+        }
+        case OPERATION_PAGE_FILE_AUDIT: {
+            const VaultEvent *r=&page->data.file_audit.rows[i];
+            char action[]={r->action,0};
+            append(out,"\"%u\",\"%u\",",r->sequence,r->file);stamp_text(out,r->at);
+            append(out,",");string(out,action);append(out,",");string(out,r->actor);
+            append(out,",");string(out,r->before);append(out,",");string(out,r->after);
+            break;
+        }
+        case OPERATION_PAGE_DOWNLOAD_HISTORY: {
+            const DownloadHistoryRow *r=&page->data.download_history.rows[i];
+            append(out,"\"%zu\",\"%u\",",r->sequence,r->file);string(out,r->subject);
+            append(out,",\"%llu\",\"%u\",",(unsigned long long)r->at,r->size);string(out,r->protocol);
+            break;
+        }
+        case OPERATION_PAGE_DOWNLOAD_STATS: {
+            const DownloadCount *r=&page->data.download_stats.rows[i];
+            append(out,"\"%u\",\"%llu\"",r->file,(unsigned long long)r->count);
+            break;
+        }
+        default: {
+            const MailFileInfo *r=&page->data.mail_files.rows[i];
+            append(out,"\"%u\",\"%u\",",r->id,r->size);string(out,r->name);
+            append(out,",");string(out,r->active?"active":"ready");
+            break;
+        }
+        }
+        append(out,"]");
+    }
+    append(out,"],\"next\":%u}",next);
+}
+
 static void render_page(ViewOutput *out,const OperationPage *page) {
     unsigned count=0;
     uint32_t next=0;
@@ -92,12 +166,78 @@ static void render_page(ViewOutput *out,const OperationPage *page) {
     switch(page->kind) {
     case OPERATION_PAGE_BOARDS: key="boards";count=page->data.boards.count;next=page->data.boards.next;break;
     case OPERATION_PAGE_NOTES: key="notes";count=page->data.notes.count;next=page->data.notes.next;break;
+    case OPERATION_PAGE_MEMBERS: case OPERATION_PAGE_ARTICLE_AUDIT:
+    case OPERATION_PAGE_FILE_AUDIT: case OPERATION_PAGE_MAIL_FILES:
+    case OPERATION_PAGE_DOWNLOAD_HISTORY: case OPERATION_PAGE_DOWNLOAD_STATS:
+        render_report(out,page);return;
+    case OPERATION_PAGE_UNREAD: key="matches";count=page->data.unread.count;next=page->data.unread.next;break;
+    case OPERATION_PAGE_FILE_CHILDREN:
+        key="file_boards";count=(unsigned)page->data.file_children.count;next=page->data.file_children.next;break;
+    case OPERATION_PAGE_FILE_TEXT: {
+        const OperationFileText *r=&page->data.file_text;
+        append(out,"\"next\":%u,\"file_text\":{\"id\":%u,\"body\":",r->next,r->id);
+        quoted(out,r->text,r->size);append(out,"}");return;
+    }
+    case OPERATION_PAGE_FILE_DETAIL: {
+        const VaultQueryDetail *r=&page->data.file_detail;
+        char digest[65];vault_hex(r->entry.sha256,digest);
+        append(out,"\"report\":{\"kind\":\"fields\",\"title\":\"FILE\",\"fields\":[[\"file\",\"%u\"],[\"bytes\",\"%u\"],[\"sha256\",",
+               r->entry.id,r->entry.size);string(out,digest);
+        append(out,"],[\"name\",");string(out,r->entry.name);
+        append(out,"],[\"description\",");string(out,r->entry.description);
+        append(out,"],[\"publisher\",");string(out,r->entry.publisher);
+        append(out,"],[\"category\",");string(out,*r->entry.category?r->entry.category:"-");
+        append(out,"],[\"ASCII\",\"%s\"],[\"protocol\",",r->entry.ascii?"ON":"OFF");
+        string(out,r->protocol);append(out,"]]}");return;
+    }
     case OPERATION_PAGE_ARTICLES: key="matches";count=page->data.articles.count;next=page->data.articles.next;break;
     case OPERATION_PAGE_TREE: key="tree";count=page->data.tree.count;next=page->data.tree.next;break;
     case OPERATION_PAGE_MAIL: key="mail";count=page->data.mail.count;next=page->data.mail.next;break;
     case OPERATION_PAGE_PROFILES: key="profiles";count=page->data.profiles.count;next=page->data.profiles.next;break;
     case OPERATION_PAGE_FILE_BOARDS: key="file_boards";count=(unsigned)page->data.file_boards.count;next=page->data.file_boards.next;break;
     case OPERATION_PAGE_FILES: key="files";count=(unsigned)page->data.files.count;next=page->data.files.next;break;
+    case OPERATION_PAGE_GATHER:
+        key="gather";count=page->data.gather.count;next=page->data.gather.next;break;
+    case OPERATION_PAGE_CONNECTIONS: {
+        static const char *const modes[]={"BBS","EDITOR","CHAT","AUTH","BINARY","ZMODEM","DOOR"};
+        append(out,"\"report\":{\"kind\":\"table\",\"title\":\"CONNECTIONS\",\"columns\":["
+                   "\"connection\",\"login\",\"state\",\"transport\",\"peer\",\"seconds\",\"idle\","
+                   "\"received\",\"sent\",\"queued\",\"columns\",\"rows\"],\"rows\":[");
+        for(size_t i=0;i<page->data.connections.count;i++) {
+            const ConnectionSummary *r=&page->data.connections.rows[i];
+            append(out,"%s[\"%lu\",",i?",":"",r->id);string(out,r->login);
+            append(out,",");string(out,(unsigned)r->mode<sizeof(modes)/sizeof(*modes)?modes[r->mode]:"?");
+            append(out,",");string(out,r->telnet==2?"SSH":r->telnet?"TELNET":"RAW");
+            append(out,",");string(out,*r->peer?r->peer:"unknown");
+            append(out,",\"%llu\",\"%llu\",\"%llu\",\"%llu\",\"%zu\",\"%u\",\"%u\"]",
+                   (unsigned long long)r->elapsed,(unsigned long long)r->idle,(unsigned long long)r->rx,
+                   (unsigned long long)r->tx,r->queued,r->columns,r->rows);
+        }
+        append(out,"],\"next\":0}");return;
+    }
+    case OPERATION_PAGE_PREFERENCES: {
+        const MemberPreferences *r=&page->data.preferences;
+        append(out,"\"report\":{\"kind\":\"fields\",\"title\":\"PREFS\",\"fields\":[");
+        if(r->present)append(out,"[\"language\",\"%s\"],[\"pager\",\"%s\"],[\"editor\",\"%s\"],"
+                           "[\"columns\",\"%u\"],[\"rows\",\"%u\"]",
+                           r->language?"en":"ja",r->pager?"ON":"OFF",r->editor?"LINE":"SOLID",r->columns,r->rows);
+        else append(out,"[\"status\",\"NONE\"]");
+        append(out,"]]}");return;
+    }
+    case OPERATION_PAGE_APPLICATION: {
+        const MemberApplication *r=&page->data.application;
+        append(out,"\"report\":{\"kind\":\"fields\",\"title\":\"APPLICATION\",\"fields\":["
+                   "[\"user\",\"%u\"],[\"login\",",r->profile.user);string(out,r->profile.name);
+        for(unsigned i=0;i<PROFILE_FIELDS;i++) {
+            append(out,"],[");string(out,profile_key(i));append(out,",");
+            string(out,member_profile_value(&r->profile,i));
+        }
+        const char *keys[]={"FROMBBS","SYSOPNOTE"};
+        for(unsigned i=0;i<2;i++)if(r->notes.present[i]) {
+            append(out,"],[");string(out,keys[i]);append(out,",");string(out,r->notes.values[i]);
+        }
+        append(out,"]]}");return;
+    }
     case OPERATION_PAGE_CONFERENCE: render_conference(out,&page->data.conference);return;
     case OPERATION_PAGE_PROFILE: {
         const MemberProfile *p=&page->data.profile;
@@ -135,8 +275,10 @@ static void render_page(ViewOutput *out,const OperationPage *page) {
             append(out,",\"title\":");string(out,r->summary.title);
             break;
         }
+        case OPERATION_PAGE_UNREAD:
         case OPERATION_PAGE_ARTICLES: {
-            const ArticleSummary *r=&page->data.articles.rows[i];
+            const ArticleSummary *r=page->kind==OPERATION_PAGE_UNREAD?
+                &page->data.unread.rows[i].summary:&page->data.articles.rows[i];
             append(out,"\"id\":\"%u\",\"board\":\"%u\",\"parent\":\"%u\",\"title\":",
                    r->id,r->board,r->parent);
             string(out,r->title);
@@ -160,6 +302,19 @@ static void render_page(ViewOutput *out,const OperationPage *page) {
             const MemberProfileRow *r=&page->data.profiles.rows[i];
             append(out,"\"id\":%u,\"login\":",r->user);string(out,r->name);
             append(out,",\"handle\":");string(out,r->handle);
+            break;
+        }
+        case OPERATION_PAGE_GATHER: {
+            const ActivityGather *r=&page->data.gather.rows[i];
+            append(out,"\"id\":%u,\"date\":",r->sequence);stamp_text(out,r->time);
+            append(out,",\"author\":");string(out,r->name);
+            append(out,",\"handle\":");string(out,r->handle);
+            append(out,",\"body\":");string(out,r->body);break;
+        }
+        case OPERATION_PAGE_FILE_CHILDREN: {
+            const VaultQueryChild *r=&page->data.file_children.rows[i];
+            append(out,"\"path\":");string(out,r->name);
+            append(out,",\"title\":");string(out,*r->display?r->display:r->name);
             break;
         }
         case OPERATION_PAGE_FILE_BOARDS: {
@@ -206,18 +361,29 @@ static void render_content(ViewOutput *out,const OperationContent *r,const char 
     append(out,"}");
 }
 
-static void reply(Session *s,const char *nonce,const char *text,SessionResultView view) {
+static void view_reply(Session *s,const char *nonce,const char *text,SessionResultView view,const CheckTraversal *check) {
     size_t body=view.content?view.content->size:0;
     if(body>CONTENT_BODY) { session_abort(s);return; }
     size_t capacity=32768+6*body;
+    if(view.page && view.page->kind==OPERATION_PAGE_FILE_TEXT)capacity+=6*view.page->data.file_text.size;
+    if(view.page && view.page->kind==OPERATION_PAGE_CONNECTIONS)capacity+=32768;
+    if(view.page && view.page->kind==OPERATION_PAGE_GATHER)
+        capacity+=6*sizeof(view.page->data.gather);
+    if(view.page && view.page->kind==OPERATION_PAGE_APPLICATION)
+        capacity+=6*sizeof(view.page->data.application);
     ViewOutput out={.text=malloc(capacity),.capacity=capacity};
     if(!out.text) { session_abort(s);return; }
     int content=view.content && (view.content->kind==2 || view.content->state==ARTICLE_VISIBLE);
     append(&out,"CONNECTOR VIEW %s {\"text\":",nonce);
     string(&out,(content || view.page)?"":text);
     append(&out,",\"data\":{");
-    if(content)render_content(&out,view.content,view.body);
+    if(content) {
+        render_content(&out,view.content,view.body);
+        if(view.sequence_next)append(&out,",\"next\":%u",view.sequence_next);
+    }
     else if(view.page)render_page(&out,view.page);
+    if(check)append(&out,"%s\"check\":{\"active\":%s,\"finished\":%s}",
+                    content || view.page?",":"",check->active?"true":"false",check->finished?"true":"false");
     append(&out,"}}\r\n");
     if(out.failed)session_abort(s);
     else session_impl_queue_text(s,out.text);
@@ -225,7 +391,147 @@ static void reply(Session *s,const char *nonce,const char *text,SessionResultVie
     free(out.text);
 }
 
+static void reply(Session *s,const char *nonce,const char *text,SessionResultView view) {
+    view_reply(s,nonce,text,view,NULL);
+}
+
+static SessionOperationStatus submit_view(Session *s,OperationRequest *q) {
+    int structured=s->core.structured;
+    if(!q->board)q->board=s->core.board;
+    s->core.structured=1;
+    SessionOperationStatus status=session_submit(s,q);
+    s->core.structured=structured;
+    return status;
+}
+
+static SessionOperationStatus submit_check_page(Session *s,OperationRequest *q,CheckTraversal *check) {
+    q->since=check->since;q->until=check->until;q->cursor=check->cursor;q->board=check->board;
+    if(check->active==1) { q->op='Z';q->action=11;q->scope=check->scope;strcpy(q->title,"CHECK"); }
+    else if(check->active==2) { q->op='m';q->action='L';q->number=MAIL_LIST_NEWS;strcpy(q->title,"CHECK"); }
+    else {
+        q->op='Y';q->action=VAULT_CMD_NEWS;q->number=check->cursor;
+        snprintf(q->body,sizeof(q->body),"%s%s@%llu:%llu",check->key,*check->key?"|":"",
+                 (unsigned long long)check->since,(unsigned long long)check->until);
+    }
+    SessionOperationStatus status=submit_view(s,q);
+    check->pending=status==SESSION_OPERATION_ACCEPTED;
+    return status;
+}
+
+static void web_check(Session *s,const char *nonce,const char *kind,uint32_t board,const char *arg,
+                      OperationRequest *q) {
+    CheckTraversal *check=&s->connection.connector_check;
+    const char *error="ERR connector check syntax\r\n";
+    SessionOperationStatus status=SESSION_OPERATION_UNAVAILABLE;
+    if(s->connection.connector_check_user!=s->core.user ||
+       s->connection.connector_check_epoch!=s->core.user_epoch)
+        check_traversal_reset(check);
+    if(!s->core.user)error="ERR login required\r\n";
+    else if(!strcmp(kind,"check_start") && board<=CATALOG_MAX && session_impl_safe_text(arg)) {
+        CheckTraversal next={0};
+        q->op='}';q->action='N';
+        q->number=check_traversal_select(&next,arg,board?board:s->core.board);
+        if(q->number<3) {
+            strcpy(q->title,next.key);
+            status=submit_view(s,q);
+            if(status==SESSION_OPERATION_ACCEPTED) {
+                *check=next;
+                s->connection.connector_check_user=s->core.user;
+                s->connection.connector_check_epoch=s->core.user_epoch;
+            }
+            error=NULL;
+        }
+    } else if(!board && !*arg) {
+        if(!strcmp(kind,"check_cancel")) {
+            check_traversal_reset(check);
+            view_reply(s,nonce,"CHECK CANCELLED\r\n",(SessionResultView){0},check);
+            return;
+        }
+        if(!strcmp(kind,"check_next")) {
+            if(!check->active || check->finished)error="ERR no further CHECK page\r\n";
+            else { status=submit_check_page(s,q,check);error=NULL; }
+        } else if(!strcmp(kind,"check_done")) {
+            CheckCommit commit;
+            if(!check_traversal_commit(check,&commit))error="ERR finish CHECK NEXT first\r\n";
+            else {
+                q->op='}';q->action='n';q->number=commit.kind;q->until=commit.until;
+                strcpy(q->title,commit.key);
+                status=submit_view(s,q);
+                check->committing=status==SESSION_OPERATION_ACCEPTED;
+                error=NULL;
+            }
+        }
+    }
+    if(status==SESSION_OPERATION_ACCEPTED) {
+        memcpy(s->connection.connector_view_nonce,nonce,33);
+        s->connection.connector_check_request=1;
+    } else view_reply(s,nonce,error?error:"ERR board busy\r\n",
+                      (SessionResultView){.status=SESSION_RESULT_FAILED},check);
+}
+
+/* These views reuse the existing worker requests and their current actor ACLs. */
+static int additional_request(OperationRequest *q,const char *kind,uint32_t id,uint32_t cursor,const char *arg) {
+    if(!strcmp(kind,"article_scan") || !strcmp(kind,"mail_scan")) {
+        if(!strncmp(arg,"DESC",4) && (!arg[4] || arg[4]==' '))q->descending=1;
+        else if(strncmp(arg,"ASC",3) || (arg[3] && arg[3]!=' '))return 0;
+        const char *space=strchr(arg,' ');
+        q->cursor=cursor?cursor:q->descending?UINT32_MAX:1;
+        if(!strcmp(kind,"mail_scan")) {
+            if(space || id)return 0;
+            q->op='m';q->action='f';
+        } else {
+            if(id>CATALOG_MAX || !space || !session_impl_safe_text(space+1) ||
+               !session_impl_find_arguments(space+1,q))return 0;
+            q->op='Z';q->action=4;q->board=id;
+        }
+        return 1;
+    }
+    if(!strcmp(kind,"file_children")) {
+        if(id || !*arg || strlen(arg)>48 || strchr(arg,'|') || !session_impl_safe_text(arg))return 0;
+        q->op='Y';q->action=VAULT_CMD_CHILDREN;q->number=cursor;
+        strcpy(q->title,arg);return 1;
+    }
+    if(!strcmp(kind,"article_audit")) {
+        if(strlen(arg)>32 || strchr(arg,' ') || !session_impl_safe_text(arg) || (id && *arg))return 0;
+        q->op='A';q->audit_article=id;q->number=cursor;
+        strcpy(q->title,arg);return 1;
+    }
+    if(!strcmp(kind,"profile_login")) {
+        if(id || cursor || strlen(arg)>32 || strchr(arg,' ') || !session_impl_safe_text(arg))return 0;
+        q->op='Z';q->action=7;strcpy(q->username,arg);return 1;
+    }
+    if(*arg)return 0;
+    if(!strcmp(kind,"connections") && !id && !cursor) { q->op='!';q->action='L'; }
+    else if(!strcmp(kind,"preferences") && !id && !cursor)q->op='V';
+    else if(!strcmp(kind,"application") && id && id<=MEMBER_MAX && !cursor) { q->op='}';q->action='A';q->number=id; }
+    else if((!strcmp(kind,"file_history") || !strcmp(kind,"file_stats")) && !id) {
+        q->op='Y';q->action=!strcmp(kind,"file_history")?VAULT_CMD_HISTORY:VAULT_CMD_STATS;
+        snprintf(q->title,sizeof(q->title),"%u",cursor);
+    }
+    else if(!strcmp(kind,"file_audit") && !id) { q->op='Y';q->action=VAULT_CMD_AUDIT;q->number=cursor; }
+    else if(!strcmp(kind,"file_text") && id) {
+        q->op='Y';q->action=VAULT_CMD_TEXT;q->number=id;
+        snprintf(q->body,sizeof(q->body),"%u",cursor);
+    }
+    else if(!strcmp(kind,"file_detail") && id && !cursor) { q->op='Y';q->action=VAULT_CMD_INFO;q->number=id; }
+    else if(!strcmp(kind,"gather") && !id) { q->op='!';q->action='G';q->cursor=cursor; }
+    else if(!strcmp(kind,"mail_files") && !id) { q->op='m';q->action='I';q->cursor=cursor; }
+    else if(!strcmp(kind,"member_list") && !id && cursor<=MEMBER_MAX) { q->op='l';q->number=cursor; }
+    else if(!strcmp(kind,"applications") && !id && cursor<=MEMBER_MAX) { q->op='%';q->action='P';q->cursor=cursor; }
+    else if(!strcmp(kind,"article_unread") && id<=CATALOG_MAX) { q->op='v';q->board=id;q->cursor=cursor; }
+    else if(!strcmp(kind,"article_new") && id<=CATALOG_MAX && !cursor) { q->op='n';q->board=id; }
+    else if(!strcmp(kind,"mail_next") && !id && !cursor) { q->op='m';q->action='N'; }
+    else if(!strcmp(kind,"mail_previous") && id>1 && !cursor) { q->op='m';q->action='f';q->cursor=id-1;q->descending=1; }
+    else if(!strcmp(kind,"article_prev") && id && !cursor) { q->op='B';q->number=id; }
+    else if(!strcmp(kind,"article_next") && id && !cursor) { q->op='N';q->number=id; }
+    else if(!strcmp(kind,"article_parent") && id && !cursor) { q->op='U';q->number=id; }
+    else if(!strcmp(kind,"article_child") && id && !cursor) { q->op='C';q->number=id; }
+    else return 0;
+    return 1;
+}
+
 static int request(OperationRequest *q,const char *kind,uint32_t id,uint32_t cursor,const char *path) {
+    if(additional_request(q,kind,id,cursor,path))return 1;
     if(!strcmp(kind,"files")) {
         q->op='Y';q->action=*path?VAULT_CMD_IN:VAULT_CMD_LIST;q->number=cursor?cursor:1;
         if(strlen(path)>48 || strchr(path,'|') || !session_impl_safe_text(path))return 0;
@@ -334,17 +640,16 @@ void session_impl_web_view(Session *s,const char *payload) {
     unsigned long id=strtoul(number,NULL,10),cursor=strtoul(start,NULL,10);
     OperationRequest *q=calloc(1,sizeof(*q));
     if(!q) { reply(s,nonce,"ERR board busy\r\n",empty);return; }
+    if(id<=CONTENT_ID_MAX && !cursor && !strncmp(kind,"check_",6)) {
+        web_check(s,nonce,kind,(uint32_t)id,path,q);free(q);return;
+    }
     if(id>CONTENT_ID_MAX || cursor>CONTENT_ID_MAX || !request(q,kind,(uint32_t)id,(uint32_t)cursor,path)) {
         free(q);reply(s,nonce,"ERR connector view syntax\r\n",empty);return;
     }
-    if(!s->core.board_enabled && q->op!='m' && q->op!=BOARD_CONFERENCE) {
+    if(!s->core.board_enabled && q->op!='m' && q->op!='%' && q->op!='l' && q->op!='!' && q->op!=BOARD_CONFERENCE) {
         free(q);reply(s,nonce,"ERR no board\r\n",empty);return;
     }
-    int structured=s->core.structured;
-    if(!q->board)q->board=s->core.board;
-    s->core.structured=1;
-    SessionOperationStatus status=session_submit(s,q);
-    s->core.structured=structured;
+    SessionOperationStatus status=submit_view(s,q);
     if(status==SESSION_OPERATION_ACCEPTED)memcpy(s->connection.connector_view_nonce,nonce,sizeof(nonce));
     else reply(s,nonce,status==SESSION_OPERATION_LOGIN_REQUIRED?"ERR login required\r\n":"ERR board busy\r\n",empty);
     free(q);
@@ -353,6 +658,25 @@ void session_impl_web_view(Session *s,const char *payload) {
 int session_impl_web_view_result(Session *s,const OperationResult *r,SessionResultView view) {
     char *nonce=s->connection.connector_view_nonce;
     if(!*nonce)return 0;
+    if(s->connection.connector_check_request) {
+        CheckTraversal *check=&s->connection.connector_check;
+        const char *text=r->text;
+        if(view.status==SESSION_RESULT_OK && r->service_action=='n') {
+            check_traversal_begin(check,r->service_number,r->since,r->until);
+            OperationRequest *q=calloc(1,sizeof(*q));
+            SessionOperationStatus status=q?submit_check_page(s,q,check):SESSION_OPERATION_UNAVAILABLE;
+            free(q);
+            if(status==SESSION_OPERATION_ACCEPTED)return 1;
+            text="ERR board busy\r\n";
+        } else if(check->committing)check_traversal_committed(check,r->feedback.checkpoint_saved);
+        else if(check->pending) {
+            if(r->feedback.page_found)check_traversal_page(check,1,r->feedback.page_next);
+            else check->pending=0;
+        }
+        view_reply(s,nonce,text,view,check);
+        s->connection.connector_check_request=0;nonce[0]=0;
+        return 1;
+    }
     if(view.status==SESSION_RESULT_OK && (r->mail_action=='L' || r->mail_action=='R')) {
         rtbbs(s)->mail_state.mail_mode=1;
         if(r->mail_action=='L')

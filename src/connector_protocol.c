@@ -96,7 +96,7 @@ bad:memset(q,0,sizeof(*q));output[0]=0;return 0;
 }
 int connector_state_format(const ConnectorState *q,const char *nonce,char *out,size_t capacity) {
     if(!capacity)return 0;
-    int n=snprintf(out,capacity,"CONNECTOR STATE %.32s {\"version\":1,\"transfer_block\":65536,\"core_views\":1,\"core_updates\":1,\"core_conference\":1,\"core_search\":1,\"core_discovery\":1,\"input_limit\":%u,\"connection\":%lu,\"user\":%u,\"username\":\"%s\",\"board\":%u,\"article\":%u,\"admin\":%d,\"sigop\":%d,\"level\":%u,\"editing\":%d,\"editor_kind\":%u,\"secret\":%d,\"password_mode\":%d,\"mail\":%d,\"mail_current\":%u,\"chat\":%d,\"talk\":%d,\"pager\":%d,\"gather\":%d,\"input\":%d,\"confirmation\":%u,\"binary\":%d,\"door\":%d,\"members\":%d,\"features\":{\"mail\":%d,\"chat\":%d,\"vault\":%d}}\r\n",
+    int n=snprintf(out,capacity,"CONNECTOR STATE %.32s {\"version\":1,\"transfer_block\":65536,\"core_views\":1,\"core_updates\":1,\"core_conference\":1,\"core_search\":1,\"core_discovery\":1,\"core_operations\":1,\"input_limit\":%u,\"connection\":%lu,\"user\":%u,\"username\":\"%s\",\"board\":%u,\"article\":%u,\"admin\":%d,\"sigop\":%d,\"level\":%u,\"editing\":%d,\"editor_kind\":%u,\"secret\":%d,\"password_mode\":%d,\"mail\":%d,\"mail_current\":%u,\"chat\":%d,\"talk\":%d,\"pager\":%d,\"gather\":%d,\"input\":%d,\"confirmation\":%u,\"binary\":%d,\"door\":%d,\"members\":%d,\"features\":{\"mail\":%d,\"chat\":%d,\"vault\":%d}}\r\n",
         nonce,q->input_limit,q->connection,q->user,q->username,q->board,q->article,q->admin,q->sigop,q->level,
         q->editing,q->editor_kind,q->secret,q->password_mode,q->mail,q->mail_current,q->chat,q->talk,
         q->pager,q->gather,q->input,q->confirmation,q->binary,q->door,q->members,

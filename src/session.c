@@ -75,6 +75,7 @@ void session_revoke(Session *s) {
 }
 int session_logout(Session *s) {
     if(!session_core_logout(&s->core))return 0;
+    check_traversal_reset(&s->connection.connector_check);
     board_conference_session(s->core.slot,0,0,0);
     session_ui_discard_inactive(s);s->ui_binding.preferred[0]=0;s->ui_binding.explicit_choice=0;s->ui_binding.restore_pending=0;return 1;
 }

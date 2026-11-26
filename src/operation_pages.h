@@ -7,6 +7,16 @@
 #include "door_core.h"
 #include "mmm_notes.h"
 #include "conference_core.h"
+#include "activity_core.h"
+#include "connection_core.h"
+#include "download_core.h"
+#include "app_limits.h"
+typedef struct { unsigned count,next; ActivityGather rows[4]; } OperationGatherPage;
+#define OPERATION_FILE_TEXT_BYTES (VAULT_CHUNK * 8)
+typedef struct {
+    uint32_t id,next; size_t size;
+    char text[OPERATION_FILE_TEXT_BYTES];
+} OperationFileText;
 /* Bounded, owned results copied only after Core authorization. No display-text
  * parsing, pointers into repositories, or extra unbounded body allocation. */
 typedef enum { OPERATION_PAGE_NONE,
@@ -23,11 +33,18 @@ typedef enum { OPERATION_PAGE_NONE,
     OPERATION_PAGE_PROFILE,
     OPERATION_PAGE_FILES,
     OPERATION_PAGE_FILE_DETAIL,
+    OPERATION_PAGE_FILE_TEXT,
     OPERATION_PAGE_FILE_BOARDS,
     OPERATION_PAGE_FILE_CATEGORIES,
     OPERATION_PAGE_FILE_CHILDREN,
     OPERATION_PAGE_FILE_AUDIT,
     OPERATION_PAGE_DOORS,
+    OPERATION_PAGE_GATHER,
+    OPERATION_PAGE_PREFERENCES,
+    OPERATION_PAGE_APPLICATION,
+    OPERATION_PAGE_CONNECTIONS,
+    OPERATION_PAGE_DOWNLOAD_HISTORY,
+    OPERATION_PAGE_DOWNLOAD_STATS,
     OPERATION_PAGE_CONFERENCE,
     OPERATION_PAGE_MMM_SCANLIST
 } OperationPageKind;
@@ -47,11 +64,18 @@ typedef struct {
         MemberProfile profile;
         VaultQueryFiles files;
         VaultQueryDetail file_detail;
+        OperationFileText file_text;
         VaultQueryBoards file_boards;
         VaultQueryCategories file_categories;
         VaultQueryChildren file_children;
         VaultQueryAudit file_audit;
         DoorListing doors;
+        OperationGatherPage gather;
+        MemberPreferences preferences;
+        MemberApplication application;
+        DownloadHistory download_history;
+        DownloadStats download_stats;
+        struct { size_t count; ConnectionSummary rows[CONNECTION_MAX]; } connections;
         MmmScanList mmm_scanlist;
         ConferenceReply conference;
     } data;
