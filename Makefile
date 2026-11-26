@@ -216,7 +216,7 @@ test-legacy-transfers: runtime vaultctl
 clean:
 	rm -f test-mmm-input test-conference-core
 	rm -f liner-notes-solaris-door-child
-	rm -f test-session-ui-lifecycle test-session-core test-session-policy-core test-form-flow-core test-message-flow-core test-list-navigation-core test-mail-navigation-core test-preference-core test-traversal-core test-batch-core test-editor-interface test-connector-protocol test-terminal-policy test-connector-core test-notification-core test-connection-core test-chat-core test-door-core test-editor-core test-link-core test-authentication-core test-vault-management-core test-vault-query-core test-download-core test-download-store test-activity-core test-activity-store test-catalog-group-core test-catalog-group-store test-board-topology-core test-catalog-policy-core test-catalog-core test-member-settings-store test-mail-core test-member-core test-article-core liner-notes-door-lock runtime vaultctl memberctl dbconvert generate-structured generate-scale generate-members test-adapters test-chat test-vault-core test-upload-core test-transfer-connector test-userlog test-stage61-userlog test-zhost
+	rm -f test-session-ui-lifecycle test-session-core test-session-policy-core test-form-flow-core test-message-flow-core test-list-navigation-core test-mail-navigation-core test-preference-core test-traversal-core test-batch-core test-editor-interface test-connector-protocol test-terminal-policy test-connector-core test-notification-core test-connection-core test-chat-core test-door-core test-editor-core test-link-core test-authentication-core test-vault-management-core test-vault-query-core test-download-core test-download-store test-activity-core test-activity-store test-catalog-group-core test-catalog-group-store test-board-topology-core test-catalog-policy-core test-catalog-core test-member-settings-store test-mail-core test-member-core test-article-core test-storage-init liner-notes-door-lock runtime vaultctl memberctl dbconvert generate-structured generate-scale generate-members test-adapters test-chat test-vault-core test-upload-core test-transfer-connector test-userlog test-stage61-userlog test-zhost
 
 memberctl: src/db_index.h src/memberctl.c src/members.c src/members.h src/app_limits.h src/store_limits.h
 	$(CC) $(CPPFLAGS) $(SQLITE_CFLAGS) $(CFLAGS) $(LDFLAGS) -std=c11 -Wall -Wextra -Werror src/memberctl.c src/members.c -lcrypto $(SQLITE_LIBS) $(LDLIBS) src/storage_sqlite.c $(SQLITE_CFLAGS) -pthread -lcrypto $(SQLITE_LIBS) -o memberctl
@@ -649,7 +649,12 @@ test-ssh-sources:
 check: test-ssh-sources
 
 .PHONY: test-storage-relations
-check: test-storage-relations
+check: test-storage-relations test-storage-init
+.PHONY: test-storage-init
+test-storage-init:
+	$(CC) $(CPPFLAGS) $(SQLITE_CFLAGS) $(CFLAGS) $(LDFLAGS) -std=c11 -Wall -Wextra -Werror -Isrc tests/test_storage_init_failure.c -pthread -lcrypto $(SQLITE_LIBS) $(LDLIBS) -o test-storage-init
+	$(PYTHON) -c "import pathlib, subprocess, tempfile; temp = tempfile.TemporaryDirectory(); subprocess.run(['./test-storage-init', str(pathlib.Path(temp.name)/'bbs.sqlite')], check=True); temp.cleanup()"
+
 test-storage-relations: tests/test_storage_relations.c src/storage_records.inc
 	$(CC) $(CPPFLAGS) $(SQLITE_CFLAGS) $(CFLAGS) $(LDFLAGS) -std=c11 -Wall -Wextra -Werror -Isrc tests/test_storage_relations.c -lcrypto $(SQLITE_LIBS) -o test-storage-relations
 	./test-storage-relations

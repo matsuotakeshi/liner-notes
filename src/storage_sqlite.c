@@ -79,8 +79,18 @@ int storage_init(const char *path) {
     if(ok && storage_version>=2)ok=row_schema(db);
     if(creating) { if(ok)ok=sql(db,"COMMIT");if(!ok)sql(db,"ROLLBACK"); }
     if(db)sqlite3_close(db);
-    if(!ok || chmod(database,0600)) { close(owner);owner=-1;database[0]=0;return 0; }
-    int d=open(directory,O_RDONLY);ok=d>=0 && fsync(d)==0;if(d>=0)close(d);return ok;
+    if(ok && chmod(database,0600)==0) {
+        int dirfd=open(directory,O_RDONLY);
+        if(dirfd>=0) {
+            int synced=fsync(dirfd);
+            close(dirfd);
+            if(!synced)return 1;
+        }
+    }
+    close(owner);
+    owner=-1;
+    database[0]=directory[0]=0;
+    return 0;
 }
 static int length_refresh(Store *s) {
     if(!s->get_length && sqlite3_prepare_v2(s->db,"SELECT length FROM streams WHERE id=?",-1,&s->get_length,NULL)!=SQLITE_OK)return 0;
