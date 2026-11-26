@@ -11,6 +11,14 @@ from test_mmm_ui import GATE, MAIN, NOTES, OPEN, PASSWORD, key, post
 from test_telnet import Client, disconnected
 
 
+def select_notes_ui(client, name):
+    # Selection draws the new menu immediately. Saving the preference is a
+    # worker request, so wait for its acknowledgement and the ready prompt.
+    switched = client.cmd("ui " + name, b"UI preference saved.")
+    client.until(MAIN)
+    return switched
+
+
 def run(binary):
     with tempfile.TemporaryDirectory(prefix="ln-mash-") as tmp, ExitStack() as stack:
         root = Path(tmp)
@@ -78,7 +86,7 @@ def run(binary):
         mash.cmd("post #1", b"Title> ")
         post(mash, b"MASH base", b"MASH original", NOTES)
         mash.cmd("/", MAIN)
-        assert b"UI preference saved" in peer.cmd("ui mmm", MAIN)
+        assert b"3 Filer" in select_notes_ui(peer, "mmm")
         assert b"MASH original" in peer.cmd("open -b2 #1", OPEN)
         key(peer, b"w", b"Title> ")
         post(peer, b"MMM reply", b"MMM cross reply", OPEN)
@@ -104,18 +112,18 @@ def run(binary):
         assert b"MASH conference fixture" in peer.cmd("talk -n", b"TALK) ")
         peer.cmd("a", b"TALK) ")
         peer.cmd("q", MAIN)
-        peer.cmd("ui mash", MAIN)
+        select_notes_ui(peer, "mash")
         assert b"No conference lines" in peer.cmd("14", b"TALK) ")
         peer.cmd("q", MAIN)
 
-        mash.cmd("ui mmm", MAIN)
+        select_notes_ui(mash, "mmm")
         assert b"MASH original" not in mash.cmd("pfile -t", MAIN)
-        mash.cmd("ui mash", MAIN)
+        select_notes_ui(mash, "mash")
         assert b"MASH original" in mash.cmd("pfile -t", MAIN)
         mash.cmd("ui rtbbs", b"UI PREF SAVED rtbbs")
         mash.until()
         assert b"Reply to a reply" in mash.cmd("READ 4")
-        mash.cmd("UI mash", MAIN)
+        select_notes_ui(mash, "mash")
         assert b"Sequencer: 0 (session)" in mash.cmd("sets reset", MAIN)
         mash.send(b"bye\r\n")
         disconnected(mash)

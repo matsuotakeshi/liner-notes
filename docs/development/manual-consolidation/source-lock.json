@@ -399,7 +399,7 @@
   "src/zmodem_host.h": "8b9177feec47139f07e6b72977cfee8fb8ae8ea4c67d032fbfbef5fa62390ad4",
   "src/session_web_update.c": "59c7380df763213e3caca3395df0604d47d40f1d7674bac545b3fa65ef7034e1",
   "src/session_web_view.c": "7c8b0eb0c6be3ab30d6c27264fc3e60790f0ed87a0c7153d647a225ff64bacb3",
-  "tests/test_web_connector.py": "87b5c7b14b22bf7d21e9e81924e67bf5c601d038948646ccf26efb918e71fc35",
+  "tests/test_web_connector.py": "4ad41da471b28182065b4d246d46014c7c2cb9497b8d98d34062b01929ea144f",
   "tests/test_web_http.py": "532acbdc3b5b9a37395445551348f273b75633022bd8378189d7698e20fb2804",
   "ci/solaris_package.py": "855c0bdd34b4285b7a8cbf2cab373fbee247c3b3d82a33981b7719ab6e81dc5d",
   ".github/workflows/solaris-package.yml": "d69c66ac69829023039177bdcfc0e5f92158a9518d3148b14caddd5be99d4d66"

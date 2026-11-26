@@ -243,8 +243,9 @@ for line in sys.stdin:
             assert b'PTY 100 30' in mmm.cmd('size', b'DOOR> ')
             assert b'SSH PTY test' in mmm.cmd('quit', b'GAMES>> ')
             mmm.cmd('.', b'MAIN>> ')
-            mmm.cmd('ui mash', b'UI preference saved.')
-            assert b'MASH | 1 Mail' in mmm.until(b'MAIN>> ')
+            switched = mmm.cmd('ui mash', b'UI preference saved.')
+            assert b'MASH | 1 Mail' in switched, switched[-1500:]
+            mmm.until(b'MAIN>> ')
             restored.close()
             selected = connect('bob')
             mash = screen(selected, b'MAIN>> ')
