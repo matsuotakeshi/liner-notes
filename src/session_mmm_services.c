@@ -598,6 +598,14 @@ void mmm_chat_result(Session *s,const OperationResult *r,uint64_t now) {
     case 'O': chat_online(s->core.id);ok=1;break;
     case 'S': ok=chat_say(s->core.id,r->text,now);break;
     case 'D': ok=chat_private(s->core.id,r->chat_target,r->text,now);break;
+    case 'C':
+        ok=chat_call(s->core.id,r->text,now);
+        if(ok>0)mmm_say(s,"SYSOP notified.\r\n","SYSOPへ通知しました。\r\n");
+        else if(!ok) {
+            mmm_say(s,"No SYSOP available.\r\n","応答可能なSYSOPはいません。\r\n");
+            return;
+        }
+        break;
     }
     if(ok<=0)mmm_say(s,"Chat operation unavailable.\r\n","チャット操作を実行できません。\r\n");
 }

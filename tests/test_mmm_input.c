@@ -16,6 +16,18 @@ static int sink(void *ctx,const unsigned char *data,size_t size) {
 }
 
 int main(void) {
+    MashInput wire=mash_parse("  !\t12 Keep My Case");
+    assert(wire.command==MASH_WIRE && !strcmp(wire.argument,"12 Keep My Case"));
+    assert(mash_parse("!uname -a").command==MASH_UNKNOWN);
+    assert(mash_parse("SETUP -?").command==MASH_SETUP);
+    assert(!strcmp(mash_parse("  readnews -?").usage,"readnews [-n]"));
+    assert(mash_parse("readnew -n").command==MASH_UNKNOWN);
+    assert(!strcmp(mash_menu_command(0,3),"setup"));
+    assert(!strcmp(mash_menu_command(0,12),"readnews -n"));
+    assert(!strcmp(mash_menu_command(0,14),"talk -n"));
+    assert(!mash_menu_command(0,11) && !mash_menu_command(0,UINT32_MAX));
+    assert(!strcmp(mash_menu_command(1,4),"games") && !mash_menu_command(1,5));
+    assert(parse("bbs",1).command==MMM_UNKNOWN);
     assert(parse("notes",0).command==MMM_UNKNOWN);
     assert(parse("mail",0).command==MMM_UNKNOWN);
     assert(parse("filer",0).command==MMM_UNKNOWN);

@@ -7,9 +7,10 @@
 #include <openssl/crypto.h>
 
 SessionUiConfig session_ui_default(void) {
-    SessionUiConfig config={.count=2,.allowed=1,.policy=SESSION_UI_FIXED};
+    SessionUiConfig config={.count=3,.allowed=1,.policy=SESSION_UI_FIXED};
     config.adapters[0]=session_ui_rtbbs();
     config.adapters[1]=session_ui_mmm();
+    config.adapters[2]=session_ui_mash();
     return config;
 }
 

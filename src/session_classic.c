@@ -294,7 +294,7 @@ int session_impl_classic_commands(Session *s,const char *line) {
         case '\\':classic_ask(s,CI_MEMO,MSG_CLASSIC_MEMO);return 1;
         case '#':action="ACCOUNT";break;
         case 'S':session_impl_queue_text(s,*site_text(0)?site_text(0):ui_text(&rtbbs(s)->presentation.ui,MSG_SITE_EMPTY));session_impl_prompt(s);return 1;
-        case 'V':session_impl_queue_text(s,"Liner notes 0.75\r\n");session_impl_prompt(s);return 1;
+        case 'V':session_impl_queue_text(s,LINER_VERSION_TEXT "\r\n");session_impl_prompt(s);return 1;
         case 'X':session_impl_queue_text(s,ui_text(&rtbbs(s)->presentation.ui,MSG_CLASSIC_NO_GATEWAY));session_impl_prompt(s);return 1;
         }
     } else if(rtbbs(s)->presentation.classic_area==CM_BOARD) {
