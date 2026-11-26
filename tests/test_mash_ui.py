@@ -76,7 +76,8 @@ def run(binary):
 
         assert b"Connections" in mash.cmd("6", b"OTHERS>> ")
         assert b"bob" in mash.cmd("1", b"OTHERS>> ")
-        assert b"[to " in mash.cmd(b"! " + peer_id + b" Case Preserved", b"OTHERS>> ")
+        receipt = mash.cmd(b"! " + peer_id + b" Case Preserved", b"OTHERS>> ")
+        assert b"[to " + peer_id + b" bob] Case Preserved" in receipt, receipt
         assert b"Case Preserved" in peer.until(MAIN)
         assert b"[to " not in mash.cmd("! * forbidden", b"OTHERS>> ")
         assert b"SYSOP notified" in peer.cmd("$ Need assistance", MAIN)

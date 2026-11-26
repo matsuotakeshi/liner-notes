@@ -570,7 +570,9 @@ void mmm_file_result(Session *s,const OperationResult *r,const OperationPage *pa
 int mmm_chat_event(Session *s,const ChatEvent *e) {
     const MmmUi *m=mmm_view(s);
     if((e->kind=='I' || e->kind=='C') && (m->input || m->application.step || s->core.pending))return 0;
-    if(strchr("LOJS",e->kind) && !m->chatting)return 1;
+    if(strchr("LJS",e->kind) && !m->chatting)return 1;
+    /* MASH telegrams also have a sender acknowledgement outside the room. */
+    if(e->kind=='O' && !m->chatting && s->ui_binding.active!=session_ui_mash())return 1;
     char text[CHAT_TEXT+160];
     switch(e->kind) {
     case 'I': snprintf(text,sizeof(text),"[wire %lu %s] %s\r\n",e->connection,e->name,e->text);break;

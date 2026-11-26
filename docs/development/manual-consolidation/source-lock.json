@@ -374,7 +374,7 @@
   "tests/test_mmm_input.c": "2f9c6b7b0470d3dfe3a31f336fda00c0d6c25dcef6e5a9b28e97290c956c018f",
   "tests/test_mmm_ui.py": "8fe32fe4d3b712c5cdf9ca7bcad843a3ba28676f1b4cf2242506fef6318e588a",
   "src/session_mmm_internal.h": "49a471eadf30f81ae0b91ba13b061f8c2d93c5a2e5248a564d9ff59be28c9e0d",
-  "src/session_mmm_services.c": "b868acec01ed47d1159d8037c647dc0607da2dc4db452aced874ddfe3a6f031a",
+  "src/session_mmm_services.c": "efc53656ac1c979111aa82381e277b108123cec0f1a72eaf45f5180d386f3cf2",
   "tests/test_mmm_services.py": "5d99d3c6028c86cb5fd11be2d9673eebdb632229b9a03e105cd6e24e3d1c835a",
   "src/mmm_notes.h": "4dd3f8b7a546a8ba34cafd4ad1f3f7f13d06b89a1e1a69e450f6a5b9dfe717d2",
   "src/mmm_notes_core.c": "0e5cbff58e43ecdc52e6b9a24899898fd0d497b48f1856f2361963a5e1331824",
