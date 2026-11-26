@@ -55,17 +55,21 @@ int session_impl_conference_command(Session *s,char *line) {
     session_impl_submit(s,q);free(q);return 1;
 }
 
-int session_impl_conference_result(Session *s,const OperationResult *r) {
-    if(r->page.kind!=OPERATION_PAGE_CONFERENCE)return 0;
-    const ConferenceReply *page=&r->page.data.conference;
+const char *session_impl_conference_error(ConferenceStatus status) {
     static const char *const error[]={
         "", "ERR conference login required\r\n", "ERR conference session expired\r\n",
         "ERR conference access denied\r\n", "ERR conference invalid input\r\n",
         "ERR conference room or message unavailable\r\n", "ERR conference room exists\r\n",
         "ERR conference storage\r\n"
     };
+    return (unsigned)status<sizeof(error)/sizeof(*error)?error[status]:error[CONFERENCE_STORAGE];
+}
+
+int session_impl_conference_result(Session *s,const OperationResult *r) {
+    if(r->page.kind!=OPERATION_PAGE_CONFERENCE)return 0;
+    const ConferenceReply *page=&r->page.data.conference;
     char text[CONFERENCE_TEXT+180];
-    if(page->status!=CONFERENCE_OK)session_impl_emit(s,error[page->status]);
+    if(page->status!=CONFERENCE_OK)session_impl_emit(s,session_impl_conference_error(page->status));
     else switch(page->action) {
     case CONFERENCE_POST:
         snprintf(text,sizeof(text),"CONFERENCE SAVED %u\r\n",page->position);

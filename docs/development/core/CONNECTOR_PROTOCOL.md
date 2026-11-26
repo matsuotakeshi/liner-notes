@@ -50,6 +50,18 @@ without the capability use the existing terminal flow. Navigation, dialogue
 entry, credential prompts, terminal controls and dedicated file transfer retain
 their existing protocols.
 
+## Web line conference
+
+The additive `core_conference: 1` capability enables the Web line-conference screen.
+`conf_rooms`, `conf_history`, `conf_unread`, and `conf_position` use the existing
+VIEW envelope. The numeric arguments are room and cursor. The projected
+`conference` object includes room, next, through and either rooms or lines.
+The UPDATE operations `conference.post`, `conference.seen` and `conference.create`
+use id for room, arg for the seen cutoff, and body for a message or room title.
+The Core resolves the caller's identity and applies the same member and
+administrator permissions as RTBBS and MMM. Displaying an unread page has no
+write side effect. Older runtimes omit the capability and the Web entry stays hidden.
+
 ## Responsibilities and lifetime
 
 - `connector_protocol.h/.c` recognizes OPEN/SYNC/LITERAL/BLOCK/LINKBLOCK/DATA/TRANSFER

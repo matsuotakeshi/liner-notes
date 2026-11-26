@@ -83,6 +83,23 @@ static int attachments(char *csv,MailAttachments *out) {
     }
 }
 
+static int conference_action(OperationRequest *q,const char *kind,uint32_t room,uint32_t cursor) {
+    ConferenceRequest *request=&q->conference;
+    size_t length=strlen(q->body);
+    if(!strcmp(kind,"conference.seen")) {
+        if(!cursor || length)return 0;
+        request->action=CONFERENCE_SEEN;
+    } else {
+        if(!room || cursor || !length || length>CONFERENCE_TEXT)return 0;
+        if(!strcmp(kind,"conference.post"))request->action=CONFERENCE_POST;
+        else if(!strcmp(kind,"conference.create"))request->action=CONFERENCE_CREATE;
+        else return 0;
+        memcpy(request->text,q->body,length+1);
+    }
+    request->room=room;request->cursor=cursor;q->op=BOARD_CONFERENCE;
+    return 1;
+}
+
 static int switch_value(const char *value) {
     if(!strcmp(value,"ON"))return 1;
     if(!strcmp(value,"OFF"))return 0;
@@ -281,6 +298,9 @@ void session_impl_web_update(Session *s,char *payload) {
             error="CHAT ERROR target\r\n";goto finish;
         }
         q->op='&';q->chat_target=conversation->talk_target;q->action=q->chat_target?'D':'S';
+    } else if(!strncmp(kind,"conference.",11)) {
+        if(board || flag || *q->title || *q->username || q->mail_attachments.count ||
+           !conference_action(q,kind,id,arg))goto finish;
     } else if(strchr(kind,'.')) {
         if(board || *q->username || q->mail_attachments.count || !action(q,kind,id,arg,(int)flag))goto finish;
     } else if(arg || (strcmp(kind,"mail") && *q->username) || !compose(s,q,kind,board,id,(int)flag))goto finish;
@@ -324,7 +344,13 @@ int session_impl_web_update_result(Session *s,const OperationResult *r,SessionRe
         ui->editor.draft_revision=ui->mail_state.mail_revision=0;
         session_impl_undo_clear(s);
     }
-    update_reply(s,nonce,text,ok,r->mail_id?r->mail_id:r->selected,
+    uint32_t id=r->mail_id?r->mail_id:r->selected;
+    if(r->page.kind==OPERATION_PAGE_CONFERENCE) {
+        const ConferenceReply *page=&r->page.data.conference;
+        text=session_impl_conference_error(page->status);
+        if(ok)id=page->action==CONFERENCE_CREATE?page->room:page->position;
+    }
+    update_reply(s,nonce,text,ok,id,
                  r->mail_revision?r->mail_revision:r->draft_revision,r->feedback.audit_failed);
     nonce[0]=0;s->connection.connector_finish_editor=0;
     return 1;
