@@ -24,6 +24,7 @@ sys.path.insert(0, str(ROOT / "ci"))
 from native_ci import all_passed, parse_result, remote_directory_command, require_trusted_main, run_parallel, ssh_options, supervise, validate_remote_directory
 import native_remote
 from native_remote import RESULT, commands_for, host_lock, unpack
+from solaris_package import write_manifest
 
 SHA = "a" * 40
 
@@ -151,6 +152,37 @@ class PolicyTests(unittest.TestCase):
         for value in ("/known/key", "IdentitiesOnly=yes", "BatchMode=yes",
                       "PasswordAuthentication=no", "StrictHostKeyChecking=yes"):
             self.assertIn(value, options)
+
+    def test_solaris_package_scope(self):
+        self.assertEqual(commands_for("solaris", "package"),
+                         [[sys.executable, "ci/solaris_package.py"]])
+        with self.assertRaises(ValueError):
+            commands_for("freebsd", "package")
+        workflow = yaml.safe_load((ROOT / ".github/workflows/solaris-package.yml").read_text())
+        self.assertEqual(set(workflow[True]), {"workflow_dispatch"})
+        self.assertIn("refs/heads/main", workflow["jobs"]["package"]["if"])
+        self.assertEqual(workflow["concurrency"]["group"], "liner-notes-native-solaris")
+
+    @unittest.skipUnless(os.name == "posix", "IPS file modes require POSIX permissions")
+    def test_solaris_package_manifest(self):
+        with tempfile.TemporaryDirectory() as folder:
+            stage = Path(folder) / "proto"
+            settings = stage / "opt/liner-notes/share/liner-notes/config"
+            settings.mkdir(parents=True)
+            path = settings / "solaris.json.sample"
+            path.write_text("{}")
+            path.chmod(0o644)
+            output = Path(folder) / "manifest"
+            write_manifest(stage, output, "0.75", SHA)
+            lines = output.read_text().splitlines()
+            self.assertIn(f"set name=linernotes.source-sha value={SHA}", lines)
+            self.assertIn("set name=variant.arch value=i386", lines)
+            sample = "opt/liner-notes/share/liner-notes/config/solaris.json.sample"
+            self.assertIn(f"file {sample} path={sample} owner=root group=bin mode=0644", lines)
+            self.assertFalse(any(line.startswith(("dir path=etc ", "dir path=opt ")) for line in lines))
+            (settings / "invalid filename").touch()
+            with self.assertRaisesRegex(ValueError, "Unsafe IPS payload path"):
+                write_manifest(stage, output, "0.75", SHA)
 
     def test_native_test_commands_are_preserved(self):
         self.assertEqual(commands_for("freebsd"), [["make", "-j2"], ["make", "check"]])

@@ -17,6 +17,7 @@ import threading
 import time
 
 from native_remote import RESULT, suite_timeout
+from solaris_package import ARCHIVE as SOLARIS_ARCHIVE, RECEIPT as SOLARIS_RECEIPT
 
 ROOT = Path(__file__).resolve().parents[1]
 TARGETS = {
@@ -179,6 +180,16 @@ def execute_target(target, archive, digest, sha, output, cancelled, suite="core"
             if code:
                 raise RuntimeError("Native SSH exited with status " + str(code))
             parse_result(log_path, target, sha, suite)
+            if suite == "package":
+                package_dir = directory + "/source/build/solaris-package/"
+                run_setup(["scp", *ssh_options(key),
+                           host + ":" + package_dir + SOLARIS_ARCHIVE,
+                           host + ":" + package_dir + SOLARIS_RECEIPT, str(output)], log, cancelled)
+                receipt = json.loads((output / SOLARIS_RECEIPT).read_text(encoding="ascii"))
+                if (receipt.get("source_sha") != sha or receipt.get("acceptance") != "passed"
+                        or receipt.get("archive") != SOLARIS_ARCHIVE
+                        or receipt.get("sha256") != hashlib.sha256((output / SOLARIS_ARCHIVE).read_bytes()).hexdigest()):
+                    raise ValueError("Invalid Solaris package receipt or archive")
             result["status"] = "passed"
         except Exception as error:
             result["status"] = "cancelled" if cancelled.is_set() else "failed"
@@ -210,9 +221,11 @@ def all_passed(results, targets, sha, suite="core"):
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--target", choices=["all", *TARGETS], default="all")
-    parser.add_argument("--suite", choices=("core", "ssh"), default="core")
+    parser.add_argument("--suite", choices=("core", "ssh", "package"), default="core")
     parser.add_argument("--output", required=True, type=Path)
     args = parser.parse_args()
+    if args.suite == "package" and args.target != "solaris":
+        parser.error("The IPS package suite requires --target solaris")
     sha = os.environ.get("GITHUB_SHA", "")
     head = subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=ROOT, text=True).strip()
     require_trusted_main(os.environ, sha, head, args.target)
