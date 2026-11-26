@@ -182,6 +182,34 @@ def create_app(config):
             return result
         return response(session,result)
 
+    # Typed result lists share the action form and return the Core's opaque next position.
+    discovery = {
+        'board.news': ('board_news','{date}','NEWSFROM {cursor} {date}'),
+        'mail.news': ('mail_news','{date}','MAIL NEWSFROM {cursor} {date}'),
+        'mail.inbox': ('mail_inbox','','MAIL +'),
+        'mail.sent': ('mail_sent','','MAIL +'),
+        'mail.unread': ('mail_unread','','MAIL +'),
+        'file.boards': ('file_boards','','FILEBOARDS {cursor}'),
+        'file.list': ('files','','FILES {cursor}'),
+        'file.subtree': ('files','{path}','FILESINFROM {cursor} {path}'),
+        'file.search': ('file_search','{query}','FILESEARCHFROM {cursor} {query}'),
+        'file.search_in': ('file_search','{path}|{query}','FILESEARCHFROM {cursor} {path}|{query}'),
+        'file.news': ('file_news','{path}|{date}','FILENEWSFROM {cursor} {path}|{date}'),
+        'profile.list': ('profiles','*','PROFILESFROM {cursor} *'),
+        'profile.search': ('profiles','{query}','PROFILESFROM {cursor} {query}'),
+        'profile.find': ('profile_find','{field} {query}','PROFILESFROM {cursor} {query}'),
+        'profile.group': ('profile_group','','PROFILESFROM {cursor} *'),
+    }
+    search_actions = ('board.search','board.author','mail.search')
+
+    def search_positions(payload, state):
+        cursor=payload.get('cursor',0)
+        board=payload.get('search_board',state.get('board',0))
+        for position in (cursor,board):
+            if type(position) is not int or not 0<=position<=2147483646:
+                raise ValueError('Invalid search position')
+        return cursor,board
+
     async def operate(request):
         session=current(request,mutate=True);payload=await object_body(request)
         key=payload['action']
@@ -194,12 +222,22 @@ def create_app(config):
                 return response(session,await session.bridge.update(key,flag=item['confirm'],**core_update(key,args)))
             if session.bridge.state.get('mail') and group!='mail':await session.bridge.exchange('MAIL EXIT')
             command=item['command'].format(**args).rstrip()
-            if key in ('board.search','board.author','mail.search'):
-                cursor=payload.get('cursor',0)
-                board=payload.get('search_board',session.bridge.state.get('board',0))
-                for position in (cursor,board):
-                    if type(position) is not int or not 0<=position<=2147483646:
-                        raise ValueError('Invalid search position')
+            if key in discovery:
+                cursor,board=search_positions(payload,session.bridge.state)
+                kind,parameters,continuation=discovery[key]
+                if session.bridge.state.get('core_discovery')==1:
+                    ident=board if kind=='board_news' else 0
+                    if kind=='profile_group':
+                        group_id=args['group']
+                        if not re.fullmatch(r'[0-9]{1,3}',group_id) or not 1<=int(group_id)<=100:
+                            raise ValueError('Invalid member group')
+                        ident=int(group_id)
+                    if kind=='profile_find':
+                        args['field']=args['field'].upper()
+                    return response(session,await session.bridge.view(kind,ident,cursor,parameters.format(**args).rstrip()))
+                if cursor:command=continuation.format(cursor=cursor,**args)
+            elif key in search_actions:
+                cursor,board=search_positions(payload,session.bridge.state)
                 if key=='mail.search':
                     query=args['query'].strip()
                     kind,board,parameters='mail_search',0,query

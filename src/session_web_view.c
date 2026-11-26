@@ -95,6 +95,8 @@ static void render_page(ViewOutput *out,const OperationPage *page) {
     case OPERATION_PAGE_ARTICLES: key="matches";count=page->data.articles.count;next=page->data.articles.next;break;
     case OPERATION_PAGE_TREE: key="tree";count=page->data.tree.count;next=page->data.tree.next;break;
     case OPERATION_PAGE_MAIL: key="mail";count=page->data.mail.count;next=page->data.mail.next;break;
+    case OPERATION_PAGE_PROFILES: key="profiles";count=page->data.profiles.count;next=page->data.profiles.next;break;
+    case OPERATION_PAGE_FILE_BOARDS: key="file_boards";count=(unsigned)page->data.file_boards.count;next=page->data.file_boards.next;break;
     case OPERATION_PAGE_FILES: key="files";count=(unsigned)page->data.files.count;next=page->data.files.next;break;
     case OPERATION_PAGE_CONFERENCE: render_conference(out,&page->data.conference);return;
     case OPERATION_PAGE_PROFILE: {
@@ -152,6 +154,19 @@ static void render_page(ViewOutput *out,const OperationPage *page) {
             append(out,"\"id\":\"%u\",\"read\":\"%d\",\"sender\":",r->id,r->read);
             string(out,r->from);append(out,",\"recipient\":");string(out,r->to);
             append(out,",\"title\":");string(out,r->title);
+            break;
+        }
+        case OPERATION_PAGE_PROFILES: {
+            const MemberProfileRow *r=&page->data.profiles.rows[i];
+            append(out,"\"id\":%u,\"login\":",r->user);string(out,r->name);
+            append(out,",\"handle\":");string(out,r->handle);
+            break;
+        }
+        case OPERATION_PAGE_FILE_BOARDS: {
+            const VaultBoard *r=&page->data.file_boards.rows[i];
+            append(out,"\"upload\":%s,\"path\":",r->can_upload?"true":"false");
+            string(out,*r->name?r->name:"-");
+            append(out,",\"title\":");string(out,*r->display?r->display:*r->name?r->name:"-");
             break;
         }
         case OPERATION_PAGE_FILES: {
@@ -215,12 +230,53 @@ static int request(OperationRequest *q,const char *kind,uint32_t id,uint32_t cur
         q->op='Y';q->action=*path?VAULT_CMD_IN:VAULT_CMD_LIST;q->number=cursor?cursor:1;
         if(strlen(path)>48 || strchr(path,'|') || !session_impl_safe_text(path))return 0;
         strcpy(q->title,path);
+    } else if(!strcmp(kind,"file_search") || !strcmp(kind,"file_news")) {
+        const char *bar=strchr(path,'|'),*filter=bar?bar+1:path;
+        int news=!strcmp(kind,"file_news");
+        uint64_t stamp;
+        if(id || !*filter || strlen(filter)>80 || !session_impl_safe_text(path) ||
+           (bar && (bar==path || bar-path>48 || strchr(filter,'|'))) ||
+           (news && !date_filter(filter,&stamp)))return 0;
+        q->op='Y';q->action=news?VAULT_CMD_NEWS:VAULT_CMD_SEARCH;
+        q->number=cursor?cursor:1;
+        strcpy(q->body,path);
+    } else if(!strcmp(kind,"file_boards")) {
+        if(id || *path)return 0;
+        q->op='Y';q->action=VAULT_CMD_BOARDS;q->number=cursor;
+    } else if(!strcmp(kind,"board_news")) {
+        uint64_t stamp;
+        if(id>CATALOG_MAX || !date_filter(path,&stamp))return 0;
+        q->op='Z';q->action=11;q->board=id;q->cursor=cursor?cursor:1;
+        strcpy(q->title,path);
+    } else if(!strcmp(kind,"profiles") || !strcmp(kind,"profile_group") || !strcmp(kind,"profile_find")) {
+        const char *query=path;
+        if(cursor>MEMBER_MAX || !session_impl_safe_text(path))return 0;
+        q->op='Z';q->action=10;q->cursor=cursor?cursor:1;
+        if(!strcmp(kind,"profile_group")) {
+            if(!id || id>100 || *path)return 0;
+            q->scope=100;q->number=id;query="*";
+        } else if(id)return 0;
+        else if(!strcmp(kind,"profile_find")) {
+            const char *space=strchr(path,' ');char field[32]={0};
+            if(!space || space==path || (size_t)(space-path)>=sizeof(field))return 0;
+            memcpy(field,path,(size_t)(space-path));
+            int index=profile_field(field);
+            if(index<0)return 0;
+            q->scope=index+1;query=space+1;
+        }
+        if(!*query || strlen(query)>80)return 0;
+        strcpy(q->title,query);
     } else if(!strcmp(kind,"find")) {
         q->op='Z';q->action=3;q->board=id;q->cursor=cursor?cursor:1;
         if(id>CATALOG_MAX || !session_impl_safe_text(path) || !session_impl_find_arguments(path,q))return 0;
     } else if(!strcmp(kind,"mail_search")) {
         if(id || !*path || strlen(path)>80 || !session_impl_safe_text(path))return 0;
         q->op='m';q->action='L';q->number=MAIL_LIST_SEARCH;q->cursor=cursor;
+        strcpy(q->title,path);
+    } else if(!strcmp(kind,"mail_news")) {
+        uint64_t stamp;
+        if(id || !date_filter(path,&stamp))return 0;
+        q->op='m';q->action='L';q->number=MAIL_LIST_NEWS;q->cursor=cursor;
         strcpy(q->title,path);
     } else if(*path)return 0;
     else if(!strncmp(kind,"conf_",5)) {
@@ -232,8 +288,12 @@ static int request(OperationRequest *q,const char *kind,uint32_t id,uint32_t cur
         else return 0;
     } else if(!strcmp(kind,"boards") || !strcmp(kind,"notes")) {
         q->op=kind[0]=='b'?'b':'O';q->number=cursor?cursor:1;
-    } else if(!strcmp(kind,"mail")) {
-        q->op='m';q->action='L';q->number=MAIL_LIST_ALL;q->cursor=cursor;
+    } else if(!strcmp(kind,"mail") || !strcmp(kind,"mail_inbox") ||
+              !strcmp(kind,"mail_sent") || !strcmp(kind,"mail_unread")) {
+        q->op='m';q->action='L';q->cursor=cursor;
+        q->number=!strcmp(kind,"mail_inbox")?MAIL_LIST_INBOX:
+                  !strcmp(kind,"mail_sent")?MAIL_LIST_SENT:
+                  !strcmp(kind,"mail_unread")?MAIL_LIST_UNREAD:MAIL_LIST_ALL;
     } else {
         if(!id)return 0;
         q->number=id;

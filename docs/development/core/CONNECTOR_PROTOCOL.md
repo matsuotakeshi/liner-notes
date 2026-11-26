@@ -128,3 +128,23 @@ until it is 0, including when a page has zero matches. Article rows are returned
 in `data.matches`, and mail rows in `data.mail`. The Core applies its normal
 visibility, password grant, and mailbox access checks. Older runtimes continue
 using the legacy command path.
+
+`core_discovery: 1` adds the typed views below. Position 0 starts each list.
+Pass the returned `data.next` as the next position with the same arguments.
+
+| View | ID | Trailing argument | Result list |
+| --- | --- | --- | --- |
+| `board_news` | Board ID or 0 for current board | `YYYY-MM-DD` | `matches` |
+| `mail_news` | 0 | `YYYY-MM-DD` | `mail` |
+| `mail_inbox`, `mail_sent`, `mail_unread` | 0 | None | `mail` |
+| `file_boards` | 0 | None | `file_boards` |
+| `file_search` | 0 | Pattern, optionally prefixed by a board and a pipe | `files` |
+| `file_news` | 0 | Board, pipe, and `YYYY-MM-DD` | `files` |
+| `profiles` | 0 | Search text or `*` | `profiles` |
+| `profile_find` | 0 | Uppercase field key, space, search text | `profiles` |
+| `profile_group` | Member group ID | None | `profiles` |
+
+For file searches a board of `-` means the root. File lists and subtree
+lists reuse the existing `files` view. The shorter legacy commands remain
+available when the peer has no discovery capability. Date scans here are
+read-only queries. The interactive `CHECK` workflow owns checkpoint changes.

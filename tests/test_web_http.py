@@ -80,6 +80,17 @@ async def exercise(bbs,tmp):
             r=await post(b,'action',{'action':action,'values':values,'search_board':1})
             assert r['state']['core_search']==1 and not r['text'],r
             assert r['data']['matches']==[{'id':'1','board':'1','parent':'0','title':'Web article'}],r
+        r=await post(b,'action',{'action':'board.news','values':{'date':'2000-01-01'},'search_board':1})
+        assert r['state']['core_discovery']==1 and not r['text'],r
+        assert [row['id'] for row in r['data']['matches']]==['1'],r
+        r=await post(b,'action',{'action':'profile.search','values':{'query':'alice'}})
+        assert not r['text'] and [(row['id'],row['login']) for row in r['data']['profiles']]==[(1,'alice')],r
+        r=await post(a,'action',{'action':'profile.handle','values':{'text':'Web Search Handle'}})
+        assert r['mutation']['ok'],r
+        r=await post(b,'action',{'action':'profile.find','values':{'field':'handle','query':'Web Search Handle'}})
+        assert not r['text'] and [row['login'] for row in r['data']['profiles']]==['alice'],r
+        r=await post(a,'action',{'action':'profile.group','values':{'group':'100'}})
+        assert not r['text'] and not r['data']['profiles'],r
         bad=await b.post(base+'action',json={'action':'board.search','values':{'query':'Web'},'cursor':True})
         assert bad.status==400,await bad.text()
         r=await post(b,'query',{'kind':'notes'});assert r['data']['notes'][0]['title']=='Web article',r
@@ -100,6 +111,19 @@ async def exercise(bbs,tmp):
         headers={'X-File-Name':enc('日本語.bin'),'X-File-Description':enc('Web test'),'X-File-Board':'-'}
         r=await a.post(base+'upload',data=payload,headers=headers);assert r.status==200,await r.text();v=await r.json();fid=v['id'];assert v['sha256']==digest
         r=await post(a,'query',{'kind':'files'});assert r['data']['files'][0]['name']=='日本語.bin',r
+        for action,values in (
+            ('file.list',{}),('file.subtree',{'path':'-'}),
+            ('file.search',{'query':'*.bin'}),('file.search_in',{'path':'-','query':'*.bin'}),
+            ('file.news',{'path':'-','date':'2000-01-01'}),
+        ):
+            r=await post(b,'action',{'action':action,'values':values})
+            assert not r['text'] and [row['id'] for row in r['data']['files']]==[fid],r
+        r=await post(b,'action',{'action':'file.search_in','values':{'path':'games/child','query':'*.bin'}})
+        assert not r['text'] and not r['data']['files'],r
+        r=await post(b,'action',{'action':'file.boards'})
+        assert not r['text'] and any(row['path']=='games/child' and row['title']=='Child files' for row in r['data']['file_boards']),r
+        r=await post(b,'action',{'action':'file.news','values':{'path':'-','date':'2001-02-29'}})
+        assert r['text'].startswith('ERR ') and not r['data']['files'],r
         r=await post(a,'action',{'action':'file.desc','values':{'id':str(fid),'text':'更新した説明'}});assert r['mutation']['ok'],r
         r=await post(outsider,'action',{'action':'file.desc','values':{'id':str(fid),'text':'Unauthorized'}});assert not r['mutation']['ok'],r
         r=await b.post(base+'download',json={'id':fid});assert r.status==200,await r.text();assert await r.read()==payload
@@ -112,6 +136,14 @@ async def exercise(bbs,tmp):
         r=await post(outsider,'compose',{'kind':'mail','title':'Forbidden','recipient':'bob','body':'private','attachments':[attachment]});assert not r['mutation']['ok'],r
         r=await post(a,'compose',{'kind':'mail','title':'private','recipient':'bob','body':'私信本文','attachments':[attachment]});assert r['mutation']['ok'] and r['mutation']['id']==1,r
         r=await post(b,'query',{'kind':'mail'});assert r['data']['mail'][0]['title']=='private',r
+        filters=(('mail.inbox',{}),('mail.unread',{}),('mail.news',{'date':'2000-01-01'}))
+        for action,values in filters:
+            r=await post(b,'action',{'action':action,'values':values})
+            assert not r['text'] and [row['id'] for row in r['data']['mail']]==['1'],r
+        r=await post(a,'action',{'action':'mail.sent'})
+        assert not r['text'] and [row['id'] for row in r['data']['mail']]==['1'],r
+        r=await post(outsider,'action',{'action':'mail.news','values':{'date':'2000-01-01'}})
+        assert not r['text'] and not r['data']['mail'],r
         search={'action':'mail.search','values':{'query':'私信本文'}}
         r=await post(b,'action',search)
         assert not r['text'] and [m['id'] for m in r['data']['mail']]==['1'],r
