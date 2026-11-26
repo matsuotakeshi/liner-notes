@@ -1,0 +1,35 @@
+name: Solaris IPS Package CI
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: liner-notes-native-solaris
+  cancel-in-progress: false
+jobs:
+  package:
+    if: ${{ github.repository == 'matsuotakeshi/liner-notes' && github.ref == 'refs/heads/main' && github.event_name == 'workflow_dispatch' }}
+    runs-on: [self-hosted, Linux, X64]
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Build and test the Solaris IPS package on exact main
+        run: python3 ci/native_ci.py --suite package --target solaris --output "$RUNNER_TEMP/solaris-package"
+      - name: Save verified Solaris package and receipt
+        uses: actions/upload-artifact@v4
+        with:
+          name: liner-notes-solaris-ips
+          path: |
+            ${{ runner.temp }}/solaris-package/*.p5p
+            ${{ runner.temp }}/solaris-package/SOLARIS-PACKAGE.json
+          if-no-files-found: error
+      - name: Save Solaris package diagnostics
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: liner-notes-solaris-ips-diagnostics
+          path: |
+            ${{ runner.temp }}/solaris-package/solaris.log
+            ${{ runner.temp }}/solaris-package/results.json

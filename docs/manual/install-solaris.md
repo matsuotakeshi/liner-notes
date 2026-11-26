@@ -2,7 +2,7 @@
 
 ## Solaris 11.4の対応範囲
 
-対象はOracle Solaris 11.4 CBE x86-64です。0.75ではソースから構築する検証対象です。SPARC・ARMは対象外です。ネイティブビルド、基本BBS、Door、WebUI、BBS間リンク、実ZMODEM転送の自動回帰試験が成功しています。SMFは専用fixtureで検証し、本番サービスの運用と区別します。全機能対応や本番運用の検証完了を意味しません。
+対象はOracle Solaris 11.4 CBE x86-64です。0.75ではソースから構築する検証対象です。SPARC・ARMは対象外です。ネイティブビルド、基本BBS、Door、WebUI、BBS間リンク、実ZMODEM転送の自動回帰試験が成功しています。SMFは専用の試験サービスで登録・起動・停止・再起動・異常終了からの復旧を実機検証しました。全機能対応や本番運用の検証完了を意味しません。
 
 ## 検証と依存関係
 
@@ -67,11 +67,18 @@ Doorを有効にするときは同じビルドの排他helperを本体と一緒�
 - Solaris 11.4 CBE x86-64、GCC15、Python3.13.9で本体・管理コマンドのビルドと基本BBS回帰全体、SQLiteの別コピー変換・バックアップ・復元、doctor 33件と原本非変更、C/Python排他寿命、SMF staging・定義検証が成功しました。DoorはNAWS・複数接続/枠・異常終了/切断/子孫回収、WebUIはHTTP・CSRF・私信・転送・実PTY、BBS間リンクは3局スター/リング・mTLS・再送・再起動・チェックポイントまで成功しています。
 - lrzsz0.13.1による実送受信、バイナリ・空ファイル、SHA-256一致、日英メニュー、メール添付、一括転送、通信切断後の途中再開、同じ接続からの再試行、保存済み登録先を使うZRESUMEが成功しました。転送子プロセス24並列と制限超過拒否・停止回収、タイムアウト後の端末属性の完全復元、転送中の会員権限取り消しも検証しています。これは自動試験の範囲であり、Solarisでの本番規模の同時大容量転送性能を保証するものではありません。
 - WebUI・リンクの検証では、専用venvへaiohttp3.14.5を導入し、既存のcryptography46.0.3と組み合わせて成功しました。system PythonとOSパッケージは変更していません。
+- 0.75の[Solaris Native CI](https://github.com/matsuotakeshi/liner-notes/actions/runs/45760676614)では、SMFに試験用サービスを登録し、起動・Telnet接続、停止・再起動、異常終了後の復旧と登録の後片付けを確認しました。内蔵SSHは[別の実機試験](https://github.com/matsuotakeshi/liner-notes/actions/runs/45770691991)で確認しています。
+
+## Solaris IPSパッケージ（開発候補）
+
+`Solaris IPS Package CI`はレビュー済みmainをSolaris 11.4 x86-64でビルドし、`.p5p`を一時IPSイメージへ導入してBBS本体・管理ツールを試します。成功した実行はパッケージと、版・ソースSHA・SHA-256を記録した `SOLARIS-PACKAGE.json` を保存します。公開済みv0.75の配布物とは別の候補です。
+
+パッケージの管理範囲は `/opt/liner-notes` です。稼働設定は同梱の `share/liner-notes/config/*.sample` から必要なものだけを `/etc/liner-notes` にコピーします。データ、アカウント、SMF登録は別途準備します。サイト固有のメニュー・HELPなどは管理領域外に置いて設定から参照します。Pythonは候補のビルドに使ったシステム側の絶対パスが必要です。標準候補に内蔵SSHと認証付きDoor隔離は含めません。
+
 ## 現在の制約
 
-- CIアカウントにはSMF管理権限がありません。固定サービスだけを管理する限定helperの初回設置は別途承認が必要です。通常のCIが権限やOS設定を自動変更することはなく、実サービス登録・稼働は現在未検証です。
-- SMFマニフェストと設定保持を行うstaging installerを用意しています。実SMFでの登録・起動・停止・自動起動、および本番用の導入・更新手順は未検証です。FreeBSDのrc.dやLinuxのsystemdの手順をそのまま使用しないでください。
+- CIは限定ヘルパーを通じて試験用FMRIだけを管理します。OS再起動後の自動起動と、本番構成での導入・更新・復元は未検証です。FreeBSDのrc.dやLinuxのsystemdの手順をそのまま使用しないでください。
 - COM・モデムコネクタはFreeBSD/Linux向けです。Solaris対応はありません。
 - FreeBSD pkg、RPM、DEBをSolarisへ導入できるという意味ではありません。
 
-設定やDBの意味は共通です。[保存方式](storage.md)、[バックアップ](backup-recovery.md)、[Door設定](external-games.md)も参照してください。OS固有のサービス操作は実機確認が完了するまで正式手順として公開しません。
+設定やDBの意味は共通です。[保存方式](storage.md)、[バックアップ](backup-recovery.md)、[Door設定](external-games.md)も参照してください。本番運用は、利用する構成での導入・更新・復元を確認してから判断します。

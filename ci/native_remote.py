@@ -52,6 +52,8 @@ def unpack(directory, digest, sha):
 def commands_for(target, suite="core"):
     if suite == "ssh":
         return [[sys.executable, "ci/native_ssh.py", "--target", target]]
+    if suite == "package" and target == "solaris":
+        return [[sys.executable, "ci/solaris_package.py"]]
     if suite != "core":
         raise ValueError("Unknown native suite")
     if target == "solaris":
@@ -201,7 +203,7 @@ def main():
     run = sub.add_parser("worker")
     run.add_argument("target", choices=["freebsd", "rocky", "debian", "solaris"])
     run.add_argument("sha")
-    run.add_argument("--suite", choices=("core", "ssh"), default="core")
+    run.add_argument("--suite", choices=("core", "ssh", "package"), default="core")
     run.add_argument("--timeout", type=int)
     run.add_argument("--lease", type=int, default=45)
     args = parser.parse_args()

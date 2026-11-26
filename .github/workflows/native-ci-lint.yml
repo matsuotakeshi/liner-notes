@@ -9,6 +9,8 @@ on:
       - "tests/test_freebsd_package_lease.py"
       - ".github/workflows/freebsd-package.yml"
       - "ci/solaris_ci.py"
+      - "ci/solaris_package.py"
+      - ".github/workflows/solaris-package.yml"
       - "ci/*solaris_smf*.py"
       - "tests/test_solaris_smf_ci.py"
       - "ci/solaris_door_jail.py"
