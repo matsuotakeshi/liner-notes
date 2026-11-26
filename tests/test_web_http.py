@@ -340,15 +340,20 @@ async def exercise(bbs,tmp):
             r=await post(outsider,'action',{'action':action,'values':values})
             assert r['mutation']['ok'],r
         r=await post(outsider,'action',{'action':'settings.save'})
-        assert r['mutation']['ok'],r
+        assert r['mutation']['ok'] and r['text'].startswith('PREFS SAVED'),r
         r=await post(outsider,'action',{'action':'settings.prefs'})
         assert not r['text'] and r['data']['report']['title']=='PREFS',r
         saved=dict(r['data']['report']['fields'])
+        assert saved.get('language') in ('ja','en'),r
         assert saved==dict(language=saved['language'],pager='ON',editor='LINE',columns='100',rows='30'),r
         r=await post(outsider,'action',{'action':'settings.editor','values':{'value':'BETA'}})
         assert r['mutation']['ok'],r
         r=await post(outsider,'action',{'action':'settings.load'})
         assert r['mutation']['ok'] and r['text'].startswith('PREFS LOADED'),r
+        r=await post(outsider,'action',{'action':'settings.save'})
+        assert r['mutation']['ok'] and r['text'].startswith('PREFS SAVED'),r
+        r=await post(outsider,'action',{'action':'settings.prefs'})
+        assert dict(r['data']['report']['fields'])==saved,r
         r=await post(b,'action',{'action':'board.check','values':{'scope':'ALL'}})
         assert r['data']['check']=={'active':True,'finished':False} and r['data']['next'],r
         r=await post(b,'action',{'action':'check.done'})

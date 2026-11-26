@@ -397,10 +397,10 @@
   "scripts/zmodem_host.py": "63dda85291055109cd7c2c5fc2c387f16c1388f511a38a797067c35d8bb8e6e9",
   "src/zmodem_host.c": "29d8e3c5dae7b1b3fbc01292c467c4cee9531c76965972739d97729ff426b9bc",
   "src/zmodem_host.h": "8b9177feec47139f07e6b72977cfee8fb8ae8ea4c67d032fbfbef5fa62390ad4",
-  "src/session_web_update.c": "2524cd5072b04290e10085790f7816c8152f92840495d50d17c8e24ae946dd70",
+  "src/session_web_update.c": "591dc17418d6c8c27b3801bc9700f5da32a8f428d54fbdcb0045c3743781ee71",
   "src/session_web_view.c": "66dd64cb097590ee614fa1942b2cd1b14a83e68b67d135c9ad664602025e7417",
   "tests/test_web_connector.py": "6eaf041984583da7a15d79edba0a606e95b4e038471846832a14eb0ba38a1975",
-  "tests/test_web_http.py": "a78e2e1a097608ffce2d81db34840247149bdd5e791bf07f2cd54ce4e8835919",
+  "tests/test_web_http.py": "3e68b83a7b57230ca14ecc0e8bea37bf1f176c46d238058087476657afe7d8aa",
   "ci/solaris_package.py": "855c0bdd34b4285b7a8cbf2cab373fbee247c3b3d82a33981b7719ab6e81dc5d",
   ".github/workflows/solaris-package.yml": "d69c66ac69829023039177bdcfc0e5f92158a9518d3148b14caddd5be99d4d66"
 }

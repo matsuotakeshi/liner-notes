@@ -409,7 +409,10 @@ void session_impl_web_update(Session *s,char *payload) {
     if(!s->core.board_enabled && (q->op=='P' || q->op=='w' || strchr("suZhrY(",q->op))) {
         error="ERR no board\r\n";goto finish;
     }
-    if(q->op=='V' && q->number==1)session_impl_preferences_request(s,q);
+    if(!strcmp(kind,"settings.save")) {
+        q->number=1;
+        session_impl_preferences_request(s,q);
+    }
     SessionOperationStatus status=session_submit(s,q);
     if(status==SESSION_OPERATION_ACCEPTED) {
         memcpy(s->connection.connector_update_nonce,nonce,33);
