@@ -73,6 +73,15 @@ async def exercise(bbs,tmp):
         r=await outsider.post(base+'action',json={'action':'admin.level','values':{'user':'1','level':'5'},'confirmed':True});assert r.status==409
         content='/CANCEL\n.\n<script>alert(1)</script>\n日本語の本文'
         r=await post(a,'compose',{'kind':'article','title':'Web article','body':content});assert r['mutation']==dict(ok=True,id=1,revision=0,audit_failed=False),r
+        for action,values in (
+            ('board.search',{'scope':'HERE','query':'日本語の本文'}),
+            ('board.author',{'scope':'SUBTREE','author':'alice'}),
+        ):
+            r=await post(b,'action',{'action':action,'values':values,'search_board':1})
+            assert r['state']['core_search']==1 and not r['text'],r
+            assert r['data']['matches']==[{'id':'1','board':'1','parent':'0','title':'Web article'}],r
+        bad=await b.post(base+'action',json={'action':'board.search','values':{'query':'Web'},'cursor':True})
+        assert bad.status==400,await bad.text()
         r=await post(b,'query',{'kind':'notes'});assert r['data']['notes'][0]['title']=='Web article',r
         r=await post(b,'query',{'kind':'read','id':1});assert r['data']['article']['body']==content.replace('\n','\r\n')+'\r\n',r
         await post(a,'action',{'action':'settings.editor','values':{'value':'LINE'}})
@@ -103,6 +112,11 @@ async def exercise(bbs,tmp):
         r=await post(outsider,'compose',{'kind':'mail','title':'Forbidden','recipient':'bob','body':'private','attachments':[attachment]});assert not r['mutation']['ok'],r
         r=await post(a,'compose',{'kind':'mail','title':'private','recipient':'bob','body':'私信本文','attachments':[attachment]});assert r['mutation']['ok'] and r['mutation']['id']==1,r
         r=await post(b,'query',{'kind':'mail'});assert r['data']['mail'][0]['title']=='private',r
+        search={'action':'mail.search','values':{'query':'私信本文'}}
+        r=await post(b,'action',search)
+        assert not r['text'] and [m['id'] for m in r['data']['mail']]==['1'],r
+        r=await post(outsider,'action',search)
+        assert not r['text'] and not r['data']['mail'],r
         r=await post(b,'query',{'kind':'mail_read','id':1});assert r['data']['message']['body']=='私信本文\r\n',r
         assert r['data']['message']['attachments']==[{'id':attachment,'size':len(payload),'name':'日本語.bin'}],r
         denied=await post(outsider,'query',{'kind':'mail_read','id':1})
@@ -142,6 +156,20 @@ async def exercise(bbs,tmp):
         await ws.send_bytes(b'DOOR 1\r\n');await terminal_until(b'WEB DOOR READY')
         await ws.send_bytes(b'hello\r\n');await terminal_until(b'Back to BBS')
         await ws.send_bytes(b'PING\r\n');await terminal_until(b'PONG');await ws.close()
+        searchable=[]
+        for i in range(10):
+            r=await post(a,'compose',{'kind':'article','board':1,'title':f'Web pagination {i}','body':'page-marker'})
+            assert r['mutation']['ok'],r
+            searchable.append(r['mutation']['id'])
+        r=await post(a,'action',{'action':'admin.hide','values':{'id':str(searchable[0])},'confirmed':True})
+        assert r['mutation']['ok'],r
+        search={'action':'board.search','values':{'scope':'HERE','query':'page-marker'},'search_board':1}
+        r=await post(b,'action',search)
+        assert not r['text'] and [int(row['id']) for row in r['data']['matches']]==searchable[1:9],r
+        assert r['data']['next']==searchable[9],r
+        r=await post(b,'action',{**search,'cursor':r['data']['next']})
+        assert not r['text'] and [int(row['id']) for row in r['data']['matches']]==searchable[9:],r
+        assert r['data']['next']==0,r
         print('PASS Web HTTP: CSRF/Origin, session isolation, 256KiB drafts, Gather, literal posts, mail/privacy, public/private files with SHA256, one-use downloads, resume/retry, terminal login and real PTY door return')
     finally:
         await asyncio.gather(*(c.close() for c in clients));await runner.cleanup()

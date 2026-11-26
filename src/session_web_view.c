@@ -1,6 +1,7 @@
 #define _POSIX_C_SOURCE 200809L
 #include "session_internal.h"
 #include "app_limits.h"
+#include "catalog.h"
 #include "date_filter.h"
 #include "mail_query.h"
 #include "profile_store.h"
@@ -91,6 +92,7 @@ static void render_page(ViewOutput *out,const OperationPage *page) {
     switch(page->kind) {
     case OPERATION_PAGE_BOARDS: key="boards";count=page->data.boards.count;next=page->data.boards.next;break;
     case OPERATION_PAGE_NOTES: key="notes";count=page->data.notes.count;next=page->data.notes.next;break;
+    case OPERATION_PAGE_ARTICLES: key="matches";count=page->data.articles.count;next=page->data.articles.next;break;
     case OPERATION_PAGE_TREE: key="tree";count=page->data.tree.count;next=page->data.tree.next;break;
     case OPERATION_PAGE_MAIL: key="mail";count=page->data.mail.count;next=page->data.mail.next;break;
     case OPERATION_PAGE_FILES: key="files";count=(unsigned)page->data.files.count;next=page->data.files.next;break;
@@ -129,6 +131,13 @@ static void render_page(ViewOutput *out,const OperationPage *page) {
             stamp_text(out,r->updated);
             append(out,",\"unread\":");count_text(out,page->data.notes.unread_known,r->unread);
             append(out,",\"title\":");string(out,r->summary.title);
+            break;
+        }
+        case OPERATION_PAGE_ARTICLES: {
+            const ArticleSummary *r=&page->data.articles.rows[i];
+            append(out,"\"id\":\"%u\",\"board\":\"%u\",\"parent\":\"%u\",\"title\":",
+                   r->id,r->board,r->parent);
+            string(out,r->title);
             break;
         }
         case OPERATION_PAGE_TREE: {
@@ -206,6 +215,13 @@ static int request(OperationRequest *q,const char *kind,uint32_t id,uint32_t cur
         q->op='Y';q->action=*path?VAULT_CMD_IN:VAULT_CMD_LIST;q->number=cursor?cursor:1;
         if(strlen(path)>48 || strchr(path,'|') || !session_impl_safe_text(path))return 0;
         strcpy(q->title,path);
+    } else if(!strcmp(kind,"find")) {
+        q->op='Z';q->action=3;q->board=id;q->cursor=cursor?cursor:1;
+        if(id>CATALOG_MAX || !session_impl_safe_text(path) || !session_impl_find_arguments(path,q))return 0;
+    } else if(!strcmp(kind,"mail_search")) {
+        if(id || !*path || strlen(path)>80 || !session_impl_safe_text(path))return 0;
+        q->op='m';q->action='L';q->number=MAIL_LIST_SEARCH;q->cursor=cursor;
+        strcpy(q->title,path);
     } else if(*path)return 0;
     else if(!strncmp(kind,"conf_",5)) {
         q->op=BOARD_CONFERENCE;q->conference.room=id;q->conference.cursor=cursor;
@@ -265,7 +281,8 @@ void session_impl_web_view(Session *s,const char *payload) {
         free(q);reply(s,nonce,"ERR no board\r\n",empty);return;
     }
     int structured=s->core.structured;
-    q->board=s->core.board;s->core.structured=1;
+    if(!q->board)q->board=s->core.board;
+    s->core.structured=1;
     SessionOperationStatus status=session_submit(s,q);
     s->core.structured=structured;
     if(status==SESSION_OPERATION_ACCEPTED)memcpy(s->connection.connector_view_nonce,nonce,sizeof(nonce));

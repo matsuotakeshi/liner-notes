@@ -117,3 +117,14 @@ Windows validation covers the pure C test, strict syntax checks of Session and
 adapters, i18n catalog checks and canonical manual. Full adapter/runtime and OS
 integration are left to existing hosted PR CI and trusted-main native CI; local
 syntax success is not an execution result for those tests.
+
+The additive `core_search: 1` capability enables paginated Core search views.
+`VIEW find <board> <cursor> <scope> <author> <query>` uses `HERE`, `SUBTREE`, or `ALL`.
+Board 0 selects the current board. The caller can pass a fixed board ID to keep
+the scope anchored across requests. An asterisk selects any author or query.
+`VIEW mail_search 0 <cursor> <query>` searches mail visible to the signed-in member.
+Cursor 0 starts the search. Reuse the returned `data.next` with the same arguments
+until it is 0, including when a page has zero matches. Article rows are returned
+in `data.matches`, and mail rows in `data.mail`. The Core applies its normal
+visibility, password grant, and mailbox access checks. Older runtimes continue
+using the legacy command path.
