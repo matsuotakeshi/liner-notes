@@ -222,7 +222,7 @@ static void render_page(ViewOutput *out,const OperationPage *page) {
                            "[\"columns\",\"%u\"],[\"rows\",\"%u\"]",
                            r->language?"en":"ja",r->pager?"ON":"OFF",r->editor?"LINE":"SOLID",r->columns,r->rows);
         else append(out,"[\"status\",\"NONE\"]");
-        append(out,"]]}");return;
+        append(out,"]}");return;
     }
     case OPERATION_PAGE_APPLICATION: {
         const MemberApplication *r=&page->data.application;

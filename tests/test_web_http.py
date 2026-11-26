@@ -262,8 +262,14 @@ async def exercise(bbs,tmp):
         assert not r['text'] and not r['data']['report']['rows'],r
         r=await post(a,'action',{'action':'admin.audit_article','values':{'id':str(searchable[0])}})
         assert not r['text'] and any(row[4:6]==['HIDE',str(searchable[0])] for row in r['data']['report']['rows']),r
-        r=await post(a,'action',{'action':'settings.prefs'})
+        r=await post(outsider,'action',{'action':'settings.prefs'})
         assert not r['text'] and r['data']['report']['title']=='PREFS',r
+        assert r['data']['report']['fields']==[['status','NONE']],r
+        r=await post(outsider,'action',{'action':'settings.save'})
+        assert r['mutation']['ok'],r
+        r=await post(outsider,'action',{'action':'settings.prefs'})
+        assert not r['text'] and r['data']['report']['title']=='PREFS',r
+        assert set(dict(r['data']['report']['fields']))=={'language','pager','editor','columns','rows'},r
         r=await post(b,'action',{'action':'board.check','values':{'scope':'ALL'}})
         assert r['data']['check']=={'active':True,'finished':False} and r['data']['next'],r
         r=await post(b,'action',{'action':'check.done'})
