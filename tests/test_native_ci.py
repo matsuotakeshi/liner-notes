@@ -22,6 +22,7 @@ import yaml
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "ci"))
 from native_ci import all_passed, parse_result, remote_directory_command, require_trusted_main, run_parallel, ssh_options, supervise, validate_remote_directory
+import native_ci
 import native_remote
 from native_remote import RESULT, commands_for, host_lock, unpack
 from solaris_package import write_manifest
@@ -49,18 +50,47 @@ class PolicyTests(unittest.TestCase):
                     if expected is None:
                         worker.assert_not_called()
                     else:
-                        worker.assert_called_once_with(target, SHA, expected, 45, suite)
+                        worker.assert_called_once_with(target, SHA, expected, 45, suite, telnet_start_timeout=None)
 
     def test_native_sets_bounded_io_waits(self):
         child = Mock()
         child.poll.return_value = 0
-        with patch.object(native_remote.subprocess, 'Popen', return_value=child) as spawn, \
-             patch.object(native_remote, 'heartbeat'):
-            native_remote.run_commands([['test-only']], 0)
-        env = spawn.call_args.kwargs['env']
-        self.assertEqual(env['LINER_TEST_START_TIMEOUT'], '180')
-        self.assertEqual(env['LINER_TEST_AUTH_TIMEOUT'], '30')
-        self.assertEqual(env['LINER_TEST_STOP_TIMEOUT'], '30')
+        for arguments, startup_wait in (({}, "10"), ({"telnet_start_timeout": 30}, "30")):
+            with self.subTest(arguments=arguments), \
+                 patch.object(native_remote.subprocess, "Popen", return_value=child) as spawn, \
+                 patch.object(native_remote, "heartbeat"):
+                native_remote.run_commands([["test-only"]], 0, **arguments)
+                env = spawn.call_args.kwargs["env"]
+                self.assertEqual(env["LINER_TEST_START_TIMEOUT"], "180")
+                self.assertEqual(env["LINER_TEST_AUTH_TIMEOUT"], "30")
+                self.assertEqual(env["LINER_TEST_STOP_TIMEOUT"], "30")
+                self.assertEqual(env["LINER_TEST_TELNET_START_TIMEOUT"], startup_wait)
+
+    def test_remote_only_accepts_bounded_debian_core_telnet_overrides(self):
+        for target, suite, seconds, allowed in (
+            ("debian", "core", 30, True), ("debian", "core", 120, True),
+            ("debian", "core", 9, False), ("debian", "core", 121, False),
+            ("debian", "ssh", 30, False), ("freebsd", "core", 30, False),
+        ):
+            args = ["native_remote.py", "worker", target, SHA, "--suite", suite,
+                    "--telnet-start-timeout", str(seconds)]
+            with self.subTest(args=args), patch.object(sys, "argv", args), \
+                 patch.object(native_remote, "worker") as worker, \
+                 patch("sys.stdout", new_callable=io.StringIO):
+                self.assertEqual(native_remote.main(), 0 if allowed else 1)
+                if allowed:
+                    worker.assert_called_once_with(target, SHA, 3300, 45, suite,
+                                                   telnet_start_timeout=seconds)
+                else:
+                    worker.assert_not_called()
+
+    def test_coordinator_rejects_telnet_override_on_automatic_ci(self):
+        args = ["native_ci.py", "--target", "debian", "--output", "unused",
+                "--telnet-start-timeout", "30"]
+        with patch.object(sys, "argv", args), patch.dict(os.environ, {"GITHUB_EVENT_NAME": "push"}), \
+             patch("sys.stderr", new_callable=io.StringIO) as stderr, self.assertRaises(SystemExit):
+            native_ci.main()
+        self.assertIn("requires a manual workflow", stderr.getvalue())
 
 
     def test_only_exact_trusted_main_can_reach_ssh(self):

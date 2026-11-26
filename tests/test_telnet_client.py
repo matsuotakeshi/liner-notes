@@ -8,6 +8,7 @@ import sys
 import tempfile
 import time
 from test_board import Server
+from test_runtime import test_wait_timeout
 
 
 def run(binary,entry=None):
@@ -17,6 +18,7 @@ def run(binary,entry=None):
     client=shutil.which('telnet')
     if not client:
         print('SKIP: native telnet client is not installed'); return
+    start_wait = test_wait_timeout("LINER_TEST_TELNET_START_TIMEOUT", 10)
     binary=str(pathlib.Path(binary).resolve())
     with tempfile.TemporaryDirectory(prefix='telnet-client-') as d:
         p=pathlib.Path(d)
@@ -28,18 +30,19 @@ def run(binary,entry=None):
                 os.execv('/bin/sh',['/bin/sh',entry,str(s.port)])
             os.execv(client,[client,'-8','127.0.0.1',str(s.port)])
         buf=b''
-        def until(marker):
+        def until(marker, timeout=10, phase="dialogue"):
             nonlocal buf
-            deadline=time.monotonic()+10
+            deadline=time.monotonic()+timeout
             while marker not in buf:
                 left=deadline-time.monotonic()
-                assert left>0,('client timeout',buf)
+                details = ("native Telnet timeout", phase, timeout, client, buf)
+                assert left > 0, details
                 ready,_,_=select.select([fd],[],[],left)
-                assert ready,('client timeout',buf)
+                assert ready, details
                 chunk=os.read(fd,8192); assert chunk,buf; buf+=chunk
             end=buf.index(marker)+len(marker); result,buf=buf[:end],buf[end:]; return result
         try:
-            assert b'Liner notes' in until(b'] > ')
+            assert b'Liner notes' in until(b'] > ', start_wait, 'initial prompt')
             os.write(fd,b'REGISTER nativeclient\r'); until(b'Password (8-128 bytes)> ')
             os.write(fd,b'native-client-secret-2468\r')
             result=until(b'] > ')

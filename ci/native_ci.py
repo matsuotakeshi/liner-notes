@@ -16,7 +16,7 @@ import sys
 import threading
 import time
 
-from native_remote import RESULT, suite_timeout
+from native_remote import RESULT, suite_timeout, validate_telnet_start_timeout
 from solaris_package import ARCHIVE as SOLARIS_ARCHIVE, RECEIPT as SOLARIS_RECEIPT
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -136,7 +136,7 @@ def validate_remote_directory(target, directory):
     return directory
 
 
-def execute_target(target, archive, digest, sha, output, cancelled, suite="core"):
+def execute_target(target, archive, digest, sha, output, cancelled, suite="core", *, telnet_start_timeout=None):
     started = time.monotonic()
     result = {"target": target, "source_sha": sha, "archive_sha256": digest, "suite": suite,
               "status": "failed", "started_at": timestamp()}
@@ -168,8 +168,11 @@ def execute_target(target, archive, digest, sha, output, cancelled, suite="core"
             encoded = base64.b64encode(bootstrap.encode("utf8")).decode("ascii")
             loader = 'import base64;exec(base64.b64decode("' + encoded + '"))'
             run_setup(ssh + [shlex.join([python, "-c", loader, "unpack", directory, digest, sha])], log, cancelled)
-            command = "cd " + shlex.quote(directory + "/source") + " && exec " + shlex.join([
-                python, "ci/native_remote.py", "worker", target, sha, "--suite", suite])
+            worker_args = [python, "ci/native_remote.py", "worker", target, sha, "--suite", suite]
+            if telnet_start_timeout is not None:
+                worker_args += ["--telnet-start-timeout", str(telnet_start_timeout)]
+                result["telnet_start_timeout_seconds"] = telnet_start_timeout
+            command = "cd " + shlex.quote(directory + "/source") + " && exec " + shlex.join(worker_args)
             result["tests_started_at"] = timestamp()
             # Give Solaris core extra time to report results and clean up after its deadline.
             remote_timeout = suite_timeout(target, suite)
@@ -223,9 +226,16 @@ def main():
     parser.add_argument("--target", choices=["all", *TARGETS], default="all")
     parser.add_argument("--suite", choices=("core", "ssh", "package"), default="core")
     parser.add_argument("--output", required=True, type=Path)
+    parser.add_argument("--telnet-start-timeout", type=int)
     args = parser.parse_args()
     if args.suite == "package" and args.target != "solaris":
         parser.error("The IPS package suite requires --target solaris")
+    try:
+        validate_telnet_start_timeout(args.target, args.suite, args.telnet_start_timeout)
+    except ValueError as error:
+        parser.error(str(error))
+    if args.telnet_start_timeout is not None and os.environ.get("GITHUB_EVENT_NAME") != "workflow_dispatch":
+        parser.error("Telnet startup override requires a manual workflow")
     sha = os.environ.get("GITHUB_SHA", "")
     head = subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=ROOT, text=True).strip()
     require_trusted_main(os.environ, sha, head, args.target)
@@ -241,7 +251,9 @@ def main():
         signal.signal(signum, lambda signum, frame: cancelled.set())
     targets = list(DEFAULT_TARGETS) if args.target == "all" else [args.target]
     started = time.monotonic()
-    results = run_parallel(targets, lambda target: execute_target(target, archive, digest, sha, output, cancelled, args.suite))
+    results = run_parallel(targets, lambda target: execute_target(
+        target, archive, digest, sha, output, cancelled, args.suite,
+        telnet_start_timeout=args.telnet_start_timeout))
     ok = all_passed(results, targets, sha, args.suite) and not cancelled.is_set()
     report = {"suite": args.suite, "source_sha": sha, "archive_sha256": digest, "ok": ok,
               "targets": targets, "duration_seconds": round(time.monotonic() - started, 3), "results": results}
