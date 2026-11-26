@@ -205,18 +205,41 @@ int userlog_maintain(void) {
     if(!dj_open(&journal,journal_path,"LNUSER01",apply,NULL)) { journal.broken=1;return 0; }
     memcpy(live,saved,sizeof(live));checked=journal.sequence;checked_count=count;return 1;
 }
-void userlog_table(uint32_t user,uint32_t cursor,int all,uint64_t now,char *out,size_t size) {
-    if(!enabled || journal.broken) { snprintf(out,size,!enabled?"ERR userlog disabled\r\n":"ERR userlog storage\r\n");return; }
-    if(user>MEMBER_MAX || cursor>count+1) { snprintf(out,size,"ERR command\r\n");return; }
-    uint64_t *ordinal=calloc(MEMBER_MAX+1,sizeof(*ordinal));if(!ordinal) { snprintf(out,size,"ERR userlog allocation\r\n");return; }for(unsigned i=0;i<=MEMBER_MAX;i++)ordinal[i]=totals[i].logins;
-    size_t index=cursor?cursor-1:count,used=(size_t)snprintf(out,size,"USERTABLE LOGIN LOGOUT SECONDS COUNT TRANSPORT\r\n");unsigned shown=0,scanned=0;
+const char *userlog_session_page(uint32_t user,uint32_t cursor,int all,uint64_t now,UserlogSessionPage *page) {
+    memset(page,0,sizeof(*page));
+    if(!enabled || journal.broken)return !enabled?"ERR userlog disabled\r\n":"ERR userlog storage\r\n";
+    if(user>MEMBER_MAX || cursor>count+1)return "ERR command\r\n";
+    uint64_t *ordinal=calloc(MEMBER_MAX+1,sizeof(*ordinal));
+    if(!ordinal)return "ERR userlog allocation\r\n";
+    for(unsigned i=0;i<=MEMBER_MAX;i++)ordinal[i]=totals[i].logins;
+    size_t index=cursor?cursor-1:count;unsigned scanned=0;
     for(size_t i=count;i>index;i--)if(events[i-1].kind=='L')ordinal[events[i-1].user]--;
-    while(index && shown<8 && scanned++<256) { Event *e=&events[--index];if(e->kind!='L')continue;uint64_t number=ordinal[e->user]--;if(!all && e->user!=user)continue;
+    while(index && page->count<8 && scanned++<256) {
+        Event *e=&events[--index];if(e->kind!='L')continue;
+        uint64_t number=ordinal[e->user]--;
+        if(!all && e->user!=user)continue;
         uint64_t end=0,elapsed=0;const char *transport="UNKNOWN";
         for(size_t i=index;i>0;i--)if(events[i-1].kind=='C' && events[i-1].connection==e->connection) { transport=events[i-1].transport;break; }
         for(size_t i=index+1;i<count;i++)if(events[i].connection==e->connection && strchr("TOEX",events[i].kind)) { elapsed=events[i].elapsed;if(events[i].kind!='T') { end=events[i].at;break; } }
         if(!end) { Live *l=connection(e->connection);if(l && l->user==e->user && now>=l->start)elapsed=now-l->start; }
-        used+=(size_t)snprintf(out+used,size-used,"SESSIONROW %u %u %" PRIu64 " %" PRIu64 " %" PRIu64 " %" PRIu64 " %s\r\n",e->connection,e->user,e->at,end,elapsed/1000,number,transport);shown++;
+        UserlogSessionRow *row=&page->rows[page->count++];
+        *row=(UserlogSessionRow){.connection=e->connection,.user=e->user,.login_at=e->at,
+                                .logout_at=end,.seconds=elapsed/1000,.ordinal=number};
+        strcpy(row->transport,transport);
     }
-    snprintf(out+used,size-used,"END NEXT %zu\r\n",index?index+1:0);free(ordinal);
+    page->next=index?(uint32_t)(index+1):0;
+    free(ordinal);return NULL;
+}
+
+void userlog_table(uint32_t user,uint32_t cursor,int all,uint64_t now,char *out,size_t size) {
+    UserlogSessionPage page;
+    const char *error=userlog_session_page(user,cursor,all,now,&page);
+    if(error) { snprintf(out,size,"%s",error);return; }
+    size_t used=(size_t)snprintf(out,size,"USERTABLE LOGIN LOGOUT SECONDS COUNT TRANSPORT\r\n");
+    for(unsigned i=0;i<page.count;i++) {
+        const UserlogSessionRow *row=&page.rows[i];
+        used+=(size_t)snprintf(out+used,size-used,"SESSIONROW %u %u %" PRIu64 " %" PRIu64 " %" PRIu64 " %" PRIu64 " %s\r\n",
+            row->connection,row->user,row->login_at,row->logout_at,row->seconds,row->ordinal,row->transport);
+    }
+    snprintf(out+used,size-used,"END NEXT %u\r\n",page.next);
 }

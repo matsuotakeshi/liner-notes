@@ -49,6 +49,7 @@ typedef enum { OPERATION_PAGE_NONE,
     OPERATION_PAGE_UPLOAD,
     OPERATION_PAGE_USERLOG,
     OPERATION_PAGE_USERSTATS,
+    OPERATION_PAGE_USERTABLE,
     OPERATION_PAGE_CONFERENCE,
     OPERATION_PAGE_MMM_SCANLIST
 } OperationPageKind;
@@ -81,6 +82,7 @@ typedef struct {
         DownloadStats download_stats;
         VaultUpload upload;
         UserlogReport userlog;
+        UserlogSessionPage usertable;
         struct { size_t count; ConnectionSummary rows[CONNECTION_MAX]; } connections;
         MmmScanList mmm_scanlist;
         ConferenceReply conference;

@@ -334,6 +334,24 @@ void session_impl_web_update(Session *s,char *payload) {
             error="CHAT ERROR target\r\n";goto finish;
         }
         q->op='&';q->chat_target=conversation->talk_target;q->action=q->chat_target?'D':'S';
+    } else if(!strcmp(kind,"admin.disconnect") || !strcmp(kind,"admin.announce") ||
+              !strcmp(kind,"admin.shutdown") || !strcmp(kind,"admin.shutdown_cancel") ||
+              !strcmp(kind,"admin.shutdown_now")) {
+        if(board || arg || !flag || *q->username || *q->title || q->mail_attachments.count)goto finish;
+        q->op='!';q->number=id;
+        if(!strcmp(kind,"admin.disconnect")) {
+            if(!id || *q->body)goto finish;
+            q->action='K';
+        } else if(!strcmp(kind,"admin.announce")) {
+            if(id || !chat_text_valid(q->body))goto finish;
+            q->action='A';
+        } else if(!strcmp(kind,"admin.shutdown")) {
+            if(!id || id>86400 || !chat_text_valid(q->body))goto finish;
+            q->action='S';
+        } else {
+            if(id || *q->body)goto finish;
+            q->action=!strcmp(kind,"admin.shutdown_cancel")?'C':'S';
+        }
     } else if(!strcmp(kind,"file.upload_cancel") || !strcmp(kind,"mail.upload_cancel")) {
         if(board || !id || id>VAULT_ID_MAX || arg || !flag || *q->username ||
            *q->title || *q->body || q->mail_attachments.count)goto finish;

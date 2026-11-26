@@ -201,7 +201,16 @@ static void service_result(BoardResult *r) {
         session_access_refresh(s);
     }
     if((!r->service_action || strchr("GgM",r->service_action)) && !r->board_refresh)return;
-    if(r->service_action=='u') { userlog_table(r->service_number,r->service_next,!strcmp(r->service_text,"ALL"),now_ms(),r->text,sizeof(r->text));return; }
+    if(r->service_action=='u') {
+        int all=!strcmp(r->service_text,"ALL");
+        if(r->structured) {
+            UserlogSessionPage page;
+            const char *error=userlog_session_page(r->service_number,r->service_next,all,now_ms(),&page);
+            if(error) { r->feedback.failed=1;snprintf(r->text,sizeof(r->text),"%s",error); }
+            else { OPERATION_PAGE(r,USERTABLE,usertable,page); }
+        } else userlog_table(r->service_number,r->service_next,all,now_ms(),r->text,sizeof(r->text));
+        return;
+    }
     if(r->service_action=='U' || r->service_action=='V') {
         int all=!strcmp(r->service_text,"ALL"),stats=r->service_action=='V';
         if(r->structured) {

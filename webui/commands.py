@@ -297,8 +297,20 @@ SESSION_UPDATES = {
 }
 
 
+RUNTIME_UPDATES = {
+    'admin.disconnect': ('id',),
+    'admin.announce': (None,None,None,'text'),
+    'admin.shutdown': ('seconds',None,None,'text'),
+    'admin.shutdown_cancel': (),
+    'admin.shutdown_now': (),
+}
+
+
 def core_update(key, args):
-    names = SESSION_UPDATES[key] if key in SESSION_UPDATES else CORE_UPDATES[key]
+    if key in RUNTIME_UPDATES:
+        names=RUNTIME_UPDATES[key]
+    else:
+        names=SESSION_UPDATES[key] if key in SESSION_UPDATES else CORE_UPDATES[key]
     values = {field: args[name] for field, name in zip(('id', 'arg', 'title', 'body'), names) if name}
     for field in ('id', 'arg'):
         if field in values:
