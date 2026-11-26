@@ -139,6 +139,9 @@ def run(binary):
         mash.cmd("ui rtbbs", b"UI PREF SAVED rtbbs")
         mash.until()
         assert b"Reply to a reply" in mash.cmd("READ 4")
+        busy = mash.cmd("UI mash")
+        assert b"Finish the current operation before changing UI." in busy, busy
+        mash.cmd("MENU")
         select_notes_ui(mash, "mash")
         assert b"Sequencer: 0 (session)" in mash.cmd("sets reset", MAIN)
         mash.send(b"bye\r\n")
