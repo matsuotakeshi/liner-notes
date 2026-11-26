@@ -489,7 +489,7 @@ static int additional_request(OperationRequest *q,const char *kind,uint32_t id,u
     if(!strcmp(kind,"file_children")) {
         if(id || !*arg || strlen(arg)>48 || strchr(arg,'|') || !session_impl_safe_text(arg))return 0;
         q->op='Y';q->action=VAULT_CMD_CHILDREN;q->number=cursor;
-        strcpy(q->title,arg);return 1;
+        strcpy(q->body,arg);return 1;
     }
     if(!strcmp(kind,"article_audit")) {
         if(strlen(arg)>32 || strchr(arg,' ') || !session_impl_safe_text(arg) || (id && *arg))return 0;
