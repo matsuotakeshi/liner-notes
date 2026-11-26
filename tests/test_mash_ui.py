@@ -108,8 +108,9 @@ def run(binary):
         key(peer, b"q", NOTES)
         peer.cmd("/", MAIN)
 
-        opened = mash.cmd("open -b3 #1", OPEN)
-        assert b"MMM cross reply" in opened and b"Parent #2 (p)" in opened
+        assert b"MASH original" in mash.cmd("open -b2 #1", OPEN)
+        opened = key(mash, b" ", OPEN)
+        assert b"MMM cross reply" in opened and b"Parent #2 (p)" in opened, opened
         key(mash, b"w", b"Title> ")
         post(mash, b"MASH nested", b"Reply to a reply", OPEN)
         assert b"Parent #3 (p)" in key(mash, b" ", OPEN)
