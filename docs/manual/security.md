@@ -130,7 +130,10 @@ CIログへ保存します。起動前検査の失敗も対象とし、journal�
 
 配布元のlrzszがない場合や必要な転送試験に失敗する場合は、[Linux導入](install-linux.md)の
 隔離ビルド手順で用意した実エンジンを使います。版名だけで転送成功を判断しません。
-この実機CIの成功までは、専用SELinuxポリシーは検証中です。
+0.75と同じソースSHAのRocky Linux 10検証機で、専用ポリシーをEnforcingのまま検証しました。
+これとは別に、使い捨てRocky Linux 10環境でポリシーRPMの導入・リビジョン更新・削除を確認しました。
+[実機CI](https://github.com/matsuotakeshi/liner-notes/actions/runs/45773929619) ·
+[版・SHA・配布物の照合](https://github.com/matsuotakeshi/liner-notes/actions/runs/45775262020)
 
 
 ### 認証付きDoorの追加ポリシー

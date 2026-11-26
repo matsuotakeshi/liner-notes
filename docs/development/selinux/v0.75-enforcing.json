@@ -1,0 +1,8 @@
+{
+  "source_sha": "e50d36039d52645f23598655e75a49172ddf80ea",
+  "archive_sha256": "6f3748c515aa03fd211b97121bcb99163da8ccf528794bd6302c2ff5c8f736bb",
+  "policy_sha256": "90337dfc14408f474fdb326780f6949499fb696120904a2c62e9bad42f873c77",
+  "runtime_sha256": "5d8fe9e6904ed43a2684b6bcb593fef6d34d1e6010d9612b4feae6f4443e3036",
+  "enforcing": true,
+  "acceptance": "success"
+}

@@ -65,8 +65,9 @@ SELinuxを無効にして解決する手順は採用しません。なお本体�
 ### 任意SELinux RPMと配布候補の確認
 
 0.75の `liner-notes-selinux` は本体とは別に導入する任意RPMです。本体の版と
-ポリシーの版は独立しており、たとえば本体0.75とポリシー0.1.0が同じソースコミットから
-作られます。同じ版番号であることではなく、40桁のソースSHAが一致することを確認します。
+ポリシーの版は独立しています。0.75と同じソースから生成・検証した任意RPMは
+`liner-notes-selinux-0.3.0-1.el10.noarch.rpm` です。40桁のソースSHAが本体と一致することを確認します。
+0.75の標準配布セットへの追加ではなく、[Rocky SELinux policyの成果物](https://github.com/matsuotakeshi/liner-notes/actions/runs/45773929619/artifacts/15095585628)として提供します。
 専用ドメインの動作検証とラベルの扱いは[SELinuxの運用](security.md)を参照してください。
 
 Release Setの通常の `freebsd15`・`rocky10`・`debian13` 候補は従来どおりです。
