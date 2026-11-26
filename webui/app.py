@@ -193,7 +193,30 @@ def create_app(config):
             if typed and (key!='profile.handle' or session.bridge.state.get('user')):
                 return response(session,await session.bridge.update(key,flag=item['confirm'],**core_update(key,args)))
             if session.bridge.state.get('mail') and group!='mail':await session.bridge.exchange('MAIL EXIT')
-            result=await session.bridge.exchange(item['command'].format(**args).rstrip())
+            command=item['command'].format(**args).rstrip()
+            if key in ('board.search','board.author','mail.search'):
+                cursor=payload.get('cursor',0)
+                board=payload.get('search_board',session.bridge.state.get('board',0))
+                for position in (cursor,board):
+                    if type(position) is not int or not 0<=position<=2147483646:
+                        raise ValueError('Invalid search position')
+                if key=='mail.search':
+                    query=args['query'].strip()
+                    kind,board,parameters='mail_search',0,query
+                    if cursor:command=f'MAIL SEARCHFROM {cursor} {query}'
+                else:
+                    scope=args['scope'].upper()
+                    author=args.get('author','*').strip()
+                    query=args.get('query','*').strip()
+                    if scope not in ('HERE','SUBTREE','ALL') or not 0<len(author.encode())<=32 or any(c.isspace() for c in author):
+                        raise ValueError('Invalid article search filter')
+                    kind,parameters='find',f'{scope} {author} {query}'
+                    command=f'FINDFROM {cursor} {parameters}' if cursor else f'FIND {parameters}'
+                if not 0<len(query.encode())<=80:
+                    raise ValueError('Search text must be 1 to 80 bytes')
+                if session.bridge.state.get('core_search')==1:
+                    return response(session,await session.bridge.view(kind,board,cursor,parameters))
+            result=await session.bridge.exchange(command)
             if item['edit'] and session.bridge.state.get('editing'):
                 preview=await session.bridge.exchange('/PREVIEW');result['preview']=preview['text']
         return response(session,result)
