@@ -179,7 +179,7 @@ test-chat: tests/test_chat.c src/chat.c src/chat_core.c src/chat.h src/chat_pref
 	$(CC) $(CPPFLAGS) $(SQLITE_CFLAGS) $(CFLAGS) $(LDFLAGS) -std=c11 -Wall -Wextra -Werror -Isrc tests/test_chat.c src/chat.c src/chat_core.c src/storage_sqlite.c $(SQLITE_CFLAGS) -pthread -lcrypto $(SQLITE_LIBS) -o test-chat
 
 test-zhost: tests/test_zhost.c src/zmodem_host.c src/zmodem_host.h src/download.h src/userlog.h src/app_limits.h
-	$(CC) $(CPPFLAGS) $(SQLITE_CFLAGS) $(CFLAGS) $(LDFLAGS) -std=c11 -Wall -Wextra -Werror -Isrc tests/test_zhost.c src/zmodem_host.c src/storage_sqlite.c $(SQLITE_CFLAGS) -pthread -lcrypto $(SQLITE_LIBS) -o test-zhost
+	$(CC) $(CPPFLAGS) $(SQLITE_CFLAGS) $(CFLAGS) $(LDFLAGS) -std=c11 -Wall -Wextra -Werror -Isrc tests/test_zhost.c src/storage_sqlite.c $(SQLITE_CFLAGS) -pthread -lcrypto $(SQLITE_LIBS) -o test-zhost
 
 # Real-wire 1GiB/16-file tests plus sparse 16GiB staging boundary.
 test-zmodem-limits: vaultctl
