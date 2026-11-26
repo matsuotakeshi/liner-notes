@@ -23,6 +23,12 @@ def suite_timeout(target, suite):
     return 5400 if (target, suite) == ("solaris", "core") else DEFAULT_SUITE_TIMEOUT
 
 
+def effective_telnet_start_timeout(target, suite, seconds):
+    if seconds is not None:
+        return seconds
+    return 30 if (target, suite) == ("debian", "core") else 10
+
+
 def validate_telnet_start_timeout(target, suite, seconds):
     if seconds is not None and ((target, suite) != ("debian", "core") or not 10 <= seconds <= 120):
         raise ValueError("Telnet startup override requires Debian core and 10 to 120 seconds")
@@ -199,7 +205,7 @@ def worker(target, sha, timeout, lease, suite="core", *, telnet_start_timeout=No
                 subprocess.run(command, check=True, timeout=15)
         run_commands(commands_for(target, suite), sys.stdin.fileno(),
                      max(0, deadline-time.monotonic()), lease, lambda: cancelled, state,
-                     telnet_start_timeout=10 if telnet_start_timeout is None else telnet_start_timeout)
+                     telnet_start_timeout=effective_telnet_start_timeout(target, suite, telnet_start_timeout))
 
 
 def main():
