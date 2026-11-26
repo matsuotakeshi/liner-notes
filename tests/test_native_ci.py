@@ -66,6 +66,19 @@ class PolicyTests(unittest.TestCase):
                 self.assertEqual(env["LINER_TEST_STOP_TIMEOUT"], "30")
                 self.assertEqual(env["LINER_TEST_TELNET_START_TIMEOUT"], startup_wait)
 
+    def test_only_debian_core_defaults_to_thirty_seconds_for_telnet_startup(self):
+        for target, suite, override, expected in (
+            ("debian", "core", None, 30), ("debian", "core", 15, 15),
+            ("debian", "ssh", None, 10), ("freebsd", "core", None, 10),
+            ("rocky", "core", None, 10), ("solaris", "core", None, 10),
+        ):
+            with self.subTest(target=target, suite=suite, override=override):
+                self.assertEqual(native_remote.effective_telnet_start_timeout(target, suite, override), expected)
+        workflow = yaml.load((ROOT / ".github/workflows/debian-build-test.yml").read_text(encoding="utf8"),
+                             Loader=yaml.BaseLoader)
+        self.assertEqual(workflow["on"]["workflow_dispatch"]["inputs"]["telnet_start_timeout_seconds"]["default"],
+                         "30")
+
     def test_remote_only_accepts_bounded_debian_core_telnet_overrides(self):
         for target, suite, seconds, allowed in (
             ("debian", "core", 30, True), ("debian", "core", 120, True),

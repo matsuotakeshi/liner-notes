@@ -16,7 +16,7 @@ import sys
 import threading
 import time
 
-from native_remote import RESULT, suite_timeout, validate_telnet_start_timeout
+from native_remote import RESULT, effective_telnet_start_timeout, suite_timeout, validate_telnet_start_timeout
 from solaris_package import ARCHIVE as SOLARIS_ARCHIVE, RECEIPT as SOLARIS_RECEIPT
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -171,7 +171,8 @@ def execute_target(target, archive, digest, sha, output, cancelled, suite="core"
             worker_args = [python, "ci/native_remote.py", "worker", target, sha, "--suite", suite]
             if telnet_start_timeout is not None:
                 worker_args += ["--telnet-start-timeout", str(telnet_start_timeout)]
-                result["telnet_start_timeout_seconds"] = telnet_start_timeout
+            if (target, suite) == ("debian", "core"):
+                result["telnet_start_timeout_seconds"] = effective_telnet_start_timeout(target, suite, telnet_start_timeout)
             command = "cd " + shlex.quote(directory + "/source") + " && exec " + shlex.join(worker_args)
             result["tests_started_at"] = timestamp()
             # Give Solaris core extra time to report results and clean up after its deadline.

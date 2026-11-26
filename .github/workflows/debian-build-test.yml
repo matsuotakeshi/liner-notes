@@ -7,7 +7,7 @@ on:
       telnet_start_timeout_seconds:
         description: Seconds to wait for the first Telnet prompt (10-120)
         type: number
-        default: 10
+        default: 30
   workflow_call:
 permissions:
   contents: read
