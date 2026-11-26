@@ -16,16 +16,16 @@ import sys
 import threading
 import time
 
-from native_remote import RESULT
+from native_remote import RESULT, suite_timeout
 
 ROOT = Path(__file__).resolve().parents[1]
 TARGETS = {
     "freebsd": ("takeshi@10.0.0.50", "/home/ci/.ssh/id_ed25519_freebsd_ci"),
     "rocky": ("ci-test@10.0.0.51", "/home/ci/.ssh/id_ed25519_rocky_ci"),
-    "ubuntu": ("ci-test@10.0.0.53", "/home/ci/.ssh/id_ed25519_ubuntu_ci"),
+    "debian": ("ci-test@10.0.0.59", "/home/ci/.ssh/id_ed25519_debian_ci"),
     "solaris": ("ci-test@10.0.0.52", "/home/ci/.ssh/id_ed25519_solaris_ci"),
 }
-DEFAULT_TARGETS = ("freebsd", "rocky", "ubuntu")
+DEFAULT_TARGETS = ("freebsd", "rocky", "debian")
 
 
 def timestamp():
@@ -170,7 +170,10 @@ def execute_target(target, archive, digest, sha, output, cancelled, suite="core"
             command = "cd " + shlex.quote(directory + "/source") + " && exec " + shlex.join([
                 python, "ci/native_remote.py", "worker", target, sha, "--suite", suite])
             result["tests_started_at"] = timestamp()
-            code = supervise(ssh + [command], log, cancelled)
+            # Give Solaris core extra time to report results and clean up after its deadline.
+            remote_timeout = suite_timeout(target, suite)
+            grace = 300 if (target, suite) == ("solaris", "core") else 100
+            code = supervise(ssh + [command], log, cancelled, timeout=remote_timeout + grace)
             result["tests_finished_at"] = timestamp()
             log.flush()
             if code:

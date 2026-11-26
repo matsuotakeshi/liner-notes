@@ -366,18 +366,21 @@ for line in sys.stdin:
 
         # The marker reader is bounded and accepts only complete records from
         # the synthetic PTY worker. Solaris or the terminal may echo input.
-        def terminal_line(fd, prefix):
+        def terminal_lines(fd, *prefixes):
             deadline = time.monotonic()+3
             buffer = b''
             while len(buffer)<4096:
                 remaining = deadline-time.monotonic()
-                self.assertTrue(remaining>0 and select.select([fd],[],[],remaining)[0],buffer)
+                self.assertTrue(remaining>0 and select.select([fd],[],[],remaining)[0],
+                                (prefixes,buffer))
                 data = os.read(fd,512)
                 self.assertTrue(data,buffer)
                 buffer += data
-                for line in buffer.split(b'\n')[:-1]:
-                    if line.startswith(prefix):
-                        return line.rstrip(b'\r')
+                lines = buffer.split(b'\n')[:-1]
+                matches = [next((line.rstrip(b'\r') for line in lines if line.startswith(prefix)),None)
+                           for prefix in prefixes]
+                if all(match is not None for match in matches):
+                    return matches
             self.fail('Too much synthetic terminal output')
 
         def terminal_eof(fd, local_echo=b''):
@@ -413,14 +416,19 @@ for line in sys.stdin:
                         os.close(slave)
                         slave = None
                         try:
-                            _, leader, detached, columns, rows = terminal_line(master,b'READY ').split()
+                            ready, = terminal_lines(master,b'READY ')
+                            _, leader, detached, columns, rows = ready.split()
                             self.assertEqual((columns,rows),(b'80',b'24'))
                             leader, detached = int(leader), int(detached)
                             self.assertNotEqual(leader,holder.pid)
                             fcntl.ioctl(master,termios.TIOCSWINSZ,struct.pack('HHHH',30,100,0,0))
-                            self.assertEqual(terminal_line(master,b'WINCH'),b'WINCH')
+                            # Wake the worker's terminal read so Python can run the
+                            # pending signal handler even if Solaris restarts I/O.
+                            # Require both real replies, even when read together.
                             os.write(master,b'size\n')
-                            self.assertEqual(terminal_line(master,b'SIZE '),b'SIZE 100 30')
+                            winch, size = terminal_lines(master,b'WINCH',b'SIZE ')
+                            self.assertEqual(winch,b'WINCH')
+                            self.assertEqual(size,b'SIZE 100 30')
                             if mode=='quit':
                                 self.assertEqual(detached,0)
                                 os.write(master,b'quit\n')

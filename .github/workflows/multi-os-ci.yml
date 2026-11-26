@@ -16,7 +16,7 @@ jobs:
     uses: ./.github/workflows/change-scope.yml
   native:
     needs: changes
-    name: Parallel FreeBSD / Rocky / Ubuntu regression
+    name: Parallel FreeBSD / Rocky / Debian regression
     if: ${{ github.repository == 'matsuotakeshi/liner-notes' && github.ref == 'refs/heads/main' && needs.changes.outputs.build == 'true' }}
     runs-on: [self-hosted, Linux, X64]
     timeout-minutes: 60

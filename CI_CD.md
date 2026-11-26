@@ -12,7 +12,7 @@
 | 10.0.0.54 / Ubuntu | Self-hosted GitHub Actions Runner、ネイティブCIの起点 |
 | 10.0.0.50 / FreeBSD | ネイティブビルド・テスト・pkg生成 |
 | 10.0.0.51 / Rocky Linux | ネイティブビルド・テスト |
-| 10.0.0.53 / Ubuntu | ネイティブビルド・テスト |
+| 10.0.0.59 / Debian | ネイティブビルド・テスト |
 | 10.0.0.52 / Solaris 11.4 CBE | main限定の独立したSolaris Native CI。移植検証中。基本BBSと追加機能の結果を分けて記録 |
 
 設定済みSSH鍵、固定ホスト鍵の照合、既存CIアカウントを使います。ホスト鍵検証を無効化したり、パスワード認証やroot接続へ安易に切り替えたりしません。既存RunnerやVMを不必要に作り直さず、CIを無視して代替検証環境を新設しません。再現調査の手動試験は補助とし、必要な検査は既存CIへ取り込みます。
@@ -21,7 +21,7 @@
 
 1. 最新mainから開発ブランチを作成し、変更と対応する自動テストを追加・修正する。利用説明・設定・制限は該当する統合マニュアル章も更新する。
 2. PRを作成し、GitHub-hosted Runnerで適用される必須CIの成功とレビューを確認してmainへ統合する。手動試験だけで完了としない。
-3. 統合後は同じmainコミットに対する `Multi-OS Native CI` のFreeBSD・Rocky Linux・Ubuntuと最終ゲートの成功を確認する。
+3. 統合後は同じmainコミットに対する `Multi-OS Native CI` のFreeBSD・Rocky Linux・Debianと最終ゲートの成功を確認する。
 4. 変更に応じて `FreeBSD 15 Package CI`、`Rocky 10 Package CI`、`Debian 13 Package CI` の候補生成・検証を確認する。リリース時は対象パッケージと `Release Set Verification` の同一SHA照合を完了する。
 5. 失敗、キャンセル、スキップ、未完了を成功扱いしない。原因を調査して修正または根拠のある再検証を行い、最終コミットの証跡を残す。古い成功で新しい失敗を隠さない。
 
@@ -86,7 +86,7 @@ FreeBSDの配布用Portsは、`liner-notes-freebsd15-ports-distribution` Artifac
 
 ## ネイティブCIの並列実行
 
-`Multi-OS Native CI` は既存の10.0.0.54 Runnerの1ジョブから、FreeBSD・Rocky Linux・Ubuntuへ同時にSSH試験を開始します。Runner台数・登録・鍵・VM設定は変更しません。OS別の従来のビルド引数と `make check` は維持し、1件でも失敗・欠落・中止すれば最終ゲートを失敗させます。
+`Multi-OS Native CI` は既存の10.0.0.54 Runnerの1ジョブから、FreeBSD・Rocky Linux・Debianへ同時にSSH試験を開始します。Debianには親機の `ci` ユーザーから専用鍵で接続し、確認済みのホスト鍵を照合します。OS別の従来のビルド引数と `make check` は維持し、1件でも失敗・欠落・中止すれば最終ゲートを失敗させます。
 
 手動の各OSワークフローも同じ実行処理を使い、全入口でmain限定・共通の同時実行制御を適用します。各ホストでは実行ごとに専用作業ディレクトリを作り、ホスト単位のロックも取得します。接続断・タイムアウト・中止を監視し、ビルドのプロセスグループを停止します。
 
@@ -104,6 +104,8 @@ Solaris Native CIの自動実行はmainへのpushごとではなく、毎日1回
 緊急修正・リリース前にはmainを指定してworkflow_dispatchで追加実行できます。
 手動実行や管理者による再実行は日次1回の枠外です。main/repository/SHA検査、
 既存の排他、SSHアカウント・ホスト鍵照合、試験範囲は維持します。
+Solarisのコア回帰は、リモート側90分（排他ロック待ちを含む）、SSH監視95分、
+Actionsジョブ全体105分を上限とします。個別試験と専用SSH試験の上限は従来どおりです。
 
 配備判定は同一SHAのSolaris日次実行・手動実行（変更前のpush実行も含む）の
 最新結果と実行ステップ・Artifactを確認します。前日の異なるSHAの成功では

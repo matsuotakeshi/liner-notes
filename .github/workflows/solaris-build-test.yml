@@ -19,7 +19,8 @@ jobs:
     name: Solaris 11.4 x86-64 native tests
     if: ${{ github.repository == 'matsuotakeshi/liner-notes' && github.ref == 'refs/heads/main' && needs.changes.outputs.build == 'true' }}
     runs-on: [self-hosted, Linux, X64]
-    timeout-minutes: 60
+    # Remote worker: 90 min. SSH supervisor: 95 min. Reserve time for setup and artifacts.
+    timeout-minutes: 105
     steps:
       - uses: actions/checkout@v4
         with:

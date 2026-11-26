@@ -60,7 +60,7 @@ separately reviewed update; these commands must not overwrite them.
 
 ```sh
 test "$(id -u)" = 0 || exit 1
-test "$(uname -n)" = solaris || exit 1
+test "$(uname -n)" = solaris-ci || exit 1
 test "$(uname -s)" = SunOS || exit 1
 id ci-test || exit 1
 test -d /etc/sudoers.d || exit 1

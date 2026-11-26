@@ -5,7 +5,7 @@ on:
       target:
         description: Installed libssh required; Solaris is explicit, never part of all
         type: choice
-        options: [all, freebsd, rocky, ubuntu, solaris]
+        options: [all, freebsd, rocky, debian, solaris]
         default: all
 permissions:
   contents: read

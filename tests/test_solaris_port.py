@@ -41,7 +41,7 @@ class SolarisContracts(unittest.TestCase):
                     self.assertIn("#define __EXTENSIONS__ 1", macros)
 
     def test_separate_target_preserves_three_os_default(self):
-        self.assertEqual(native_ci.DEFAULT_TARGETS, ("freebsd", "rocky", "ubuntu"))
+        self.assertEqual(native_ci.DEFAULT_TARGETS, ("freebsd", "rocky", "debian"))
         self.assertEqual(native_ci.TARGETS["solaris"],
                          ("ci-test@10.0.0.52", "/home/ci/.ssh/id_ed25519_solaris_ci"))
         self.assertEqual(native_remote.commands_for("solaris"),
