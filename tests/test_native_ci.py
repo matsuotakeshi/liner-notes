@@ -54,13 +54,17 @@ class PolicyTests(unittest.TestCase):
     def test_native_sets_bounded_io_waits(self):
         child = Mock()
         child.poll.return_value = 0
-        with patch.object(native_remote.subprocess, 'Popen', return_value=child) as spawn, \
-             patch.object(native_remote, 'heartbeat'):
-            native_remote.run_commands([['test-only']], 0)
-        env = spawn.call_args.kwargs['env']
-        self.assertEqual(env['LINER_TEST_START_TIMEOUT'], '180')
-        self.assertEqual(env['LINER_TEST_AUTH_TIMEOUT'], '30')
-        self.assertEqual(env['LINER_TEST_STOP_TIMEOUT'], '30')
+        for target, startup_wait in (("debian", "30"), ("rocky", "10"),
+                                     ("freebsd", "10"), ("solaris", "10")):
+            with self.subTest(target=target), \
+                 patch.object(native_remote.subprocess, "Popen", return_value=child) as spawn, \
+                 patch.object(native_remote, "heartbeat"):
+                native_remote.run_commands([["test-only"]], 0, target=target)
+                env = spawn.call_args.kwargs["env"]
+                self.assertEqual(env["LINER_TEST_START_TIMEOUT"], "180")
+                self.assertEqual(env["LINER_TEST_AUTH_TIMEOUT"], "30")
+                self.assertEqual(env["LINER_TEST_STOP_TIMEOUT"], "30")
+                self.assertEqual(env["LINER_TEST_TELNET_START_TIMEOUT"], startup_wait)
 
 
     def test_only_exact_trusted_main_can_reach_ssh(self):

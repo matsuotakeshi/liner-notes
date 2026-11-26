@@ -117,12 +117,14 @@ def heartbeat(heartbeat_fd, state, lease, stopped):
         raise RuntimeError("Runner heartbeat expired")
 
 
-def run_commands(commands, heartbeat_fd, timeout=DEFAULT_SUITE_TIMEOUT, lease=45, stopped=lambda: False, heartbeat_state=None):
+def run_commands(commands, heartbeat_fd, timeout=DEFAULT_SUITE_TIMEOUT, lease=45,
+                 stopped=lambda: False, heartbeat_state=None, *, target=None):
     """EOF, lost heartbeat, cancellation and timeouts all fail closed."""
     deadline = time.monotonic() + timeout
     state = heartbeat_state if heartbeat_state is not None else {'last': time.monotonic(), 'pending': b''}
     env = dict(os.environ, LINER_TEST_START_TIMEOUT="180",
-               LINER_TEST_AUTH_TIMEOUT="30", LINER_TEST_STOP_TIMEOUT="30")
+               LINER_TEST_AUTH_TIMEOUT="30", LINER_TEST_STOP_TIMEOUT="30",
+               LINER_TEST_TELNET_START_TIMEOUT="30" if target == "debian" else "10")
     for command in commands:
         print("NATIVE_STEP " + json.dumps(command), flush=True)
         process = subprocess.Popen(command, stdin=subprocess.DEVNULL, env=env, start_new_session=True)
@@ -190,7 +192,9 @@ def worker(target, sha, timeout, lease, suite="core"):
             print(Path("/etc/os-release").read_text(), flush=True)
             for command in (["python3", "--version"], ["clang", "--version"], ["free", "-h"]):
                 subprocess.run(command, check=True, timeout=15)
-        run_commands(commands_for(target, suite), sys.stdin.fileno(), max(0, deadline-time.monotonic()), lease, lambda: cancelled, state)
+        run_commands(commands_for(target, suite), sys.stdin.fileno(),
+                     max(0, deadline-time.monotonic()), lease, lambda: cancelled, state,
+                     target=target)
 
 
 def main():

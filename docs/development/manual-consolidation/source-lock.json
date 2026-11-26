@@ -350,7 +350,7 @@
   "scripts/structured_db.py": "17fea547120955b7d3cd3bfc321316f3b3079b658e8a26a3472058058391e44d",
   "scripts/database_tools.py": "13f25671e2a0b4b396aab6ea2e898fe2abc7d69ab431e34bbe860e9189986672",
   "help/en/adminstorage.txt": "ced73fe9634e4e55c7750f59aa7d06c038a8ee87bcc3568154055a7779c06522",
-  "ci/native_remote.py": "781030c03e989c3a0c69354cb33cd38f6c63df4799a1ce98051ac663798d3746",
+  "ci/native_remote.py": "26e40898853aa2cfc65442c019c258f58c168266100b0671818d8cd67d6f9b16",
   "ci/native_ssh.py": "be71f00bc2d853da9ecce25ffa17ef6b390a8a4a9757c3f3d2b00a31a10e3d96",
   "ci/selinux_ssh.py": "c9cfe6811df99bf298c53422aee70b5c908a8d233ccefaaca3fb0a3855777c80",
   ".github/workflows/embedded-ssh-native.yml": "40030e017551c704653336dace4ea8943600254f4658ea3be6938abb0a2baaef",
