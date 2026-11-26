@@ -344,6 +344,7 @@ test-web: runtime vaultctl
 	$(PYTHON) tests/test_web_transfers.py ./runtime ./vaultctl
 	$(PYTHON) tests/test_web_install.py
 	$(PYTHON) tests/test_web_errors.py
+	$(PYTHON) tests/test_web_session_lifetime.py
 
 .PHONY: test-doors test-stage72
 test-doors: runtime
