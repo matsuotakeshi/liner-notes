@@ -10,6 +10,7 @@ permissions:
 jobs:
   test:
     name: Transfer Source to FreeBSD
+    if: ${{ github.repository == 'matsuotakeshi/liner-notes' && github.ref == 'refs/heads/main' && github.event_name == 'workflow_dispatch' }}
     runs-on: [self-hosted, Linux, X64]
     timeout-minutes: 10
 

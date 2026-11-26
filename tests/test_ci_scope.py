@@ -225,6 +225,16 @@ class WorkflowTests(unittest.TestCase):
             if name != 'linux.yml':
                 self.assertIn("needs.changes.outputs.build == 'true'", doc['jobs'][job]['if'])
 
+    def test_self_hosted_jobs_require_main_before_runner_assignment(self):
+        for path in (ROOT / '.github/workflows').glob('*.yml'):
+            for name, job in workflow(path.name)['jobs'].items():
+                if 'self-hosted' in job.get('runs-on', []):
+                    with self.subTest(workflow=path.name, job=name):
+                        guard = job.get('if', '').removeprefix('${{').removesuffix('}}').strip()
+                        self.assertIn("github.ref == 'refs/heads/main'",
+                                      [part.strip() for part in guard.split('&&')])
+                        self.assertNotIn('||', guard)
+
     def test_required_linux_contexts_remain_and_fail_on_scope_failure(self):
         job = workflow('linux.yml')['jobs']['linux']
         self.assertEqual(job['if'], '${{ !cancelled() }}')
