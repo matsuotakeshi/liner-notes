@@ -67,6 +67,14 @@ def verify_local_archive(archive, checksum):
         os.close(fd)
 
 
+def package_identity_matches(platform, name, identity, package):
+    if platform == 'rocky10':
+        version, arch = identity
+        # CI signs the exact RPM filename, including its distribution release and architecture.
+        return f'{name}-{version}.{arch}.rpm' == package['filename']
+    return identity[0] == package['version']
+
+
 def preflight_debian_upgrade(directory, packages):
     """APT simulation checks dependencies without changing the package database."""
     files = [str(Path(directory) / item['filename']) for item in packages.values()]
@@ -269,8 +277,11 @@ class Host:
                 require(actual == name + '\t' + item['version'] + '\tcomms/liner-notes', 'FreeBSD package identity/Origin mismatch')
                 require(self.before[name][1] == 'comms/liner-notes', 'Installed FreeBSD Origin differs')
             elif self.platform == 'rocky10':
-                actual = command(['/usr/bin/rpm', '-qp', '--qf', '%{NAME}\t%{VERSION}-%{RELEASE}', str(path)])
-                require(actual == name + '\t' + item['version'], 'RPM metadata differs from signed manifest')
+                actual = command(['/usr/bin/rpm', '-qp', '--qf',
+                                  '%{NAME}\t%{VERSION}-%{RELEASE}\t%{ARCH}', str(path)]).split('\t')
+                require(len(actual) == 3 and actual[0] == name
+                        and package_identity_matches(self.platform, name, actual[1:], item),
+                        'RPM metadata differs from signed manifest')
             else:
                 actual = command(['/usr/bin/dpkg-deb', '-f', str(path), 'Package', 'Version'])
                 require(actual == 'Package: ' + name + '\nVersion: ' + item['version'], 'DEB metadata differs from signed manifest')
@@ -398,7 +409,8 @@ class Host:
         after = self.inventory()
         require({n:v for n,v in after.items() if n not in self.packages} ==
                 {n:v for n,v in self.before.items() if n not in self.packages}, 'Unrelated package inventory changed')
-        require(all(after[n][0] == p['version'] for n,p in self.packages.items()), 'Installed version mismatch')
+        require(all(package_identity_matches(self.platform, name, after[name], package)
+                    for name, package in self.packages.items()), 'Installed version mismatch')
 
     def health(self, release):
         from deploy_restore import health_probes
@@ -426,7 +438,8 @@ class Host:
         inventory = self.inventory()
         if release:
             expected = release['platforms'][self.platform]
-            require(all(inventory[n][0] == expected[n]['version'] for n in inventory if n in PACKAGES), 'Health version mismatch')
+            require(all(package_identity_matches(self.platform, name, identity, expected[name])
+                        for name, identity in inventory.items() if name in PACKAGES), 'Health version mismatch')
         return {n:v[0] for n,v in inventory.items() if n in PACKAGES}
 
 
