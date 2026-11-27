@@ -4,6 +4,7 @@
 #include <string.h>
 #include <stdlib.h>
 #include <limits.h>
+#include <stdio.h>
 
 _Static_assert(SESSION_UI_MAX < sizeof(uint32_t)*CHAR_BIT,
                "UI mask validation shifts by the registered adapter count");
@@ -145,6 +146,63 @@ void session_result(Session *s,const BoardResult *completion,uint64_t now) {
         s->ui_binding.preferred[UI_PROFILE_NAME_MAX]=0;
         if(completion->auth>0 && !s->ui_binding.explicit_choice) { s->ui_binding.restore_pending=1;restore_choice(s); }
     }
+}
+
+static int choice_is_available(const Session *s,const char *name) {
+    SessionUiSelection status=session_ui_preflight(s,name);
+    return status==SESSION_UI_SELECTED || status==SESSION_UI_UNCHANGED;
+}
+
+void session_ui_menu_hint(Session *s) {
+    const SessionUiConfig *c=&s->ui_binding.config;
+    if(c->policy==SESSION_UI_FIXED)return;
+    for(unsigned i=0;i<c->count;i++) {
+        const char *name=c->adapters[i]->name;
+        if(c->adapters[i]!=s->ui_binding.active && choice_is_available(s,name)) {
+            session_impl_queue_text(s,session_ui_snapshot(s).language==LANGUAGE_JA?
+                "UI 端末UI選択（Liner Notes拡張）\r\n":"UI Terminal UI selection (Liner Notes extension)\r\n");
+            return;
+        }
+    }
+}
+
+void session_ui_list_choices(Session *s,int interactive) {
+    const SessionUiConfig *c=&s->ui_binding.config;
+    static const char *const policies[]={"FIXED","MEMBERS","ALL"};
+    char line[128];
+    snprintf(line,sizeof(line),"UI %s / %s / DEFAULT %s\r\n",session_ui_name(s),
+             policies[c->policy],c->adapters[c->default_index]->name);
+    session_impl_queue_text(s,line);
+    unsigned number=0;
+    for(unsigned i=0;i<c->count;i++) {
+        const char *name=c->adapters[i]->name;
+        if(interactive) {
+            if(c->policy==SESSION_UI_FIXED || !choice_is_available(s,name))continue;
+            snprintf(line,sizeof(line),"  %u. %s\r\n",++number,name);
+        } else {
+            if(!(c->allowed&(UINT32_C(1)<<i)) || (c->policy==SESSION_UI_FIXED && i!=c->default_index))continue;
+            snprintf(line,sizeof(line),"  UI %s\r\n",name);
+        }
+        session_impl_queue_text(s,line);
+    }
+    if(number)session_impl_queue_text(s,session_ui_snapshot(s).language==LANGUAGE_JA?
+        "UI 番号 / UI 識別子 / UI RESET 既定に戻す / UI CANCEL 中止\r\n":
+        "UI number / UI name / UI RESET restore default / UI CANCEL cancel\r\n");
+}
+
+const char *session_ui_choice_name(const Session *s,const char *name) {
+    if(!*name || strspn(name,"0123456789")!=strlen(name))return name;
+    /* Numeric profile identifiers remain usable by their exact name. */
+    const SessionUiConfig *c=&s->ui_binding.config;
+    for(unsigned i=0;i<c->count;i++)if(!strcmp(c->adapters[i]->name,name))return name;
+    if(c->policy==SESSION_UI_FIXED || strlen(name)>2)return name;
+    unsigned target=(unsigned)strtoul(name,NULL,10);
+    if(!target)return name;
+    for(unsigned i=0;i<c->count;i++) {
+        const char *candidate=c->adapters[i]->name;
+        if(choice_is_available(s,candidate) && --target==0)return candidate;
+    }
+    return name;
 }
 
 SessionUiSelection session_ui_choose(Session *s,const char *name) {

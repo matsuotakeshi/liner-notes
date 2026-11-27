@@ -63,8 +63,10 @@ void wani_menu(Session *s,int requested) {
     }
     switch(u->common.screen) {
     case MAIN_SCREEN:
-        mmm_say(s,"board (b)  pool (p)  system (s)  game (g)\r\nl / cd PATH / read / open / topic / mail / ui / off / ?\r\n",
-                  "board (b) 掲示板 / pool (p) 保管庫 / system (s) 設定 / game (g) ゲーム\r\nl / cd パス / read / open / topic / mail / ui / off / ?\r\n");break;
+        session_ui_menu_hint(s);
+        mmm_extensions_hint(s);
+        mmm_say(s,"board (b)  pool (p)  system (s)  game (g)\r\nl / cd PATH / read / open / topic / mail / off / ?\r\n",
+                  "board (b) 掲示板 / pool (p) 保管庫 / system (s) 設定 / game (g) ゲーム\r\nl / cd パス / read / open / topic / mail / off / ?\r\n");break;
     case NOTES_SCREEN:
         mmm_say(s,"Number or name: select  l: list  more: next  q: up\r\n","番号・名前 選択 / l 一覧 / more 続き / q 上位\r\n");break;
     case BOARD_SCREEN: case INDEX_SCREEN: case OPEN_SCREEN:

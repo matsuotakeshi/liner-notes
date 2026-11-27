@@ -56,12 +56,14 @@ void big_model_menu(Session *s,int requested) {
     if(ui->quiet && !requested)return;
     switch(ui->shared.screen) {
     case MAIN_SCREEN:
+        session_ui_menu_hint(s);
+        mmm_extensions_hint(s);
         mmm_say(s,"BIG-Model | B SIGs  C Chat  E Exit  H Help  M Mail\r\n"
                   "N New articles (N resume)  O New headlines  P Files  T Telegram  U Settings  W Who  X All SIGs\r\n"
-                  "+ Liner Notes extensions\r\n",
+                  "+ Liner Notes extensions / TOPIC short notices\r\n",
                   "BIG-Model | B 掲示板・SIG  C チャット  E 終了  H 案内  M メール\r\n"
                   "N 新着記事 (N resume 再開)  O 新着見出し  P 保管庫  T 電報  U 端末設定  W 接続一覧  X 全SIG探索\r\n"
-                  "+ Liner Notes拡張\r\n");
+                  "+ Liner Notes拡張 / TOPIC 短文伝言板\r\n");
         break;
     case NOTES_SCREEN:
         mmm_say(s,"Number: select  L: more  0: up  /: main\r\n","番号 選択  L 続き  0 上位  / 主メニュー\r\n");

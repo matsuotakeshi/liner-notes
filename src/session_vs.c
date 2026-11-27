@@ -52,6 +52,8 @@ void vs_menu(Session *s,int requested) {
     }
     switch(m->screen) {
     case MAIN_SCREEN:
+        session_ui_menu_hint(s);
+        mmm_extensions_hint(s);
         mmm_say(s,"N news / NA continuous / NF files / P pointer / B boards / F files / M mail / D direct / C chat / U settings / H help / O off\r\n",
                   "N ニュース / NA 一気読み / NF 新着ファイル / P ポインタ / B 掲示板 / F ファイル / M メール / D ダイレクト / C チャット / U 設定 / H 案内 / O 終了\r\n");break;
     case NOTES_SCREEN: session_impl_queue_text(s,"#ID/name / . up / + list / * descendants / A ID ON|OFF / Q\r\n");break;

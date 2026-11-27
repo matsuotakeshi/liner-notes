@@ -109,11 +109,14 @@ void net_cock_menu(Session *s,int requested) {
     default:return;
     }
     if(u->mode) {
+        if(requested) { session_ui_menu_hint(s);mmm_extensions_hint(s); }
         if(requested)session_impl_queue_text(s,"BREAD / BWRITE / BSET / RALL / RNALL / PMOVE / MREAD / MWRITE / PDS / CHAT / MODE / EXCOM / OFF\r\n");
         return;
     }
     switch(u->menu) {
     case NC_MAIN_MENU:
+        session_ui_menu_hint(s);
+        mmm_extensions_hint(s);
         if(s->core.admin)mmm_say(s,"1. Member  2. Boards  3. Mail  4. Mode  5. Board settings  6. Chat  7. Join  8. Report  9. Off\r\n",
             "1. 会員  2. 掲示板  3. メール  4. 設定  5. ボード管理  6. チャット  7. 入会  8. 状態  9. 切断\r\n");
         else mmm_say(s,"1. Member  2. Boards  3. Mail  4. Chat  5. Join  6. Off\r\n",

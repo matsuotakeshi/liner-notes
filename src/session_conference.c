@@ -55,6 +55,76 @@ int session_impl_conference_command(Session *s,char *line) {
     session_impl_submit(s,q);free(q);return 1;
 }
 
+static int topic_submit(Session *s,const ConferenceRequest *request) {
+    OperationRequest *q=calloc(1,sizeof(*q));
+    if(!q)return 0;
+    q->op=BOARD_CONFERENCE;q->conference=*request;
+    int accepted=session_submit(s,q)==SESSION_OPERATION_ACCEPTED;
+    free(q);return accepted;
+}
+
+int session_topic_command(Session *s,char *line) {
+    char command[6];size_t n=strcspn(line," ");
+    if(n!=5)return 0;
+    for(size_t i=0;i<n;i++)command[i]=line[i]>='a' && line[i]<='z'?(char)(line[i]-'a'+'A'):line[i];
+    command[n]=0;
+    if(strcmp(command,"TOPIC"))return 0;
+    const char *args=line+n+strspn(line+n," ");
+    ConferenceRequest q={.action=TOPIC_UNREAD};
+    if(*args>='0' && *args<='9') {
+        if(!number(&args,&q.cursor,1) || *args)goto invalid;
+        if(!topic_submit(s,&q))session_impl_queue_text(s,"ERR topic unavailable\r\n");
+        return 1;
+    }
+    char verb[4];n=strcspn(args," ");
+    if(n>=sizeof(verb))goto invalid;
+    for(size_t i=0;i<n;i++)verb[i]=args[i]>='a' && args[i]<='z'?(char)(args[i]-'a'+'A'):args[i];
+    verb[n]=0;args+=n;args+=strspn(args," ");
+    if(!*verb || !strcmp(verb,"ALL")) {
+        if(*verb)q.action=TOPIC_HISTORY;
+        if(*args && (!number(&args,&q.cursor,1) || *args))goto invalid;
+    } else if(!strcmp(verb,"-W")) {
+        if(!*args || strlen(args)>CONFERENCE_TEXT)goto invalid;
+        q.action=TOPIC_POST;strcpy(q.text,args);
+    } else if(!strcmp(verb,"-D")) {
+        if(!number(&args,&q.cursor,0) || *args)goto invalid;
+        q.action=TOPIC_DELETE;
+    } else goto invalid;
+    if(!topic_submit(s,&q))session_impl_queue_text(s,"ERR topic unavailable\r\n");
+    return 1;
+invalid:
+    session_impl_queue_text(s,"TOPIC [cursor | ALL [cursor] | -W text | -D id]\r\n");
+    return 1;
+}
+
+int session_topic_result(Session *s,const OperationResult *r) {
+    if(r->page.kind!=OPERATION_PAGE_CONFERENCE)return 0;
+    const ConferenceReply *p=&r->page.data.conference;
+    if(p->action<TOPIC_HISTORY || p->action>TOPIC_SEEN)return 0;
+    int ja=session_ui_snapshot(s).language==LANGUAGE_JA;
+    if(p->status!=CONFERENCE_OK)session_impl_queue_text(s,session_impl_conference_error(p->status));
+    else if(p->action==TOPIC_POST)session_impl_queue_text(s,ja?"伝言を書き込みました。\r\n":"Topic posted.\r\n");
+    else if(p->action==TOPIC_DELETE)session_impl_queue_text(s,ja?"伝言を削除しました。\r\n":"Topic deleted.\r\n");
+    else if(p->action!=TOPIC_SEEN) {
+        char line[CONFERENCE_TEXT+100];
+        for(unsigned i=0;i<p->count;i++) {
+            const ConferenceLine *row=&p->rows.lines[i];
+            snprintf(line,sizeof(line),"#%u %s | %s\r\n",row->id,row->name,row->text);
+            session_impl_queue_text(s,line);
+        }
+        if(p->next) {
+            snprintf(line,sizeof(line),"TOPIC%s %u\r\n",p->action==TOPIC_HISTORY?" ALL":"",p->next);
+            session_impl_queue_text(s,line);
+        }
+        if(p->action==TOPIC_UNREAD && p->count && s->core.active && !s->core.closing) {
+            ConferenceRequest mark={.action=TOPIC_SEEN,.cursor=p->position};
+            if(topic_submit(s,&mark))return 1;
+            session_impl_queue_text(s,"ERR topic read position\r\n");
+        }
+    }
+    session_impl_prompt(s);return 1;
+}
+
 const char *session_impl_conference_error(ConferenceStatus status) {
     static const char *const error[]={
         "", "ERR conference login required\r\n", "ERR conference session expired\r\n",
@@ -66,6 +136,7 @@ const char *session_impl_conference_error(ConferenceStatus status) {
 }
 
 int session_impl_conference_result(Session *s,const OperationResult *r) {
+    if(session_topic_result(s,r))return 1;
     if(r->page.kind!=OPERATION_PAGE_CONFERENCE)return 0;
     const ConferenceReply *page=&r->page.data.conference;
     char text[CONFERENCE_TEXT+180];

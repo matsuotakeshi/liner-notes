@@ -97,13 +97,16 @@ void ktbbs_menu(Session *s,int requested) {
     }
     switch(mmm_view(s)->screen) {
     case MAIN_SCREEN:
-        if(!view(s)->expert || requested)
+        if(!view(s)->expert || requested) {
+            session_ui_menu_hint(s);
+            mmm_extensions_hint(s);
             mmm_say(s,"KTBBS | R Read  E Enter  N News  M Mail  F Files  C Chat\r\n"
                       "I Install  O Profile  U Users  W Who  K Withdraw  X Expert  G Goodbye\r\n"
                       "A Apply  H Help  L History  Y System  # Status  ! Liner Notes\r\n",
                       "KTBBS | R 読書  E 書込  N 新着  M メール  F 保管庫  C チャット\r\n"
                       "I 端末設定  O プロフィール  U 会員  W 接続一覧  K 取消  X 案内切替  G 終了\r\n"
                       "A 入会  H ヘルプ  L 履歴  Y 局情報  # 状態  ! Liner Notes拡張\r\n");
+        }
         break;
     case NOTES_SCREEN: mmm_say(s,"Board number or name; ? list, L more, 0 back.\r\n","ボード番号・名前。? 一覧 L 続き 0 戻る。\r\n");break;
     case BOARD_SCREEN: mmm_say(s,"R Read / I Article # / S Search / L List / # Status / B Sub-boards / 0 Back\r\n",
@@ -128,8 +131,8 @@ void ktbbs_menu(Session *s,int requested) {
     case TALK_SCREEN: mmm_conference_menu(s);break;
     case KTBBS_ENTER_SCREEN: mmm_say(s,"M Mail / W Write article / R Reply / 0 Back\r\n",
                                       "M メール / W 投稿 / R 返信 / 0 戻る\r\n");break;
-    case KTBBS_EXT_SCREEN: mmm_say(s,"Liner Notes extensions: games / talk / manage / draft [resume] / UI [name] / 0 Back\r\n",
-                                    "Liner Notes拡張: games / talk / manage / draft [resume] / UI [名前] / 0 戻る\r\n");break;
+    case KTBBS_EXT_SCREEN: mmm_say(s,"Liner Notes extensions: games / talk / TOPIC / manage / draft [resume] / 0 Back\r\n",
+                                    "Liner Notes拡張: games / talk / TOPIC / manage / draft [resume] / 0 戻る\r\n");break;
     default: break;
     }
 }

@@ -99,6 +99,14 @@ void board_conference_session(int slot,unsigned long session,uint32_t user,uint3
 }
 int board_submit(const BoardRequest *q) { assert(q->user==12 && q->user_epoch==3 && q->session==77 && q->slot==2);requests++;return 1; }
 
+typedef struct { char text[2048];size_t length; } Captured;
+static int capture(void *context,const char *text,size_t size) {
+    Captured *output=context;
+    if(size>=sizeof(output->text)-output->length)return 0;
+    memcpy(output->text+output->length,text,size);
+    output->length+=size;output->text[output->length]=0;return 1;
+}
+
 static void registration_limits(SessionIO io) {
     Session s;
     SessionUiConfig config=session_ui_default();
@@ -118,8 +126,18 @@ static void registration_limits(SessionIO io) {
     config.default_index=0;config.allowed=UINT32_C(0xffff);config.count=SESSION_UI_MAX;
     assert(session_ui_configure(&config,"ALL",names[15],allow));
     assert(config.default_index==15 && config.allowed==UINT32_C(0xffff));
+    Captured output={0};io.context=&output;io.write=capture;
     assert(session_init_ui(&s,io,77,2,1,1,1,LANGUAGE_EN,&config));
     assert(s.ui_binding.states[15] && !s.ui_binding.states[8]);
+    session_ui_list_choices(&s,1);
+    char last[64];snprintf(last,sizeof(last),"16. %s",names[15]);
+    assert(strstr(output.text,last));
+    assert(!strcmp(session_ui_choice_name(&s,"16"),names[15]));
+    assert(!strcmp(session_ui_choice_name(&s,"17"),"17"));
+    s.ui_binding.config.policy=SESSION_UI_FIXED;
+    output=(Captured){0};session_ui_list_choices(&s,1);
+    assert(!strstr(output.text,last) && !strstr(output.text,"UI RESET"));
+    s.ui_binding.config.policy=SESSION_UI_ALL;
     for(unsigned i=0;i<SESSION_UI_MAX;i++)
         assert(session_ui_select(&s,names[i])==SESSION_UI_SELECTED);
     session_dispose(&s);
