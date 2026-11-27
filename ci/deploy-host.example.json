@@ -37,6 +37,7 @@
     "probes": {}
   },
   "probes": {},
+  "backup_storage": "off-host",
   "backup_sink": {
     "host": "backup.example.invalid",
     "machine_id": "REPLACE_WITH_VERIFIED_BACKUP_HOST_MACHINE_ID_SHA256",

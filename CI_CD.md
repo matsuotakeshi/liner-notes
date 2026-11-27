@@ -80,6 +80,8 @@ Self-hosted Runnerと自宅検証VMには、レビュー済みでmainへ統合�
 画面の既定は `scope=freebsd`・`mode=plan` とします。公開済みの正式タグ、署名manifest、
 同一SHAの既存CI成功を必須とし、main全コミット・タグpushからの自動applyは行いません。
 初回を含め毎回、対象局とrun/attemptに紐付いた明示承認を必要とします。
+別ホスト保管が未導入の局では、管理者が明示的に同一ホスト保管を選べます。
+どちらの方式でも、更新前に保管したarchiveのSHA-256照合と隔離した復元の成功を必須とします。
 DebianとRockyも `scope=debian` と `scope=rocky` で個別に選べます。
 全局更新は従来の `scope=all` として残します。単独配備の署名許可は他局では使えません。
 リリースsetの全検査は維持し、CDから再ビルドやnative workflowを起動しません。
