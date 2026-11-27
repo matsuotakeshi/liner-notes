@@ -83,6 +83,7 @@ const SessionUiAdapter *session_ui_mmm(void);
 const SessionUiAdapter *session_ui_mash(void);
 const SessionUiAdapter *session_ui_ktbbs(void);
 const SessionUiAdapter *session_ui_big_model(void);
+const SessionUiAdapter *session_ui_wani_bbs(void);
 SessionUiConfig session_ui_default(void);
 int session_ui_configure(SessionUiConfig *,const char *,const char *,const char *);
 SessionUiSelection session_ui_preflight(const Session *,const char *);

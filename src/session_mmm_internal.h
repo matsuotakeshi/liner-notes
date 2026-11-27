@@ -23,7 +23,9 @@ typedef enum {
     JOB_NOTE_DRAFT, JOB_NOTE_DRAFT_SAVE, JOB_NOTE_DRAFT_STATUS, JOB_NOTE_DRAFT_DROP, JOB_NOTE_CHANGE,
     JOB_NOTE_DRAFT_DROPPED, JOB_STREAM_READ, JOB_STREAM_SEEN, JOB_MANAGE, JOB_PFILE_APPEND, JOB_PFILE_MAIL, JOB_SIGNATURE, JOB_SIGNATURE_EDIT, JOB_SIGNATURE_SAVE,
     JOB_CONFERENCE, JOB_KTBBS_FIND, JOB_KTBBS_STATUS, JOB_BIG_MODEL_PAGE, JOB_BIG_MODEL_WINDOW, JOB_BIG_MODEL_DESTINATIONS,
-    JOB_BIG_MODEL_LIST, JOB_BIG_MODEL_LIST_SAVE, JOB_BIG_MODEL_PASSWORD, JOB_BIG_MODEL_MENU
+    JOB_BIG_MODEL_LIST, JOB_BIG_MODEL_LIST_SAVE, JOB_BIG_MODEL_PASSWORD, JOB_BIG_MODEL_MENU,
+    JOB_WANI_MODE, JOB_WANI_CONFIG, JOB_WANI_RESOLVE, JOB_WANI_PAGE, JOB_WANI_WINDOW,
+    JOB_WANI_SCAN, JOB_WANI_PERSONAL, JOB_WANI_PASSWORD, JOB_WANI_TOPIC, JOB_WANI_SIGNATURE
 } MmmJob;
 typedef enum { OPEN_BOARD_MENU, OPEN_INDEX, OPEN_BASE, OPEN_POST, OPEN_NEW, OPEN_NEW_OR_INDEX } MmmBoardAction;
 typedef enum { BROWSE_READ, BROWSE_INDEX, BROWSE_EXACT, BROWSE_RESPONSE, BROWSE_TITLES, BROWSE_FLAT_LIST, BROWSE_KTBBS_TITLE, BROWSE_FLAT_BODY } MmmBrowse;
@@ -124,6 +126,8 @@ void mmm_door_result(Session *s,const OperationResult *r,const OperationPage *pa
 void mmm_render_news(Session *s,const ArticlePage *page);
 /* Shared typed terminal actions. Each profile owns its input grammar. */
 void mmm_ui_boards(Session *,uint32_t);
+void mmm_ui_shared_command(Session *,char *);
+void mmm_ui_editor(Session *,char *);
 void mmm_ui_enter_board(Session *,const char *,MmmBoardAction);
 void mmm_ui_read_article(Session *,uint32_t);
 void mmm_ui_browse(Session *,MmmBrowse,uint32_t,uint32_t,int,int);

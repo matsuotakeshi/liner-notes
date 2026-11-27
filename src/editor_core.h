@@ -30,5 +30,6 @@ EditorOutcome editor_apply(EditorDocument *,EditorOperation,uint32_t first,uint3
  * deletes the selected lines. The full change is one undoable edit. */
 EditorOutcome editor_transform(EditorDocument *,uint32_t first,uint32_t last,
                                int complement,const char *needle,const char *replacement);
+EditorOutcome editor_remove_blank_lines(EditorDocument *);
 void editor_discard_undo(EditorDocument *);
 #endif

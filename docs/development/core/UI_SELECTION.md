@@ -75,3 +75,7 @@ main-only native CI must validate their respective commits before acceptance.
 
 Invalid/overlong UI names use the shared JA/EN error catalog. The catalog
 coverage check and real-socket i18n test cover both language presentations.
+
+WANI-BBSの通常表示では同じフラット一覧を使い、マルチノーツではルートを
+表紙、全子孫を番号順のページに投影する。表示形式はボード単位で選べる。
+親子関係、記事IDおよび読み書きの権限は共通のArticle Coreに残る。

@@ -6,6 +6,7 @@ static int feature_exec(const char *sql) { return sqlite3_exec(features_db,sql,N
 static sqlite3_stmt *feature_stmt(const char *sql) { sqlite3_stmt *s=NULL;if(sqlite3_prepare_v2(features_db,sql,-1,&s,NULL)!=SQLITE_OK)return NULL;return s; }
 #include "member_settings_store.inc"
 #include "mmm_notes_store.inc"
+#include "wani_settings_store.inc"
 #include "catalog_group_store.inc"
 static int delete_recover(void) {
     for(;;) {
@@ -42,7 +43,7 @@ static int features_import(const char *base) {
         sqlite3_stmt *attach=feature_stmt("ATTACH DATABASE ? AS legacy");if(!attach)return 0;sqlite3_bind_text(attach,1,path,-1,SQLITE_STATIC);int ok=sqlite3_step(attach)==SQLITE_DONE;sqlite3_finalize(attach);if(!ok)return 0;
     }
     if(!feature_exec("BEGIN IMMEDIATE"))return 0;
-    const char *tables[]={"board_deletions","ui_preferences","menu_preferences","guest_boards","news_scoped","news","delegated","group_moves","applications","link_articles","mmm_board_labels","mmm_scanlist","mmm_scan_rules","big_model_scanlist","mmm_signatures","conference_rooms","conference_lines","conference_read"};int ok=1;
+    const char *tables[]={"board_deletions","ui_preferences","menu_preferences","guest_boards","news_scoped","news","delegated","group_moves","applications","link_articles","mmm_board_labels","mmm_scanlist","mmm_scan_rules","big_model_scanlist","mmm_signatures","conference_rooms","conference_lines","conference_read","topic_lines","topic_read","wani_board_views","wani_subscriptions"};int ok=1;
     for(unsigned i=0;legacy && ok && i<sizeof(tables)/sizeof(*tables);i++) {
         sqlite3_stmt *q=feature_stmt("SELECT 1 FROM legacy.sqlite_master WHERE type='table' AND name=?");if(!q) { ok=0;break; }sqlite3_bind_text(q,1,tables[i],-1,SQLITE_STATIC);int present=sqlite3_step(q)==SQLITE_ROW;sqlite3_finalize(q);
         if(present) { char command[256];snprintf(command,sizeof(command),"INSERT OR IGNORE INTO %s SELECT * FROM legacy.%s",tables[i],tables[i]);ok=feature_exec(command); }
@@ -61,7 +62,7 @@ static int features_open(const char *base) {
     if(!storage_database() && chmod(path,0600))return 0;
 #endif
     sqlite3_busy_timeout(features_db,5000);
-    return feature_exec(storage_database()?"PRAGMA journal_mode=WAL":"PRAGMA journal_mode=DELETE") && feature_exec("PRAGMA synchronous=FULL;CREATE TABLE IF NOT EXISTS board_deletions(board INTEGER PRIMARY KEY,actor INTEGER,depth INTEGER,done INTEGER);CREATE TABLE IF NOT EXISTS menu_preferences(id INTEGER PRIMARY KEY,value INTEGER);CREATE TABLE IF NOT EXISTS guest_boards(id INTEGER PRIMARY KEY,value INTEGER);CREATE TABLE IF NOT EXISTS news_scoped(user INTEGER,kind INTEGER,scope TEXT,stamp INTEGER NOT NULL,PRIMARY KEY(user,kind,scope));CREATE TABLE IF NOT EXISTS news(user INTEGER,kind INTEGER,stamp INTEGER NOT NULL,PRIMARY KEY(user,kind));CREATE TABLE IF NOT EXISTS delegated(board INTEGER,gid INTEGER,PRIMARY KEY(board,gid));CREATE TABLE IF NOT EXISTS group_moves(board INTEGER PRIMARY KEY,actor INTEGER,source INTEGER,destination INTEGER,done INTEGER);CREATE TABLE IF NOT EXISTS applications(user INTEGER,field TEXT,value TEXT,PRIMARY KEY(user,field));") && feature_exec(UI_PREFERENCE_SCHEMA) && feature_exec(MMM_NOTES_SCHEMA) && feature_exec(LINK_ARTICLES_SCHEMA) && conference_schema(features_db) && features_import(base) && catalog_group_repository_recover() && delete_recover();
+    return feature_exec(storage_database()?"PRAGMA journal_mode=WAL":"PRAGMA journal_mode=DELETE") && feature_exec("PRAGMA synchronous=FULL;CREATE TABLE IF NOT EXISTS board_deletions(board INTEGER PRIMARY KEY,actor INTEGER,depth INTEGER,done INTEGER);CREATE TABLE IF NOT EXISTS menu_preferences(id INTEGER PRIMARY KEY,value INTEGER);CREATE TABLE IF NOT EXISTS guest_boards(id INTEGER PRIMARY KEY,value INTEGER);CREATE TABLE IF NOT EXISTS news_scoped(user INTEGER,kind INTEGER,scope TEXT,stamp INTEGER NOT NULL,PRIMARY KEY(user,kind,scope));CREATE TABLE IF NOT EXISTS news(user INTEGER,kind INTEGER,stamp INTEGER NOT NULL,PRIMARY KEY(user,kind));CREATE TABLE IF NOT EXISTS delegated(board INTEGER,gid INTEGER,PRIMARY KEY(board,gid));CREATE TABLE IF NOT EXISTS group_moves(board INTEGER PRIMARY KEY,actor INTEGER,source INTEGER,destination INTEGER,done INTEGER);CREATE TABLE IF NOT EXISTS applications(user INTEGER,field TEXT,value TEXT,PRIMARY KEY(user,field));") && feature_exec(UI_PREFERENCE_SCHEMA) && feature_exec(MMM_NOTES_SCHEMA) && feature_exec(WANI_SETTINGS_SCHEMA) && feature_exec(LINK_ARTICLES_SCHEMA) && conference_schema(features_db) && features_import(base) && catalog_group_repository_recover() && delete_recover();
 }
 int application_repository_load(uint32_t user,ApplicationNotes *out) {
     if(!out)return 0;

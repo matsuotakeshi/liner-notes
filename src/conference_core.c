@@ -16,7 +16,12 @@ int conference_schema(sqlite3 *db) {
         " room INTEGER NOT NULL REFERENCES conference_rooms(id),"
         " through INTEGER NOT NULL, PRIMARY KEY(user,room),"
         " FOREIGN KEY(room,through) REFERENCES conference_lines(room,id));"
-        "INSERT OR IGNORE INTO conference_rooms VALUES(1,'General');";
+        "INSERT OR IGNORE INTO conference_rooms VALUES(1,'General');"
+        "CREATE TABLE IF NOT EXISTS topic_lines(id INTEGER PRIMARY KEY CHECK(id BETWEEN 1 AND 2147483646),"
+        " user INTEGER NOT NULL CHECK(user>0), name TEXT NOT NULL, stamp INTEGER NOT NULL,"
+        " body TEXT NOT NULL, deleted INTEGER NOT NULL DEFAULT 0 CHECK(deleted IN (0,1)));"
+        "CREATE TABLE IF NOT EXISTS topic_read(user INTEGER PRIMARY KEY CHECK(user>0),"
+        " through INTEGER NOT NULL REFERENCES topic_lines(id));";
     return sqlite3_exec(db,sql,NULL,NULL,NULL)==SQLITE_OK;
 }
 
@@ -142,6 +147,70 @@ static ConferenceStatus create(sqlite3 *db,const ConferenceIdentity *who,const C
     return sqlite3_changes(db)?CONFERENCE_OK:CONFERENCE_EXISTS;
 }
 
+
+static ConferenceStatus topic_list(sqlite3 *db,uint32_t user,const ConferenceRequest *q,ConferenceReply *reply) {
+    int reverse=q->action==TOPIC_REVERSE;
+    sqlite3_stmt *s=statement(db,reverse?
+        "SELECT id,user,stamp,name,body FROM topic_lines WHERE deleted=0 AND (?2=0 OR id<?2) ORDER BY id DESC LIMIT 9":
+        "SELECT id,user,stamp,name,body FROM topic_lines WHERE deleted=0 AND id>?2"
+        " AND (?3=0 OR id>coalesce((SELECT through FROM topic_read WHERE user=?1),0)) ORDER BY id LIMIT 9");
+    if(!s)return CONFERENCE_STORAGE;
+    int ok=sqlite3_bind_int64(s,2,q->cursor)==SQLITE_OK;
+    if(!reverse)ok=ok && sqlite3_bind_int64(s,1,user)==SQLITE_OK &&
+        sqlite3_bind_int(s,3,q->action==TOPIC_UNREAD)==SQLITE_OK;
+    int rc=SQLITE_ERROR;
+    if(ok)while((rc=sqlite3_step(s))==SQLITE_ROW) {
+        if(reply->count==CONFERENCE_PAGE) { reply->next=reply->position;break; }
+        ConferenceLine *row=&reply->rows.lines[reply->count];
+        row->id=(uint32_t)sqlite3_column_int64(s,0);
+        row->user=(uint32_t)sqlite3_column_int64(s,1);
+        row->time=(uint64_t)sqlite3_column_int64(s,2);
+        if(!copy_text(s,3,row->name,sizeof(row->name)) || !copy_text(s,4,row->text,sizeof(row->text))) {
+            rc=SQLITE_CORRUPT;break;
+        }
+        reply->count++;reply->position=row->id;
+    }
+    return sqlite3_finalize(s)==SQLITE_OK && (rc==SQLITE_ROW || rc==SQLITE_DONE)?CONFERENCE_OK:CONFERENCE_STORAGE;
+}
+
+static ConferenceStatus topic_write(sqlite3 *db,uint32_t user,const ConferenceIdentity *who,
+                                    const ConferenceRequest *q,ConferenceReply *reply) {
+    sqlite3_stmt *s=NULL;
+    int ok;
+    switch(q->action) {
+    case TOPIC_POST: {
+        if(!safe_text(q->text,CONFERENCE_TEXT))return CONFERENCE_INVALID;
+        time_t stamp=time(NULL);
+        if(stamp<0 || !safe_text(who->name,80))return CONFERENCE_STORAGE;
+        s=statement(db,"INSERT INTO topic_lines(user,name,stamp,body) VALUES(?,?,?,?)");
+        ok=s && sqlite3_bind_int64(s,1,user)==SQLITE_OK &&
+            sqlite3_bind_text(s,2,who->name,-1,SQLITE_STATIC)==SQLITE_OK &&
+            sqlite3_bind_int64(s,3,(sqlite3_int64)stamp)==SQLITE_OK &&
+            sqlite3_bind_text(s,4,q->text,-1,SQLITE_STATIC)==SQLITE_OK;
+        break;
+    }
+    case TOPIC_DELETE:
+        if(!q->cursor)return CONFERENCE_INVALID;
+        /* Retain IDs for monotonic markers and snapshot restores. */
+        s=statement(db,"UPDATE topic_lines SET deleted=1,name='',body='' WHERE id=? AND deleted=0 AND (user=? OR ?=1)");
+        ok=s && sqlite3_bind_int64(s,1,q->cursor)==SQLITE_OK &&
+            sqlite3_bind_int64(s,2,user)==SQLITE_OK && sqlite3_bind_int(s,3,who->administrator)==SQLITE_OK;
+        break;
+    case TOPIC_SEEN:
+        if(!q->cursor)return CONFERENCE_INVALID;
+        s=statement(db,"INSERT INTO topic_read SELECT ?1,id FROM topic_lines WHERE id=?2"
+            " ON CONFLICT(user) DO UPDATE SET through=max(through,excluded.through)");
+        ok=s && sqlite3_bind_int64(s,1,user)==SQLITE_OK && sqlite3_bind_int64(s,2,q->cursor)==SQLITE_OK;
+        break;
+    default:return CONFERENCE_INVALID;
+    }
+    if(ok)ok=sqlite3_step(s)==SQLITE_DONE;
+    if(sqlite3_finalize(s)!=SQLITE_OK || !ok)return CONFERENCE_STORAGE;
+    if(!sqlite3_changes(db))return CONFERENCE_MISSING;
+    reply->position=q->action==TOPIC_POST?(uint32_t)sqlite3_last_insert_rowid(db):q->cursor;
+    return CONFERENCE_OK;
+}
+
 static ConferenceStatus run(sqlite3 *db,ConferenceResolve resolve,void *context,const ConferenceActor *actor,
                             const ConferenceRequest *q,ConferenceReply *reply) {
     if(!actor || !actor->user)return CONFERENCE_LOGIN;
@@ -151,6 +220,11 @@ static ConferenceStatus run(sqlite3 *db,ConferenceResolve resolve,void *context,
     if(status!=CONFERENCE_OK)return status;
     if(who.guest)return CONFERENCE_DENIED;
     if(!db)return CONFERENCE_STORAGE;
+    if(q && q->action>=TOPIC_HISTORY && q->action<=TOPIC_SEEN) {
+        if(q->room || q->cursor>CONFERENCE_LAST_ID)return CONFERENCE_INVALID;
+        return q->action<=TOPIC_REVERSE?topic_list(db,actor->user,q,reply):
+            topic_write(db,actor->user,&who,q,reply);
+    }
     if(!q || q->action<CONFERENCE_LIST || q->action>CONFERENCE_CREATE || q->room>CONFERENCE_ROOMS ||
        q->cursor>CONFERENCE_LAST_ID ||
        (!q->room && q->action!=CONFERENCE_LIST && q->action!=CONFERENCE_UNREAD && q->action!=CONFERENCE_SEEN))

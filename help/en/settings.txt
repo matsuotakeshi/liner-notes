@@ -23,3 +23,5 @@ UI shows available profiles. UI mash selects MASH when the station permits it. T
 UI ktbbs selects the KTBBS profile when the station allows it. At MAIN, ? displays the bilingual KTBBS guide. R opens board selection, E opens the posting menu, and ! opens Liner Notes extensions.
 
 Use UI big-model when enabled. B opens SIGs, N/O/X explore new articles, T sends a telegram, ? shows help, and + opens Liner Notes extensions.
+
+Use UI wani-bbs when enabled. b opens boards, p opens files, s opens settings, g opens games, topic opens the message board, and ? describes the current screen.

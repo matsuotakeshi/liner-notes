@@ -97,7 +97,17 @@ static void malformed_and_isolation(void) {
     strcpy(d.undo_body,"bad");reject(EDITOR_UNDO,0,0,NULL,EDITOR_INVALID);
     assert(editor_apply(NULL,EDITOR_CLEAR,0,0,NULL)==EDITOR_INVALID);
 }
+static void blank_lines_are_one_edit(void) {
+    reset();strcpy(d.body,"\r\nfirst\r\n\r\nsecond\r\n\r\n");
+    assert(editor_remove_blank_lines(&d)==EDITOR_OK && !strcmp(d.body,"first\r\nsecond\r\n"));
+    assert(editor_apply(&d,EDITOR_UNDO,0,0,NULL)==EDITOR_OK &&
+           !strcmp(d.body,"\r\nfirst\r\n\r\nsecond\r\n\r\n"));
+    strcpy(d.body,"bad\n");
+    assert(editor_remove_blank_lines(&d)==EDITOR_INVALID && !strcmp(d.body,"bad\n"));
+}
+
 int main(void) {
+    blank_lines_are_one_edit();
     lines_and_undo();title_and_clear();quote_and_import();bounds_and_capacity();spans_and_search();malformed_and_isolation();
     puts("PASS: 6 editor Core groups (mutation/undo, title/clear, quote/import, capacity, search, isolation)");return 0;
 }

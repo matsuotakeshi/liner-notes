@@ -24,3 +24,5 @@ UI で利用可能なUIを表示し、局が許可していれば UI mash でMAS
 局が許可していれば UI ktbbs でKTBBS風に切り替えます。主メニューの ? で案内、R でボード選択、E で書込メニュー、! で Liner Notes拡張を開きます。
 
 局が許可していれば UI big-model で切り替えます。B はSIG、N/O/X は新着探索、T は電報、? は案内、+ はLiner Notes拡張です。
+
+局が許可していれば UI wani-bbs で切り替えます。b 掲示板、p 保管庫、s 設定、g ゲーム、topic 簡易伝言板、? 現画面の案内です。

@@ -64,6 +64,10 @@ static const SessionUiAdapter adapter={
     .emit=text,.prompt=simple,.menu=menu,.help=text,.uppercase=upper,.tick=tick,.door_finish=simple
 };
 const SessionUiAdapter *session_ui_rtbbs(void) { return &adapter; }
+const SessionUiAdapter *session_ui_wani_bbs(void) {
+    static SessionUiAdapter sixth;
+    sixth=adapter;sixth.name="wani-bbs";return &sixth;
+}
 const SessionUiAdapter *session_ui_big_model(void) {
     static SessionUiAdapter fifth;
     fifth=adapter;fifth.name="big-model";return &fifth;

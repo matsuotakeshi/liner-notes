@@ -96,7 +96,7 @@ int main(void) {
     assert(member_settings_repository_check_get(1,0,"",&stamp) && stamp==100);
     assert(member_settings_repository_check_get(2,3,"",&stamp) && !stamp);
     assert(!member_settings_repository_check_save(1,3,"2:0",610));
-    assert(member_settings_repository_mmm_set(1,50));
+    assert(member_settings_repository_sequencer_set(1,3,50));
     assert(member_settings_repository_check_get(1,3,"",&stamp) && stamp==50);
     assert(member_settings_repository_check_get(1,0,"",&stamp) && stamp==100);
     puts("PASS: existing schema/defaults, menu modes, per-user/kind/scope isolation and bound SQL text");
