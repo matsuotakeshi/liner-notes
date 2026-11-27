@@ -121,11 +121,16 @@ def run(binary, vaultctl, dbconvert):
         bob.cmd("/", b"MAIN>> ")
 
         alice.cmd("R 1", READ)
-        alice.cmd("S", b"SEARCH [1 sender")
-        # Consume the entire question before requesting the next one.
-        alice.until(b"> ")
+        search = b"SEARCH [1 sender / 2 text / 0 back] > "
+        alice.cmd("S", search)
+        alice.cmd("1", b"Search value > ")
+        results = alice.cmd("bob", b"LIST> ")
+        assert b"MMM original" in results and b"KTBBS original" not in results, results
+        alice.cmd("0", READ)
+        alice.cmd("S", search)
         alice.cmd("2", b"Search value > ")
-        assert b"MMM original" in alice.cmd("Body through MMM", b"LIST> ")
+        results = alice.cmd("Body through MMM", b"LIST> ")
+        assert b"MMM original" in results and b"KTBBS original" not in results, results
         assert b"Body through MMM" in alice.cmd("1", ARTICLE)
         key(alice, b"r", TITLE)
         reply = write(alice, "A KTBBS reply", "Reply body", ARTICLE)

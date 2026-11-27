@@ -403,6 +403,6 @@
   "tests/test_web_http.py": "532acbdc3b5b9a37395445551348f273b75633022bd8378189d7698e20fb2804",
   "ci/solaris_package.py": "855c0bdd34b4285b7a8cbf2cab373fbee247c3b3d82a33981b7719ab6e81dc5d",
   ".github/workflows/solaris-package.yml": "d69c66ac69829023039177bdcfc0e5f92158a9518d3148b14caddd5be99d4d66",
-  "src/session_ktbbs.c": "2707dea5800478933851d56083618aa9256f2527f8cef78d51da09b56d81f09d",
+  "src/session_ktbbs.c": "ed03db6e6e7ea48a84ab96b190710ea7c8e819ad196670a472fd9c6472db696a",
   "src/ktbbs_input.c": "4c3217a87b5451579ae1db98a3c31f510378ecf3b83f5cfa614f8ae003c52764"
 }

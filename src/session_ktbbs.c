@@ -218,8 +218,8 @@ static void find_page(Session *s,uint32_t cursor) {
     OperationRequest *q=mmm_request(s,'Z');
     if(!q)return;
     q->action=3;q->scope=ARTICLE_HERE;q->cursor=cursor;
-    if(k->find_author)strcpy(q->username,k->find_text);
-    else strcpy(q->title,k->find_text);
+    strcpy(q->username,k->find_author?k->find_text:"*");
+    strcpy(q->title,k->find_author?"*":k->find_text);
     mmm_submit(s,q,JOB_KTBBS_FIND);
 }
 
