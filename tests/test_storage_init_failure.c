@@ -16,6 +16,9 @@ static int test_sync(int fd) {
     return fsync(fd);
 }
 
+/* FreeBSD headers normalize these macros after choosing their API namespace. */
+#undef _POSIX_C_SOURCE
+#undef _XOPEN_SOURCE
 #define fsync test_sync
 #include "../src/storage_sqlite.c"
 #undef fsync
