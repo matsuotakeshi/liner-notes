@@ -12,7 +12,7 @@ test -x "$python"
 "$python" -E -s -c 'import cryptography'
 base=/usr/local/libexec/liner-notes-deploy
 install -d -o root -m 755 "$base"
-for source in deploy_policy deploy_transaction deploy_host deploy_restore; do
+for source in deploy_policy deploy_transaction deploy_host deploy_restore transfer_connectors; do
   install -o root -m 644 "scripts/$source.py" "$base/$source.py"
 done
 printf '#!/bin/sh\nexec %s -E -s %s/deploy_host.py\n' "$python" "$base" > /usr/local/libexec/liner-notes-deploy-host

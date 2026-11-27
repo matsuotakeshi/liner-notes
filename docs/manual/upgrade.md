@@ -89,6 +89,9 @@ root管理profileにはtarget、private state directory、incoming directory、�
 有効なWeb/link/登録Doorには追加のprobeが必須です。profileのprobeには検証会員の
 秘密情報が入り得るためrootのみが読み書きできるようにし、GitHubへアップロードしません。
 probeはlocalhostへの送受信で、任意のroot shellコマンドではありません。
+稼働中のサービスがTelnetの場合は該当probeに `"transport": "telnet"` を設定し、最初に接続時の
+プロンプトを待つ交換を置きます。サーバーによるエコーの交渉が成立してからコマンドやパスワードを送ります。
+RAW接続で起動する隔離復元側のprobeは `transport` を省略します。
 profileから省略した既知のBBS/Web/linkサービスは、read-only statusと専用アカウントの
 worker確認で非稼働を確かめます。稼働サービスの漏れや、停止確認対象から外れた所有者を
 検出した場合は、BBSを止める前に拒否します。FreeBSDの標準配布には現時点でlink専用rcが

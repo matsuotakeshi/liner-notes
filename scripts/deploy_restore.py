@@ -124,7 +124,7 @@ def verify_restored(restored, roots, checks):
 
 
 def health_probes(probes, readiness_seconds=30):
-    """Only local TCP exchanges; no shell, filesystem mutation or external host.
+    """Local raw TCP or Telnet exchanges, without shell or external hosts.
 
     A root-maintained profile supplies the private acceptance account and exact
     transcript expectations. Probe payloads and responses are never reported.
@@ -133,6 +133,8 @@ def health_probes(probes, readiness_seconds=30):
     for name, probe in probes.items():
         require(probe['host'] in ('127.0.0.1', '::1'), 'Health probes must stay on this host')
         require(type(probe['port']) is int and 0 < probe['port'] < 65536 and probe['exchanges'], 'Invalid health probe')
+        transport = probe.get('transport', 'raw')
+        require(transport in ('raw', 'telnet'), 'Invalid health probe transport')
         deadline = time.monotonic() + readiness_seconds
         while True:
             try:
@@ -144,17 +146,32 @@ def health_probes(probes, readiness_seconds=30):
                 time.sleep(0.2)
         with connection as stream:
             stream.settimeout(10)
-            received = bytearray()
+            protocol = None
+            if transport == 'telnet':
+                from transfer_connectors import Protocol
+                protocol = Protocol(probe['host'], probe['port'], connection=stream)
+            received = protocol.buf if protocol else bytearray()
             for exchange in probe['exchanges']:
                 if exchange.get('send'):
-                    stream.sendall(exchange['send'].encode('utf-8'))
+                    payload = exchange['send'].encode('utf-8')
+                    if protocol:
+                        # The BBS closes password mode unless the client
+                        # accepts server echo. Do not send credentials if
+                        # that negotiation did not happen or was revoked.
+                        require(protocol.remote_echo, 'Telnet health probe has not accepted server echo')
+                        protocol.send_bytes(payload)
+                    else:
+                        stream.sendall(payload)
                 expected = exchange['expect'].encode('utf-8')
                 require(expected, 'Health check expectation must not be empty')
                 deadline = time.monotonic() + 10
                 while expected not in received and len(received) < 1024 * 1024 and time.monotonic() < deadline:
-                    block = stream.recv(8192)
-                    require(block, 'Health probe ended early')
-                    received.extend(block)
+                    if protocol:
+                        protocol.receive()
+                    else:
+                        block = stream.recv(8192)
+                        require(block, 'Health probe ended early')
+                        received.extend(block)
                 require(expected in received, 'Health probe did not match its expected response')
                 # Preserve later prompts coalesced into the same TCP read.
                 end = received.index(expected) + len(expected)

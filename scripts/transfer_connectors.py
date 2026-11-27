@@ -14,9 +14,10 @@ class RemoteError(ValueError):
 
 
 class Protocol:
-    def __init__(self, host, port):
-        self.sock=socket.create_connection((host,port),timeout=15)
+    def __init__(self, host, port, *, connection=None):
+        self.sock=connection if connection is not None else socket.create_connection((host,port),timeout=15)
         self.telnet=False;self.binary_stream=False
+        self.remote_echo=False
         self.buf=bytearray(); self.state=0; self.verb=0; self.subsize=0
 
     def close(self):
@@ -44,6 +45,7 @@ class Protocol:
             elif self.state==2:
                 if self.verb==251:self.sock.sendall(bytes([255,253 if b in (0,1,3) else 254,b]))
                 elif self.verb==253:self.sock.sendall(bytes([255,251 if b in (0,3) else 252,b]))
+                if b==1 and self.verb in (251,252):self.remote_echo=self.verb==251
                 self.state=0
             elif self.state==3:
                 self.subsize+=1
