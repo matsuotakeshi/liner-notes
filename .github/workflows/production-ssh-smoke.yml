@@ -2,6 +2,12 @@ name: Production SSH Connectivity Test
 
 on:
   workflow_dispatch:
+    inputs:
+      scope:
+        description: 'Read-only target scope; select freebsd for FreeBSD-only CD'
+        type: choice
+        options: [all, freebsd]
+        default: all
 
 permissions:
   contents: read
@@ -12,8 +18,8 @@ concurrency:
 
 jobs:
   connectivity:
-    name: Read-only SSH checks (3 VPS)
-    if: "${{ github.ref == 'refs/heads/main' }}"
+    name: Read-only SSH checks (selected scope)
+    if: "${{ github.repository == 'matsuotakeshi/liner-notes' && github.ref == 'refs/heads/main' }}"
     runs-on: ubuntu-24.04
     environment: production
     timeout-minutes: 10
@@ -24,13 +30,14 @@ jobs:
         with:
           persist-credentials: false
 
-      - name: Verify production SSH access
+      - name: ${{ inputs.scope == 'freebsd' && 'Verify production SSH access (FreeBSD only)' || 'Verify production SSH access' }}
         shell: bash
         env:
           DEPLOY_SSH_KEY: ${{ secrets.ID_ED25519_LN_DEPLOY }}
           FREEBSD_HOST: ${{ vars.LN_VPS_FREEBSD_HOST }}
           ROCKY_HOST: ${{ vars.LN_VPS_ROCKY_HOST }}
           DEBIAN_HOST: ${{ vars.LN_VPS_DEBIAN_HOST }}
+          DEPLOY_SCOPE: ${{ inputs.scope }}
         run: |
           set -euo pipefail
           umask 077
@@ -55,7 +62,17 @@ jobs:
             exit 1
           fi
 
-          for host in "$FREEBSD_HOST" "$ROCKY_HOST" "$DEBIAN_HOST"; do
+          # Match the closed controller target list, not arbitrary variable hosts.
+          test "$FREEBSD_HOST" = srv.ysni.org
+          case "$DEPLOY_SCOPE" in
+            freebsd) hosts=("$FREEBSD_HOST") ;;
+            all)
+              test "$ROCKY_HOST" = rocky.ysni.org
+              test "$DEBIAN_HOST" = debian.ysni.org
+              hosts=("$FREEBSD_HOST" "$ROCKY_HOST" "$DEBIAN_HOST") ;;
+            *) echo 'Unknown deployment scope' >&2; exit 1 ;;
+          esac
+          for host in "${hosts[@]}"; do
             [[ -n "$host" ]] || { echo "::error::A production host variable is empty" >&2; exit 1; }
             if ! ssh-keygen -F "$host" -f "$known_hosts_file" >/dev/null 2>&1; then
               echo "::error::No known_hosts entry matches the configured host: $host" >&2
@@ -87,6 +104,8 @@ jobs:
           }
 
           check_host "FreeBSD" "$FREEBSD_HOST" freebsd15
-          check_host "Rocky Linux" "$ROCKY_HOST" rocky10
-          check_host "Debian" "$DEBIAN_HOST" debian13
-          echo "PASS: SSH access to all 3 production VPS"
+          if [[ "$DEPLOY_SCOPE" = all ]]; then
+            check_host "Rocky Linux" "$ROCKY_HOST" rocky10
+            check_host "Debian" "$DEBIAN_HOST" debian13
+          fi
+          echo "PASS: SSH access to selected scope: $DEPLOY_SCOPE"

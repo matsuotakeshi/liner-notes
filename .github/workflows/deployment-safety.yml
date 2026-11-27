@@ -25,7 +25,7 @@ jobs:
           set -euo pipefail
           mkdir -p build/deployment-evidence
           python3 -c 'import json,os; from pathlib import Path; Path("build/deployment-evidence/source.json").write_text(json.dumps({"source_sha":os.environ["GITHUB_SHA"],"run_id":os.environ["GITHUB_RUN_ID"],"run_attempt":os.environ["GITHUB_RUN_ATTEMPT"]})+"\n")'
-          for suite in deployment deploy_components deploy_restore_readonly freebsd_upgrade_boundary freebsd_package_lease; do
+          for suite in deployment freebsd_cd deploy_components deploy_restore_readonly freebsd_upgrade_boundary freebsd_package_lease; do
             python3 "tests/test_${suite}.py" 2>&1 | tee "build/deployment-evidence/${suite}.log"
           done
           python3 -m py_compile ci/freebsd_upgrade_root.py ci/freebsd_upgrade_jail.py ci/prepare_freebsd_upgrade_template.py ci/install_freebsd_upgrade_helper.py

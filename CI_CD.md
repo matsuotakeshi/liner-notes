@@ -76,6 +76,15 @@ Self-hosted Runnerと自宅検証VMには、レビュー済みでmainへ統合�
 
 ## リリースと配備の分離
 
+本番FreeBSD向けCDは既存 `Approved staged production update` の手動実行を使用し、
+画面の既定は `scope=freebsd`・`mode=plan` とします。公開済みの正式タグ、署名manifest、
+同一SHAの既存CI成功を必須とし、main全コミット・タグpushからの自動applyは行いません。
+初回を含め毎回、対象局とrun/attemptに紐付いた明示承認を必要とします。
+全局更新は従来の `scope=all` として残します。FreeBSDのみの署名許可は他局では使えません。
+リリースsetの全検査は維持し、CDから再ビルドやnative workflowを起動しません。
+CI親機を本番SSHの中継にせず、既存hosted runner・専用資格情報・固定host keyを使用します。
+手順と初回未確認事項は[バージョンアップ](docs/manual/upgrade.md)を参照してください。
+
 原則としてCI生成物をリリース候補にします。pkg/RPM/DEBごとにソースコミットSHA、版、SHA-256を関連付け、同一ソースの成果物であることを検証します。FreeBSD pkgのOriginは **`comms/liner-notes`** を維持します。個別ビルドの成果物へ無断で差し替えません。
 
 FreeBSDの配布用Portsは、`liner-notes-freebsd15-ports-distribution` Artifactから取得します。CIはpkgに使用したソースと生成済みの `distinfo` のハッシュ・サイズを照合し、pkgと統合マニュアルを同梱します。Gitの作業ツリーには、ソースアーカイブ自身を参照する `distinfo` を置きません。

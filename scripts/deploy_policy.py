@@ -14,6 +14,8 @@ import time
 from pathlib import Path
 
 TARGETS = ('rocky.ysni.org', 'debian.ysni.org', 'srv.ysni.org')
+FREEBSD_TARGETS = ('srv.ysni.org',)
+SCOPES = {'all': TARGETS, 'freebsd': FREEBSD_TARGETS}
 PLATFORMS = dict(zip(TARGETS, ('rocky10', 'debian13', 'freebsd15')))
 PACKAGES = {'liner-notes', 'liner-notes-web', 'liner-notes-link', 'liner-notes-selinux'}
 SERVICES = {
@@ -107,27 +109,33 @@ def validate_release(doc):
     return doc
 
 
-def approval_phrase(doc, run_id, attempt):
-    return 'DEPLOY ' + doc['tag'] + ' ' + doc['source_sha'] + ' ' + ','.join(TARGETS) + f' RUN {run_id}/{attempt}'
+def deployment_targets(targets):
+    require(isinstance(targets, (tuple, list)) and tuple(targets) in SCOPES.values(),
+            'Only the ordered three-host scope or FreeBSD-only scope is allowed')
+    return tuple(targets)
 
 
-def authorization(doc, run_id, attempt, actor_id, now=None, freebsd_previous_version=None):
+def approval_phrase(doc, run_id, attempt, targets=TARGETS):
+    return 'DEPLOY ' + doc['tag'] + ' ' + doc['source_sha'] + ' ' + ','.join(deployment_targets(targets)) + f' RUN {run_id}/{attempt}'
+
+
+def authorization(doc, run_id, attempt, actor_id, now=None, freebsd_previous_version=None, *, targets=TARGETS):
     now = int(time.time() if now is None else now)
     require(all(type(x) is int and x > 0 for x in (run_id, attempt, actor_id)), 'Invalid approval identity')
     require(freebsd_previous_version is None or (isinstance(freebsd_previous_version, str) and
             re.fullmatch(r'[0-9][A-Za-z0-9.+_~-]*', freebsd_previous_version)), 'Invalid tested previous FreeBSD version')
     return dict(schema=1, manifest_sha256=hashlib.sha256(canonical(doc)).hexdigest(),
                 freebsd_previous_version=freebsd_previous_version,
-                source_sha=doc['source_sha'], release_id=doc['release_id'], targets=list(TARGETS),
+                source_sha=doc['source_sha'], release_id=doc['release_id'], targets=list(deployment_targets(targets)),
                 run_id=run_id, run_attempt=attempt, actor_id=actor_id,
                 issued_at=now, expires_at=now + 3600)
 
 
 def validate_authorization(auth, doc, target, now=None):
     now = int(time.time() if now is None else now)
-    expected = authorization(doc, auth.get('run_id'), auth.get('run_attempt'), auth.get('actor_id'), auth.get('issued_at'), auth.get('freebsd_previous_version'))
-    require(auth == expected and auth['targets'] == list(TARGETS), 'Authorization does not match this release/run/target set')
-    require(target in TARGETS and auth['issued_at'] <= now < auth['expires_at'], 'Expired or future deployment authorization')
+    expected = authorization(doc, auth.get('run_id'), auth.get('run_attempt'), auth.get('actor_id'), auth.get('issued_at'), auth.get('freebsd_previous_version'), targets=auth.get('targets'))
+    require(auth == expected, 'Authorization does not match this release/run/target set')
+    require(target in auth['targets'] and auth['issued_at'] <= now < auth['expires_at'], 'Unauthorized target, expired or future deployment authorization')
     return auth
 
 
@@ -135,7 +143,7 @@ def transaction_id(doc):
     return str(doc['release_id']) + '-' + doc['source_sha']
 
 
-def validate_environment(environment, branches, approvals, doc, run_id, attempt):
+def validate_environment(environment, branches, approvals, doc, run_id, attempt, *, targets=TARGETS):
     """Arguments must be fresh authenticated GitHub API responses, not inputs."""
     require(environment.get('name') == 'production-release', 'Wrong protected environment')
     rules = environment.get('protection_rules', [])
@@ -148,7 +156,7 @@ def validate_environment(environment, branches, approvals, doc, run_id, attempt)
     policy = environment.get('deployment_branch_policy') or {}
     require(policy.get('custom_branch_policies') is True, 'Explicit main-only environment policy required')
     require(branches.get('branch_policies') and all(r.get('name') == 'main' and r.get('type', 'branch') == 'branch' for r in branches['branch_policies']), 'Environment permits a non-main ref')
-    phrase = approval_phrase(doc, run_id, attempt)
+    phrase = approval_phrase(doc, run_id, attempt, targets)
     matched = [r for r in approvals if any(e.get('id') == environment['id'] for e in r.get('environments', []))]
     require(matched and not any(r.get('state') == 'rejected' for r in matched), 'Current run lacks an approved review')
     accepted = [r for r in matched if r.get('state') == 'approved' and r.get('user', {}).get('id') == 34602508 and r.get('comment') == phrase]

@@ -10,7 +10,7 @@ import json
 import os
 from pathlib import Path
 
-from deploy_policy import TARGETS, canonical, require, transaction_id, validate_authorization
+from deploy_policy import canonical, deployment_targets, require, transaction_id, validate_authorization
 
 
 def atomic_json(path, document):
@@ -107,7 +107,11 @@ def apply_host(release, authorization, target, adapter):
 def rollout(release, authorization, apply, *, dry_run=True):
     """`apply` is an authenticated transport, never an authorization callback."""
     results = []
-    for target in TARGETS:
+    targets = deployment_targets(authorization.get('targets'))
+    # Validate the entire signed scope before the first transport call.
+    for target in targets:
+        validate_authorization(authorization, release, target)
+    for target in targets:
         validate_authorization(authorization, release, target)
         if dry_run:
             results.append({'target': target, 'result': 'plan-only'})

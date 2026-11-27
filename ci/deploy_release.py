@@ -17,7 +17,7 @@ import zipfile
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / 'scripts'))
-from deploy_policy import (TARGETS, PLATFORMS, approval_phrase, authorization, canonical,
+from deploy_policy import (SCOPES, PLATFORMS, approval_phrase, authorization, canonical,
                            digest_file, require, sign, transaction_id,
                            validate_environment, validate_release, verify)
 from deploy_transaction import rollout
@@ -67,10 +67,10 @@ def successful_execution(jobs, step, minimum=1):
     require(len(executed) >= minimum and all(j.get('conclusion') == 'success' for j in executed), 'Required tests were not actually executed')
 
 
-def fresh_connectivity(jobs, now=None):
+def fresh_connectivity(jobs, now=None, step='Verify production SSH access'):
     now = now or datetime.datetime.now(datetime.timezone.utc)
     steps = [s for j in jobs.get('jobs', []) if j.get('conclusion') == 'success'
-             for s in j.get('steps', []) if s.get('name') == 'Verify production SSH access' and s.get('conclusion') == 'success']
+             for s in j.get('steps', []) if s.get('name') == step and s.get('conclusion') == 'success']
     require(len(steps) == 1, 'Current production preflight step is missing or ambiguous')
     completed = datetime.datetime.fromisoformat(steps[0]['completed_at'].replace('Z', '+00:00'))
     require(completed.tzinfo is not None and 0 <= (now-completed).total_seconds() <= 3600,
@@ -143,7 +143,8 @@ def package_evidence(release, receipt, manifests, policy_manifest=None):
                 'Selected policy is absent from verified release components')
 
 
-def fresh_evidence(release):
+def fresh_evidence(release, *, scope='all', connectivity=True):
+    require(scope in SCOPES, 'Unknown deployment scope')
     sha = release['source_sha']
     trusted_release_ancestor(sha, os.environ['GITHUB_SHA'])
     released = api(f'repos/{REPO}/releases/{release["release_id"]}')
@@ -153,6 +154,11 @@ def fresh_evidence(release):
     require(commit['sha'] == sha, 'Release tag points to another commit')
     evidence, artifacts = {}, {}
     for label, (workflow, event, step, artifact_name) in GATES.items():
+        if label == 'connectivity':
+            if not connectivity:
+                continue
+            if scope == 'freebsd':
+                step = 'Verify production SSH access (FreeBSD only)'
         # Package/application evidence belongs to the immutable release. The
         # environmental preflight belongs to this newly reviewed controller.
         gate_sha = os.environ['GITHUB_SHA'] if label == 'connectivity' else sha
@@ -161,7 +167,7 @@ def fresh_evidence(release):
         jobs = api(f'repos/{REPO}/actions/runs/{run_id}/jobs?filter=latest&per_page=100')
         successful_execution(jobs, step, 2 if label == 'linux' else 1)
         if label == 'connectivity':
-            fresh_connectivity(jobs)
+            fresh_connectivity(jobs, step=step)
         if label == 'deployment':
             successful_execution(jobs, 'Restore and boot the actual BBS using a disposable unprivileged account')
         if label == 'selinux':
@@ -203,6 +209,14 @@ def fresh_evidence(release):
                                               'config_data_retained', 'unrelated_services_untouched',
                                               'old_package_restoration_verified')))
     evidence['freebsd_previous_version'] = full.get('previous_version')
+    # New controller code needs its own executed safety tests, even when the
+    # package is an older release. No build is dispatched from this controller.
+    controller_sha = os.environ['GITHUB_SHA']
+    runs = api(f'repos/{REPO}/actions/workflows/deployment-safety.yml/runs?head_sha={controller_sha}&per_page=100')
+    controller_run = latest_full_run(runs, controller_sha, 'push', 'controller_deployment')
+    jobs = api(f'repos/{REPO}/actions/runs/{controller_run}/jobs?filter=latest&per_page=100')
+    successful_execution(jobs, GATES['deployment'][2])
+    evidence['controller_deployment'] = controller_run
     return evidence, released
 
 
@@ -244,10 +258,11 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--release-id', type=int, required=True)
     parser.add_argument('--mode', choices=('plan', 'apply'), default='plan')
+    parser.add_argument('--scope', choices=tuple(SCOPES), default='all')
     parser.add_argument('--output', type=Path, required=True)
     args = parser.parse_args()
     args.output.write_text(json.dumps({'mode': args.mode, 'release_id': args.release_id,
-                                      'controller_sha': os.environ.get('GITHUB_SHA'), 'targets': list(TARGETS),
+                                      'controller_sha': os.environ.get('GITHUB_SHA'), 'targets': list(SCOPES[args.scope]),
                                       'run_id': os.environ.get('GITHUB_RUN_ID'),
                                       'run_attempt': os.environ.get('GITHUB_RUN_ATTEMPT'),
                                       'started_at': datetime.datetime.now(datetime.timezone.utc).isoformat(),
@@ -259,12 +274,13 @@ def main():
         report.update(result='rejected-or-stopped', reason='admission-integrity-or-host-operation-failed',
                       finished_at=datetime.datetime.now(datetime.timezone.utc).isoformat())
         completed = {r.get('target') for r in report.get('results', [])}
-        report['not_attempted_targets'] = [target for target in TARGETS if target not in completed]
+        report['not_attempted_targets'] = [target for target in SCOPES[args.scope] if target not in completed]
         args.output.write_text(json.dumps(report, indent=2) + '\n')
         raise
 
 
 def execute(args):
+    targets = SCOPES[args.scope]
     require(os.environ.get('GITHUB_REPOSITORY') == REPO and os.environ.get('GITHUB_REF') == 'refs/heads/main' and
             os.environ.get('GITHUB_EVENT_NAME') == 'workflow_dispatch', 'Trusted main dispatch required')
     run_id, attempt = int(os.environ['GITHUB_RUN_ID']), int(os.environ['GITHUB_RUN_ATTEMPT'])
@@ -282,33 +298,38 @@ def execute(args):
         initial = json.loads(args.output.read_text())
         initial.update(source_sha=release['source_sha'], release=release['tag'])
         args.output.write_text(json.dumps(initial, indent=2) + '\n')
-        evidence, published = fresh_evidence(release)
-        phrase = approval_phrase(release, run_id, attempt)
+        evidence, published = fresh_evidence(release, scope=args.scope, connectivity=args.mode == 'apply')
+        phrase = approval_phrase(release, run_id, attempt, targets)
         if args.mode == 'plan':
-            args.output.write_text(json.dumps({'mode': 'plan', 'source_sha': release['source_sha'], 'controller_sha': os.environ['GITHUB_SHA'], 'targets': list(TARGETS),
-                                              'approval_comment': phrase, 'ci_runs': evidence}, indent=2) + '\n')
+            args.output.write_text(json.dumps({'mode': 'plan', 'source_sha': release['source_sha'], 'controller_sha': os.environ['GITHUB_SHA'], 'targets': list(targets),
+                                              'approval_comment': phrase, 'ci_runs': evidence,
+                                              'production_connectivity': 'not-checked-plan-only'}, indent=2) + '\n')
             print(phrase)
             return
         require(evidence['freebsd_service_upgrade_verified'], 'Full isolated FreeBSD package/service upgrade acceptance is missing; apply remains disabled')
         actor = validate_environment(api(f'repos/{REPO}/environments/production-release'),
                                      api(f'repos/{REPO}/environments/production-release/deployment-branch-policies'),
-                                     api(f'repos/{REPO}/actions/runs/{run_id}/approvals'), release, run_id, attempt)
-        auth = authorization(release, run_id, attempt, actor, freebsd_previous_version=evidence['freebsd_previous_version'])
-        signed_auth = sign(auth, os.environ['LN_DEPLOY_AUTH_KEY'].encode())
+                                     api(f'repos/{REPO}/actions/runs/{run_id}/approvals'), release, run_id, attempt, targets=targets)
         key = folder / 'ssh-key'
         key.write_text(os.environ['ID_ED25519_LN_DEPLOY'])
         key.chmod(0o600)
-        for packages in release['platforms'].values():
+        for target in targets:
+            packages = release['platforms'][PLATFORMS[target]]
             for item in packages.values():
                 subprocess.run(['gh', 'release', 'download', release['tag'], '--repo', REPO, '--pattern', item['filename'], '--dir', str(folder)], check=True)
                 path = folder / item['filename']
                 require(path.stat().st_size == item['size'] and digest_file(path) == item['sha256'], 'Downloaded release package checksum mismatch')
         # Revalidate current-main and CI after approval and package download.
-        fresh_evidence(release)
+        evidence, _ = fresh_evidence(release, scope=args.scope)
+        require(evidence['freebsd_service_upgrade_verified'], 'FreeBSD upgrade evidence changed before apply')
+        # Mint only after downloads and final evidence checks, so the one-hour
+        # authorization window is not consumed while preparing packages.
+        auth = authorization(release, run_id, attempt, actor, freebsd_previous_version=evidence['freebsd_previous_version'], targets=targets)
+        signed_auth = sign(auth, os.environ['LN_DEPLOY_AUTH_KEY'].encode())
         results = []
         def save_audit():
-            args.output.write_text(json.dumps({'release': release['tag'], 'source_sha': release['source_sha'], 'controller_sha': os.environ['GITHUB_SHA'], 'targets': list(TARGETS),
-                                              'package_hashes': {p: {n: i['sha256'] for n, i in packages.items()} for p, packages in release['platforms'].items()},
+            args.output.write_text(json.dumps({'release': release['tag'], 'source_sha': release['source_sha'], 'controller_sha': os.environ['GITHUB_SHA'], 'targets': list(targets),
+                                              'package_hashes': {PLATFORMS[t]: {n: i['sha256'] for n, i in release['platforms'][PLATFORMS[t]].items()} for t in targets},
                                               'approval': {'run_id': run_id, 'run_attempt': attempt, 'actor_id': actor},
                                               'ci_runs': evidence, 'results': results}, indent=2) + '\n')
         save_audit()
