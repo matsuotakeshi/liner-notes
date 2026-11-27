@@ -26,3 +26,5 @@ UI で利用可能なUIを表示し、局が許可していれば UI mash でMAS
 局が許可していれば UI big-model で切り替えます。B はSIG、N/O/X は新着探索、T は電報、? は案内、+ はLiner Notes拡張です。
 
 局が許可していれば UI wani-bbs で切り替えます。b 掲示板、p 保管庫、s 設定、g ゲーム、topic 簡易伝言板、? 現画面の案内です。
+
+対応版で局が許可していれば UI net-cock で切り替えます。MODE MENU は番号、MODE COMMAND はコマンド方式です。BREAD は掲示板、R は本文、EXCOM は拡張案内です。
