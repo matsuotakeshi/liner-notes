@@ -63,6 +63,11 @@ static int topic_submit(Session *s,const ConferenceRequest *request) {
     free(q);return accepted;
 }
 
+static void topic_error(Session *s,MessageId id) {
+    session_impl_queue_text(s,message_text(session_ui_snapshot(s).language,id));
+    session_impl_queue_text(s,"\r\n");
+}
+
 int session_topic_command(Session *s,char *line) {
     char command[6];size_t n=strcspn(line," ");
     if(n!=5)return 0;
@@ -73,7 +78,7 @@ int session_topic_command(Session *s,char *line) {
     ConferenceRequest q={.action=TOPIC_UNREAD};
     if(*args>='0' && *args<='9') {
         if(!number(&args,&q.cursor,1) || *args)goto invalid;
-        if(!topic_submit(s,&q))session_impl_queue_text(s,"ERR topic unavailable\r\n");
+        if(!topic_submit(s,&q))topic_error(s,MSG_ERR_CONFERENCE_UNAVAILABLE);
         return 1;
     }
     char verb[4];n=strcspn(args," ");
@@ -90,7 +95,7 @@ int session_topic_command(Session *s,char *line) {
         if(!number(&args,&q.cursor,0) || *args)goto invalid;
         q.action=TOPIC_DELETE;
     } else goto invalid;
-    if(!topic_submit(s,&q))session_impl_queue_text(s,"ERR topic unavailable\r\n");
+    if(!topic_submit(s,&q))topic_error(s,MSG_ERR_CONFERENCE_UNAVAILABLE);
     return 1;
 invalid:
     session_impl_queue_text(s,"TOPIC [cursor | ALL [cursor] | -W text | -D id]\r\n");
@@ -119,7 +124,7 @@ int session_topic_result(Session *s,const OperationResult *r) {
         if(p->action==TOPIC_UNREAD && p->count && s->core.active && !s->core.closing) {
             ConferenceRequest mark={.action=TOPIC_SEEN,.cursor=p->position};
             if(topic_submit(s,&mark))return 1;
-            session_impl_queue_text(s,"ERR topic read position\r\n");
+            topic_error(s,MSG_ERR_SETTINGS_STORAGE);
         }
     }
     session_impl_prompt(s);return 1;

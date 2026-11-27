@@ -389,7 +389,7 @@
   "src/conference_core.c": "c18f74848f383f7407ecc4709bf291d54161e28a41d70b6cad68e5e8e53b40a0",
   "src/conference_core.h": "32f77a92d2ad68eedc97530b0bf01d8f3d2a46076f620a74d09dd32749a46f9c",
   "src/menu.c": "962c853e3c5acebd444fcbcd96e6a876932bb176f14f4bdb27638d7217c06624",
-  "src/session_conference.c": "9a35c12afabab96b070fa66da2f6c0c08a27685dc613a06a2912f08eb42498ed",
+  "src/session_conference.c": "62ba1bc8597d7cb98cfb43b72386506f2e187a829cf31fc9aefdea053dc12960",
   "src/session_mmm_conference.c": "3895a5976210cb0ccc850419b08aa690a4048a231ac718fe0e7b1f8209118b99",
   "tests/test_conference.py": "b0679a37892be698db0efc4638b9f093c2a51ef397269939f88688f511696a65",
   "tests/test_conference_core.c": "7392c46107f0d6789a5448003ce9eb29486cff77e8e3c96cda97cb9299aa15bf",
