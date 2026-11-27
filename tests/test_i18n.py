@@ -65,7 +65,7 @@ def run(binary):
             assert 'Username' in a.cmd('REGISTER','> ')
             assert 'Password' in a.cmd('alice','> ')
             assert 'Logged in as alice' in a.cmd(PASSWORD)
-            assert '談話室' in a.cmd('B'); selected=a.cmd('1'); assert 'Base notes' in selected,repr(selected)
+            assert '談話室' in a.cmd('B'); selected=a.cmd('1'); assert 'Articles' in selected,repr(selected)
             assert 'New note title' in a.cmd('POST','> ')
             assert 'Enter the body' in a.cmd('日本語の題名','Body > ')
             a.cmd('LANG ja','Body > '); a.cmd('本文は翻訳しない','Body > ')

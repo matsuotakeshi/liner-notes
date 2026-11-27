@@ -797,6 +797,14 @@ static void navigation_tests(void) {
     ArticleSummary row;ArticleActor actor=navigation_reset();
     assert(article_navigate(NULL,2,1,ARTICLE_CHILD,&row)==ARTICLE_OK);assert(row.id==2 && row.board==2 && row.parent==1);
     page_items[2].title[0]='X';assert(row.title[0]!='X');
+    assert(article_flat_neighbour(&actor,2,4,0,&row)==ARTICLE_OK && row.id==5 && row.parent==2);
+    assert(article_flat_neighbour(NULL,2,5,1,&row)==ARTICLE_OK && row.id==4);
+    page_hidden[5]=1;
+    assert(article_flat_neighbour(&actor,2,4,0,&row)==ARTICLE_OK && row.id==6);
+    page_hidden[5]=0;
+    readable=0;
+    assert(article_flat_neighbour(&actor,2,1,1,&row)==ARTICLE_BOARD_DENIED);
+    navigation_cleared(&row);readable=1;
     assert(article_navigate(&actor,2,2,ARTICLE_NEXT,&row)==ARTICLE_OK);assert(row.id==3);
     assert(article_navigate(&actor,2,3,ARTICLE_PREVIOUS,&row)==ARTICLE_OK);assert(row.id==2);
     assert(article_navigate(&actor,2,5,ARTICLE_PARENT,&row)==ARTICLE_OK);assert(row.id==2);
