@@ -141,8 +141,22 @@ def run(binary, vaultctl, dbconvert):
             alice.cmd(".", WRITE)
             assert b"Mail sent" in alice.cmd("Y", b"Mail> ")
             alice.cmd("Q", COMMAND)
-            assert b"Private mail" in bob.cmd("MREAD", b"Mail> ")
-            assert b"Private body" in bob.cmd("T", b"Mail> ")
+            alice.cmd("MWRITE bob", b"Title> ")
+            alice.cmd("Second mail", b"Text> ")
+            alice.cmd("Second body", b"Text> ")
+            alice.cmd(".", WRITE)
+            assert b"Mail sent" in alice.cmd("Y", b"Mail> ")
+            alice.cmd("Q", COMMAND)
+            inbox = bob.cmd("MREAD", b"Mail> ")
+            assert b"Private mail" in inbox and b"Second mail" in inbox, inbox
+            # A mail-arrival notice can redraw the prompt. Wait for the
+            # response header before treating the next prompt as completion.
+            for command, number, expected in (("T", 1, b"Private body"),
+                                               ("N", 2, b"Second body"),
+                                               ("B", 1, b"Private body"),
+                                               ("E", 2, b"Second body")):
+                response = bob.cmd(command, f"Mail #{number} ".encode()) + bob.until(b"Mail> ")
+                assert expected in response, response
             bob.cmd("Q", MENU)
 
             alice.cmd("PDS", b"PDS> ")

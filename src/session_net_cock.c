@@ -453,13 +453,16 @@ static void mail_line(Session *s,NetInput c) {
         mmm_simple_operation(s,'m','R',u->parent,JOB_MAIL);return;
     }
     if(same(c.word,"Q") || !strcmp(c.word,"0")) { home(s);return; }
-    if(!*c.word || same(c.word,"N") || same(c.word,"B") || same(c.word,"T")) {
-        mail_sequence(s,same(c.word,"T")?0:u->selected,same(c.word,"B"));return;
+    if(same(c.word,"T")) { mail_sequence(s,1,0);return; }
+    if(!*c.word || same(c.word,"N")) { mail_sequence(s,u->selected+1,0);return; }
+    if(same(c.word,"B")) {
+        mail_sequence(s,u->selected>1?u->selected-1:0,1);
+        return;
     }
     if(same(c.word,"E")) { mmm_simple_operation(s,'m','T',0,JOB_MAIL);return; }
     if(same(c.word,"R") && !*c.argument) {
         if(u->selected)mmm_simple_operation(s,'m','R',u->selected,JOB_MAIL);
-        else mail_sequence(s,0,0);
+        else mail_sequence(s,1,0);
         return;
     }
     if(same(c.word,"P") || same(c.word,"F")) {
