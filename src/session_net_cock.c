@@ -826,7 +826,7 @@ static void setting_result(Session *s,const OperationResult *r,const OperationPa
         if(!r->service_number) {
             u->input=NC_IDLE;mmm_say(s,"End of board settings.\r\n","購読設定を終了しました。\r\n");
         } else {
-            char row[152];
+            char row[sizeof(r->service_text)+32];
             snprintf(row,sizeof(row),"#%u %s [%c]\r\n",r->service_number,r->service_text,r->service_next?'Y':'N');
             session_impl_queue_text(s,row);
             u->subscription_board=r->service_number;u->input=NC_SUBSCRIPTION;
