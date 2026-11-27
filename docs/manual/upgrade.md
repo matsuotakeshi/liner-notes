@@ -131,6 +131,8 @@ backup receiverはprivate directory `/var/lib/liner-notes-release-backups` を�
 ゲーム外部データ、秘密鍵、証明書を含むバックアップをActions Artifactに保管しないでください。
 
 Linux更新はローカルpackageだけのRPM/dpkgで行い、依存解決のための一括OS更新はしません。
+Rockyは署名済みのRPMファイル名と照合し、パッケージ名・ディストリビューションのリリース接尾辞を含む版・
+アーキテクチャを更新前後に確認します。
 Debianはサービス停止前にAPTの試行結果を読み、承認済みDEB以外の追加・更新・削除や、
 依存不足で完了しない計画を拒否します。必要な依存は管理者が別途導入します。
 インストール時は既存conffileを保持します。FreeBSDはOrigin `comms/liner-notes` を確認した
