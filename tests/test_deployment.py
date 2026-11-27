@@ -17,7 +17,7 @@ import threading
 import time
 from types import SimpleNamespace
 import unittest
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path[:0] = [str(ROOT / 'scripts'), str(ROOT / 'ci')]
@@ -121,6 +121,26 @@ class Deployment(unittest.TestCase):
 
     def fixtures(self, failure=None):
         return {target: Fixture(self.base / str(i), target, failure if i == 1 else None) for i, target in enumerate(policy.TARGETS)}
+
+    def test_telnet_health_probe_negotiates_fragmented_echo_and_fails_closed(self):
+        probe = {'login': {'host': '127.0.0.1', 'port': 2222, 'transport': 'telnet',
+                          'exchanges': [{'expect': 'banner'}, {'send': 'LOGIN fixture\r\n', 'expect': 'password'},
+                                        {'send': 'fixture-secret\r\n', 'expect': 'success'}]}}
+        stream = MagicMock()
+        stream.__enter__.return_value = stream
+        stream.recv.side_effect = [b'\xff', b'\xfb', b'\x01banner', b'password', b'success']
+        with patch('deploy_restore.socket.create_connection', return_value=stream):
+            health_probes(probe)
+        self.assertEqual([call.args[0] for call in stream.sendall.call_args_list],
+                         [b'\xff\xfd\x01', b'LOGIN fixture\r\n', b'fixture-secret\r\n'])
+
+        for chunks in ([b'banner'], [b'\xff\xfb\x01banner', b'\xff\xfc\x01password']):
+            stream.reset_mock()
+            stream.recv.side_effect = chunks
+            with patch('deploy_restore.socket.create_connection', return_value=stream), \
+                 self.assertRaisesRegex(ValueError, 'has not accepted server echo'):
+                health_probes(probe)
+            self.assertNotIn(b'fixture-secret\r\n', [call.args[0] for call in stream.sendall.call_args_list])
 
     def test_complete_three_node_sequence_and_repeated_apply(self):
         hosts = self.fixtures()
