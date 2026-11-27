@@ -79,12 +79,14 @@ void big_model_menu(Session *s,int requested) {
                   "番号または R 番号 本文  Enter 次の記事  L 続き  Q 中断  0 戻る\r\n");
         break;
     case MAIL_SCREEN:
+        mmm_extensions_hint(s);
         mmm_say(s,"R [NUM]: inbox/read  W USER: send  N: unread  A NUM: reply  K NUM confirm: delete\r\n"
                   "L: more  FIND/FILES/UPLOAD/GET/GETALL/RESUME: Liner Notes extensions  0: back\r\n",
                   "R [番号] 受信一覧・本文  W 会員ID 送信  N 未読  A 番号 返信  K 番号 confirm 削除\r\n"
                   "L 続き  FIND/FILES/UPLOAD/GET/GETALL/RESUME は拡張  0 戻る\r\n");
         break;
     case FILER_SCREEN:
+        mmm_extensions_hint(s);
         mmm_say(s,"L: list  S PATTERN: find  I NUM: info  D NUM: get  U [DESC]: upload  R: resume\r\n"
                   "CD/DIRS/PROTOCOL/ADD/BATCH/PUTBATCH/UNLOCK: Liner Notes extensions  0: back\r\n",
                   "L 一覧  S パターン 検索  I 番号 詳細  D 番号 取得  U [説明] 登録  R 再開\r\n"

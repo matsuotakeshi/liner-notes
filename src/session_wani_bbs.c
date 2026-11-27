@@ -78,9 +78,9 @@ void wani_menu(Session *s,int requested) {
                       "マルチノーツ: l 索引 / 番号 表紙 / . ページ一覧 / w / S 購読 / U 解除\r\n");
         }
         break;
-    case FILER_SCREEN: mmm_say(s,"l list / r ID / w description / x ID / f pattern / cd PATH / q\r\n",
+    case FILER_SCREEN: mmm_extensions_hint(s);mmm_say(s,"l list / r ID / w description / x ID / f pattern / cd PATH / q\r\n",
                                   "l 一覧 / r 番号 / w 説明 / x 番号 / f 検索 / cd パス / q\r\n");break;
-    case MAIL_SCREEN: mmm_say(s,"l inbox / r [ID] read / m USER / R reply / D ID confirm / S personal / q\r\n",
+    case MAIL_SCREEN: mmm_extensions_hint(s);mmm_say(s,"l inbox / r [ID] read / m USER / R reply / D ID confirm / S personal / q\r\n",
                                  "l 受信箱 / r [番号] / m 会員ID / R 返信 / D 番号 confirm / S 一時保存 / q\r\n");break;
     case TERM_SCREEN: mmm_say(s,"mail / prof / regprof / passwd / layout / seqset / subscriptions / manage\r\n",
                                  "mail 郵便受け / prof / regprof / passwd / layout / seqset / subscriptions / manage\r\n");break;

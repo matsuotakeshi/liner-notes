@@ -100,8 +100,8 @@ void net_cock_menu(Session *s,int requested) {
     case OPEN_SCREEN: case INDEX_SCREEN:
         mmm_say(s,"R read / A,L titles / N,B,T,E move / P,F reply / U,I parent,return / W write / D delete / Q exit\r\n",
                   "R 本文 / A,L 題名 / N,B,T,E 移動 / P,F 返信 / U,I 返信元・復帰 / W 投稿 / D 削除 / Q 終了\r\n");return;
-    case MAIL_SCREEN: session_impl_queue_text(s,"R [ID] / N / B / T / E / A / P / F / D / Q\r\n");return;
-    case FILER_SCREEN: session_impl_queue_text(s,"A/L / R [ID] / X/Y/Z [ID] / S [ID] / W / Q\r\n");return;
+    case MAIL_SCREEN: mmm_extensions_hint(s);session_impl_queue_text(s,"R [ID] / N / B / T / E / A / P / F / D / Q\r\n");return;
+    case FILER_SCREEN: mmm_extensions_hint(s);session_impl_queue_text(s,"A/L / R [ID] / X/Y/Z [ID] / S [ID] / W / Q\r\n");return;
     case CHAT_SCREEN: session_impl_queue_text(s,".L / .P LINE TEXT / .C TEXT / .T TEXT / .B TEXT / .Q\r\n");return;
     case GAMES_SCREEN: mmm_say(s,"Number: start / 0: exit\r\n","番号 起動 / 0 戻る\r\n");return;
     case MANAGE_SCREEN: mmm_manage_menu(s);return;

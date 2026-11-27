@@ -115,9 +115,9 @@ void ktbbs_menu(Session *s,int requested) {
                                  "表示行の番号で選択。#ID は記事番号。L 続き 0 戻る。\r\n");break;
     case OPEN_SCREEN: mmm_say(s,"Enter Next / P Previous / R Reply / + - Jump / D Parent / 0 Back\r\n",
                                 "Enter 次 / P 前 / R 返信 / + - 移動 / D 親記事 / 0 戻る\r\n");break;
-    case MAIL_SCREEN: mmm_say(s,"Enter Read / L List / I # Open / R # Reply / K # Delete / S Search / 0 Back\r\n",
+    case MAIL_SCREEN: mmm_extensions_hint(s);mmm_say(s,"Enter Read / L List / I # Open / R # Reply / K # Delete / S Search / 0 Back\r\n",
                                 "Enter 順次読む / L 一覧 / I # 番号指定 / R # 返信 / K # 削除 / S 検索 / 0 戻る\r\n");break;
-    case FILER_SCREEN: mmm_say(s,"L List / S Search / X Y Z M Protocol / U Upload / D Download / H Guide / 0 Back\r\n",
+    case FILER_SCREEN: mmm_extensions_hint(s);mmm_say(s,"L List / S Search / X Y Z M Protocol / U Upload / D Download / H Guide / 0 Back\r\n",
                                  "L 一覧 / S 検索 / X Y Z M 転送方式 / U 登録 / D 取得 / H 案内 / 0 戻る\r\n");break;
     case CHAT_SCREEN: mmm_say(s,"Type a message. W Who / T Telegram / S Call operator / // Leave\r\n",
                                 "発言を入力。W 接続一覧 / T 電報 / S SYSOP呼出 / // 退出\r\n");break;

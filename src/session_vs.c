@@ -60,8 +60,8 @@ void vs_menu(Session *s,int requested) {
     case BOARD_SCREEN: session_impl_queue_text(s,"R [ID] / L [ID|DATE|BY|TITLE|BASE] / W / N / NA / P / # / A ON|OFF / . / Q\r\n");break;
     case OPEN_SCREEN: session_impl_queue_text(s,"Enter / B / +/- / ID / S related / R reply / P profile / K delete / J unavailable / Q\r\n");break;
     case NEW_SCREEN: session_impl_queue_text(s,"Enter read / A continuous / S skip board / T base / B previous / Q stop\r\n");break;
-    case MAIL_SCREEN: session_impl_queue_text(s,"R [ID] / W USER / L / K / B attachments / Q\r\n");break;
-    case FILER_SCREEN: session_impl_queue_text(s,"F finder / B batch / L / R ID / XD YD GD ZD MD / XU YU GU ZU MU / Q\r\n");break;
+    case MAIL_SCREEN: mmm_extensions_hint(s);session_impl_queue_text(s,"R [ID] / W USER / L / K / B attachments / Q\r\n");break;
+    case FILER_SCREEN: mmm_extensions_hint(s);session_impl_queue_text(s,"F finder / B batch / L / R ID / XD YD GD ZD MD / XU YU GU ZU MU / Q\r\n");break;
     case CHAT_SCREEN: session_impl_queue_text(s,"/T telegram / /W online / /M memo / /S call / // exit\r\n");break;
     case MANAGE_SCREEN: mmm_manage_menu(s);break;
     case GAMES_SCREEN: session_impl_queue_text(s,"Number: start / Q: exit\r\n");break;
