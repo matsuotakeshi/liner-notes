@@ -77,14 +77,23 @@ Prepare `/var/db/liner-notes-ci/freebsd-template` as a root-owned, mode-0700
 directory, using a verified FreeBSD base distribution and a disposable jail,
 following the [FreeBSD jail handbook](https://docs.freebsd.org/en/books/handbook/jails/).
 The reviewed one-time setup command is
-`/usr/local/bin/python3.12 -I ci/prepare_freebsd_upgrade_template.py REVIEWED_MAIN_SHA`.
+`/usr/local/bin/python3.12 -I ci/prepare_freebsd_upgrade_template.py REVIEWED_MAIN_SHA --baseline 0.75`.
+Choose the approved baseline matching the installed production starting version.
+The existing `0.74.1` baseline remains available and is the default.
 Run it only from a root-owned copy after explicit setup approval. It independently
-downloads main and compares all three privileged script bytes before acting;
-it pins the FreeBSD 15.1 base and previous v0.74.1 package hashes. Dependencies
+downloads main and compares the privileged script bytes before acting;
+it pins the FreeBSD 15.1 base and the chosen official package version, release SHA
+and package hash. Dependencies
 are installed only inside a new bootstrap jail, using the test VM's existing
 IPv4 address without adding an alias. The host package inventory is compared
 before/after; no host service is started or stopped. Existing templates are never
-overwritten. Initial network-enabled dependency setup is separate from the
+overwritten. To change baselines on 10.0.0.50, drain FreeBSD package and upgrade
+CI, confirm no jail or mount uses the old template, and have the VM administrator
+retain the existing template at a root-private sibling path before preparing the
+new one. Retain it until the new baseline is verified. A same-version 0.75
+candidate tests a package revision only. A future production release needs a
+full receipt from the v0.75 baseline.
+Initial network-enabled dependency setup is separate from the
 offline VNET acceptance clone.
 This is a test fixture, not a copy of the live OS or BBS. Its `root/` subtree must
 contain a bootable FreeBSD userland, Python 3.12, pkg, the candidate's dependencies
