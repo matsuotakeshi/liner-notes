@@ -664,7 +664,11 @@ int main(int argc,char **argv) {
                 if(c->app.core.id==completion.session && completion.auth>0 && completion.auth<=MEMBER_MAX && completion.user_epoch<account_epochs[completion.auth]) {
                     c->used=0; c->queued=0; OPENSSL_cleanse(c->input,sizeof(c->input));
                     terminal_clear(&c->terminal); session_revoke(&c->app);
-                } else session_result(&c->app,&completion,now_ms());
+                } else {
+                    if(completion.auth>0 && session_core_matches(&c->app.core,&completion))
+                        completion.previous_login=userlog_last_login((uint32_t)completion.auth);
+                    session_result(&c->app,&completion,now_ms());
+                }
                 if(c->ssh && ln_ssh_auth_pending(c->ssh)) {
                     int accepted=completion.auth>0 && c->app.core.user==(uint32_t)completion.auth && !c->app.core.closing;
                     fprintf(stderr,"SSH auth %s slot=%d\n",accepted?"accepted":"rejected",completion.slot);

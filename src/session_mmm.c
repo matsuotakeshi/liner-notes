@@ -1,4 +1,5 @@
 #include "session_mmm_internal.h"
+#include "session_big_model.h"
 #include "mmm_input.h"
 #include "editor_core.h"
 #include "zmodem_host.h"
@@ -42,6 +43,7 @@ void mmm_prompt(Session *s) {
         return;
     }
     if(ktbbs_active(s) && ktbbs_prompt(s))return;
+    if(big_model_active(s) && big_model_prompt(s))return;
     static const char *const inputs[]={
         NULL,"ID> ","Password> ","Board password> ","Title> ","Text> ",
         "Editor>> ","Base note #> ","Response number> ","Title search> ","File board password> "
@@ -63,11 +65,12 @@ void mmm_prompt(Session *s) {
 
 void mmm_menu(Session *s,int requested) {
     if(ktbbs_active(s)) { ktbbs_menu(s,requested);return; }
+    if(big_model_active(s)) { big_model_menu(s,requested);return; }
     (void)requested;
     if(!s->core.user) { mmm_say(s,"Login required. login ID / register ID / ?\r\n",
                               "ログインが必要です。login ID / register ID / ?\r\n");return; }
     switch(mmm_view(s)->screen) {
-    case KTBBS_ENTER_SCREEN: case KTBBS_EXT_SCREEN: break;
+    case KTBBS_ENTER_SCREEN: case KTBBS_EXT_SCREEN: case BIG_MODEL_EXT_SCREEN: break;
     case MAIN_SCREEN:
         if(is_mash(s)) {
             mmm_say(s,"MASH | 1 Mail   2 Bulletin boards   3 Setup   4 Profiles   5 Library\r\n"
@@ -197,7 +200,7 @@ static void continue_browse(Session *s,uint32_t cursor) {
     OperationRequest *q=mmm_request(s,BOARD_NOTE_VIEW);
     if(!q)return;
     q->number=m->browse_root;q->cursor=cursor;q->descending=m->descending;q->notes_unread=m->unread;
-    if(m->browse>=BROWSE_KTBBS_LIST)q->action='F';
+    if(m->browse>=BROWSE_FLAT_LIST)q->action='F';
     if(m->search_responses || m->search_next)strcpy(q->title,m->search);
     mmm_submit(s,q,JOB_BROWSE);
 }
@@ -841,6 +844,7 @@ static void line(Session *s,char *text,size_t size) {
     default:
         if(m->application.step)application_value(s,text);
         else if(ktbbs_active(s))ktbbs_line(s,text);
+        else if(big_model_active(s))big_model_line(s,text);
         else command(s,text);
         break;
     }
@@ -947,8 +951,13 @@ static void render_index(Session *s,const ArticleNotesPage *page) {
 
 static void browse_result(Session *s,const ArticlePage *page) {
     MmmUi *m=mmm_state(s);
-    if(m->browse==BROWSE_KTBBS_BODY && page->count) { mmm_ui_read_article(s,page->rows[0].id);return; }
-    if(m->browse>=BROWSE_KTBBS_LIST) {
+    if(big_model_active(s)) {
+        if(!page->count && page->next)continue_browse(s,page->next);
+        else big_model_articles(s,page,m->browse==BROWSE_FLAT_BODY);
+        return;
+    }
+    if(m->browse==BROWSE_FLAT_BODY && page->count) { mmm_ui_read_article(s,page->rows[0].id);return; }
+    if(m->browse>=BROWSE_FLAT_LIST) {
         if(!page->count && page->next)continue_browse(s,page->next);
         else ktbbs_render_articles(s,page,m->browse==BROWSE_KTBBS_TITLE);
         return;
@@ -992,14 +1001,21 @@ static void browse_result(Session *s,const ArticlePage *page) {
 
 static void render_article(Session *s,const OperationContent *c,const char *body) {
     char title[240];
-    snprintf(title,sizeof(title),"%s #%u / #%u  %s\r\n%s\r\n",
-             c->parent?"Response":"Base note",c->id,c->root,c->author,c->title);
-    session_impl_queue_text(s,title);
-    if(is_mash(s) && c->parent) {
-        snprintf(title,sizeof(title),"Parent #%u (p)\r\n",c->parent);
+    if(big_model_active(s)) {
+        session_impl_queue_text(s,"NUM    R.DATE   R.TIME    SENDER  CONTENTS\r\n");
+        big_model_header(s,c->id,c->at,c->author,c->title);
+    }
+    else {
+        snprintf(title,sizeof(title),"%s #%u / #%u  %s\r\n%s\r\n",
+                 c->parent?"Response":"Base note",c->id,c->root,c->author,c->title);
         session_impl_queue_text(s,title);
+        if(is_mash(s) && c->parent) {
+            snprintf(title,sizeof(title),"Parent #%u (p)\r\n",c->parent);
+            session_impl_queue_text(s,title);
+        }
     }
     if(ktbbs_active(s) && ktbbs_page_article(s,c,body))return;
+    if(big_model_active(s) && big_model_article_body(s,c,body))return;
     session_impl_queue_text(s,body);
     OperationRequest *q=mmm_request(s,'s');
     if(q) { q->board=c->board;q->number=c->id;mmm_submit(s,q,JOB_SEEN); }
@@ -1056,6 +1072,7 @@ static void result(Session *s,const OperationResult *r,SessionResultView project
     if(job==JOB_CHAT && m->chat_kicked) { m->chat_kicked=0;mmm_prompt(s);return; }
     if(r->auth>0 && projection.status==SESSION_RESULT_OK) {
         mmm_load_preferences(s,r);
+        if(big_model_active(s))((BigModelUi *)m)->quiet=r->menu_mode==MEMBER_MENU_EXPERT;
         time_t started=time(NULL);m->login_at=started>0?(uint64_t)started:0;
         if(board_feature_enabled("chat")) {
             chat_register(s->core.id,s->core.user,r->chat_login,r->chat_name,session_chat_event,s,&r->chat_preferences);
@@ -1114,6 +1131,22 @@ static void result(Session *s,const OperationResult *r,SessionResultView project
         break;
     case JOB_INDEX: if(page && page->kind==OPERATION_PAGE_NOTES)render_index(s,&page->data.notes);break;
     case JOB_BROWSE: if(page && page->kind==OPERATION_PAGE_ARTICLES)browse_result(s,&page->data.articles);break;
+    case JOB_BIG_MODEL_DESTINATIONS: big_model_destinations(s);break;
+    case JOB_BIG_MODEL_WINDOW:
+        big_model_window(s,r->since,r->until,page && page->kind==OPERATION_PAGE_MMM_SCANLIST?&page->data.mmm_scanlist:NULL);break;
+    case JOB_BIG_MODEL_LIST:
+        if(page && page->kind==OPERATION_PAGE_MMM_SCANLIST)big_model_scanlist(s,&page->data.mmm_scanlist);
+        break;
+    case JOB_BIG_MODEL_LIST_SAVE:
+        mmm_say(s,"Exploration list saved.\r\n","探索リストを保存しました。\r\n");break;
+    case JOB_BIG_MODEL_MENU:
+        ((BigModelUi *)m)->quiet=r->service_number==MEMBER_MENU_EXPERT;
+        mmm_say(s,"Menu mode saved.\r\n","メニュー表示量を保存しました。\r\n");break;
+    case JOB_BIG_MODEL_PASSWORD:
+        mmm_say(s,"Password changed.\r\n","パスワードを変更しました。\r\n");break;
+    case JOB_BIG_MODEL_PAGE:
+        if(page && page->kind==OPERATION_PAGE_ARTICLES)big_model_articles(s,&page->data.articles,0);
+        break;
     case JOB_KTBBS_FIND:
         if(page && page->kind==OPERATION_PAGE_ARTICLES)ktbbs_render_articles(s,&page->data.articles,0);
         break;
@@ -1184,7 +1217,7 @@ static void result(Session *s,const OperationResult *r,SessionResultView project
     case JOB_POST: {
         char text[48];snprintf(text,sizeof(text),"Saved #%u\r\n",s->core.current);
         session_impl_queue_text(s,text);mmm_clear_composition(m);m->input=INPUT_NONE;
-        if(m->screen==INDEX_SCREEN && !ktbbs_active(s))index_page(s,m->page_start);
+        if(m->screen==INDEX_SCREEN && !ktbbs_active(s) && !big_model_active(s))index_page(s,m->page_start);
         break;
     }
     case JOB_MAIL: mmm_mail_result(s,r,projection);break;
@@ -1274,7 +1307,8 @@ static void result(Session *s,const OperationResult *r,SessionResultView project
 static SessionUiSnapshot snapshot(const Session *s) {
     const MmmUi *m=mmm_view(s);
     return (SessionUiSnapshot){.language=m->language,.menu=1,
-        .secret=m->input==INPUT_PASSWORD || m->input==INPUT_BOARD_PASSWORD || m->input==INPUT_FILE_PASSWORD,
+        .secret=m->input==INPUT_PASSWORD || m->input==INPUT_BOARD_PASSWORD || m->input==INPUT_FILE_PASSWORD ||
+                 (big_model_active(s) && big_model_secret(s)),
         .editing=(m->input>=INPUT_TITLE && m->input<=INPUT_EDITOR) || m->input==INPUT_KTBBS_CONFIRM,
         .chatting=m->chatting,.chat_pending=m->job==JOB_CHAT};
 }
@@ -1297,13 +1331,15 @@ static void enter(Session *s,int initial,int interactive,Language language) {
 static int can_leave(const Session *s) {
     const MmmUi *m=mmm_view(s);
     return m->screen==MAIN_SCREEN && m->input==INPUT_NONE && !m->application.step &&
-           (!ktbbs_active(s) || ((const KtbbsUi *)s->ui_binding.state)->question==KT_READY);
+           (!ktbbs_active(s) || ((const KtbbsUi *)s->ui_binding.state)->question==KT_READY) &&
+           (!big_model_active(s) || big_model_ready(s));
 }
 
 static void cleanup(Session *s,int reason,int notify_revocation) {
     Language language=mmm_view(s)->language;
     if(reason!=2)chat_disconnect(s->core.id);
     if(ktbbs_active(s))ktbbs_clear_page(s);
+    if(big_model_active(s))big_model_clear_page(s);
     OPENSSL_cleanse(mmm_state(s),s->ui_binding.active->state_size);
     mmm_state(s)->language=language;
     if(reason==1 && notify_revocation)mmm_say(s,"Session revoked.\r\n","セッションが取り消されました。\r\n");
@@ -1313,6 +1349,7 @@ static void noop(Session *s) { (void)s; }
 static void refresh_board_list(Session *s) {
     MmmUi *m=mmm_state(s);
     if(ktbbs_active(s))ktbbs_clear_page(s);
+    if(big_model_active(s))big_model_clear_page(s);
     if(m->screen==NOTES_SCREEN || m->screen==INDEX_SCREEN)m->row_count=m->next=0;
     if(m->screen==NEW_SCREEN)m->row_count=0;
 }
@@ -1494,6 +1531,10 @@ static void kt_key_input(Session *s,unsigned char ch) {
 }
 const SessionUiAdapter *session_ui_ktbbs(void) {
     static const SessionUiAdapter adapter=NOTES_ADAPTER("ktbbs",sizeof(KtbbsUi),kt_key_mode,kt_key_input,ktbbs_help);
+    return &adapter;
+}
+const SessionUiAdapter *session_ui_big_model(void) {
+    static const SessionUiAdapter adapter=NOTES_ADAPTER("big-model",sizeof(BigModelUi),big_model_keys,big_model_key,big_model_help);
     return &adapter;
 }
 #undef NOTES_ADAPTER

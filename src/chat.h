@@ -24,4 +24,5 @@ int chat_receive(unsigned long,int);
 int chat_mute(unsigned long,const char *,int);
 void chat_settings(unsigned long);
 int chat_private(unsigned long,unsigned long,const char *,uint64_t);
+int chat_private_scoped(unsigned long from,unsigned long to,uint64_t generation,const char *,uint64_t now);
 #endif

@@ -1,4 +1,4 @@
-SESSION_SOURCES= src/session.c src/session_ui.c src/session_rtbbs.c src/session_mmm.c src/session_mmm_services.c src/session_mmm_conference.c src/session_ktbbs.c src/ktbbs_input.c src/session_conference.c src/mmm_input.c src/session_auth.c src/session_board.c src/session_chat.c src/session_classic.c src/session_commands.c src/session_connector.c src/session_web_view.c src/session_web_update.c src/session_editor.c src/session_extended.c src/session_mail.c src/session_members.c src/session_menu.c src/session_output.c src/session_parse.c src/session_reading.c src/session_results.c src/session_services.c src/session_settings.c src/session_transfer.c src/session_vault.c
+SESSION_SOURCES= src/session.c src/session_ui.c src/session_rtbbs.c src/session_mmm.c src/session_mmm_services.c src/session_mmm_conference.c src/session_ktbbs.c src/ktbbs_input.c src/session_big_model.c src/big_model_input.c src/session_conference.c src/mmm_input.c src/session_auth.c src/session_board.c src/session_chat.c src/session_classic.c src/session_commands.c src/session_connector.c src/session_web_view.c src/session_web_update.c src/session_editor.c src/session_extended.c src/session_mail.c src/session_members.c src/session_menu.c src/session_output.c src/session_parse.c src/session_reading.c src/session_results.c src/session_services.c src/session_settings.c src/session_transfer.c src/session_vault.c
 
 CC?=cc
 PYTHON?=python3
@@ -214,7 +214,7 @@ test-legacy-transfers: runtime vaultctl
 	$(PYTHON) tests/test_stage61_transfer_menu.py ./runtime ./vaultctl $(LRZ) $(LSZ)
 
 clean:
-	rm -f test-mmm-input test-ktbbs-input test-conference-core
+	rm -f test-mmm-input test-ktbbs-input test-big-model-input test-conference-core
 	rm -f liner-notes-solaris-door-child
 	rm -f test-session-ui-lifecycle test-session-core test-session-policy-core test-form-flow-core test-message-flow-core test-list-navigation-core test-mail-navigation-core test-preference-core test-traversal-core test-batch-core test-editor-interface test-connector-protocol test-terminal-policy test-connector-core test-notification-core test-connection-core test-chat-core test-door-core test-editor-core test-link-core test-authentication-core test-vault-management-core test-vault-query-core test-download-core test-download-store test-activity-core test-activity-store test-catalog-group-core test-catalog-group-store test-board-topology-core test-catalog-policy-core test-catalog-core test-member-settings-store test-mail-core test-member-core test-article-core test-storage-init liner-notes-door-lock runtime vaultctl memberctl dbconvert generate-structured generate-scale generate-members test-adapters test-chat test-vault-core test-upload-core test-transfer-connector test-userlog test-stage61-userlog test-zhost
 
@@ -631,7 +631,7 @@ check: test-session-core
 
 # Shared data contracts are independent of the worker lifecycle.
 runtime test-adapters test-session-core: src/operation.h src/operation_pages.h
-runtime test-adapters: src/session_mmm_internal.h src/mmm_notes.h src/mmm_notes_repository.h src/mmm_notes_store.inc src/conference_core.h
+runtime test-adapters: src/session_big_model.h src/big_model_input.h src/session_mmm_internal.h src/mmm_notes.h src/mmm_notes_repository.h src/mmm_notes_store.inc src/conference_core.h
 
 runtime test-adapters: src/session_ui.h src/session_state.h src/session_io.h
 
@@ -729,7 +729,15 @@ check: test-mmm-traversal
 test-mmm-input: tests/test_mmm_input.c src/mmm_input.c src/mmm_input.h src/mmm_notes.h src/editor_core.c src/terminal.c src/telnet.c
 	$(CC) $(CPPFLAGS) $(CFLAGS) $(LDFLAGS) -std=c11 -Wall -Wextra -Werror -Isrc tests/test_mmm_input.c src/mmm_input.c src/editor_core.c src/terminal.c src/telnet.c -lcrypto $(LDLIBS) -o test-mmm-input
 	./test-mmm-input
-check: test-mmm-input test-ktbbs
+check: test-mmm-input test-ktbbs test-big-model
+
+.PHONY: test-big-model test-big-model-input
+test-big-model: test-big-model-input runtime vaultctl dbconvert liner-notes-door-lock
+	$(PYTHON) tests/test_big_model_ui.py ./runtime ./vaultctl ./dbconvert
+
+test-big-model-input: tests/test_big_model_input.c src/big_model_input.c src/big_model_input.h src/chat_core.c src/date_filter.h
+	$(CC) $(CPPFLAGS) $(CFLAGS) $(LDFLAGS) -std=c11 -Wall -Wextra -Werror -Isrc tests/test_big_model_input.c src/big_model_input.c src/chat_core.c -o test-big-model-input
+	./test-big-model-input
 .PHONY: test-ktbbs test-ktbbs-input
 test-ktbbs: test-ktbbs-input runtime vaultctl dbconvert
 	$(PYTHON) tests/test_ktbbs_ui.py ./runtime ./vaultctl ./dbconvert

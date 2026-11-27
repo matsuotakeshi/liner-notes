@@ -1,5 +1,6 @@
 """Real Telnet transport, opt-in synchronization, literal bodies and core permissions."""
 import asyncio
+from contextlib import closing
 import json
 from pathlib import Path
 import sys
@@ -108,6 +109,22 @@ def ktbbs_post(port):
         client.close()
 
 
+def big_model_reply(port):
+    with closing(Client(port)) as client:
+        client.until()
+        client.cmd("REGISTER carol", b"> ")
+        client.cmd("web-test-password", b"] > ")
+        client.cmd("LANG en")
+        client.cmd("UI big-model", b"UI preference saved.")
+        client.until(b"BIG> ")
+        client.cmd("B", b"SIG> ")
+        client.cmd("1", b"BOARD> ")
+        assert b"Web connector" in client.cmd("R", b"LIST> ")
+        assert b"Web connector" in client.cmd("1", b"ARTICLE> ")
+        client.cmd("A", b"Title> ")
+        post(client, b"BIG-Model Web reply", b"Shared reply body", b"ARTICLE> ")
+
+
 async def exercise(port):
     a=await Bridge('127.0.0.1',port).open()
     b=await Bridge('127.0.0.1',port).open()
@@ -161,6 +178,11 @@ async def exercise(port):
         async with a.lock:
             response=await a.view('read',3,0)
         assert response['data']['article']['body']=='Web reads this body\r\n',response
+        await asyncio.to_thread(big_model_reply, port)
+        async with a.lock:
+            response=await a.view('read',4,0)
+        item=response['data']['article']
+        assert item['body']=='Shared reply body\r\n' and item['parent']==1,response
         print('PASS Web connector: real Telnet, password secrecy, member ACL, literal 4096-byte lines, article/mail bodies and chat synchronization')
     finally:await a.close();await b.close()
 
@@ -169,6 +191,6 @@ if __name__=='__main__':
     asyncio.run(decode_typed_reply())
     with tempfile.TemporaryDirectory(prefix='ln-web-test-') as tmp:
         p=Path(tmp);server=Server(str(Path(sys.argv[1]).resolve()),p/'notes',members=p/'members',menu=True,telnet=True,
-                                     options=["--ui-policy","MEMBERS","--ui-allow","rtbbs,mash,ktbbs"])
+                                     options=["--ui-policy","MEMBERS","--ui-allow","rtbbs,mash,ktbbs,big-model"])
         try:asyncio.run(exercise(server.port))
         finally:server.close()

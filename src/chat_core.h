@@ -14,12 +14,12 @@ typedef struct {
 } ChatPersistence;
 typedef struct {
     uint32_t revision;int used,room,resident,said,deny;
-    char muted[32][33];uint64_t last,called_at;int admin,called;
+    char muted[32][33];uint64_t last,called_at,generation;int admin,called;
     ChatEvent identity;ChatNotify notify;void *context;
 } ChatPeer;
 typedef struct {
     ChatPeer peers[CONNECTION_MAX];ChatEvent history[CHAT_HISTORY];
-    unsigned history_count;ChatPersistence persistence;
+    unsigned history_count;uint64_t next_generation;ChatPersistence persistence;
 } ChatCore;
 /* Restore validated public log records before accepting connections; no callback
  * or write is made. Private/presence events cannot enter durable replay. */
@@ -42,5 +42,6 @@ int chat_core_presence(ChatCore *,unsigned long id,uint32_t user,int room_only,C
 int chat_core_say(ChatCore *core,unsigned long id,const char *text,uint64_t now);
 void chat_core_who(ChatCore *core,unsigned long id);
 int chat_core_target(ChatCore *core,unsigned long from,unsigned long to);
+int chat_core_private_scoped(ChatCore *,unsigned long from,unsigned long to,uint64_t generation,const char *,uint64_t now);
 int chat_core_private(ChatCore *core,unsigned long from,unsigned long to,const char *text,uint64_t now);
 #endif

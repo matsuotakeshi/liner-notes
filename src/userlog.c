@@ -105,6 +105,9 @@ int userlog_disconnect(int slot,uint64_t now) {
     Live *l=&live[slot];if(!l->id)return 1;
     int ok=append('E',l,l->user && now>=l->start?now-l->start:0,NULL,l->user);return ok && userlog_maintain();
 }
+uint64_t userlog_last_login(uint32_t user) {
+    return enabled && user && user<=MEMBER_MAX?totals[user].last:0;
+}
 const char *userlog_snapshot(uint32_t user,uint32_t cursor,int all,int stats,uint64_t now,UserlogReport *page) {
     memset(page,0,sizeof(*page));
     if(!enabled || journal.broken)return !enabled?"ERR userlog disabled\r\n":"ERR userlog storage\r\n";
