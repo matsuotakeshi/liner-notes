@@ -1,6 +1,7 @@
 #define _POSIX_C_SOURCE 200809L
 #include "session_mmm_internal.h"
 #include "session_big_model.h"
+#include "session_vs.h"
 #include "mmm_input.h"
 #include "vault_bridge.h"
 #include "profile_store.h"
@@ -573,7 +574,13 @@ void mmm_file_result(Session *s,const OperationResult *r,const OperationPage *pa
 
 int mmm_chat_event(Session *s,const ChatEvent *e) {
     const MmmUi *m=mmm_view(s);
-    if((e->kind=='I' || e->kind=='C') && (session_secret(s) || m->input || m->application.step || s->core.pending))return 0;
+    int busy=session_secret(s) || m->input || m->application.step || s->core.pending;
+    if(vs_active(s)) {
+        busy=busy || m->screen==NEW_SCREEN || !vs_ready(s) || s->connection.zmodem ||
+             s->connection.zmodem_start || s->connection.door || s->connection.binary;
+        if(e->kind=='I' && busy)return vs_defer_telegram(s,e);
+    }
+    if((e->kind=='I' || e->kind=='C') && busy)return 0;
     if(strchr("LJS",e->kind) && !m->chatting)return 1;
     /* MASH telegrams also have a sender acknowledgement outside the room. */
     if(e->kind=='O' && !m->chatting && s->ui_binding.active!=session_ui_mash() && !big_model_active(s))return 1;
