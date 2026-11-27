@@ -394,6 +394,8 @@ LINER_NOTES_OPTIONS="--telnet --menu --lang ja --bind 127.0.0.1 --timezone Asia/
 
 `runtime [オプション] PORT [BOARD_FILE [MEMBERS_FILE [CATALOG_FILE]]]` の順です。`liner-notes` はインストール時の実行名です。全オプションはポートより前へ置きます。
 
+端末UIも起動引数で設定できます。選択範囲は `--ui-policy FIXED|MEMBERS|ALL`、接続時の既定は `--ui-default NAME`、許可一覧は `--ui-allow NAME,...` です。例は `--ui-policy MEMBERS --ui-default rtbbs --ui-allow rtbbs,mmm,mash,ktbbs`。KTBBS風の操作は[個人設定](personal-settings.md#ktbbs-ui)を参照してください。
+
 `--admins`, `--banner`, `--bind`, `--chat-log`, `--database`, `--database-structured`, `--disable`, `--doors`, `--gather-count`, `--goodbye`, `--help-dir`, `--id-digits`, `--id-first`, `--id-mode`, `--id-prefix`, `--idle-seconds`, `--lang`, `--level-seconds`, `--limits`, `--link-accounts`, `--login-text-dir`, `--max-articles`, `--max-mail`, `--max-user-posts`, `--menu`, `--menu-dir`, `--registration`, `--registration-form`, `--rtbbs-member-policy`, `--sysinfo`, `--telnet`, `--time-grace`, `--time-warning`, `--timezone`, `--user-log`, `--userlog-keep`, `--userlog-public`, `--vault-dir`, `--zmodem-helper`
 
 `--disable chat` / `--disable mail` / `--disable vault` は繰り返し指定できます。`--max-articles` / `--max-mail` / `--max-user-posts` は0でquotaなし。`--idle-seconds` は0〜86400で0は無入力切断なし。`--level-seconds LEVEL:SECONDS` は0〜5のレベルごと、0秒は時間制限なし。警告と猶予は `--time-warning` / `--time-grace`。`--gather-count` は0〜1000で0は無効です。`--userlog-keep` の0は保持件数無制限。`--user-log -` / `--chat-log -` は該当ログを無効にします。

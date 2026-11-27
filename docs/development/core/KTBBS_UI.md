@@ -11,7 +11,7 @@ Vectorの配布ボタンからたどり、取得サイズ、アーカイブのCR
 | [ユーザーズマニュアル](https://www.vector.co.jp/soft/dl/dos/net/se009531.html) | `KTBSUSER.MAN`、43,445 bytes、`93eb7c157161dca5270384798ee171ec75d0f5f950ec042c58122e66ad8fd21a` |
 | [SYSOPマニュアル](https://www.vector.co.jp/soft/dl/dos/net/se009515.html) | `KTBSYSOP.MAN`、97,625 bytes、`8226e2f3d8d585a22d9aa7aeef6929c477ed94313129b157b90c494134074027` |
 | [ソース](https://www.vector.co.jp/soft/dl/dos/net/se023278.html) | `README.SRC`、`BBS3.PAS`、`BBS98E.PAS`、`MAILSYS.PAS`、`FILESYSA.PAS`、`SYSOPCMD.PAS` など、227,680 bytes、`7b8c07bcc1b22bcfa32710c9c25da6173251c9ffc5630d4cdb4b8ba0b5cc76b9` |
-| [システムメッセージ・定義](https://www.vector.co.jp/soft/dl/dos/net/se023279.html) | `DEFINE.DEF`、`BOARDS.DEF`、`FBOARDS.DEF`、キーテーブル、メッセージ内包アーカイブ、20,330 bytes、`9a7e73633140af3df5604a89b7e2d7912510db7bd5320181b7f2d5c340262a98` |
+| [システムメッセージ・定義](https://www.vector.co.jp/soft/dl/dos/net/se023279.html) | `DEFINE.DEF`、`BOARDS.DEF`、`FBOARDS.DEF`、キーテーブル、メッセージ内包アーカイブ（`IDIN.JTX`、`MAINMENU.JTX`、`READMENU.JTX`、`FILEMENU.JTX`、`CHATMENU.JTX` 等）、20,330 bytes、`9a7e73633140af3df5604a89b7e2d7912510db7bd5320181b7f2d5c340262a98` |
 
 `KTBSYSOP.MAN` の配付条件と著作権節は原作者とKPUCの権利を明記し、改変配布にも条件を適用する。GPLで配布する実装には資料のコード・文言・アートを組み込まず、動作上の事実に基づく新規コードと独自の表示を用いる。
 
@@ -33,3 +33,16 @@ Vectorの配布ボタンからたどり、取得サイズ、アーカイブのCR
 | 外部ゲーム・一行会議 | 標準配布でLiner NotesのDoorと同じ機能、または一行会議の互換性を確認できていない | 未確認。既存Doorと一行会議をLiner Notes拡張として提供する |
 
 KTBBSの画面状態と入力文法は独立したアダプターに置く。既存の端末UIで型付きCore要求を作る処理、結果、エディタ、転送、通知が再利用できる箇所は共有する。Webコネクタは既存のRTBBSアダプター経由を維持する。
+
+## 実装と原典との差
+
+- `session_ktbbs.c` と `ktbbs_input.c` が画面と入力の意味を管理する。複数UIが共有する端末処理（型付きCore要求、認証フォーム、エディタ、転送、チャット、一行会議、Doorの結果処理）は既存コードを再利用する。KTBBSの状態は独立した `KtbbsUi` に入れ、許可されたUIの選択以外では他UIから参照しない。
+- Article Coreにボード全体を記事ID順で一覧にする処理を追加した。既存の可視性検査と予算付き検索を再利用し、返信もページに含める。表示番号はページ内だけに有効で、本文・返信・削除の各要求でCoreがIDと権限を再検査する。DBスキーマと既存ノート巡回の動作は維持する。
+- 原典の `R→ボード→R/I/S/L`、`E→W/R/M`、題名確認・`//`・`S/L/C/0`、`N@`・`C`・`Y/N`、`M→L`、`F→方式→U/D`、チャットの `W/T/S//` を操作の基準とした。色、文言、メニューの配置は独自。旧時刻のみ・開始ボード付き新着指定、題名だけに限定した検索、旧局のメニュー定義ファイル、旧Bメール形式、同報グループ、電報配達確認、チャットログの部屋全体切替、DOS保守メニューには差異が残る。
+- `N` の既定はLiner Notesの巡回チェックポイント。原典の前回ログイン時刻やMMMの個人ボード順をそのまま使わない。メールの順序とファイルボードのパスも現行Coreに従う。`I`の端末設定はLiner Notesの文字幅と端末寸法、ページ停止を使用する。Shift_JIS/CP932は原典資料の解読に使用し、端末通信での自動文字コード変換は追加していない。
+- 同じ会員・管理者権限と接続中の安全な切替条件を使用する。認証前の `RAW` はコネクタ用の既存経路に渡す。旧ゲストIDの生成は行わず、KTBBS風端末の入り口では通常会員の認証を求める。未認証で公開ボードを提供する場合は局の既存RTBBS風設定を使う。
+- Liner Notes拡張は `!` メニュー（Door、一行会議、管理、下書き）と、親記事移動、転送・添付などの既存機能。原典に含まれる旧プログラムや追加の階層ユニットは実行せず、実機とのバイト単位の表示照合は未実施。
+
+## 検証方法
+
+`make test-ktbbs-input` は入力文法、短縮指定、番号境界、日付正規化を検査する。`make test-ktbbs` は隔離したTelnetの会員・ACL、表示番号・記事ID、RTBBS/MMMとの相互閲覧、返信、メール、チャット、保管庫と転送ヘルパー、Door復帰、保存したUI、RAWを検査する。既存のWebコネクタ試験でKTBBSの記事を型付きWeb応答から読み、SSH試験でもKTBBSの選択と読書を検査する。ネイティブCIと公開前のパッケージ等はPR・統合SHAで追跡する。ローカルWindowsでは警告をエラーとするC構文検査、KTBBS入力・既存MMM入力・Article Core・UIライフサイクルの4試験、Core境界9件、マニュアル生成と照合を実行した。POSIXの実接続・実端末はCI側で確認する。

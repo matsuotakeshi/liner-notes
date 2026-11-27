@@ -473,7 +473,9 @@
         "src/session_core.c",
         "src/session_state.h",
         "tests/test_session_core.c",
-        "tests/test_session_operations.c"
+        "tests/test_session_operations.c",
+        "src/session_ktbbs.c",
+        "src/ktbbs_input.c"
       ]
     },
     {
