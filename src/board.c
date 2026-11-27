@@ -534,6 +534,10 @@ static void note_view(const BoardRequest *q,BoardResult *r) {
         /* An entry can become unreadable halfway through an ordered scan. */
         if(result==ARTICLE_BOARD_DENIED && q->scope)result=ARTICLE_OK;
         if(result==ARTICLE_OK)OPERATION_PAGE(r,ARTICLES,articles,page);
+    } else if(q->action=='F') {
+        ArticlePage page;
+        result=article_browse_board(&actor,q->board,q->cursor,q->descending,&page);
+        if(result==ARTICLE_OK)OPERATION_PAGE(r,ARTICLES,articles,page);
     } else if(q->action=='B') {
         ArticleBoardsPage page;
         result=article_board_children(&actor,q->number,q->cursor,&page);

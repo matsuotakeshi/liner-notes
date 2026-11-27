@@ -8,6 +8,7 @@ sys.path.insert(0,str(Path(__file__).resolve().parents[1]))
 from webui.bridge import Bridge, BridgeError, response_data
 from test_board import Server
 from test_mmm_ui import MAIN, OPEN, NOTES, post
+from test_ktbbs_ui import MAIN as KT_MAIN, BOARD as KT_BOARD, READ as KT_READ, write as kt_write
 from test_telnet import Client
 
 
@@ -90,6 +91,23 @@ def mash_post(port):
         client.close()
 
 
+def ktbbs_post(port):
+    client = Client(port)
+    try:
+        client.until()
+        client.cmd("LOGIN alice", b"> ")
+        client.cmd("web-test-password", b"] > ")
+        client.cmd("LANG en")
+        client.cmd("UI ktbbs", b"UI preference saved.")
+        client.until(KT_MAIN)
+        client.cmd("E", b"ENTER> ")
+        client.cmd("W", KT_BOARD)
+        client.cmd("1", b"Title> ")
+        assert b"Saved #3" in kt_write(client, "KTBBS via Telnet", "Web reads this body", KT_READ)
+    finally:
+        client.close()
+
+
 async def exercise(port):
     a=await Bridge('127.0.0.1',port).open()
     b=await Bridge('127.0.0.1',port).open()
@@ -139,6 +157,10 @@ async def exercise(port):
             response=await a.view('read',2,0)
         assert response['data']['article']['body']=='Terminal response read from Web Core\r\n',response
         assert response['data']['article']['parent']==1,response
+        await asyncio.to_thread(ktbbs_post, port)
+        async with a.lock:
+            response=await a.view('read',3,0)
+        assert response['data']['article']['body']=='Web reads this body\r\n',response
         print('PASS Web connector: real Telnet, password secrecy, member ACL, literal 4096-byte lines, article/mail bodies and chat synchronization')
     finally:await a.close();await b.close()
 
@@ -147,6 +169,6 @@ if __name__=='__main__':
     asyncio.run(decode_typed_reply())
     with tempfile.TemporaryDirectory(prefix='ln-web-test-') as tmp:
         p=Path(tmp);server=Server(str(Path(sys.argv[1]).resolve()),p/'notes',members=p/'members',menu=True,telnet=True,
-                                     options=["--ui-policy","MEMBERS","--ui-allow","rtbbs,mash"])
+                                     options=["--ui-policy","MEMBERS","--ui-allow","rtbbs,mash,ktbbs"])
         try:asyncio.run(exercise(server.port))
         finally:server.close()
