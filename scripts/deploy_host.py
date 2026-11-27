@@ -67,6 +67,26 @@ def verify_local_archive(archive, checksum):
         os.close(fd)
 
 
+def preflight_debian_upgrade(directory, packages):
+    """APT simulation checks dependencies without changing the package database."""
+    files = [str(Path(directory) / item['filename']) for item in packages.values()]
+    plan = command(['/usr/bin/apt-get', '--simulate', '--no-install-recommends', '--no-remove',
+                    'install', *files])
+    expected = {name: item['version'] for name, item in packages.items()}
+    observed = {}
+    for line in plan.splitlines():
+        if not line.startswith(('Inst ', 'Conf ', 'Remv ', 'Purg ')):
+            continue
+        record = re.match(r'^(Inst|Conf) ([a-z0-9+.-]+)(?::[a-z0-9-]+)? (?:\[[^\]]+\] )?\(([^ )]+)', line)
+        require(record is not None, 'Debian dry-run contains a removal or unknown action')
+        action, name, version = record.groups()
+        require(expected.get(name) == version, 'Debian dependencies must already be installed; unrelated package changes are not permitted')
+        if action == 'Inst':
+            require(name not in observed, 'Ambiguous Debian dry-run')
+            observed[name] = version
+    require(observed == expected, 'Debian dry-run did not identify the complete approved upgrade')
+
+
 def validate_link_processes(lines, managed, allowed_uids):
     for line in lines.splitlines():
         fields = line.strip().split(None, 1)
@@ -282,8 +302,7 @@ class Host:
             files = [str(self.stage / p['filename']) for p in self.packages.values()]
             command(['/usr/bin/rpm', '-U', '--test', *files])
         else:
-            files = [str(self.stage / p['filename']) for p in self.packages.values()]
-            command(['/usr/bin/dpkg', '--no-act', '--install', *files])
+            preflight_debian_upgrade(self.stage, self.packages)
         return {n: self.before[n][0] for n in self.packages}
 
     def stop(self):

@@ -26,7 +26,7 @@ from deploy_transaction import apply_host, atomic_json, rollout
 from deploy_backup_store import receive
 from deploy_restore import health_probes
 from deploy_release import successful_execution, latest_full_run, trusted_release_ancestor, fresh_connectivity, main as controller_main, record_target
-from deploy_host import (Host, backup_storage, command as host_command, validate_backup_inventory,
+from deploy_host import (Host, backup_storage, command as host_command, preflight_debian_upgrade, validate_backup_inventory,
                          validate_link_processes, verify_local_archive)
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 from cryptography.hazmat.primitives.serialization import Encoding, PrivateFormat, PublicFormat, NoEncryption
@@ -221,6 +221,22 @@ class Deployment(unittest.TestCase):
         with self.assertRaises(ValueError):
             apply_host(self.doc, self.auth, policy.TARGETS[0], host)
         self.assertNotIn('install', host.calls)
+
+    def test_debian_depends_must_already_be_installed_before_service_stop(self):
+        packages = {'liner-notes': {'filename': 'candidate.deb', 'version': '0.75-1'}}
+        good = ('Inst liner-notes [0.74-1] (0.75-1 local-deb [amd64])\n'
+                'Conf liner-notes (0.75-1 local-deb [amd64])')
+        with patch('deploy_host.command', return_value=good) as simulate:
+            preflight_debian_upgrade(self.base, packages)
+            self.assertEqual(simulate.call_args.args[0],
+                ['/usr/bin/apt-get', '--simulate', '--no-install-recommends', '--no-remove',
+                 'install', str(self.base/'candidate.deb')])
+        for invalid in ('Inst libssh-4:amd64 (0.11.5 Debian [amd64])\n'+good,
+                        good+'\nConf unrelated (1.0 Debian [amd64])',
+                        good+'\nRemv unrelated [1.0]', good.replace('0.75-1', '0.75-2'),
+                        '0 upgraded, 0 newly installed, 0 to remove'):
+            with self.subTest(plan=invalid), patch('deploy_host.command', return_value=invalid), self.assertRaises(ValueError):
+                preflight_debian_upgrade(self.base, packages)
 
     def test_local_backup_is_explicit_and_unverified_archive_blocks_install(self):
         self.assertEqual(backup_storage({'backup_sink': {}}), 'off-host')
