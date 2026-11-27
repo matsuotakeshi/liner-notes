@@ -102,6 +102,7 @@ def run(binary):
             assert b"first page body" in alice.cmd("", READ)
             assert b"without pages" in alice.cmd("B", READ)
             alice.cmd("b", b"/board> ")
+            alice.cmd("cd /", MAIN)
             assert b"unavailable" in bob.cmd("layout 1 mnotes", MAIN)
             assert b"unavailable" in bob.cmd("b #2", MAIN)
             assert b"Topic posted" in bob.cmd("topic -w quiet message", MAIN)
