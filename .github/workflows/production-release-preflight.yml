@@ -73,6 +73,7 @@ jobs:
           fetch_runs debian debian-package.yml
           fetch_runs release_set release-set.yml
           fetch_runs connectivity production-ssh-smoke.yml
+          python3 -c 'import json,sys; sys.path.insert(0,"ci"); from deploy_release import connectivity_runs; data=json.load(sys.stdin); json.dump(connectivity_runs(data,"all"),sys.stdout)' < "$evidence/connectivity.json" > "$evidence/connectivity-all.json"
 
           release_set_run_id="$(python3 ci/release_admission.py gates \
             --source-sha "$RELEASE_SHA" \
@@ -81,10 +82,10 @@ jobs:
             --rocky-json "$evidence/rocky.json" \
             --debian-json "$evidence/debian.json" \
             --release-set-json "$evidence/release_set.json" \
-            --connectivity-json "$evidence/connectivity.json")"
+            --connectivity-json "$evidence/connectivity-all.json")"
           # This legacy preflight promises all three hosts. A successful
-          # FreeBSD-only smoke run cannot satisfy that promise.
-          connectivity_run_id="$(python3 -c 'import json,sys; sys.path.insert(0,"ci"); from release_admission import latest_successful_run; print(latest_successful_run(json.load(open(sys.argv[1])),sys.argv[2],"workflow_dispatch","connectivity"))' "$evidence/connectivity.json" "$RELEASE_SHA")"
+          # Single-host smoke runs cannot satisfy that promise.
+          connectivity_run_id="$(python3 -c 'import json,sys; sys.path.insert(0,"ci"); from release_admission import latest_successful_run; print(latest_successful_run(json.load(open(sys.argv[1])),sys.argv[2],"workflow_dispatch","connectivity"))' "$evidence/connectivity-all.json" "$RELEASE_SHA")"
           gh api "repos/$GITHUB_REPOSITORY/actions/runs/$connectivity_run_id/jobs?filter=latest&per_page=100" > "$evidence/connectivity-jobs.json"
           python3 -c 'import json,sys; sys.path.insert(0,"ci"); from deploy_release import successful_execution,fresh_connectivity; jobs=json.load(open(sys.argv[1])); successful_execution(jobs,"Verify production SSH access"); fresh_connectivity(jobs)' "$evidence/connectivity-jobs.json"
           gh api "repos/$GITHUB_REPOSITORY/actions/runs/$release_set_run_id/artifacts?per_page=100" > "$evidence/artifacts.json"

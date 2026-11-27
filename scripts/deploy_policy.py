@@ -15,7 +15,8 @@ from pathlib import Path
 
 TARGETS = ('rocky.ysni.org', 'debian.ysni.org', 'srv.ysni.org')
 FREEBSD_TARGETS = ('srv.ysni.org',)
-SCOPES = {'all': TARGETS, 'freebsd': FREEBSD_TARGETS}
+SCOPES = {'all': TARGETS, 'freebsd': FREEBSD_TARGETS,
+          'debian': ('debian.ysni.org',), 'rocky': ('rocky.ysni.org',)}
 PLATFORMS = dict(zip(TARGETS, ('rocky10', 'debian13', 'freebsd15')))
 PACKAGES = {'liner-notes', 'liner-notes-web', 'liner-notes-link', 'liner-notes-selinux'}
 SERVICES = {
@@ -111,7 +112,7 @@ def validate_release(doc):
 
 def deployment_targets(targets):
     require(isinstance(targets, (tuple, list)) and tuple(targets) in SCOPES.values(),
-            'Only the ordered three-host scope or FreeBSD-only scope is allowed')
+            'Only a named single host or the ordered three-host scope is allowed')
     return tuple(targets)
 
 

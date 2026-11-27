@@ -77,6 +77,14 @@ def fresh_connectivity(jobs, now=None, step='Verify production SSH access'):
             'Production connectivity check must have completed within the last hour')
 
 
+def connectivity_runs(document, scope):
+    """Keep success and failure evidence separate for each dispatch scope."""
+    require(scope in SCOPES and document.get('total_count', 0) <= 100 and
+            isinstance(document.get('workflow_runs'), list), 'Incomplete connectivity run evidence')
+    title = f'Production SSH connectivity ({scope})'
+    return {'workflow_runs': [run for run in document['workflow_runs'] if run.get('display_title') == title]}
+
+
 def latest_full_run(document, sha, event, label):
     """Allow an explicit full manual run after a documentation-only push.
 
@@ -157,12 +165,14 @@ def fresh_evidence(release, *, scope='all', connectivity=True):
         if label == 'connectivity':
             if not connectivity:
                 continue
-            if scope == 'freebsd':
-                step = 'Verify production SSH access (FreeBSD only)'
+            if scope != 'all':
+                step = f'Verify production SSH access ({scope})'
         # Package/application evidence belongs to the immutable release. The
         # environmental preflight belongs to this newly reviewed controller.
         gate_sha = os.environ['GITHUB_SHA'] if label == 'connectivity' else sha
         runs = api(f'repos/{REPO}/actions/workflows/{workflow}/runs?head_sha={gate_sha}&per_page=100')
+        if label == 'connectivity':
+            runs = connectivity_runs(runs, scope)
         run_id = latest_full_run(runs, gate_sha, event, label)
         jobs = api(f'repos/{REPO}/actions/runs/{run_id}/jobs?filter=latest&per_page=100')
         successful_execution(jobs, step, 2 if label == 'linux' else 1)

@@ -115,13 +115,14 @@ class FreeBSDDelivery(unittest.TestCase):
         if name == 'DEPLOYMENT-MANIFEST.json':
             (folder / name).write_text(json.dumps(self.envelope))
         else:
-            self.assertEqual(name, 'liner-notes.pkg')
+            self.assertIn(name, {item['filename'] for packages in self.doc['platforms'].values()
+                                 for item in packages.values()})
             (folder / name).write_bytes(self.payload)
 
-    def run_controller(self, mode, *, transport=None, evidence=None):
+    def run_controller(self, mode, *, transport=None, evidence=None, scope='freebsd'):
         output = self.root / 'audit.json'
         output.write_text('{}')
-        args = SimpleNamespace(scope='freebsd', mode=mode, release_id=123, output=output)
+        args = SimpleNamespace(scope=scope, mode=mode, release_id=123, output=output)
         with patch.dict(os.environ, self.env), patch.object(controller, 'api', side_effect=self.api), \
              patch.object(controller.subprocess, 'run', side_effect=self.download), \
              patch.object(controller, 'fresh_evidence', side_effect=evidence or (lambda *a, **k: (self.evidence, self.published))) as checks, \
@@ -152,6 +153,50 @@ class FreeBSDDelivery(unittest.TestCase):
         self.assertEqual(ssh.call_count, 1)
         self.assertEqual(set(report['package_hashes']), {'freebsd15'})
 
+    def test_linux_apply_contacts_only_the_approved_host_and_uses_its_packages(self):
+        for scope, host, platform in [('debian', 'debian.ysni.org', 'debian13'),
+                                      ('rocky', 'rocky.ysni.org', 'rocky10')]:
+            with self.subTest(scope=scope):
+                self.approval['comment'] = policy.approval_phrase(self.doc, 100, 2, (host,))
+
+                def transport(target, release, signed, folder, key):
+                    self.assertEqual(target, host)
+                    auth = policy.verify(signed, self.public)
+                    self.assertEqual(auth['targets'], [host])
+                    for other in set(policy.TARGETS) - {host}:
+                        with self.assertRaises(ValueError):
+                            policy.validate_authorization(auth, self.doc, other)
+                    packages = {item['filename'] for item in self.doc['platforms'][platform].values()}
+                    self.assertEqual({p.name for p in folder.iterdir()},
+                                     packages | {'DEPLOYMENT-MANIFEST.json', 'ssh-key'})
+                    return {'target': target, 'source_sha': self.doc['source_sha'], 'result': 'healthy'}
+
+                report, checks, ssh = self.run_controller('apply', scope=scope, transport=transport)
+                self.assertEqual(report['targets'], [host])
+                self.assertEqual(set(report['package_hashes']), {platform})
+                self.assertEqual(checks.call_args.kwargs['scope'], scope)
+                self.assertEqual(ssh.call_count, 1)
+                self.approval['comment'] = policy.approval_phrase(self.doc, 100, 2, policy.TARGETS)
+                with self.assertRaises(ValueError):
+                    self.run_controller('apply', scope=scope)
+
+    def test_connectivity_all_scope_cannot_substitute_and_new_failure_blocks_one_scope(self):
+        def run(run_id, scope, conclusion):
+            return dict(id=run_id, run_number=run_id, run_attempt=1, head_sha=self.env['GITHUB_SHA'],
+                        head_branch='main', event='workflow_dispatch', status='completed',
+                        conclusion=conclusion, display_title=f'Production SSH connectivity ({scope})')
+
+        document = {'workflow_runs': [run(1, 'debian', 'success'), run(2, 'rocky', 'success'),
+                                     run(3, 'debian', 'failure'), run(4, 'all', 'success')]}
+        for scope, wanted in [('rocky', 2), ('all', 4)]:
+            selected = controller.connectivity_runs(document, scope)
+            self.assertEqual(controller.latest_full_run(selected, self.env['GITHUB_SHA'],
+                                                        'workflow_dispatch', 'connectivity'), wanted)
+        for scope in ('debian', 'freebsd'):
+            with self.assertRaises(ValueError):
+                controller.latest_full_run(controller.connectivity_runs(document, scope),
+                                            self.env['GITHUB_SHA'], 'workflow_dispatch', 'connectivity')
+
     def test_missing_signed_manifest_denies_apply(self):
         self.published['assets'] = []
         with self.assertRaises(ValueError):
@@ -173,7 +218,7 @@ class FreeBSDDelivery(unittest.TestCase):
 
     def test_connectivity_is_scope_specific_and_expires(self):
         now = datetime.datetime.now(datetime.timezone.utc)
-        step = {'name': 'Verify production SSH access (FreeBSD only)', 'conclusion': 'success', 'completed_at': now.isoformat()}
+        step = {'name': 'Verify production SSH access (freebsd)', 'conclusion': 'success', 'completed_at': now.isoformat()}
         jobs = {'jobs': [{'conclusion': 'success', 'steps': [step]}]}
         controller.fresh_connectivity(jobs, now, step=step['name'])
         with self.assertRaises(ValueError):
@@ -207,6 +252,7 @@ class FreeBSDDelivery(unittest.TestCase):
                 run_id = len(runs) + 1
                 runs[run_id] = (label, gate, sha)
                 return {'workflow_runs': [{'id': run_id, 'head_sha': sha, 'head_branch': 'main',
+                    'display_title': 'Production SSH connectivity (freebsd)' if label == 'connectivity' else '',
                     'event': gate[1], 'run_number': run_id, 'run_attempt': 1, 'status': 'completed',
                     'conclusion': 'failure' if label == bad_gate else 'success'}]}
             run_id = int(path.split('/actions/runs/')[1].split('/')[0])
@@ -214,7 +260,7 @@ class FreeBSDDelivery(unittest.TestCase):
             if '/jobs?' in path:
                 step = gate[2]
                 if label == 'connectivity':
-                    step = 'Verify production SSH access (FreeBSD only)'
+                    step = 'Verify production SSH access (freebsd)'
                 steps = [{'name': step, 'conclusion': 'success', 'completed_at': datetime.datetime.now(datetime.timezone.utc).isoformat()}]
                 if label == 'deployment':
                     steps.append({'name': 'Restore and boot the actual BBS using a disposable unprivileged account', 'conclusion': 'success'})
