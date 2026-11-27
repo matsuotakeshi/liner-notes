@@ -725,7 +725,13 @@ static int request(OperationRequest *q,const char *kind,uint32_t id,uint32_t cur
         q->op='m';q->action='L';q->number=MAIL_LIST_NEWS;q->cursor=cursor;
         strcpy(q->title,path);
     } else if(*path)return 0;
-    else if(!strncmp(kind,"conf_",5)) {
+    else if(!strncmp(kind,"topic_",6)) {
+        if(id)return 0;
+        if(!strcmp(kind,"topic_history"))q->conference.action=TOPIC_HISTORY;
+        else if(!strcmp(kind,"topic_unread"))q->conference.action=TOPIC_UNREAD;
+        else return 0;
+        q->op=BOARD_CONFERENCE;q->conference.cursor=cursor;
+    } else if(!strncmp(kind,"conf_",5)) {
         q->op=BOARD_CONFERENCE;q->conference.room=id;q->conference.cursor=cursor;
         if(!strcmp(kind,"conf_rooms") && !id)q->conference.action=CONFERENCE_LIST;
         else if(!strcmp(kind,"conf_history") && id)q->conference.action=CONFERENCE_HISTORY;

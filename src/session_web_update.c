@@ -89,7 +89,19 @@ static int attachments(char *csv,MailAttachments *out) {
 static int conference_action(OperationRequest *q,const char *kind,uint32_t room,uint32_t cursor) {
     ConferenceRequest *request=&q->conference;
     size_t length=strlen(q->body);
-    if(!strcmp(kind,"conference.seen")) {
+    if(!strncmp(kind,"topic.",6)) {
+        if(room)return 0;
+        if(!strcmp(kind,"topic.post")) {
+            if(cursor || !length || length>CONFERENCE_TEXT)return 0;
+            request->action=TOPIC_POST;
+            memcpy(request->text,q->body,length+1);
+        } else {
+            if(!cursor || length)return 0;
+            if(!strcmp(kind,"topic.seen"))request->action=TOPIC_SEEN;
+            else if(!strcmp(kind,"topic.delete"))request->action=TOPIC_DELETE;
+            else return 0;
+        }
+    } else if(!strcmp(kind,"conference.seen")) {
         if(!cursor || length)return 0;
         request->action=CONFERENCE_SEEN;
     } else {
@@ -414,7 +426,7 @@ void session_impl_web_update(Session *s,char *payload) {
             if(mode<0)goto finish;
             q->op='}';q->action='v';q->number=(uint32_t)mode;menu_mode=mode;
         }
-    } else if(!strncmp(kind,"conference.",11)) {
+    } else if(!strncmp(kind,"conference.",11) || !strncmp(kind,"topic.",6)) {
         if(board || flag || *q->title || *q->username || q->mail_attachments.count ||
            !conference_action(q,kind,id,arg))goto finish;
     } else if(strchr(kind,'.')) {

@@ -52,6 +52,7 @@ async def exercise(bbs, directory):
                 info = await call(client, "session", {})
                 client.headers["X-CSRF-Token"] = info["csrf"]
             await call(second, "conference", {"action": "rooms"}, 403)
+            await call(second, "conference", {"topic": True, "action": "history"}, 403)
             await login(first, "alice")
             await login(second, "bob")
 
@@ -86,10 +87,25 @@ async def exercise(bbs, directory):
                 assert message in history["text"], history
                 sent = await bridge.command("LINECONF POST 2 From the terminal")
                 assert "CONFERENCE SAVED" in sent["text"], sent
+                sent = await bridge.command("TOPIC -W Bob's notice")
+                assert "Topic posted." in sent["text"], sent
             finally:
                 await bridge.close()
             history = await conference(first, "history", room=2)
             assert [row["text"] for row in history["data"]["conference"]["lines"]] == [message, "From the terminal"]
+
+            topic = await conference(second, "unread", topic=True)
+            lines = topic["data"]["conference"]["lines"]
+            assert [row["text"] for row in lines] == ["Bob's notice"], topic
+            assert (await conference(second, "seen", topic=True, cursor=lines[0]["id"]))["mutation"]["ok"]
+            assert not (await conference(second, "unread", topic=True))["data"]["conference"]["lines"]
+            topic = await conference(first, "post", topic=True, body="From Web TOPIC")
+            assert topic["mutation"]["ok"] and topic["mutation"]["id"], topic
+            topic_id = topic["mutation"]["id"]
+            assert not (await conference(second, "delete", topic=True, cursor=topic_id))["mutation"]["ok"]
+            assert (await conference(first, "delete", topic=True, cursor=topic_id))["mutation"]["ok"]
+            topic = await conference(second, "history", topic=True)
+            assert [row["text"] for row in topic["data"]["conference"]["lines"]] == ["Bob's notice"]
         finally:
             await runner.cleanup()
 
