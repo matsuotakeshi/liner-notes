@@ -9,6 +9,7 @@ import shlex
 import shutil
 import subprocess
 import sys
+import time
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -16,7 +17,11 @@ ROOT = Path(__file__).resolve().parents[1]
 
 def run(command):
     print("+ " + shlex.join(command), flush=True)
-    subprocess.run(command, cwd=ROOT, check=True)
+    started = time.monotonic()
+    try:
+        subprocess.run(command, cwd=ROOT, check=True)
+    finally:
+        print(f"Elapsed {time.monotonic() - started:.3f}s: {shlex.join(command)}", flush=True)
 
 
 def find_tool(names):

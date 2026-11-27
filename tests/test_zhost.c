@@ -8,6 +8,17 @@
 #include <sys/stat.h>
 #include <stdlib.h>
 #include <string.h>
+#include <errno.h>
+
+/* Exercise the real child startup with one failed descriptor operation. */
+static int reject_stderr;
+static int fixture_dup2(int oldfd,int newfd) {
+    if(reject_stderr && newfd==STDERR_FILENO) { errno=EBADF;return -1; }
+    return dup2(oldfd,newfd);
+}
+#define dup2 fixture_dup2
+#include "../src/zmodem_host.c"
+#undef dup2
 static uint64_t now(void) { struct timespec t;clock_gettime(CLOCK_MONOTONIC,&t);return (uint64_t)t.tv_sec*1000+t.tv_nsec/1000000; }
 static int sink(void *c,const unsigned char *data,size_t size) { (void)c;(void)data;(void)size;return 1; }
 static void personal(const char *path,const char *body,int expected) {
@@ -54,7 +65,11 @@ int main(void) {
     zhost_receipt(h,&id,&bytes,&recovery);assert(recovery==5);zhost_stop(h);
     limit=now()+5000;while(zhost_pending() && now()<limit) { zhost_reap(now());struct timespec pause={0,10000000};nanosleep(&pause,NULL); }assert(!zhost_pending());
     puts("PASS: host watchdog permits continuing activity beyond ten minutes and terminates an idle helper");
-    personal(path,"printf 'PFILE 610d0a\\nDONE OK 0 3\\n' >&3\n",1);
+    const char valid[]="printf 'PFILE 610d0a\\nDONE OK 0 3\\n' >&3\n";
+    reject_stderr=1;
+    personal(path,valid,-1);
+    reject_stderr=0;
+    personal(path,valid,1);
     personal(path,"printf 'PFILE 610d0a\\nDONE OK 0 2\\n' >&3\n",-1);
     personal(path,"printf 'PFILE 61000a\\nDONE OK 0 3\\n' >&3\n",-1);
     personal(path,"printf 'PFILE 610d0a\\nDONE OK 0 3\\nPFILE 62\\n' >&3\n",-1);

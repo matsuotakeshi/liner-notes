@@ -55,7 +55,7 @@ def copy_instance(root,destination,exclude=()):
  destination.mkdir(mode=0o700)
  for name in directories:(destination/name).mkdir(mode=0o700,parents=True,exist_ok=True)
  for name in files:
-  if name in exclude or any(name.startswith(x+'-') for x in exclude):continue
+  if name in exclude:continue
   target=destination/name;target.parent.mkdir(mode=0o700,parents=True,exist_ok=True);shutil.copy2(root/name,target)
   target.chmod(0o700 if target.stat().st_mode&0o111 else 0o600)
  return destination
@@ -96,7 +96,8 @@ def export_instance(root,database,board,destination):
  root=Path(root).resolve();database=Path(database).resolve();destination=Path(destination).absolute()
  maintenance.outside(destination,root);relative_db=database.relative_to(root).as_posix()
  with locked(database) as db:
-  copy_instance(root,destination,(relative_db,relative_db+'.lock'))
+  sidecars={relative_db+suffix for suffix in ('','.lock','-wal','-shm','-journal')}
+  copy_instance(root,destination,sidecars)
   names=export_streams(db,destination,board)
   (destination/LAYOUT).write_text(json.dumps({'schema':db.execute('SELECT version FROM storage_meta WHERE id=1').fetchone()[0]}),encoding='utf8')
   (destination/LAYOUT).chmod(0o600)

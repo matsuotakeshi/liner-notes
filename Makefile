@@ -179,7 +179,7 @@ test-chat: tests/test_chat.c src/chat.c src/chat_core.c src/chat.h src/chat_pref
 	$(CC) $(CPPFLAGS) $(SQLITE_CFLAGS) $(CFLAGS) $(LDFLAGS) -std=c11 -Wall -Wextra -Werror -Isrc tests/test_chat.c src/chat.c src/chat_core.c src/storage_sqlite.c $(SQLITE_CFLAGS) -pthread -lcrypto $(SQLITE_LIBS) -o test-chat
 
 test-zhost: tests/test_zhost.c src/zmodem_host.c src/zmodem_host.h src/download.h src/userlog.h src/app_limits.h
-	$(CC) $(CPPFLAGS) $(SQLITE_CFLAGS) $(CFLAGS) $(LDFLAGS) -std=c11 -Wall -Wextra -Werror -Isrc tests/test_zhost.c src/zmodem_host.c src/storage_sqlite.c $(SQLITE_CFLAGS) -pthread -lcrypto $(SQLITE_LIBS) -o test-zhost
+	$(CC) $(CPPFLAGS) $(SQLITE_CFLAGS) $(CFLAGS) $(LDFLAGS) -std=c11 -Wall -Wextra -Werror -Isrc tests/test_zhost.c src/storage_sqlite.c $(SQLITE_CFLAGS) -pthread -lcrypto $(SQLITE_LIBS) -o test-zhost
 
 # Real-wire 1GiB/16-file tests plus sparse 16GiB staging boundary.
 test-zmodem-limits: vaultctl
@@ -216,7 +216,7 @@ test-legacy-transfers: runtime vaultctl
 clean:
 	rm -f test-mmm-input test-conference-core
 	rm -f liner-notes-solaris-door-child
-	rm -f test-session-ui-lifecycle test-session-core test-session-policy-core test-form-flow-core test-message-flow-core test-list-navigation-core test-mail-navigation-core test-preference-core test-traversal-core test-batch-core test-editor-interface test-connector-protocol test-terminal-policy test-connector-core test-notification-core test-connection-core test-chat-core test-door-core test-editor-core test-link-core test-authentication-core test-vault-management-core test-vault-query-core test-download-core test-download-store test-activity-core test-activity-store test-catalog-group-core test-catalog-group-store test-board-topology-core test-catalog-policy-core test-catalog-core test-member-settings-store test-mail-core test-member-core test-article-core liner-notes-door-lock runtime vaultctl memberctl dbconvert generate-structured generate-scale generate-members test-adapters test-chat test-vault-core test-upload-core test-transfer-connector test-userlog test-stage61-userlog test-zhost
+	rm -f test-session-ui-lifecycle test-session-core test-session-policy-core test-form-flow-core test-message-flow-core test-list-navigation-core test-mail-navigation-core test-preference-core test-traversal-core test-batch-core test-editor-interface test-connector-protocol test-terminal-policy test-connector-core test-notification-core test-connection-core test-chat-core test-door-core test-editor-core test-link-core test-authentication-core test-vault-management-core test-vault-query-core test-download-core test-download-store test-activity-core test-activity-store test-catalog-group-core test-catalog-group-store test-board-topology-core test-catalog-policy-core test-catalog-core test-member-settings-store test-mail-core test-member-core test-article-core test-storage-init liner-notes-door-lock runtime vaultctl memberctl dbconvert generate-structured generate-scale generate-members test-adapters test-chat test-vault-core test-upload-core test-transfer-connector test-userlog test-stage61-userlog test-zhost
 
 memberctl: src/db_index.h src/memberctl.c src/members.c src/members.h src/app_limits.h src/store_limits.h
 	$(CC) $(CPPFLAGS) $(SQLITE_CFLAGS) $(CFLAGS) $(LDFLAGS) -std=c11 -Wall -Wextra -Werror src/memberctl.c src/members.c -lcrypto $(SQLITE_LIBS) $(LDLIBS) src/storage_sqlite.c $(SQLITE_CFLAGS) -pthread -lcrypto $(SQLITE_LIBS) -o memberctl
@@ -344,6 +344,7 @@ test-web: runtime vaultctl
 	$(PYTHON) tests/test_web_transfers.py ./runtime ./vaultctl
 	$(PYTHON) tests/test_web_install.py
 	$(PYTHON) tests/test_web_errors.py
+	$(PYTHON) tests/test_web_session_lifetime.py
 
 .PHONY: test-doors test-stage72
 test-doors: runtime
@@ -355,6 +356,7 @@ test-stage72: test-doors test-web
 # The optional link tests need link-requirements.txt; web tests need aiohttp.
 .PHONY: test-stage73
 test-stage73: all
+	$(PYTHON) tests/test_db_backup_inventory.py
 	$(PYTHON) tests/test_stage73_database.py ./runtime
 	$(PYTHON) tests/test_serial_connector.py ./runtime
 	$(PYTHON) tests/test_web_reports.py
@@ -647,7 +649,12 @@ test-ssh-sources:
 check: test-ssh-sources
 
 .PHONY: test-storage-relations
-check: test-storage-relations
+check: test-storage-relations test-storage-init
+.PHONY: test-storage-init
+test-storage-init:
+	$(CC) $(CPPFLAGS) $(SQLITE_CFLAGS) $(CFLAGS) $(LDFLAGS) -std=c11 -Wall -Wextra -Werror -Isrc tests/test_storage_init_failure.c -pthread -lcrypto $(SQLITE_LIBS) $(LDLIBS) -o test-storage-init
+	$(PYTHON) -c "import pathlib, subprocess, tempfile; temp = tempfile.TemporaryDirectory(); subprocess.run(['./test-storage-init', str(pathlib.Path(temp.name)/'bbs.sqlite')], check=True); temp.cleanup()"
+
 test-storage-relations: tests/test_storage_relations.c src/storage_records.inc
 	$(CC) $(CPPFLAGS) $(SQLITE_CFLAGS) $(CFLAGS) $(LDFLAGS) -std=c11 -Wall -Wextra -Werror -Isrc tests/test_storage_relations.c -lcrypto $(SQLITE_LIBS) -o test-storage-relations
 	./test-storage-relations

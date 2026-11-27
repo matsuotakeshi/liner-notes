@@ -2,6 +2,8 @@
 """Hosted-only Solaris build/CI contracts. Does not contact a VM."""
 from pathlib import Path
 import importlib.util
+from contextlib import redirect_stdout
+from io import StringIO
 import os
 import shutil
 import subprocess
@@ -22,6 +24,20 @@ spec.loader.exec_module(build_lrzsz)
 
 
 class SolarisContracts(unittest.TestCase):
+    def test_command_duration_and_failure_propagation(self):
+        for error in (None, subprocess.CalledProcessError(1, 'gmake')):
+            output = StringIO()
+            with self.subTest(error=error), redirect_stdout(output), \
+                 patch.object(solaris_ci.subprocess, 'run', side_effect=error), \
+                 patch('time.monotonic', side_effect=[10, 12.5]):
+                if error:
+                    with self.assertRaises(subprocess.CalledProcessError):
+                        solaris_ci.run(['gmake', 'test-doors'])
+                else:
+                    solaris_ci.run(['gmake', 'test-doors'])
+                self.assertIn('2.500s', output.getvalue())
+                self.assertIn('gmake test-doors', output.getvalue())
+
     def test_native_compiler_is_available_to_board_fault_helper(self):
         flags = ["gmake", "CC=/usr/gcc/15/bin/gcc", "CPPFLAGS=-D__EXTENSIONS__=1"]
         with patch.object(solaris_ci, "build_arguments", return_value=flags), \

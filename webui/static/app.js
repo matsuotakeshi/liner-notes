@@ -26,7 +26,49 @@ function translate(){document.documentElement.lang=lang;document.querySelectorAl
 function clearPrivateView(){notices.length=0;chatHistory.length=0;boards=[];notes=[];mail=[];files=[];currentArticle=null;currentMessage=null;selectedBoard=1;selectedTitle='';$('#notice-count').textContent='0';$('#notices').replaceChildren();$('#notice-drawer').hidden=true;}
 function setStatus(){const user=state.user;$('#account-name').textContent=user?state.username:t('guest');$('#avatar').textContent=user?state.username[0].toUpperCase():'G';$('#account-detail').textContent=connected?(user?(state.admin?'SYSOP':(state.sigop||state.vault_sigop)?'SIGOP':'MEMBER')+' · #'+user:t('online')):t('offline');$('#status').textContent=connected?t('online'):t('offline');$('#connection-dot').classList.toggle('online',connected);$('#login-button').hidden=!!user;$('#new-post').textContent=lang==='ja'?'投稿先を選ぶ':'Choose board & post';breadcrumbs();}
 function nav(){const root=$('#navigation');root.replaceChildren();for(const key of ['home','board','mail','files','chat','gather','conference','people','settings','games','terminal','help','admin']){if(key==='conference'&&state.core_conference!==1)continue;if(key==='games'&&!state.games?.length)continue;if(key==='admin'&&!state.admin&&!state.sigop&&!state.vault_sigop)continue;if(['mail','chat','files'].includes(key)&&state.features?.[key==='files'?'vault':key]===0)continue;root.append(button('',()=>navigate(key),'nav-item'+(view===key?' active':'')).appendChild(el('span',{},icons[key])).parentNode);const last=root.lastChild;last.append(el('span',{},t(key)+(!state.user&&['mail','files','chat','gather','conference','settings'].includes(key)?' 🔒':'')));if(!state.user&&['mail','files','chat','gather','conference','settings'].includes(key))last.title=lang==='ja'?'ログインが必要です':'Sign-in required';last.setAttribute('aria-current',view===key?'page':'false');}setStatus();}
-async function api(path,data,options={}){busy++;try{const headers={...options.headers};if(data!==undefined){headers['Content-Type']='application/json';if(csrf)headers['X-CSRF-Token']=csrf;}const r=await fetch('api/'+path,{method:data===undefined?'GET':'POST',credentials:'same-origin',headers,body:data===undefined?undefined:JSON.stringify(data),...options});const type=r.headers.get('Content-Type')||'';const result=type.includes('json')?await r.json():{error:await r.text()};if(!r.ok)throw new Error(result.error||r.statusText);if(result.csrf)csrf=result.csrf;if(typeof result.secret_challenge==='string')secretChallenge=result.secret_challenge;if(result.state){if(state.user!==result.state.user)clearPrivateView();state=result.state;actions=result.actions||actions;connected=true;nav();}return result;}catch(error){toast(error.message,true);throw error;}finally{busy--;}}
+async function api(path, data, options={}) {
+    const requestedCsrf=csrf;
+    busy++;
+    try {
+        const headers={...options.headers};
+        if(data!==undefined) {
+            headers['Content-Type']='application/json';
+            if(requestedCsrf)headers['X-CSRF-Token']=requestedCsrf;
+        }
+        const r=await fetch('api/'+path,{
+            method:data===undefined?'GET':'POST', credentials:'same-origin',
+            body:data===undefined?undefined:JSON.stringify(data), ...options, headers
+        });
+        const type=r.headers.get('Content-Type')||'';
+        const result=type.includes('json')?await r.json():{error:await r.text()};
+        if(!r.ok)throw new Error(result.error||r.statusText);
+        if(requestedCsrf!==csrf)throw new Error(t('refresh'));
+        if(state.user && result.state && !result.state.user) {
+            clearPrivateView();
+            csrf='';state={};
+            await connect();
+            return result;
+        }
+        if(result.csrf && result.csrf!==csrf) {
+            csrf=result.csrf;
+            if(requestedCsrf)listen();
+        }
+        if(typeof result.secret_challenge==='string')secretChallenge=result.secret_challenge;
+        if(result.state) {
+            if(state.user!==result.state.user)clearPrivateView();
+            state=result.state;
+            actions=result.actions||actions;
+            connected=true;
+            nav();
+        }
+        return result;
+    } catch(error) {
+        toast(error.message,true);
+        throw error;
+    } finally {
+        busy--;
+    }
+}
 async function handleResult(r,{show=true}={}){if(currentArticle&&/^(?:HIDDEN |WITHDRAWN |WITHDRAW SAVED )/m.test(r.text||'')){currentArticle=null;main(heading('board',selectedTitle,[button('← '+t('back'),()=>boardPage())]));}if((r.mutation?.ok===false||r.text&&/^(ERR |MAIL ERROR|CHAT ERROR)/m.test(r.text))&&!r.data?.article&&!r.data?.message)toast(r.text.trim(),true);if(show&&(r.text||r.data?.report)){const target=$('#chat-results')||$('#main');target.querySelector(':scope > .result')?.remove();target.append(collectionResult(r)||messageResult(r.text,r.data?.report));}dialogue(r.text);return r;}
 function showDialog(title,content){$('#dialog-title').textContent=title;$('#dialog-body').replaceChildren(content);if(!$('#dialog').open)$('#dialog').showModal();}
 async function closeDialog(){if(composing){toast(lang==='ja'?'送信処理の完了をお待ちください。':'Please wait for the current submission.');return;}if(draftDirty&&!confirm(lang==='ja'?'未保存の入力を閉じますか？':'Close without saving?'))return;if(state.editing)await api('input',{line:'/CANCEL'});draftDirty=false;$('#dialog').close();}
@@ -59,7 +101,7 @@ function dialogue(text=''){
 }
 function authDialog(register=false){
  const form=template('auth');form.querySelector('[data-switch]').textContent=register?t('login'):t('register');form.querySelector('[data-switch]').onclick=()=>authDialog(!register);form.querySelector('[type=submit]').textContent=register?t('register'):t('login');
- form.onsubmit=async e=>{e.preventDefault();const submit=form.querySelector('[type=submit]');submit.disabled=true;try{const r=await api('auth',{...formValues(form),register});form.elements.password.value='';$('#dialog').close();if(state.user){toast((lang==='ja'?'ようこそ、':'Welcome, ')+state.username);listen();await loadBoards();await navigate(view,true);}else await handleResult(r);}finally{submit.disabled=false;}};showDialog(register?t('register'):t('login'),form);translate();
+ form.onsubmit=async e=>{e.preventDefault();const submit=form.querySelector('[type=submit]');submit.disabled=true;try{const r=await api('auth',{...formValues(form),register});form.elements.password.value='';$('#dialog').close();if(state.user){toast((lang==='ja'?'ようこそ、':'Welcome, ')+state.username);await loadBoards();await navigate(view,true);}else await handleResult(r);}finally{submit.disabled=false;}};showDialog(register?t('register'):t('login'),form);translate();
 }
 
 async function connect(){try{let r;const res=await fetch('api/session');if(res.ok){r=await res.json();state=r.state;csrf=r.csrf;secretChallenge=r.secret_challenge||'';actions=r.actions;connected=true;}else r=await api('session',{});nav();listen();if(state.secret){view='home';main(heading('home'));dialogue();}else await navigate('home',true);}catch{connected=false;nav();main(heading('home'),empty(lang==='ja'?'BBSへ接続できません。サーバーが対応版か確認してください。':'Unable to connect. Check the BBS connector version.'),button(t('connection'),connect));}}

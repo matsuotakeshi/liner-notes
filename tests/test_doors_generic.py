@@ -1,6 +1,6 @@
 """Real Telnet, private dropfiles, cross-runtime slots and process-group cleanup."""
 from pathlib import Path
-import os, re, sys, tempfile, time
+import os, re, resource, sys, tempfile, time
 from test_board import Server
 from test_telnet import Client
 from test_door_resize import gone
@@ -12,11 +12,14 @@ def run(binary):
     with tempfile.TemporaryDirectory(prefix='ln-generic-doors-') as tmp:
         p=Path(tmp);game=p/'probe';other=p/'other';other.mkdir()
         game.write_text('#!'+sys.executable+'''
-import os,sys,tty,json,signal
+import os,sys,tty,json,signal,resource
 from pathlib import Path
 tty.setraw(0)
 drop=Path(os.environ['LINER_DOOR_DROP_DIR'])
 info={'pid':os.getpid(),'node':os.environ['LINER_DOOR_NODE'],'drop':str(drop),'user':os.environ['LINER_USER_ID']}
+info['cpu']=resource.getrlimit(resource.RLIMIT_CPU)[0]
+info['core']=resource.getrlimit(resource.RLIMIT_CORE)
+info['tty']=[os.isatty(fd) for fd in (0,1,2)]
 print('PROBE '+json.dumps(info)+'\\r',flush=True)
 print('KEY> ',end='',flush=True)
 while True:
@@ -32,10 +35,14 @@ while True:
         print('CHILD '+str(child)+'\\r',flush=True)
     print('KEY '+c.hex()+'\\r\\nKEY> ',end='',flush=True)
 ''');game.chmod(0o700)
-        conf=p/'doors';conf.write_text(f'1|0|30|{game}|{p}|Probe|dorinfo1:1\n2|5|30|{game}|{p}|Restricted|dorinfo1:1\n3|0|30|{game}|{other}|Other|dorinfo1:2\n4|0|1|{game}|{other}|Timed|dorinfo1:2\n')
+        conf=p/'doors';conf.write_text(f'1|0|30|{game}|{p}|Probe|dorinfo1:1\n2|5|30|{game}|{p}|Restricted|dorinfo1:1\n3|0|30|{game}|{other}|Other|dorinfo1:2\n4|0|1|{game}|{other}|Timed|dorinfo1:2\n5|0|3600|{game}|{other}|Limits|dorinfo1:1\n')
         servers=[];clients=[]
+        inherited, hard = resource.getrlimit(resource.RLIMIT_CPU)
+        ceiling = 900 if inherited == resource.RLIM_INFINITY else min(900, inherited)
+        def limit_runtime_cpu():
+            resource.setrlimit(resource.RLIMIT_CPU, (ceiling, hard))
         def server(label):
-            s=Server(binary,p/(label+'.dat'),members=p/(label+'.members'),menu=True,telnet=True,language='en',options=['--doors',str(conf)]);servers.append(s);return s
+            s=Server(binary,p/(label+'.dat'),preexec_fn=limit_runtime_cpu,members=p/(label+'.members'),menu=True,telnet=True,language='en',options=['--doors',str(conf)]);servers.append(s);return s
         def login(s,name):
             c=Client(s.port);c.door_test_identity=name;clients.append(c);c.until();c.send(('REGISTER '+name+'\r\nprivate-password\r\n').encode());assert b'Logged in' in c.until();return c
         def start(c,n):
@@ -56,6 +63,9 @@ while True:
             guest=Client(s.port);clients.append(guest);guest.until();assert b'login' in guest.cmd('GAME').lower()
             for client in (a,b,c):
                 out=client.cmd('game',PROMPT);assert b'1: Probe' in out and b'2: Restricted' not in out,out
+            limits=start(a,5)
+            assert limits['cpu']==ceiling and limits['core']==[0,0] and all(limits['tty']),limits
+            finish(a)
             info=start(a,1);drop=Path(info['drop']);data=(drop/'DORINFO1.DEF').read_bytes()
             assert data.split(b'\r\n')==[b'Liner notes',b'SYSOP',b'',b'COM0',b'0 BAUD,N,8,1',b'0',b'LN000000001',b'',b'',b'1',b'2',b'1',b''],data
             assert drop.stat().st_mode&0o777==0o700 and (drop/'DORINFO1.DEF').stat().st_mode&0o777==0o600

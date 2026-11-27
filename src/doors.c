@@ -86,6 +86,14 @@ static int door_drop(Door *d,const DoorSpec *g,uint32_t user,unsigned level) {
     if(fclose(f))ok=0;
     return ok;
 }
+/* A Door may tighten the limits the service inherited, never raise them. */
+static int door_limit(int resource,rlim_t soft,rlim_t hard) {
+    struct rlimit limit;
+    if(getrlimit(resource,&limit)<0)return 0;
+    if(limit.rlim_cur==RLIM_INFINITY || limit.rlim_cur>soft)limit.rlim_cur=soft;
+    if(limit.rlim_max==RLIM_INFINITY || limit.rlim_max>hard)limit.rlim_max=hard;
+    return setrlimit(resource,&limit)==0;
+}
 static int door_paths_valid(void *context,const DoorSpec *game) {
     struct stat st;(void)context;
     return !stat(game->exe,&st) && S_ISREG(st.st_mode) && !access(game->exe,X_OK)
@@ -132,12 +140,15 @@ Door *door_start(unsigned id,unsigned level,uint32_t user,const char *name,unsig
         /* login_tty establishes the controlling STREAMS terminal and stdio. */
         if(login_tty(slave))_exit(126);
 #else
-        setsid();ioctl(slave,TIOCSCTTY,0);dup2(slave,0);dup2(slave,1);dup2(slave,2);
+        if(setsid()<0 || ioctl(slave,TIOCSCTTY,0)<0 ||
+           dup2(slave,STDIN_FILENO)<0 || dup2(slave,STDOUT_FILENO)<0 ||
+           dup2(slave,STDERR_FILENO)<0)_exit(126);
 #endif
         /* Inherit only the slot lock, so a surviving child still owns its slot. */
         for(int fd=3;fd<maxfd;fd++)if(fd!=d->lock)close(fd);
         signal(SIGTERM,SIG_DFL);signal(SIGINT,SIG_DFL);signal(SIGHUP,SIG_DFL);signal(SIGPIPE,SIG_DFL);
-        struct rlimit cpu={g->seconds,g->seconds+1},files={64,64},core={0,0};setrlimit(RLIMIT_CPU,&cpu);setrlimit(RLIMIT_NOFILE,&files);setrlimit(RLIMIT_CORE,&core);
+        if(!door_limit(RLIMIT_CPU,g->seconds,g->seconds+1) ||
+           !door_limit(RLIMIT_NOFILE,64,64) || !door_limit(RLIMIT_CORE,0,0))_exit(126);
         if(chdir(g->dir))_exit(126);
         execve(g->exe,argv,env);
         _exit(127);

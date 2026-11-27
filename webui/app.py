@@ -32,6 +32,8 @@ class TemplateError(Exception):
 @dataclass
 class WebSession:
     bridge: Bridge
+    guest_lock: asyncio.Lock = field(default_factory=asyncio.Lock)
+    member: int = 0
     csrf: str = field(default_factory=lambda:secrets.token_urlsafe(32))
     events: deque = field(default_factory=lambda:deque(maxlen=100))
     terminal: bool = False
@@ -91,7 +93,73 @@ def create_app(config):
         response.headers['Cache-Control']='no-store'
         return response
 
-    app = web.Application(middlewares=[boundary],client_max_size=400000)
+    @web.middleware
+    async def identity_boundary(request, handler):
+        ident = request.cookies.get(cookie, '')
+        session = sessions.get(ident)
+        if not session or not request.path.startswith(base + 'api/'):
+            return await handler(request)
+        if request.path in (base+'api/terminal', base+'api/events'):
+            # The event stream checks its admission cookie for its whole lifetime.
+            # The terminal has its own BBS connection and login.
+            return await handler(request)
+        if session.member:
+            # An interactive logout retires the bridge along with its outstanding work.
+            try:
+                if session.bridge.state.get('user') != session.member:
+                    raise web.HTTPUnauthorized(text='Session expired')
+                reply = await handler(request)
+                member = session.bridge.state.get('user')
+                if member and member != session.member:
+                    raise web.HTTPUnauthorized(text='Session changed')
+                return reply
+            finally:
+                if session.bridge.state.get('user') != session.member and sessions.pop(ident, None):
+                    if session.terminal_ws is not None and session.terminal_ws.prepared:
+                        await session.terminal_ws.close()
+                    await session.bridge.close()
+
+        async with session.guest_lock:
+            if sessions.get(ident) is not session:
+                raise web.HTTPUnauthorized(text='Session expired')
+            try:
+                reply = await handler(request)
+                member = session.bridge.state.get('user')
+                if not member:
+                    return reply
+                # Any guest dialogue can finish authentication, including a
+                # detailed application or password prompt. Rotate before replying.
+                payload = json.loads(reply.body)
+                if payload.get('state', {}).get('user') != member:
+                    raise BridgeError('Sign-in result unavailable; please reconnect')
+                async with session.bridge.lock:
+                    games = await session.bridge.exchange('GAMES')
+                if sessions.get(ident) is not session or session.bridge.state.get('user') != member:
+                    raise web.HTTPUnauthorized(text='Session expired')
+                session.games = [{'id':int(m[1]), 'title':m[2].rstrip('\r')}
+                                 for m in re.finditer(r'^GAME (\d+) \d+ (.*)\r?$', games['text'], re.M)]
+                if session.terminal_ws is not None and session.terminal_ws.prepared:
+                    await session.terminal_ws.close()
+                if sessions.get(ident) is not session:
+                    raise web.HTTPUnauthorized(text='Session expired')
+                session.downloads.clear()
+                session.member = member
+                session.csrf = secrets.token_urlsafe(32)
+                payload['csrf'] = session.csrf
+                payload['state']['games'] = session.games
+                result = web.json_response(payload)
+                new_id = secrets.token_urlsafe(32)
+                result.set_cookie(cookie,new_id,httponly=True,secure=secure,samesite='Strict',path=base)
+                del sessions[ident]
+                sessions[new_id] = session
+                return result
+            except BaseException as error:
+                if session.bridge.state.get('user') or isinstance(error, asyncio.CancelledError):
+                    sessions.pop(ident, None)
+                    await session.bridge.close()
+                raise
+
+    app = web.Application(middlewares=[boundary, identity_boundary],client_max_size=400000)
     app['sessions']=sessions
 
     async def link_control(request):
@@ -184,14 +252,6 @@ def create_app(config):
             if session.bridge.state.get('secret'):
                 result=await session.bridge.exchange(password)
             # Detailed application forms continue through the interactive form.
-        if session.bridge.state.get('user'):
-            async with session.bridge.lock:
-                games=await session.bridge.exchange('GAMES')
-                session.games=[{'id':int(m[1]),'title':m[2].rstrip('\r')} for m in re.finditer(r'^GAME (\d+) \d+ (.*)\r?$',games['text'],re.M)]
-            old=request.cookies.get(cookie,'');sessions.pop(old,None)
-            session.csrf=secrets.token_urlsafe(32);ident=secrets.token_urlsafe(32);sessions[ident]=session
-            result=response(session,result);result.set_cookie(cookie,ident,httponly=True,secure=secure,samesite='Strict',path=base)
-            return result
         return response(session,result)
 
     # Typed result lists share the action form and return the Core's opaque next position.
@@ -574,22 +634,27 @@ def create_app(config):
         session=current(request,terminal_ok=True)
         protocols={part.strip() for part in request.headers.get('Sec-WebSocket-Protocol','').split(',')}
         if 'csrf.'+session.csrf not in protocols:raise web.HTTPForbidden()
+        ident=request.cookies.get(cookie,'')
         ws=web.WebSocketResponse(protocols=('liner-notes-v1',),heartbeat=30,max_msg_size=4096)
         await ws.prepare(request)
         try:
             while not ws.closed and not session.bridge.closed:
-                text=session.bridge.idle_output()
+                if sessions.get(ident) is not session:break
+                if session.member and session.bridge.state.get('user') != session.member:break
+                text='' if session.guest_lock.locked() else session.bridge.idle_output()
                 if text:await ws.send_json({'text':text})
                 try:
                     msg=await asyncio.wait_for(ws.receive(),.3)
                     if msg.type in (WSMsgType.CLOSE,WSMsgType.CLOSED,WSMsgType.ERROR):break
                 except asyncio.TimeoutError:pass
-            if not ws.closed:await ws.send_json({'closed':True})
+            if not ws.closed and sessions.get(ident) is session:await ws.send_json({'closed':True})
         finally:await ws.close()
         return ws
 
     async def terminal(request):
-        return await relay(request,current(request,terminal_ok=True),upstream)
+        session = current(request,terminal_ok=True)
+        ident = request.cookies.get(cookie,'')
+        return await relay(request, session, upstream, lambda: sessions.get(ident) is session)
 
     async def progress(request):
         session=current(request)
@@ -617,8 +682,10 @@ def create_app(config):
         used=sum(x.stat().st_size for x in spool.iterdir() if x.is_file())
         reserved=sum(t['expected']-t['received'] for t in transfers.values() if not t['done'])
         if used+reserved+total>spool_limit:raise BridgeError('Web transfer spool capacity reached')
-        token=secrets.token_urlsafe(24);status={'owner':session,'name':name,'kind':'mail' if private else 'public','expected':total,'received':0,'sent':0,'done':False,'id':0,'phase':'receiving'};transfers[token]=status
-        fd,temp=tempfile.mkstemp(prefix='upload-',dir=spool);digest=hashlib.sha256()
+        token=secrets.token_urlsafe(24);status={'owner':session,'name':name,'kind':'mail' if private else 'public','expected':total,'received':0,'sent':0,'done':False,'id':0,'phase':'receiving'}
+        digest=hashlib.sha256()
+        fd,temp=tempfile.mkstemp(prefix='upload-',dir=spool)
+        transfers[token]=status
         try:
             with os.fdopen(fd,'wb') as stream:
                 async for chunk in request.content.iter_chunked(65536):

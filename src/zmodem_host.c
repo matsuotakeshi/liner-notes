@@ -68,8 +68,10 @@ ZHost *zhost_start(const char *helper,int receive,unsigned id,const char *user,c
     long maxfd=sysconf(_SC_OPEN_MAX);if(maxfd<0)maxfd=65536;
     pid_t pid=fork();
     if(!pid) {
-        setpgid(0,0);dup2(wi,0);dup2(wi,1);dup2(ct,3);
-        int nullfd=open("/dev/null",O_WRONLY);if(nullfd>=0)dup2(nullfd,2);
+        if(setpgid(0,0)<0 || dup2(wi,STDIN_FILENO)<0 ||
+           dup2(wi,STDOUT_FILENO)<0 || dup2(ct,3)<0)_exit(126);
+        int nullfd=open("/dev/null",O_WRONLY);
+        if(nullfd<0 || dup2(nullfd,STDERR_FILENO)<0)_exit(126);
         for(int fd=4;fd<maxfd;fd++)close(fd);
         const char *action=personal?"receive-pfile":receive==12?"receive-mail-many-resume":receive==11?"receive-mail-many":receive==10?"batch-mail":receive==9?"receive-many-resume":receive==8?"receive-mail-resume":receive==7?"receive-resume":receive==6?"receive-many":receive==5?"send-mail":receive==4?"receive-mail":receive==3?"receive-in":receive==2?"batch":receive?"receive":"send";const char *codes[]={"z","x","y","g","m","t","s","k"};char selected[48];if(protocol>7)_exit(127);snprintf(selected,sizeof(selected),"%s-%s",codes[protocol],action);
         execl(helper,helper,protocol?selected:action,number,user,text,service,(char *)NULL);_exit(127);

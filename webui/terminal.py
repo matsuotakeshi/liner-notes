@@ -6,7 +6,7 @@ from aiohttp import web, WSMsgType
 from .bridge import TelnetDecoder
 
 
-async def relay(request, session, upstream):
+async def relay(request, session, upstream, admitted):
     protocols={x.strip() for x in request.headers.get('Sec-WebSocket-Protocol','').split(',')}
     if 'csrf.'+session.csrf not in protocols:raise web.HTTPForbidden()
     if session.terminal:raise web.HTTPConflict(text='A terminal is already open')
@@ -16,7 +16,11 @@ async def relay(request, session, upstream):
     session.terminal_ws=ws
     try:
         reader,writer=await asyncio.wait_for(asyncio.open_connection(upstream['host'],int(upstream['port'])),15)
+        if not admitted():
+            raise web.HTTPUnauthorized(text='Session expired')
         await ws.prepare(request)
+        if not admitted():
+            return ws
         decoder=TelnetDecoder()
         async def output():
             try:
@@ -48,5 +52,5 @@ async def relay(request, session, upstream):
             except OSError:pass
         session.terminal=False
         session.terminal_ws=None
-        await ws.close()
+        if ws.prepared:await ws.close()
     return ws
