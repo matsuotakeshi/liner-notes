@@ -574,7 +574,7 @@ MemberOutcome member_core_menu_save(const MemberActor *actor,MemberMenuMode mode
     return member_settings_repository_menu_save(actor->user,(unsigned)mode)?MEMBER_CORE_OK:MEMBER_CORE_SETTINGS_STORAGE;
 }
 static int check_scope(MemberCheckKind kind,const char *scope) {
-    if(kind<MEMBER_CHECK_ARTICLES || kind>MEMBER_CHECK_NET_COCK || !scope)return 0;
+    if(kind<MEMBER_CHECK_ARTICLES || kind>MEMBER_CHECK_VS || !scope)return 0;
     if(!*scope)return 1;
     if(kind==MEMBER_CHECK_MAIL || kind==MEMBER_CHECK_MMM || kind==MEMBER_CHECK_WANI || kind==MEMBER_CHECK_NET_COCK)return 0;
     if(kind==MEMBER_CHECK_FILES) {
@@ -606,7 +606,7 @@ MemberOutcome member_core_check_commit(const MemberActor *actor,MemberCheckKind 
 }
 MemberOutcome member_core_sequencer_set(const MemberActor *actor,MemberCheckKind kind,uint64_t stamp) {
     MemberOutcome result=settings_authorize(actor);if(result!=MEMBER_CORE_OK)return result;
-    if(kind!=MEMBER_CHECK_MMM && kind!=MEMBER_CHECK_WANI && kind!=MEMBER_CHECK_NET_COCK)return MEMBER_CORE_INVALID;
+    if(kind!=MEMBER_CHECK_MMM && kind!=MEMBER_CHECK_WANI && kind!=MEMBER_CHECK_NET_COCK && kind!=MEMBER_CHECK_VS)return MEMBER_CORE_INVALID;
     uint64_t now=0;
     if(!member_settings_repository_now(&now) || now>INT64_MAX)return MEMBER_CORE_SETTINGS_STORAGE;
     if(stamp>now)return MEMBER_CORE_INVALID;

@@ -26,4 +26,5 @@ Use UI big-model when enabled. B opens SIGs, N/O/X explore new articles, T sends
 
 Use UI wani-bbs when enabled. b opens boards, p opens files, s opens settings, g opens games, topic opens the message board, and ? describes the current screen.
 
+Use UI vs when enabled. B opens boards, N reads news, NA streams it, and U > B > N NUMBER or N RELATED changes its order. J and DJ are unavailable.
 Use UI net-cock when enabled. MODE MENU selects numbered menus and MODE COMMAND selects commands. BREAD opens a board, R reads the body, and EXCOM lists Liner Notes extensions.

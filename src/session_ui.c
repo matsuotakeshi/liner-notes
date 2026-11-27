@@ -7,7 +7,7 @@
 #include <openssl/crypto.h>
 
 SessionUiConfig session_ui_default(void) {
-    SessionUiConfig config={.count=7,.allowed=1,.policy=SESSION_UI_FIXED};
+    SessionUiConfig config={.count=8,.allowed=1,.policy=SESSION_UI_FIXED};
     config.adapters[0]=session_ui_rtbbs();
     config.adapters[1]=session_ui_mmm();
     config.adapters[2]=session_ui_mash();
@@ -15,6 +15,7 @@ SessionUiConfig session_ui_default(void) {
     config.adapters[4]=session_ui_big_model();
     config.adapters[5]=session_ui_wani_bbs();
     config.adapters[6]=session_ui_net_cock();
+    config.adapters[7]=session_ui_vs();
     return config;
 }
 
@@ -245,6 +246,8 @@ int session_notice(const Session *s,SessionNotice kind,unsigned number,uint64_t 
 
 int session_chat_event(void *context,const ChatEvent *event) {
     Session *s=context;
-    if(!s->core.active || s->core.closing || !s->core.user || s->connection.zmodem || s->connection.door || !s->ui_binding.state)return 0;
+    if(!s->core.active || s->core.closing || !s->core.user || !s->ui_binding.state)return 0;
+    if((s->connection.zmodem || s->connection.door) &&
+       (event->kind!='I' || s->ui_binding.active!=session_ui_vs()))return 0;
     return s->ui_binding.active->chat_event(s,event);
 }

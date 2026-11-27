@@ -1,0 +1,5 @@
+#ifndef LINER_VS_CORE_H
+#define LINER_VS_CORE_H
+#define BOARD_VS '\x18'
+typedef enum { VS_PAGE=1, VS_MODE_GET, VS_MODE_SET, VS_MASK_SET, VS_TARGETS, VS_WINDOW, VS_COMMIT, VS_POINTER } VsCoreAction;
+#endif

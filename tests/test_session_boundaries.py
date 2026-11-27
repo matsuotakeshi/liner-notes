@@ -11,7 +11,7 @@ class SessionBoundaries(unittest.TestCase):
     def test_all_adapters_are_separate_build_inputs(self):
         make = (ROOT/'Makefile').read_text(encoding='utf-8')
         sources = re.search(r'^SESSION_SOURCES= (.+)$', make, re.M).group(1).split()
-        expected = {'src/session.c', 'src/mmm_input.c', 'src/ktbbs_input.c', 'src/big_model_input.c','src/wani_bbs_input.c', 'src/net_cock_input.c'} | {p.relative_to(ROOT).as_posix() for p in (ROOT/'src').glob('session_*.c') if not p.name.endswith('_core.c')}
+        expected = {'src/session.c', 'src/mmm_input.c', 'src/ktbbs_input.c', 'src/big_model_input.c','src/wani_bbs_input.c', 'src/net_cock_input.c', 'src/vs_input.c'} | {p.relative_to(ROOT).as_posix() for p in (ROOT/'src').glob('session_*.c') if not p.name.endswith('_core.c')}
         self.assertEqual(set(sources), expected)
         self.assertEqual(len(sources),len(set(sources)))
         for target in ('runtime', 'test-adapters'):

@@ -77,7 +77,7 @@ for line in sys.stdin:
         options = ['--ssh-port', str(ssh_port), '--ssh-host-key', str(host),
                    '--ssh-member-keys', str(keys), '--ssh-timeout', '3',
                    '--ssh-attempts', '4', '--doors', str(doors),
-                   '--ui-policy', 'MEMBERS', '--ui-allow', 'rtbbs,mmm,mash,ktbbs,big-model,net-cock']
+                   '--ui-policy', 'MEMBERS', '--ui-allow', 'rtbbs,mmm,mash,ktbbs,big-model,net-cock,vs']
         server = Server(binary, root/'notes', members=root/'members', admins=admins,
                         telnet=True, menu=True, language='en', options=options)
         transports = []
@@ -296,7 +296,17 @@ for line in sys.stdin:
             net.cmd('UI rtbbs', b'UI PREF SAVED rtbbs')
             net.until()
             net.channel.get_transport().close()
-            print('PASS MMM, MASH, KTBBS, BIG-Model and NET-COCK over SSH: shared articles and UI selection')
+            vs = screen(connect('bob'))
+            vs.cmd('UI vs', b'UI preference saved.')
+            vs.until(b'VS> ')
+            vs.cmd('B #1', b'Message> ')
+            assert b'SSH article body' in vs.cmd('R 1', b'Read> ')
+            vs.cmd('Q', b'Message> ')
+            vs.cmd('Q', b'VS> ')
+            vs.cmd('UI rtbbs', b'UI PREF SAVED rtbbs')
+            vs.until()
+            vs.channel.get_transport().close()
+            print('PASS MMM, MASH, KTBBS, BIG-Model, NET-COCK and VS over SSH: shared articles and UI selection')
         finally:
             telnet.close()
             for t in transports: t.close()

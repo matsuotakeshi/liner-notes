@@ -9,7 +9,7 @@ static const struct {
     {"login","login [id]",MMM_LOGIN,0},
     {"register","register id",MMM_REGISTER,0},
     {"off","off [-n]",MMM_OFF,0},
-    {"ui","ui [rtbbs|mmm|mash|ktbbs|big-model|wani-bbs|net-cock|reset]",MMM_UI,0},
+    {"ui","ui [rtbbs|mmm|mash|ktbbs|big-model|wani-bbs|net-cock|vs|reset]",MMM_UI,0},
     {"logout","logout",MMM_LOGOUT,1},
     {"notes","notes",MMM_NOTES,1},
     {"go","go board",MMM_GO,1},

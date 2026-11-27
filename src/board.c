@@ -1211,6 +1211,7 @@ static void execute(const BoardRequest *q,BoardResult *r) {
     }
     if(q->op=='}') { advanced_execute(q,r);return; }
     if(q->op==BOARD_NOTE_VIEW) { note_view(q,r);return; }
+    if(q->op==BOARD_VS) { vs_operation(q,r);return; }
     if(q->op==BOARD_NET_COCK) { net_cock_operation(q,r);return; }
     if(q->op==BOARD_WANI) { wani_configure(q,r);return; }
     if(q->op==BOARD_CONFERENCE) { conference_execute(q,r);return; }
