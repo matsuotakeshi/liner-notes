@@ -7,13 +7,14 @@
 #include <openssl/crypto.h>
 
 SessionUiConfig session_ui_default(void) {
-    SessionUiConfig config={.count=6,.allowed=1,.policy=SESSION_UI_FIXED};
+    SessionUiConfig config={.count=7,.allowed=1,.policy=SESSION_UI_FIXED};
     config.adapters[0]=session_ui_rtbbs();
     config.adapters[1]=session_ui_mmm();
     config.adapters[2]=session_ui_mash();
     config.adapters[3]=session_ui_ktbbs();
     config.adapters[4]=session_ui_big_model();
     config.adapters[5]=session_ui_wani_bbs();
+    config.adapters[6]=session_ui_net_cock();
     return config;
 }
 
