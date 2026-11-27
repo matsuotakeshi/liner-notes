@@ -394,7 +394,9 @@ LINER_NOTES_OPTIONS="--telnet --menu --lang ja --bind 127.0.0.1 --timezone Asia/
 
 `runtime [オプション] PORT [BOARD_FILE [MEMBERS_FILE [CATALOG_FILE]]]` の順です。`liner-notes` はインストール時の実行名です。全オプションはポートより前へ置きます。
 
-端末UIも起動引数で設定できます。選択範囲は `--ui-policy FIXED|MEMBERS|ALL`、接続時の既定は `--ui-default NAME`、許可一覧は `--ui-allow NAME,...` です。例は `--ui-policy MEMBERS --ui-default rtbbs --ui-allow rtbbs,mmm,mash,ktbbs,big-model`。KTBBS風の操作は[個人設定](personal-settings.md#ktbbs-ui)を参照してください。
+端末UIも起動引数で設定できます。選択範囲は `--ui-policy FIXED|MEMBERS|ALL`、接続時の既定は `--ui-default NAME`、許可一覧は `--ui-allow NAME,...` です。例は `--ui-policy MEMBERS --ui-default rtbbs --ui-allow rtbbs,mmm,mash,ktbbs,big-model,wani-bbs`。KTBBS風とWANI-BBS風の操作は[個人設定](personal-settings.md#ktbbs-ui)と[WANI-BBS風UI](personal-settings.md#wani-bbs-ui)を参照してください。
+
+WANI-BBS風UIの対応版では `layout 掲示板番号 flat|mnotes|inherit` で表示形式を設定します。ボード管理権限が必要です。管理者は `layout default flat|mnotes` で局の既定値を変更できます。初期値はマルチノーツです。
 
 `--admins`, `--banner`, `--bind`, `--chat-log`, `--database`, `--database-structured`, `--disable`, `--doors`, `--gather-count`, `--goodbye`, `--help-dir`, `--id-digits`, `--id-first`, `--id-mode`, `--id-prefix`, `--idle-seconds`, `--lang`, `--level-seconds`, `--limits`, `--link-accounts`, `--login-text-dir`, `--max-articles`, `--max-mail`, `--max-user-posts`, `--menu`, `--menu-dir`, `--registration`, `--registration-form`, `--rtbbs-member-policy`, `--sysinfo`, `--telnet`, `--time-grace`, `--time-warning`, `--timezone`, `--user-log`, `--userlog-keep`, `--userlog-public`, `--vault-dir`, `--zmodem-helper`
 
