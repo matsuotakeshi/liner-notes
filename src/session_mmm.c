@@ -1,6 +1,7 @@
 #include "session_mmm_internal.h"
 #include "session_big_model.h"
 #include "session_wani_bbs.h"
+#include "session_net_cock.h"
 #include "mmm_input.h"
 #include "editor_core.h"
 #include "zmodem_host.h"
@@ -46,6 +47,7 @@ void mmm_prompt(Session *s) {
     if(ktbbs_active(s) && ktbbs_prompt(s))return;
     if(big_model_active(s) && big_model_prompt(s))return;
     if(wani_active(s) && wani_prompt(s))return;
+    if(net_cock_active(s) && net_cock_prompt(s))return;
     static const char *const inputs[]={
         NULL,"ID> ","Password> ","Board password> ","Title> ","Text> ",
         "Editor>> ","Base note #> ","Response number> ","Title search> ","File board password> "
@@ -69,6 +71,7 @@ void mmm_menu(Session *s,int requested) {
     if(ktbbs_active(s)) { ktbbs_menu(s,requested);return; }
     if(big_model_active(s)) { big_model_menu(s,requested);return; }
     if(wani_active(s)) { wani_menu(s,requested);return; }
+    if(net_cock_active(s)) { net_cock_menu(s,requested);return; }
     (void)requested;
     if(!s->core.user) { mmm_say(s,"Login required. login ID / register ID / ?\r\n",
                               "ログインが必要です。login ID / register ID / ?\r\n");return; }
@@ -819,6 +822,7 @@ static void line(Session *s,char *text,size_t size) {
     case INPUT_LOGIN: m->input=INPUT_NONE;mmm_ui_auth_start(s,text,'a');break;
     case INPUT_TITLE: case INPUT_BODY: case INPUT_EDITOR: case INPUT_KTBBS_CONFIRM:
         if(wani_active(s) && wani_editor_line(s,&text))break;
+        if(net_cock_active(s) && net_cock_editor(s,text))break;
         if(!ktbbs_active(s) || !ktbbs_editor_line(s,&text)) {
             MmmPrompt previous=m->input;
             editorial(s,text);
@@ -853,6 +857,7 @@ static void line(Session *s,char *text,size_t size) {
         else if(ktbbs_active(s))ktbbs_line(s,text);
         else if(big_model_active(s))big_model_line(s,text);
         else if(wani_active(s))wani_line(s,text);
+        else if(net_cock_active(s))net_cock_line(s,text);
         else command(s,text);
         break;
     }
@@ -1089,10 +1094,14 @@ static void result(Session *s,const OperationResult *r,SessionResultView project
         }
         char message[88];snprintf(message,sizeof(message),"Logged in: %s\r\n",s->core.username);
         session_impl_queue_text(s,message);
-        m->screen=MAIN_SCREEN;mmm_menu(s,1);mmm_prompt(s);return;
+        m->screen=MAIN_SCREEN;
+        if(net_cock_active(s))net_cock_login(s,r);
+        else { mmm_menu(s,1);mmm_prompt(s); }
+        return;
     }
     if(projection.status!=SESSION_RESULT_OK) {
         if(job==JOB_TRANSFER)s->connection.zmodem_start=0;
+        if(net_cock_active(s))net_cock_result(s,job,r,projection);
         if(job==JOB_STREAM_READ) { mmm_prompt(s);return; }
         if(job==JOB_STREAM_SEEN) { m->stream_seen=0;mmm_stream_pause(s); }
         if(job==JOB_NAMED || job==JOB_BOARD || job==JOB_UNLOCK ||
@@ -1115,7 +1124,12 @@ static void result(Session *s,const OperationResult *r,SessionResultView project
     const OperationPage *page=projection.page;
     switch(job) {
     case JOB_AUTH: mmm_say(s,"Registration request received.\r\n","登録申請を受け付けました。\r\n");break;
-    case JOB_BOARDS: if(page && page->kind==OPERATION_PAGE_BOARDS)render_boards(s,&page->data.boards);break;
+    case JOB_BOARDS:
+        if(page && page->kind==OPERATION_PAGE_BOARDS) {
+            if(net_cock_active(s))net_cock_boards(s,&page->data.boards);
+            else render_boards(s,&page->data.boards);
+        }
+        break;
     case JOB_NAMED: if(r->service_number)mmm_ui_board(s,r->service_number);break;
     case JOB_UNLOCK: mmm_ui_board(s,m->board_target);break;
     case JOB_BOARD:
@@ -1130,6 +1144,7 @@ static void result(Session *s,const OperationResult *r,SessionResultView project
             m->screen=BOARD_SCREEN;m->article=m->root=m->note_parent=m->search_next=0;m->search_responses=0;m->search[0]=0;
             if(ktbbs_active(s) && ktbbs_board_ready(s))break;
             if(wani_active(s) && wani_board_enter(s))break;
+            if(net_cock_active(s)) { net_cock_board(s);break; }
             if(m->action==OPEN_POST)mmm_ui_prepare_post(s,0);
             else if(m->action==OPEN_INDEX)index_page(s,0);
             else if(m->action==OPEN_BASE)mmm_ui_browse(s,BROWSE_EXACT,0,m->target,0,0);
@@ -1141,6 +1156,9 @@ static void result(Session *s,const OperationResult *r,SessionResultView project
         break;
     case JOB_INDEX: if(page && page->kind==OPERATION_PAGE_NOTES)render_index(s,&page->data.notes);break;
     case JOB_BROWSE: if(page && page->kind==OPERATION_PAGE_ARTICLES)browse_result(s,&page->data.articles);break;
+    case JOB_NET_PAGE: case JOB_NET_HEADER: case JOB_NET_BODY: case JOB_NET_SEEN:
+    case JOB_NET_OPERATION: case JOB_NET_PEERS: case JOB_NET_TOPIC: case JOB_NET_DRAFT: case JOB_NET_FIND: case JOB_NET_DRAFT_SAVE:
+        net_cock_result(s,job,r,projection);break;
     case JOB_WANI_MODE: case JOB_WANI_CONFIG: case JOB_WANI_RESOLVE: case JOB_WANI_PAGE:
     case JOB_WANI_WINDOW: case JOB_WANI_SCAN: case JOB_WANI_PERSONAL: case JOB_WANI_PASSWORD: case JOB_WANI_TOPIC: case JOB_WANI_SIGNATURE:
         wani_result(s,job,r,projection);break;
@@ -1236,9 +1254,13 @@ static void result(Session *s,const OperationResult *r,SessionResultView project
     case JOB_MAIL:
         mmm_mail_result(s,r,projection);
         if(wani_active(s))wani_result(s,job,r,projection);
+        if(net_cock_active(s))net_cock_result(s,job,r,projection);
         break;
     case JOB_MAIL_BATCH: mmm_mail_batch_result(s,&r->feedback);break;
-    case JOB_FILES: case JOB_FILE_ADD: mmm_file_result(s,r,page,job==JOB_FILE_ADD);break;
+    case JOB_FILES: case JOB_FILE_ADD:
+        mmm_file_result(s,r,page,job==JOB_FILE_ADD);
+        if(net_cock_active(s))net_cock_result(s,job,r,projection);
+        break;
     case JOB_FILE_UNLOCK: mmm_file_enter(s,m->requested_path);break;
     case JOB_CHAT: mmm_chat_result(s,r,now);break;
     case JOB_PREF: mmm_load_preferences(s,r);mmm_settings_summary(s);break;
@@ -1324,7 +1346,8 @@ static SessionUiSnapshot snapshot(const Session *s) {
     const MmmUi *m=mmm_view(s);
     return (SessionUiSnapshot){.language=m->language,.menu=1,
         .secret=m->input==INPUT_PASSWORD || m->input==INPUT_BOARD_PASSWORD || m->input==INPUT_FILE_PASSWORD ||
-                 (big_model_active(s) && big_model_secret(s)) || (wani_active(s) && wani_secret(s)),
+                 (big_model_active(s) && big_model_secret(s)) || (wani_active(s) && wani_secret(s)) ||
+                 (net_cock_active(s) && net_cock_secret(s)),
         .editing=(m->input>=INPUT_TITLE && m->input<=INPUT_EDITOR) || m->input==INPUT_KTBBS_CONFIRM,
         .chatting=m->chatting,.chat_pending=m->job==JOB_CHAT};
 }
@@ -1341,14 +1364,16 @@ static void enter(Session *s,int initial,int interactive,Language language) {
         char greeting[64];snprintf(greeting,sizeof(greeting),"RTBBS-PROBE %lu\r\n",s->core.id);
         session_impl_queue_text(s,greeting);
     }
-    mmm_menu(s,1);mmm_prompt(s);
+    if(net_cock_active(s) && s->core.user)((NetCockUi *)m)->restore_mode=1;
+    else { mmm_menu(s,1);mmm_prompt(s); }
 }
 
 static int can_leave(const Session *s) {
     const MmmUi *m=mmm_view(s);
     return m->screen==MAIN_SCREEN && m->input==INPUT_NONE && !m->application.step &&
            (!ktbbs_active(s) || ((const KtbbsUi *)s->ui_binding.state)->question==KT_READY) &&
-           (!big_model_active(s) || big_model_ready(s)) && (!wani_active(s) || wani_ready(s));
+           (!big_model_active(s) || big_model_ready(s)) && (!wani_active(s) || wani_ready(s)) &&
+           (!net_cock_active(s) || net_cock_ready(s));
 }
 
 static void cleanup(Session *s,int reason,int notify_revocation) {
@@ -1419,7 +1444,9 @@ static void transfer_finish(Session *s,int ok,unsigned id,uint64_t size,int reco
                                           "転送完了: %u (%llu バイト)。\r\n"),id,(unsigned long long)size);
     else if(recovery>0)snprintf(text,sizeof(text),"%s",message_text(mmm_view(s)->language,MSG_ZMODEM_RECOVERY));
     else snprintf(text,sizeof(text),"%s",message_text(mmm_view(s)->language,MSG_ZMODEM_FAILED));
-    session_impl_queue_text(s,text);mmm_prompt(s);
+    session_impl_queue_text(s,text);
+    if(net_cock_active(s))net_cock_transfer_finished(s,ok);
+    mmm_prompt(s);
 }
 static void transfer_receipt(Session *s,const char *text) {
     uint32_t id;
@@ -1468,6 +1495,7 @@ static void tick(Session *s,uint64_t now) {
        (!s->connection.io.drained || s->connection.io.drained(s->connection.io.context)))mmm_stream_step(s);
     if(!s->core.pending && m->screen==TALK_SCREEN && m->conference_automatic &&
        (!s->connection.io.drained || s->connection.io.drained(s->connection.io.context)))mmm_conference_tick(s);
+    if(net_cock_active(s) && !s->core.pending)net_cock_tick(s);
     NotificationAudience audience=mail_audience(s);
     uint32_t arrivals=notification_mail_take(&mmm_state(s)->notifications,&audience);
     if(arrivals) { mmm_say(s,"\r\nNew mail has arrived.\r\n","\r\n新着メールがあります。\r\n");mmm_prompt(s); }
@@ -1556,6 +1584,10 @@ const SessionUiAdapter *session_ui_big_model(void) {
 }
 const SessionUiAdapter *session_ui_wani_bbs(void) {
     static const SessionUiAdapter adapter=NOTES_ADAPTER("wani-bbs",sizeof(WaniUi),NULL,NULL,wani_help);
+    return &adapter;
+}
+const SessionUiAdapter *session_ui_net_cock(void) {
+    static const SessionUiAdapter adapter=NOTES_ADAPTER("net-cock",sizeof(NetCockUi),net_cock_keys,net_cock_key,net_cock_help);
     return &adapter;
 }
 #undef NOTES_ADAPTER

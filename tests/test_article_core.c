@@ -294,6 +294,14 @@ static void tombstone(const ArticleView *view,const char *body,size_t size,Artic
 }
 static void read_tests(void) {
     ArticleActor actor=reset();ArticleView view;char body[64];
+    assert(article_header(&actor,2,7,&view)==ARTICLE_OK);
+    assert(view.state==ARTICLE_VISIBLE && view.id==7 && view.body_size==strlen(persisted_body) && !body_reads);
+    assert(article_header(&actor,3,7,&view)==ARTICLE_NOT_FOUND);
+    assert(!view.id && !view.body_size && !*view.title && !body_reads);
+    hidden=1;
+    assert(article_header(&actor,2,7,&view)==ARTICLE_OK);
+    assert(!view.id && !view.body_size && !*view.title && !body_reads);
+    hidden=0;
     assert(article_read(NULL,7,0,&view,body,sizeof(body))==ARTICLE_OK);
     assert(view.id==7 && view.board==2 && view.parent==5 && view.state==ARTICLE_VISIBLE);
     assert(!strcmp(view.author,"alice") && !strcmp(view.title,"article-title"));

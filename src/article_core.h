@@ -102,6 +102,7 @@ ArticleOutcome article_author_set(const ArticleActor *,uint32_t article,uint32_t
 ArticleOutcome article_guest_set(const ArticleActor *,uint32_t board,unsigned enabled);
 ArticleOutcome article_sigop_set(const ArticleActor *,uint32_t board,uint32_t target,ArticleRoleChange *out);
 
+ArticleOutcome article_net_withdraw(const ArticleActor *,uint32_t board,uint32_t id,int confirmed);
 ArticleOutcome article_wani_change(const ArticleActor *,uint32_t board,uint32_t id,int confirmed,const char *title);
 ArticleOutcome article_withdraw(const ArticleActor *,uint32_t board,
                                uint32_t article,int confirmed);
@@ -129,6 +130,8 @@ typedef struct {
     size_t body_size;
     char author[33],title[81];
 } ArticleView;
+/* Metadata-only read, constrained to the selected board. No body or read mark. */
+ArticleOutcome article_header(const ArticleActor *,uint32_t board,uint32_t id,ArticleView *);
 ArticleOutcome article_read(const ArticleActor *,uint32_t article,int inspect,
                             ArticleView *out,char *body,size_t capacity);
 /* Owned, bounded current-board pages. No body/hidden metadata is returned.
@@ -255,6 +258,7 @@ ArticleOutcome article_boards(const ArticleActor *,uint32_t start,int children_o
 ArticleOutcome article_next_board(const ArticleActor *,uint32_t current,ArticleBoardRow *out);
 ArticleOutcome article_board_children(const ArticleActor *,uint32_t parent,uint32_t start,
                                       ArticleBoardsPage *out);
+ArticleOutcome article_board_named_folded(const ArticleActor *,const char *title,uint32_t *id);
 ArticleOutcome article_board_named(const ArticleActor *,const char *title,uint32_t *id);
 
 /* Import a visible article from the current board into the actor's own common

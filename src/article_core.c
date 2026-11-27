@@ -371,6 +371,22 @@ ArticleOutcome article_retitle(const ArticleActor *actor,uint32_t board,uint32_t
     return result;
 }
 
+static ArticleOutcome net_withdraw(const ArticleActor *actor,uint32_t board,uint32_t id,int confirmed) {
+    ArticleOutcome result=authorize(actor,board,id);
+    if(result!=ARTICLE_OK)return result;
+    ArticleMetadata item;
+    if(!article_repository_find(id,&item))return ARTICLE_STORAGE;
+    if(item.child && !catalog_manage(board,actor->user))return ARTICLE_OWNER_REQUIRED;
+    return withdraw(actor,board,id,confirmed);
+}
+
+ArticleOutcome article_net_withdraw(const ArticleActor *actor,uint32_t board,uint32_t id,int confirmed) {
+    policy_context(actor?actor->board_grants:NULL);
+    ArticleOutcome result=net_withdraw(actor,board,id,confirmed);
+    policy_context(NULL);
+    return result;
+}
+
 static ArticleOutcome wani_change(const ArticleActor *actor,uint32_t board,uint32_t id,int confirmed,const char *title) {
     ArticleOutcome result=authorize(actor,board,id);
     if(result!=ARTICLE_OK)return result;
@@ -423,7 +439,7 @@ ArticleOutcome article_restore(const ArticleActor *actor,uint32_t board,uint32_t
     return local_moderation(actor,board,id,0);
 }
 
-static ArticleOutcome read_article(const ArticleActor *actor,uint32_t id,int inspect,
+static ArticleOutcome read_article(const ArticleActor *actor,uint32_t id,int inspect,uint32_t header_board,
                                    ArticleView *out,char *body,size_t capacity) {
     ArticleOutcome result=health();
     if(result!=ARTICLE_OK)return result;
@@ -431,8 +447,8 @@ static ArticleOutcome read_article(const ArticleActor *actor,uint32_t id,int ins
     if(result!=ARTICLE_OK)return result;
     uint32_t user=actor?actor->user:0;
     ArticleMetadata article;
-    if(!article_repository_find(id,&article) || !catalog_read(article.board,user))
-        return ARTICLE_NOT_FOUND;
+    if(!article_repository_find(id,&article) || (header_board && article.board!=header_board) ||
+       !catalog_read(article.board,user))return ARTICLE_NOT_FOUND;
     if(inspect && (!user || !catalog_manage(article.board,user)))return ARTICLE_ADMIN_REQUIRED;
     int hidden=article_repository_unavailable(id);
     if(hidden<0)return ARTICLE_STORAGE;
@@ -440,8 +456,10 @@ static ArticleOutcome read_article(const ArticleActor *actor,uint32_t id,int ins
     if(extras_removed(id)) { out->state=ARTICLE_WITHDRAWN;return ARTICLE_OK; }
     if(hidden && !inspect) { out->state=ARTICLE_CONCEALED;return ARTICLE_OK; }
     if(article.body_size>CONTENT_BODY)return ARTICLE_STORAGE;
-    if(!body || capacity<=article.body_size)return ARTICLE_BUFFER_TOO_SMALL;
-    if(!article_repository_body(id,body,capacity))return ARTICLE_STORAGE;
+    if(!header_board) {
+        if(!body || capacity<=article.body_size)return ARTICLE_BUFFER_TOO_SMALL;
+        if(!article_repository_body(id,body,capacity))return ARTICLE_STORAGE;
+    }
     out->state=ARTICLE_VISIBLE;out->inspected_hidden=hidden;
     out->root=article.root;
     out->created=article.created;
@@ -451,13 +469,24 @@ static ArticleOutcome read_article(const ArticleActor *actor,uint32_t id,int ins
     return ARTICLE_OK;
 }
 
+ArticleOutcome article_header(const ArticleActor *actor,uint32_t board,uint32_t id,ArticleView *out) {
+    if(!out)return ARTICLE_INVALID_READ;
+    memset(out,0,sizeof(*out));
+    if(!board)return ARTICLE_INVALID_READ;
+    policy_context(actor?actor->board_grants:NULL);
+    ArticleOutcome result=read_article(actor,id,0,board,out,NULL,0);
+    policy_context(NULL);
+    if(result!=ARTICLE_OK || out->state!=ARTICLE_VISIBLE)memset(out,0,sizeof(*out));
+    return result;
+}
+
 ArticleOutcome article_read(const ArticleActor *actor,uint32_t id,int inspect,
                             ArticleView *out,char *body,size_t capacity) {
     if(body && capacity)memset(body,0,capacity);
     if(!out)return ARTICLE_INVALID_READ;
     memset(out,0,sizeof(*out));
     policy_context(actor?actor->board_grants:NULL);
-    ArticleOutcome result=read_article(actor,id,inspect,out,body,capacity);
+    ArticleOutcome result=read_article(actor,id,inspect,0,out,body,capacity);
     policy_context(NULL);
     if(result!=ARTICLE_OK) {
         memset(out,0,sizeof(*out));
@@ -571,7 +600,15 @@ ArticleOutcome article_board_children(const ArticleActor *actor,uint32_t parent,
     return result;
 }
 
-ArticleOutcome article_board_named(const ArticleActor *actor,const char *title,uint32_t *id) {
+static unsigned char board_fold(unsigned char c) {
+    return c>='a' && c<='z'?(unsigned char)(c-'a'+'A'):c;
+}
+static int board_title_equal(const char *a,const char *b,int folded) {
+    if(!folded)return !strcmp(a,b);
+    while(*a && board_fold((unsigned char)*a)==board_fold((unsigned char)*b)) { a++;b++; }
+    return !*a && !*b;
+}
+static ArticleOutcome board_named(const ArticleActor *actor,const char *title,uint32_t *id,int folded) {
     if(!id || !title || !*title)return ARTICLE_INVALID_QUERY;
     *id=0;
     ArticleOutcome result=health();
@@ -582,7 +619,7 @@ ArticleOutcome article_board_named(const ArticleActor *actor,const char *title,u
     uint32_t match=0;
     for(uint32_t n=1;n<=CATALOG_MAX;n++) {
         const char *name=catalog_title(n);
-        if(!catalog_visible(n,actor->user) || !name || strcmp(name,title))continue;
+        if(!catalog_visible(n,actor->user) || !name || !board_title_equal(name,title,folded))continue;
         if(match) { result=ARTICLE_INVALID_QUERY;break; }
         match=n;
     }
@@ -591,6 +628,13 @@ ArticleOutcome article_board_named(const ArticleActor *actor,const char *title,u
     if(!match)return ARTICLE_BOARD_DENIED;
     *id=match;
     return ARTICLE_OK;
+}
+
+ArticleOutcome article_board_named(const ArticleActor *actor,const char *title,uint32_t *id) {
+    return board_named(actor,title,id,0);
+}
+ArticleOutcome article_board_named_folded(const ArticleActor *actor,const char *title,uint32_t *id) {
+    return board_named(actor,title,id,1);
 }
 
 static ArticleOutcome next_unread_board(const ArticleActor *actor,uint32_t current,ArticleBoardRow *out) {
@@ -1152,7 +1196,7 @@ static ArticleOutcome import_buffer(const ArticleActor *actor,uint32_t board,uin
     if(!article_repository_find(id,&metadata) || metadata.board!=board)return ARTICLE_NOT_FOUND;
     ArticleView view;
     memset(&view,0,sizeof(view));
-    result=read_article(actor,id,0,&view,scratch,capacity);
+    result=read_article(actor,id,0,0,&view,scratch,capacity);
     if(result!=ARTICLE_OK)return result;
     if(view.state!=ARTICLE_VISIBLE)return ARTICLE_NOT_FOUND;
     size_t n=0;while(n<capacity && scratch[n])n++;

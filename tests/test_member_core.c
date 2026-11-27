@@ -36,7 +36,7 @@ int member_settings_repository_check_save(uint32_t user,unsigned kind,const char
     settings_writes++;return 1;
 }
 int member_settings_repository_sequencer_set(uint32_t user,unsigned kind,uint64_t stamp) {
-    assert(kind==MEMBER_CHECK_MMM || kind==MEMBER_CHECK_WANI);
+    assert(kind==MEMBER_CHECK_MMM || kind==MEMBER_CHECK_WANI || kind==MEMBER_CHECK_NET_COCK);
     settings_user=user;settings_kind=kind;
     if(!settings_save_ok)return 0;
     settings_stamp=stamp;settings_writes++;return 1;
@@ -1747,7 +1747,7 @@ static void checkpoint_validation(void) {
         assert(member_core_check_commit(&actor,MEMBER_CHECK_ARTICLES,invalid[i],0)==MEMBER_CORE_INVALID);
     }
     assert(member_core_check_begin(&actor,MEMBER_CHECK_MAIL,"private",&out)==MEMBER_CORE_INVALID);
-    assert(member_core_check_begin(&actor,(MemberCheckKind)(MEMBER_CHECK_WANI+1),"",&out)==MEMBER_CORE_INVALID);
+    assert(member_core_check_begin(&actor,(MemberCheckKind)(MEMBER_CHECK_NET_COCK+1),"",&out)==MEMBER_CORE_INVALID);
     assert(member_core_check_begin(&actor,MEMBER_CHECK_MMM,"2:0",&out)==MEMBER_CORE_INVALID);
     assert(member_core_check_begin(&actor,MEMBER_CHECK_FILES,NULL,&out)==MEMBER_CORE_INVALID);
     assert(member_core_check_begin(&actor,MEMBER_CHECK_FILES,"a|b",&out)==MEMBER_CORE_INVALID);

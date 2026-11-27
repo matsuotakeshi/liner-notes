@@ -20,6 +20,8 @@ TABLES={
  'news_scoped':'user INTEGER,kind INTEGER,scope TEXT,stamp INTEGER NOT NULL,PRIMARY KEY(user,kind,scope)',
  'news':'user INTEGER,kind INTEGER,stamp INTEGER NOT NULL,PRIMARY KEY(user,kind)',
  'wani_board_views':'board INTEGER PRIMARY KEY CHECK(board BETWEEN 0 AND 1024),mode INTEGER NOT NULL CHECK(mode IN (1,2))',
+ 'net_cock_mode':'user INTEGER PRIMARY KEY CHECK(user>0),mode INTEGER NOT NULL CHECK(mode IN (0,1))',
+ 'net_cock_subscriptions':'user INTEGER NOT NULL CHECK(user>0),board INTEGER NOT NULL CHECK(board BETWEEN 1 AND 1024),PRIMARY KEY(user,board)',
  'wani_subscriptions':'user INTEGER NOT NULL CHECK(user>0),board INTEGER NOT NULL CHECK(board BETWEEN 1 AND 1024),PRIMARY KEY(user,board)',
  'mmm_board_labels':'board INTEGER PRIMARY KEY CHECK(board BETWEEN 1 AND 1024),label TEXT NOT NULL UNIQUE CHECK(length(label) BETWEEN 1 AND 31)',
  'mmm_scanlist':'user INTEGER NOT NULL CHECK(user>0),position INTEGER NOT NULL CHECK(position BETWEEN 1 AND 64),board INTEGER NOT NULL CHECK(board BETWEEN 1 AND 1024),PRIMARY KEY(user,position),UNIQUE(user,board)',

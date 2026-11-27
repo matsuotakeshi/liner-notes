@@ -25,3 +25,5 @@ UI ktbbs selects the KTBBS profile when the station allows it. At MAIN, ? displa
 Use UI big-model when enabled. B opens SIGs, N/O/X explore new articles, T sends a telegram, ? shows help, and + opens Liner Notes extensions.
 
 Use UI wani-bbs when enabled. b opens boards, p opens files, s opens settings, g opens games, topic opens the message board, and ? describes the current screen.
+
+Use UI net-cock when enabled. MODE MENU selects numbered menus and MODE COMMAND selects commands. BREAD opens a board, R reads the body, and EXCOM lists Liner Notes extensions.

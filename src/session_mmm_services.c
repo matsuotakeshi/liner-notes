@@ -607,6 +607,11 @@ void mmm_chat_result(Session *s,const OperationResult *r,uint64_t now) {
         ok=r->chat_generation?chat_private_scoped(s->core.id,r->chat_target,r->chat_generation,r->text,now):
                               chat_private(s->core.id,r->chat_target,r->text,now);
         break;
+    case 'p':
+        if(s->ui_binding.active==session_ui_net_cock()) {
+            mmm_say(s,"Receiver preferences saved.\r\n","受信設定を保存しました。\r\n");return;
+        }
+        break;
     case 'P':
         if(big_model_active(s)) {
             if(r->chat_preferences.deny)mmm_say(s,"Receiving telegrams: OFF.\r\n","電報受信: OFF\r\n");
