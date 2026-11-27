@@ -81,6 +81,7 @@ typedef enum { SESSION_UI_SELECTED,SESSION_UI_UNCHANGED,SESSION_UI_UNKNOWN,
 const SessionUiAdapter *session_ui_rtbbs(void);
 const SessionUiAdapter *session_ui_mmm(void);
 const SessionUiAdapter *session_ui_mash(void);
+const SessionUiAdapter *session_ui_ktbbs(void);
 SessionUiConfig session_ui_default(void);
 int session_ui_configure(SessionUiConfig *,const char *,const char *,const char *);
 SessionUiSelection session_ui_preflight(const Session *,const char *);

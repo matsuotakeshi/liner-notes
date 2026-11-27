@@ -77,7 +77,7 @@ for line in sys.stdin:
         options = ['--ssh-port', str(ssh_port), '--ssh-host-key', str(host),
                    '--ssh-member-keys', str(keys), '--ssh-timeout', '3',
                    '--ssh-attempts', '4', '--doors', str(doors),
-                   '--ui-policy', 'MEMBERS', '--ui-allow', 'rtbbs,mmm,mash']
+                   '--ui-policy', 'MEMBERS', '--ui-allow', 'rtbbs,mmm,mash,ktbbs']
         server = Server(binary, root/'notes', members=root/'members', admins=admins,
                         telnet=True, menu=True, language='en', options=options)
         transports = []
@@ -263,7 +263,18 @@ for line in sys.stdin:
             mash.until()
             selected.close()
             assert b'PONG' in screen(connect('bob')).cmd('PING')
-            print('PASS MMM and MASH over SSH: selection and reconnect, Door resize and return, RTBBS restore')
+            kt = screen(connect('bob'))
+            kt.cmd('UI ktbbs', b'UI preference saved.')
+            kt.until(b'MAIN> ')
+            kt.cmd('R 1', b'READ> ')
+            assert b'SSH article body' in kt.cmd('I 1', b'ARTICLE> ')
+            kt.channel.sendall(b'0')
+            kt.until(b'READ> ')
+            kt.cmd('0', b'MAIN> ')
+            kt.cmd('UI rtbbs', b'UI PREF SAVED rtbbs')
+            kt.until()
+            kt.channel.get_transport().close()
+            print('PASS MMM, MASH and KTBBS over SSH: shared articles, selection, and RTBBS restore')
         finally:
             telnet.close()
             for t in transports: t.close()
