@@ -784,6 +784,47 @@ ArticleOutcome article_browse_board(const ArticleActor *actor,uint32_t board,uin
     return result;
 }
 
+static ArticleOutcome vs_thread(const ArticleActor *actor,uint32_t board,uint32_t root,uint32_t cursor,
+                                int descending,uint64_t since,uint64_t until,ArticlePage *out) {
+    ArticleOutcome result=health();
+    if(result!=ARTICLE_OK)return result;
+    result=identity(actor,0);
+    if(result!=ARTICLE_OK)return result;
+    if(!catalog_read(board,actor->user))return ARTICLE_BOARD_DENIED;
+    ArticleMetadata entry;
+    int ok=visible_summary(root,board,&entry);
+    if(ok<0)return ARTICLE_STORAGE;
+    if(!ok || entry.parent)return ARTICLE_OK;
+    uint32_t count=article_repository_count();
+    if(count>CONTENT_ID_MAX)return ARTICLE_STORAGE;
+    if(!entry.child)count=root;
+    uint32_t id=cursor?cursor:descending?count:root;
+    if(descending && id>count)id=count;
+    for(unsigned scanned=0;id && id>=root && id<=count && out->count<8 && scanned<256;scanned++) {
+        uint32_t candidate=id;
+        id=descending?id-1:id+1;
+        ok=visible_summary(candidate,board,&entry);
+        if(ok<0)return ARTICLE_STORAGE;
+        if(!ok || (candidate!=root && entry.root!=root))continue;
+        if(until && (!entry.created || entry.created<since || entry.created>until))continue;
+        add_summary(out,candidate,&entry);
+    }
+    out->next=id && id>=root && id<=count?id:0;
+    return ARTICLE_OK;
+}
+
+ArticleOutcome article_vs_thread(const ArticleActor *actor,uint32_t board,uint32_t root,uint32_t cursor,
+                                 int descending,uint64_t since,uint64_t until,ArticlePage *out) {
+    if(!out)return ARTICLE_INVALID_READ;
+    memset(out,0,sizeof(*out));
+    if(!root)return ARTICLE_INVALID_CURSOR;
+    policy_context(actor?actor->board_grants:NULL);
+    ArticleOutcome result=vs_thread(actor,board,root,cursor,descending,since,until,out);
+    policy_context(NULL);
+    if(result!=ARTICLE_OK)memset(out,0,sizeof(*out));
+    return result;
+}
+
 static ArticleOutcome page_articles(const ArticleActor *actor,uint32_t board,uint32_t start,
                                      const char *query,int search,ArticlePage *out) {
     ArticleOutcome result=health();

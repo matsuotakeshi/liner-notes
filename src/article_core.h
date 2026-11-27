@@ -161,6 +161,8 @@ ArticleOutcome article_search(const ArticleActor *,uint32_t board,uint32_t start
  * for ALL/SUBTREE, but every result's board must be. Scan at most 256 IDs,
  * return at most 8 rows, total=0. start=0 means 1; an empty continuation is
  * valid. No body reads, acknowledgement or check-time/session mutation. */
+ArticleOutcome article_vs_thread(const ArticleActor *,uint32_t board,uint32_t root,uint32_t cursor,
+                                 int descending,uint64_t since,uint64_t until,ArticlePage *);
 ArticleOutcome article_browse_board(const ArticleActor *,uint32_t board,uint32_t start,int descending,ArticlePage *);
 
 typedef enum { ARTICLE_HERE, ARTICLE_ALL, ARTICLE_SUBTREE } ArticleScope;

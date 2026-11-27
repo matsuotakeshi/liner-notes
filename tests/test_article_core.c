@@ -1880,6 +1880,21 @@ int main(void) {
     tree_tests();
     unread_tests();
     notes_tests();
+    ArticlePage vs_page;
+    ArticleActor vs_reader=notes_reset(7);
+    page_items[1].child=3;
+    page_items[3].parent=page_items[3].root=page_items[7].root=1;
+    page_items[7].parent=3;
+    assert(article_vs_thread(&vs_reader,2,1,0,0,0,0,&vs_page)==ARTICLE_OK);
+    assert(vs_page.count==3 && vs_page.rows[0].id==1 && vs_page.rows[1].id==3 && vs_page.rows[2].id==7);
+    assert(article_vs_thread(&vs_reader,2,1,0,1,1002,1007,&vs_page)==ARTICLE_OK);
+    assert(vs_page.count==2 && vs_page.rows[0].id==7 && vs_page.rows[1].id==3);
+    page_hidden[3]=page_hidden[7]=1; /* Repository supplies effective visibility. */
+    assert(article_vs_thread(&vs_reader,2,1,0,0,0,0,&vs_page)==ARTICLE_OK);
+    assert(vs_page.count==1 && vs_page.rows[0].id==1);
+    readable=0;
+    assert(article_vs_thread(&vs_reader,2,1,0,0,0,0,&vs_page)==ARTICLE_BOARD_DENIED);
+    assert(!vs_page.count);
     news_tests();
     find_scan_tests();
     navigation_tests();

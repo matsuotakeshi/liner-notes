@@ -8,6 +8,7 @@ static sqlite3_stmt *feature_stmt(const char *sql) { sqlite3_stmt *s=NULL;if(sql
 #include "mmm_notes_store.inc"
 #include "wani_settings_store.inc"
 #include "net_cock_store.inc"
+#include "vs_store.inc"
 #include "catalog_group_store.inc"
 static int delete_recover(void) {
     for(;;) {
