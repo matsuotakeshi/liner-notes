@@ -10,6 +10,8 @@ typedef struct { char kind; int replay; uint32_t user; unsigned long connection;
     char login[33],name[81],text[CHAT_TEXT+1]; } ChatEvent;
 typedef struct {
     unsigned long connection;
+    uint64_t generation;
+    int accepts_telegram;
     char login[33],name[81],memo[81];
 } ChatPresenceRow;
 typedef struct { unsigned count; ChatPresenceRow rows[CONNECTION_MAX]; } ChatPresence;

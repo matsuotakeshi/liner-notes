@@ -44,4 +44,7 @@ int chat_presence(unsigned long id,uint32_t user,int room_only,ChatPresence *out
 int chat_say(unsigned long id,const char *text,uint64_t now) { return chat_core_say(&room,id,text,now); }
 void chat_who(unsigned long id) { chat_core_who(&room,id); }
 int chat_target(unsigned long from,unsigned long to) { return chat_core_target(&room,from,to); }
+int chat_private_scoped(unsigned long from,unsigned long to,uint64_t generation,const char *text,uint64_t now) {
+    return generation?chat_core_private_scoped(&room,from,to,generation,text,now):0;
+}
 int chat_private(unsigned long from,unsigned long to,const char *text,uint64_t now) { return chat_core_private(&room,from,to,text,now); }

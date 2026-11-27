@@ -18,7 +18,7 @@ int chat_core_text_valid(const char *s) {
     return 1;
 }
 static ChatPeer *find(ChatCore *core,unsigned long id) { for(int i=0;i<CONNECTION_MAX;i++)if(core->peers[i].used && core->peers[i].identity.connection==id)return &core->peers[i];return NULL; }
-static int muted(ChatPeer *p,const char *login) {
+static int muted(const ChatPeer *p,const char *login) {
     for(int i=0;i<32;i++)if(!strcmp(p->muted[i],login))return 1;
     return 0;
 }
@@ -61,8 +61,8 @@ int chat_core_register(ChatCore *core,unsigned long id,uint32_t user,const char 
     ChatPeer *p=find(core,id);if(p) { if(p->identity.user!=user)return 0;chat_core_apply_preferences(core,user,settings);return 1; }
     if(!user || !notify || strlen(login)>32 || strlen(name)>80 || !chat_core_text_valid(login) || !chat_core_text_valid(name))return 0;
     for(int i=0;i<CONNECTION_MAX;i++)if(!core->peers[i].used) { p=&core->peers[i];break; }
-    if(!p)return 0;
-    memset(p,0,sizeof(*p));p->used=p->resident=1;p->notify=notify;p->context=context;
+    if(!p || core->next_generation==UINT64_MAX)return 0;
+    memset(p,0,sizeof(*p));p->generation=++core->next_generation;p->used=p->resident=1;p->notify=notify;p->context=context;
     p->identity.user=user;p->identity.connection=id;strcpy(p->identity.login,login);strcpy(p->identity.name,name);
     p->revision=settings->revision;p->deny=settings->deny;memcpy(p->muted,settings->muted,sizeof(p->muted));
     for(int i=0;i<CONNECTION_MAX;i++)if(core->peers[i].used && core->peers[i].identity.user==user && core->peers[i].revision>p->revision) {
@@ -112,6 +112,7 @@ int chat_core_presence(ChatCore *core,unsigned long id,uint32_t user,int room_on
         if(!p->used || (room_only && !p->room))continue;
         ChatPresenceRow *row=&out->rows[out->count++];
         row->connection=p->identity.connection;
+        row->generation=p->generation;row->accepts_telegram=!p->deny && !muted(p,actor->identity.login);
         strcpy(row->login,p->identity.login);strcpy(row->name,p->identity.name);
         size_t length=strlen(p->identity.text);
         if(length>=sizeof(row->memo))length=0;
@@ -136,9 +137,9 @@ void chat_core_who(ChatCore *core,unsigned long id) {
     ChatEvent end={0};end.kind='E';p->notify(p->context,&end);
 }
 int chat_core_target(ChatCore *core,unsigned long from,unsigned long to) { return from!=to && find(core,from) && find(core,to); }
-int chat_core_private(ChatCore *core,unsigned long from,unsigned long to,const char *text,uint64_t now) {
+int chat_core_private_scoped(ChatCore *core,unsigned long from,unsigned long to,uint64_t generation,const char *text,uint64_t now) {
     ChatPeer *sender=find(core,from),*receiver=find(core,to);
-    if(!sender || !receiver || from==to)return -2;
+    if(!sender || !receiver || from==to || (generation && receiver->generation!=generation))return -2;
     if(receiver->deny || muted(receiver,sender->identity.login))return -3;
     if(!chat_core_text_valid(text))return 0;
     if(sender->said && now-sender->last<500)return -1;
@@ -148,6 +149,10 @@ int chat_core_private(ChatCore *core,unsigned long from,unsigned long to,const c
     sender->last=now;sender->said=1;
     event=receiver->identity;event.kind='O';strcpy(event.text,text);
     sender->notify(sender->context,&event);return 1;
+}
+
+int chat_core_private(ChatCore *core,unsigned long from,unsigned long to,const char *text,uint64_t now) {
+    return chat_core_private_scoped(core,from,to,0,text,now);
 }
 
 int chat_core_restore_public(ChatCore *core,const ChatEvent *event) {

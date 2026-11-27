@@ -12,6 +12,7 @@ int userlog_disconnect(int slot,uint64_t now);
 extern unsigned userlog_keep;
 extern int userlog_public;
 int userlog_maintain(void);
+uint64_t userlog_last_login(uint32_t user);
 typedef struct {
     uint32_t id,connection,user;
     char kind;

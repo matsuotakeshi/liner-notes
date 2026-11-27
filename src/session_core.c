@@ -19,7 +19,7 @@ void session_core_init(SessionCore *s,unsigned long id,int slot,int boards,int m
     memset(s,0,sizeof(*s));s->active=1;s->id=id;s->slot=slot;s->board_enabled=boards;s->member_mode=members;s->board=1;
 }
 static void clear_identity(SessionCore *s) {
-    s->mail_notify_revision=0;s->mail_notify_deny=0;
+    s->mail_notify_revision=0;s->mail_notify_deny=0;s->previous_login=0;
     s->user=s->user_epoch=s->current=0;s->board=1;s->username[0]=0;s->member_level=0;s->admin=s->sigop=0;
     memset(s->board_grants,0,sizeof(s->board_grants));session_core_clear_vault_grants(s);
 }
@@ -49,6 +49,7 @@ int session_core_complete_mode(SessionCore *s,const OperationResult *r,uint64_t 
         clear_identity(s);session_core_throttle(s,now);
         if(r->auth>0) {
             s->user=(uint32_t)r->auth;s->user_epoch=r->user_epoch;s->member_level=(unsigned)r->member_level;
+            s->previous_login=r->previous_login;
             snprintf(s->username,sizeof(s->username),"%s",r->chat_login);s->admin=!!r->chat_admin;
         }
     }

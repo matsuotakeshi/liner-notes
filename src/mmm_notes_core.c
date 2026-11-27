@@ -214,3 +214,40 @@ ArticleOutcome mmm_note_scanlist_save(const ArticleActor *actor,const MmmScanTar
         if(boards[j]==boards[i])return ARTICLE_INVALID_QUERY;
     return mmm_notes_scanlist_replace(actor->user,boards,list->count,NULL)?ARTICLE_OK:ARTICLE_SETTINGS_STORAGE;
 }
+
+ArticleOutcome flat_scanlist(const ArticleActor *actor,MmmScanList *out) {
+    memset(out,0,sizeof(*out));
+    ArticleOutcome result=authorize(actor);
+    if(result!=ARTICLE_OK)return result;
+    uint32_t boards[MMM_SCAN_MAX];unsigned count;
+    if(!big_model_scanlist_load(actor->user,boards,&count))return ARTICLE_SETTINGS_STORAGE;
+    out->custom=count!=0;
+    for(unsigned i=0;i<count;i++) {
+        ArticleBoardEntry entry;
+        result=article_enter_board(actor,boards[i],&entry);
+        if(result==ARTICLE_BOARD_DENIED || (result==ARTICLE_OK && (entry.password_board || entry.menu)))continue;
+        if(result!=ARTICLE_OK) { memset(out,0,sizeof(*out));return result; }
+        MmmScanBoard *row=&out->rows[out->count++];
+        row->board=entry.id;strcpy(row->title,entry.title);
+    }
+    return ARTICLE_OK;
+}
+
+ArticleOutcome flat_scanlist_save(const ArticleActor *actor,const MmmScanTargets *list) {
+    ArticleOutcome result=authorize(actor);
+    if(result!=ARTICLE_OK)return result;
+    if(!list || list->count>MMM_SCAN_MAX)return ARTICLE_INVALID_QUERY;
+    uint32_t boards[MMM_SCAN_MAX];
+    for(unsigned i=0;i<list->count;i++) {
+        const MmmBoardTarget *target=&list->targets[i];
+        if(!target->board || *target->label || target->exclude || target->mode!=MMM_SCAN_NEW)
+            return ARTICLE_INVALID_QUERY;
+        for(unsigned j=0;j<i;j++)if(boards[j]==target->board)return ARTICLE_INVALID_QUERY;
+        ArticleBoardEntry entry;
+        result=article_enter_board(actor,target->board,&entry);
+        if(result!=ARTICLE_OK)return result;
+        if(entry.menu || entry.password_board)return ARTICLE_BOARD_DENIED;
+        boards[i]=target->board;
+    }
+    return big_model_scanlist_replace(actor->user,boards,list->count)?ARTICLE_OK:ARTICLE_SETTINGS_STORAGE;
+}
