@@ -38,11 +38,12 @@ def write(client, title, body, stop):
     return client.cmd("S", stop)
 
 
-def run(binary, vaultctl):
-    binary, vaultctl = (str(Path(item).resolve()) for item in (binary, vaultctl))
+def run(binary, vaultctl, dbconvert):
+    binary, vaultctl, dbconvert = (str(Path(item).resolve()) for item in (binary, vaultctl, dbconvert))
     with tempfile.TemporaryDirectory(prefix="ln-ktbbs-") as tmp, ExitStack() as stack:
-        path = Path(tmp)
-        database = ["--database-structured", str(path / "data.sqlite")]
+        path = Path(tmp).resolve()
+        database_path = path / "data.sqlite"
+        database = ["--database-structured", str(database_path)]
         catalog = path / "catalog"
         catalog.write_text("1|0|all|member|Lobby\n2|0|g1|g1|Restricted board\n")
         game = path / "game"
@@ -54,6 +55,11 @@ def run(binary, vaultctl):
         data.write_bytes(b"KTBBS data\n")
         subprocess.run([vaultctl, "init", vault], check=True, capture_output=True)
         subprocess.run([vaultctl, "import", vault, data, "Fixture.txt", "test fixture"], check=True, capture_output=True)
+        # Import the populated legacy index before starting the structured server.
+        legacy = path / "legacy"
+        (legacy / "vault").mkdir(parents=True)
+        (vault / "index.dat").rename(legacy / "vault" / "index.dat")
+        subprocess.run([dbconvert, database_path, legacy], input="vault/index.dat\n", text=True, check=True)
         helper = path / "transfer-helper"
         helper.write_text('#!/bin/sh\nprintf "HELPER %s %s\\n" "$1" "$2"\nprintf "DONE OK 1 11\\n" >&3\n')
         helper.chmod(0o700)

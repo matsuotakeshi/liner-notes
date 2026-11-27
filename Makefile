@@ -731,8 +731,8 @@ test-mmm-input: tests/test_mmm_input.c src/mmm_input.c src/mmm_input.h src/mmm_n
 	./test-mmm-input
 check: test-mmm-input test-ktbbs
 .PHONY: test-ktbbs test-ktbbs-input
-test-ktbbs: test-ktbbs-input runtime vaultctl
-	$(PYTHON) tests/test_ktbbs_ui.py ./runtime ./vaultctl
+test-ktbbs: test-ktbbs-input runtime vaultctl dbconvert
+	$(PYTHON) tests/test_ktbbs_ui.py ./runtime ./vaultctl ./dbconvert
 
 test-ktbbs-input: tests/test_ktbbs_input.c src/ktbbs_input.c src/ktbbs_input.h
 	$(CC) $(CPPFLAGS) $(CFLAGS) $(LDFLAGS) -std=c11 -Wall -Wextra -Werror -Isrc tests/test_ktbbs_input.c src/ktbbs_input.c -o test-ktbbs-input

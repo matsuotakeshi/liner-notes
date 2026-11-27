@@ -1,6 +1,6 @@
 {
   "LICENSE": "fb981668c18a279e285fc4d83fba1e836cc84dd4daa73c9697d3cfd2d8aca6e0",
-  "Makefile": "743c3d7c7d133293ec6106c627d56f01ddab3d49e847af66b6a92607e0c17515",
+  "Makefile": "4682ca5e03f57864c1ffdbc6d387f045080b9c2e0c872a4b9719e983156c32d6",
   "boards.example.conf": "4bd1a17ecf3966d3829510e8495a1362fb8b922cd754badccc739f5e5ab0bde8",
   "ci/build-freebsd-package.sh": "b0da49279831bb59754490fabccd9f27362d813522af9e8ef2fe5fccb3162528",
   "debian/changelog": "8363cb3538dc96dbaa1a3e2acc590f1a20b8ecb7bdf0765df7f71ee5a0a1e9e9",
