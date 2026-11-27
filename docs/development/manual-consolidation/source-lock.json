@@ -109,7 +109,7 @@
   "scripts/deploy_manifest.py": "f887023c1ba391904fbebe872928ed4dffcf92515c9fc110b4026fee19fc66bf",
   "ci/freebsd_upgrade_root.py": "494841eba106e4432bcb647cbf2291dddb2f02418c1d8c7dceac6176e9bc13ea",
   "ci/freebsd_upgrade_jail.py": "04b4f2fae36f93dc89cb3d96c98d1c76c28c3b3e73ff151e94b27013a72c99d3",
-  "ci/prepare_freebsd_upgrade_template.py": "bb42a82897c2a8ea0768e11317010111b37b51f42f4fc48c79bf396583119f3a",
+  "ci/prepare_freebsd_upgrade_template.py": "b1930a2299063501fe6aafb852fbf69423b5577a78e15a8b43f8b775deebffb0",
   "ci/install_freebsd_upgrade_helper.py": "b0b91cdbae13e4c2a0f66a367976d38318c903ff7285ed616e3b445d4eddb038",
   "ci/install-freebsd-upgrade-helper.sh": "b9c0625003843c1f5fe07e7b7a9ad93284480d8e2721593c5f599ffa7a0a6513",
   "ci/freebsd_package_lease.py": "3e9c9cd0ba429b1a16c84a415a74fec57d6573e9c536e4e2a352e84985843712",

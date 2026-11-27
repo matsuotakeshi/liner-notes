@@ -5,6 +5,7 @@ No host packages/services are changed. Internet access exists only for installin
 dependencies into a new bootstrap jail. Acceptance uses an offline VNET clone.
 Never run this from a checkout writable by the CI account.
 """
+import argparse
 import hashlib
 import importlib.util
 import json
@@ -29,15 +30,29 @@ from freebsd_fixture_permissions import package_install_argv
 
 BASE_URL = 'https://download.freebsd.org/releases/amd64/amd64/15.1-RELEASE/base.txz'
 BASE_SHA256 = '3768988b151c20f965679062b065c63a977d6bbb9f47fd83695ec2c40790c18f'
-OLD_URL = 'https://github.com/matsuotakeshi/liner-notes/releases/download/v0.74.1/liner-notes-0.74.1.pkg'
-OLD_SHA256 = 'b38be5af01a943003c78fabe8e95bc5f860432af7ee222df1d81ea1ed737c6cb'
-OLD_SOURCE = 'f9983e14dc70034d500677f1163b73830440551a'
+OFFICIAL_BASELINES = {
+    '0.74.1': (
+        'f9983e14dc70034d500677f1163b73830440551a',
+        'b38be5af01a943003c78fabe8e95bc5f860432af7ee222df1d81ea1ed737c6cb',
+    ),
+    '0.75': (
+        'e50d36039d52645f23598655e75a49172ddf80ea',
+        'eb04999e398f520f8a55d78a751c5362c3d46e079679bdd82bfc115a427c859a',
+    ),
+}
 
 
 def main():
     require, command = shared.require, shared.command
-    require(len(sys.argv) == 2 and re.fullmatch(r'[0-9a-f]{40}', sys.argv[1]), 'Exact reviewed main SHA required')
-    sha = sys.argv[1]
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('source_sha', help='Exact reviewed main commit')
+    parser.add_argument('--baseline', choices=OFFICIAL_BASELINES, default='0.74.1',
+                        help='Official package installed in the isolated test template')
+    args = parser.parse_args()
+    sha, old_version = args.source_sha, args.baseline
+    require(re.fullmatch(r'[0-9a-f]{40}', sha), 'Exact reviewed main SHA required')
+    old_source, old_sha256 = OFFICIAL_BASELINES[old_version]
+    old_url = f'https://github.com/{shared.REPO}/releases/download/v{old_version}/liner-notes-{old_version}.pkg'
     require(os.geteuid() == 0 and sys.platform.startswith('freebsd'), 'FreeBSD root setup required')
     os.environ.clear()
     os.environ.update(shared.ENV)
@@ -68,7 +83,7 @@ def main():
         require((reviewed/'ci'/name).read_bytes() == (SOURCE/'ci'/name).read_bytes(), 'Installed setup source differs from reviewed main')
     require(shutil.disk_usage(parent).free > 8*1024**3, 'At least 8 GiB free required before bootstrap')
     for name, url, expected, limit in [('base.txz', BASE_URL, BASE_SHA256, 512*1024**2),
-                                       ('old.pkg', OLD_URL, OLD_SHA256, 64*1024**2)]:
+                                       ('old.pkg', old_url, old_sha256, 64*1024**2)]:
         content = source_api.get(url, limit)
         require(hashlib.sha256(content).hexdigest() == expected, 'Pinned official download hash differs')
         (work/name).write_bytes(content)
@@ -95,7 +110,7 @@ def main():
         command('/usr/sbin/jexec', jail, *package_install_argv([
             '/usr/bin/env', 'ASSUME_ALWAYS_YES=yes', '/usr/sbin/pkg', 'bootstrap', '-y']), timeout=300)
         metadata = json.loads(command('/usr/bin/tar', '-xOf', work/'old.pkg', '+MANIFEST'))
-        require(metadata['name'] == 'liner-notes' and metadata['version'] == '0.74.1'
+        require(metadata['name'] == 'liner-notes' and metadata['version'] == old_version
                 and metadata['origin'] == 'comms/liner-notes', 'Pinned package identity differs')
         dependencies = sorted(set(metadata.get('deps', {})) | {'python312', 'py312-aiohttp', 'py312-cryptography', 'sqlite3', 'lrzsz'})
         require(all(re.fullmatch(r'[A-Za-z0-9][A-Za-z0-9_+.-]*', n) for n in dependencies), 'Unexpected dependency name')
@@ -124,10 +139,10 @@ def main():
     (root/'ci').rmdir()
     (root/'etc/resolv.conf').write_text('# Acceptance clones use offline VNET loopback only.\n')
     shutil.copyfile(work/'old.pkg', candidate/'old.pkg')
-    (candidate/'template.json').write_text(json.dumps({'old_version': '0.74.1', 'old_package_sha256': OLD_SHA256,
-                                                       'old_release_source_sha': OLD_SOURCE}, indent=2)+'\n')
-    (work/'SETUP.json').write_text(json.dumps({'source_sha': sha, 'old_source_sha': OLD_SOURCE,
-                                             'old_package_sha256': OLD_SHA256, 'base_sha256': BASE_SHA256,
+    (candidate/'template.json').write_text(json.dumps({'old_version': old_version, 'old_package_sha256': old_sha256,
+                                                       'old_release_source_sha': old_source}, indent=2)+'\n')
+    (work/'SETUP.json').write_text(json.dumps({'source_sha': sha, 'old_source_sha': old_source,
+                                             'old_package_sha256': old_sha256, 'base_sha256': BASE_SHA256,
                                              'host_packages_unchanged': True, 'template_inventory': inventory.splitlines()}, indent=2)+'\n')
     candidate.rename(shared.TEMPLATE)
     print('Prepared root-private FreeBSD template; host packages/services unchanged. Acceptance has not run.')
