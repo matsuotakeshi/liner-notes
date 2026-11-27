@@ -16,6 +16,8 @@ static int fixture_dup2(int oldfd,int newfd) {
     if(reject_stderr && newfd==STDERR_FILENO) { errno=EBADF;return -1; }
     return dup2(oldfd,newfd);
 }
+/* FreeBSD headers normalize this macro after choosing their API namespace. */
+#undef _POSIX_C_SOURCE
 #define dup2 fixture_dup2
 #include "../src/zmodem_host.c"
 #undef dup2
