@@ -39,7 +39,7 @@ void session_ui_adapter_test(void) {
     Session *s=calloc(1,sizeof(*s));OperationResult *r=calloc(1,sizeof(*r));assert(s && r);
     size_t written=0;SessionIO io={&written,output,NULL,NULL};
     SessionUiConfig c=session_ui_default();
-    assert(c.policy==SESSION_UI_FIXED && c.count==5 && c.allowed==1 && !strcmp(c.adapters[0]->name,"rtbbs"));
+    assert(c.policy==SESSION_UI_FIXED && c.count==6 && c.allowed==1 && !strcmp(c.adapters[0]->name,"rtbbs"));
     assert(c.adapters[1]==session_ui_mmm());
     assert(c.adapters[2]==session_ui_mash() && c.adapters[2]!=c.adapters[1]);
     assert(c.adapters[3]==session_ui_ktbbs() && c.adapters[3]!=c.adapters[1]);
@@ -57,6 +57,11 @@ void session_ui_adapter_test(void) {
     assert(big_model.default_index==4 && big_model.allowed==31);
     assert(big_model.adapters[4]==session_ui_big_model() && big_model.adapters[4]->login_required);
     assert(!session_ui_configure(&big_model,"ALL","big-model","rtbbs,mmm"));
+    SessionUiConfig wani=c;
+    assert(session_ui_configure(&wani,"ALL","wani-bbs","rtbbs,mmm,mash,ktbbs,big-model,wani-bbs"));
+    assert(wani.default_index==5 && wani.allowed==63);
+    assert(wani.adapters[5]==session_ui_wani_bbs() && wani.adapters[5]->login_required);
+    assert(!session_ui_configure(&wani,"FIXED","wani-bbs","rtbbs"));
     assert(session_ui_config_valid(&c));
     SessionUiAdapter alt=*session_ui_rtbbs();alt.name="test-alt";alt.enter=enter;alt.leave=leave;
     alt.line=line;alt.keep_position=prepare;alt.result=result;alt.door_finish=door;alt.tick=tick;alt.uppercase=uppercase;

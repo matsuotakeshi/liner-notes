@@ -65,7 +65,7 @@ int member_settings_repository_ui_save(uint32_t user,const char *name) {
 }
 int member_settings_repository_check_get(uint32_t user,unsigned kind,const char *scope,uint64_t *stamp) {
     if(!stamp)return 0;
-    *stamp=0;if(!user || kind>3 || !scope || (kind==3 && *scope))return 0;
+    *stamp=0;if(!user || kind>4 || !scope || (kind>=3 && *scope))return 0;
     sqlite3_stmt *s=member_settings_statement(*scope?"SELECT stamp FROM news_scoped WHERE user=? AND kind=? AND scope=?":"SELECT stamp FROM news WHERE user=? AND kind=?");if(!s)return 0;
     int ok=sqlite3_bind_int64(s,1,user)==SQLITE_OK && sqlite3_bind_int(s,2,(int)kind)==SQLITE_OK;
     if(ok && *scope)ok=sqlite3_bind_text(s,3,scope,-1,SQLITE_TRANSIENT)==SQLITE_OK;
@@ -80,7 +80,7 @@ int member_settings_repository_check_get(uint32_t user,unsigned kind,const char 
     return ok;
 }
 int member_settings_repository_check_save(uint32_t user,unsigned kind,const char *scope,uint64_t stamp) {
-    if(!user || kind>3 || !scope || (kind==3 && *scope) || stamp>INT64_MAX)return 0;
+    if(!user || kind>4 || !scope || (kind>=3 && *scope) || stamp>INT64_MAX)return 0;
     sqlite3_stmt *s=member_settings_statement(*scope?"INSERT INTO news_scoped(user,kind,stamp,scope) VALUES(?,?,?,?) ON CONFLICT(user,kind,scope) DO UPDATE SET stamp=max(stamp,excluded.stamp)":"INSERT INTO news VALUES(?,?,?) ON CONFLICT(user,kind) DO UPDATE SET stamp=max(stamp,excluded.stamp)");if(!s)return 0;
     int ok=sqlite3_bind_int64(s,1,user)==SQLITE_OK && sqlite3_bind_int(s,2,(int)kind)==SQLITE_OK && sqlite3_bind_int64(s,3,(sqlite3_int64)stamp)==SQLITE_OK;
     if(ok && *scope)ok=sqlite3_bind_text(s,4,scope,-1,SQLITE_TRANSIENT)==SQLITE_OK;
@@ -88,12 +88,13 @@ int member_settings_repository_check_save(uint32_t user,unsigned kind,const char
     if(sqlite3_finalize(s)!=SQLITE_OK)ok=0;
     return ok;
 }
-int member_settings_repository_mmm_set(uint32_t user,uint64_t stamp) {
-    if(!user || stamp>INT64_MAX)return 0;
+int member_settings_repository_sequencer_set(uint32_t user,unsigned kind,uint64_t stamp) {
+    if(!user || (kind!=3 && kind!=4) || stamp>INT64_MAX)return 0;
     sqlite3_stmt *s=member_settings_statement(
-        "INSERT INTO news(user,kind,stamp) VALUES(?,3,?) ON CONFLICT(user,kind) DO UPDATE SET stamp=excluded.stamp");
+        "INSERT INTO news(user,kind,stamp) VALUES(?,?,?) ON CONFLICT(user,kind) DO UPDATE SET stamp=excluded.stamp");
     if(!s)return 0;
-    int ok=sqlite3_bind_int64(s,1,user)==SQLITE_OK && sqlite3_bind_int64(s,2,(sqlite3_int64)stamp)==SQLITE_OK
+    int ok=sqlite3_bind_int64(s,1,user)==SQLITE_OK && sqlite3_bind_int(s,2,(int)kind)==SQLITE_OK &&
+        sqlite3_bind_int64(s,3,(sqlite3_int64)stamp)==SQLITE_OK
         && sqlite3_step(s)==SQLITE_DONE;
     if(sqlite3_finalize(s)!=SQLITE_OK)ok=0;
     return ok;

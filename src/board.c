@@ -706,6 +706,7 @@ static void extra_execute(const BoardRequest *q,BoardResult *r) {
     if(q->action==5) {
         if(!q->number || q->number>article_count ||
            (q->scope && (*article_at(q->number-1)).board!=q->board) ||
+           (q->scope==2 && (*article_at(q->number-1)).root!=q->cursor) ||
            !catalog_read((*article_at(q->number-1)).board,q->user)) {
             (r->feedback.failed=1,strcpy(r->text,"ERR no article\r\n"));return;
         }
@@ -1210,6 +1211,7 @@ static void execute(const BoardRequest *q,BoardResult *r) {
     }
     if(q->op=='}') { advanced_execute(q,r);return; }
     if(q->op==BOARD_NOTE_VIEW) { note_view(q,r);return; }
+    if(q->op==BOARD_WANI) { wani_configure(q,r);return; }
     if(q->op==BOARD_CONFERENCE) { conference_execute(q,r);return; }
     if(q->op==BOARD_LINK) { link_execute(q,r);return; }
     if(q->op==BOARD_MEMBER_LIFECYCLE) {

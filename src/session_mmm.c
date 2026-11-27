@@ -1,5 +1,6 @@
 #include "session_mmm_internal.h"
 #include "session_big_model.h"
+#include "session_wani_bbs.h"
 #include "mmm_input.h"
 #include "editor_core.h"
 #include "zmodem_host.h"
@@ -44,6 +45,7 @@ void mmm_prompt(Session *s) {
     }
     if(ktbbs_active(s) && ktbbs_prompt(s))return;
     if(big_model_active(s) && big_model_prompt(s))return;
+    if(wani_active(s) && wani_prompt(s))return;
     static const char *const inputs[]={
         NULL,"ID> ","Password> ","Board password> ","Title> ","Text> ",
         "Editor>> ","Base note #> ","Response number> ","Title search> ","File board password> "
@@ -66,6 +68,7 @@ void mmm_prompt(Session *s) {
 void mmm_menu(Session *s,int requested) {
     if(ktbbs_active(s)) { ktbbs_menu(s,requested);return; }
     if(big_model_active(s)) { big_model_menu(s,requested);return; }
+    if(wani_active(s)) { wani_menu(s,requested);return; }
     (void)requested;
     if(!s->core.user) { mmm_say(s,"Login required. login ID / register ID / ?\r\n",
                               "ログインが必要です。login ID / register ID / ?\r\n");return; }
@@ -793,6 +796,9 @@ static void command(Session *s,char *text) {
     }
 }
 
+void mmm_ui_shared_command(Session *s,char *text) { command(s,text); }
+void mmm_ui_editor(Session *s,char *text) { editorial(s,text); }
+
 static void line(Session *s,char *text,size_t size) {
     (void)size;
     MmmUi *m=mmm_state(s);
@@ -812,6 +818,7 @@ static void line(Session *s,char *text,size_t size) {
     }
     case INPUT_LOGIN: m->input=INPUT_NONE;mmm_ui_auth_start(s,text,'a');break;
     case INPUT_TITLE: case INPUT_BODY: case INPUT_EDITOR: case INPUT_KTBBS_CONFIRM:
+        if(wani_active(s) && wani_editor_line(s,&text))break;
         if(!ktbbs_active(s) || !ktbbs_editor_line(s,&text)) {
             MmmPrompt previous=m->input;
             editorial(s,text);
@@ -845,6 +852,7 @@ static void line(Session *s,char *text,size_t size) {
         if(m->application.step)application_value(s,text);
         else if(ktbbs_active(s))ktbbs_line(s,text);
         else if(big_model_active(s))big_model_line(s,text);
+        else if(wani_active(s))wani_line(s,text);
         else command(s,text);
         break;
     }
@@ -1001,7 +1009,8 @@ static void browse_result(Session *s,const ArticlePage *page) {
 
 static void render_article(Session *s,const OperationContent *c,const char *body) {
     char title[240];
-    if(big_model_active(s)) {
+    if(wani_active(s))wani_render_article(s,c);
+    else if(big_model_active(s)) {
         session_impl_queue_text(s,"NUM    R.DATE   R.TIME    SENDER  CONTENTS\r\n");
         big_model_header(s,c->id,c->at,c->author,c->title);
     }
@@ -1120,6 +1129,7 @@ static void result(Session *s,const OperationResult *r,SessionResultView project
             snprintf(m->board_title,sizeof(m->board_title),"%.80s",r->service_text);
             m->screen=BOARD_SCREEN;m->article=m->root=m->note_parent=m->search_next=0;m->search_responses=0;m->search[0]=0;
             if(ktbbs_active(s) && ktbbs_board_ready(s))break;
+            if(wani_active(s) && wani_board_enter(s))break;
             if(m->action==OPEN_POST)mmm_ui_prepare_post(s,0);
             else if(m->action==OPEN_INDEX)index_page(s,0);
             else if(m->action==OPEN_BASE)mmm_ui_browse(s,BROWSE_EXACT,0,m->target,0,0);
@@ -1131,6 +1141,9 @@ static void result(Session *s,const OperationResult *r,SessionResultView project
         break;
     case JOB_INDEX: if(page && page->kind==OPERATION_PAGE_NOTES)render_index(s,&page->data.notes);break;
     case JOB_BROWSE: if(page && page->kind==OPERATION_PAGE_ARTICLES)browse_result(s,&page->data.articles);break;
+    case JOB_WANI_MODE: case JOB_WANI_CONFIG: case JOB_WANI_RESOLVE: case JOB_WANI_PAGE:
+    case JOB_WANI_WINDOW: case JOB_WANI_SCAN: case JOB_WANI_PERSONAL: case JOB_WANI_PASSWORD: case JOB_WANI_TOPIC: case JOB_WANI_SIGNATURE:
+        wani_result(s,job,r,projection);break;
     case JOB_BIG_MODEL_DESTINATIONS: big_model_destinations(s);break;
     case JOB_BIG_MODEL_WINDOW:
         big_model_window(s,r->since,r->until,page && page->kind==OPERATION_PAGE_MMM_SCANLIST?&page->data.mmm_scanlist:NULL);break;
@@ -1217,10 +1230,13 @@ static void result(Session *s,const OperationResult *r,SessionResultView project
     case JOB_POST: {
         char text[48];snprintf(text,sizeof(text),"Saved #%u\r\n",s->core.current);
         session_impl_queue_text(s,text);mmm_clear_composition(m);m->input=INPUT_NONE;
-        if(m->screen==INDEX_SCREEN && !ktbbs_active(s) && !big_model_active(s))index_page(s,m->page_start);
+        if(m->screen==INDEX_SCREEN && !ktbbs_active(s) && !big_model_active(s) && !wani_active(s))index_page(s,m->page_start);
         break;
     }
-    case JOB_MAIL: mmm_mail_result(s,r,projection);break;
+    case JOB_MAIL:
+        mmm_mail_result(s,r,projection);
+        if(wani_active(s))wani_result(s,job,r,projection);
+        break;
     case JOB_MAIL_BATCH: mmm_mail_batch_result(s,&r->feedback);break;
     case JOB_FILES: case JOB_FILE_ADD: mmm_file_result(s,r,page,job==JOB_FILE_ADD);break;
     case JOB_FILE_UNLOCK: mmm_file_enter(s,m->requested_path);break;
@@ -1308,7 +1324,7 @@ static SessionUiSnapshot snapshot(const Session *s) {
     const MmmUi *m=mmm_view(s);
     return (SessionUiSnapshot){.language=m->language,.menu=1,
         .secret=m->input==INPUT_PASSWORD || m->input==INPUT_BOARD_PASSWORD || m->input==INPUT_FILE_PASSWORD ||
-                 (big_model_active(s) && big_model_secret(s)),
+                 (big_model_active(s) && big_model_secret(s)) || (wani_active(s) && wani_secret(s)),
         .editing=(m->input>=INPUT_TITLE && m->input<=INPUT_EDITOR) || m->input==INPUT_KTBBS_CONFIRM,
         .chatting=m->chatting,.chat_pending=m->job==JOB_CHAT};
 }
@@ -1332,7 +1348,7 @@ static int can_leave(const Session *s) {
     const MmmUi *m=mmm_view(s);
     return m->screen==MAIN_SCREEN && m->input==INPUT_NONE && !m->application.step &&
            (!ktbbs_active(s) || ((const KtbbsUi *)s->ui_binding.state)->question==KT_READY) &&
-           (!big_model_active(s) || big_model_ready(s));
+           (!big_model_active(s) || big_model_ready(s)) && (!wani_active(s) || wani_ready(s));
 }
 
 static void cleanup(Session *s,int reason,int notify_revocation) {
@@ -1350,6 +1366,7 @@ static void refresh_board_list(Session *s) {
     MmmUi *m=mmm_state(s);
     if(ktbbs_active(s))ktbbs_clear_page(s);
     if(big_model_active(s))big_model_clear_page(s);
+    if(wani_active(s))((WaniUi *)m)->row_count=0;
     if(m->screen==NOTES_SCREEN || m->screen==INDEX_SCREEN)m->row_count=m->next=0;
     if(m->screen==NEW_SCREEN)m->row_count=0;
 }
@@ -1535,6 +1552,10 @@ const SessionUiAdapter *session_ui_ktbbs(void) {
 }
 const SessionUiAdapter *session_ui_big_model(void) {
     static const SessionUiAdapter adapter=NOTES_ADAPTER("big-model",sizeof(BigModelUi),big_model_keys,big_model_key,big_model_help);
+    return &adapter;
+}
+const SessionUiAdapter *session_ui_wani_bbs(void) {
+    static const SessionUiAdapter adapter=NOTES_ADAPTER("wani-bbs",sizeof(WaniUi),NULL,NULL,wani_help);
     return &adapter;
 }
 #undef NOTES_ADAPTER

@@ -114,6 +114,26 @@ EditorOutcome editor_apply(EditorDocument *d,EditorOperation op,uint32_t first,u
     clear_tail(d,info.bytes-old+add);return EDITOR_OK;
 }
 
+EditorOutcome editor_remove_blank_lines(EditorDocument *d) {
+    EditorInfo info;
+    EditorOutcome result=editor_inspect(d,&info);
+    if(result!=EDITOR_OK)return result;
+    size_t cursor=0,used=0;
+    EditorSpan line;
+    while(editor_next_line(d->body,info.bytes,&cursor,&line)>0)
+        if(line.size)used+=line.size+2;
+    if(used==info.bytes)return EDITOR_OK;
+    save(d);
+    cursor=used=0;
+    while(editor_next_line(d->undo_body,info.bytes,&cursor,&line)>0) {
+        if(!line.size)continue;
+        memcpy(d->body+used,line.text,line.size+2);
+        used+=line.size+2;
+    }
+    clear_tail(d,used);
+    return EDITOR_OK;
+}
+
 static int append_text(char *out,size_t *used,const char *text,size_t size) {
     if(size>CONTENT_BODY-*used)return 0;
     memcpy(out+*used,text,size);

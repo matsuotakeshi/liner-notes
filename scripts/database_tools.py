@@ -19,6 +19,8 @@ TABLES={
  'guest_boards':'id INTEGER PRIMARY KEY,value INTEGER',
  'news_scoped':'user INTEGER,kind INTEGER,scope TEXT,stamp INTEGER NOT NULL,PRIMARY KEY(user,kind,scope)',
  'news':'user INTEGER,kind INTEGER,stamp INTEGER NOT NULL,PRIMARY KEY(user,kind)',
+ 'wani_board_views':'board INTEGER PRIMARY KEY CHECK(board BETWEEN 0 AND 1024),mode INTEGER NOT NULL CHECK(mode IN (1,2))',
+ 'wani_subscriptions':'user INTEGER NOT NULL CHECK(user>0),board INTEGER NOT NULL CHECK(board BETWEEN 1 AND 1024),PRIMARY KEY(user,board)',
  'mmm_board_labels':'board INTEGER PRIMARY KEY CHECK(board BETWEEN 1 AND 1024),label TEXT NOT NULL UNIQUE CHECK(length(label) BETWEEN 1 AND 31)',
  'mmm_scanlist':'user INTEGER NOT NULL CHECK(user>0),position INTEGER NOT NULL CHECK(position BETWEEN 1 AND 64),board INTEGER NOT NULL CHECK(board BETWEEN 1 AND 1024),PRIMARY KEY(user,position),UNIQUE(user,board)',
  'mmm_signatures':'user INTEGER PRIMARY KEY CHECK(user>0),body TEXT NOT NULL CHECK(length(CAST(body AS BLOB))<=2048),automatic INTEGER NOT NULL CHECK(automatic IN (0,1))',
@@ -29,6 +31,8 @@ TABLES={
  'applications':'user INTEGER,field TEXT,value TEXT,PRIMARY KEY(user,field)',
  'conference_rooms':'id INTEGER PRIMARY KEY CHECK(id BETWEEN 1 AND 1500),title TEXT NOT NULL CHECK(length(CAST(title AS BLOB)) BETWEEN 1 AND 80)',
  'conference_lines':'id INTEGER PRIMARY KEY AUTOINCREMENT CHECK(id BETWEEN 1 AND 2147483646),room INTEGER NOT NULL REFERENCES conference_rooms(id),user INTEGER NOT NULL CHECK(user>0),name TEXT NOT NULL CHECK(length(CAST(name AS BLOB)) BETWEEN 1 AND 80),stamp INTEGER NOT NULL CHECK(stamp>=0),body TEXT NOT NULL CHECK(length(CAST(body AS BLOB)) BETWEEN 1 AND 512),UNIQUE(room,id)',
+ 'topic_lines':"id INTEGER PRIMARY KEY CHECK(id BETWEEN 1 AND 2147483646),user INTEGER NOT NULL CHECK(user>0),name TEXT NOT NULL,stamp INTEGER NOT NULL,body TEXT NOT NULL,deleted INTEGER NOT NULL DEFAULT 0 CHECK(deleted IN (0,1))",
+ 'topic_read':'user INTEGER PRIMARY KEY CHECK(user>0),through INTEGER NOT NULL REFERENCES topic_lines(id)',
  'conference_read':'user INTEGER NOT NULL CHECK(user>0),room INTEGER NOT NULL REFERENCES conference_rooms(id),through INTEGER NOT NULL,PRIMARY KEY(user,room),FOREIGN KEY(room,through) REFERENCES conference_lines(room,id)',
  'link_articles':'board INTEGER NOT NULL,origin TEXT NOT NULL,article TEXT NOT NULL,local_id INTEGER UNIQUE NOT NULL,revision INTEGER NOT NULL,kind TEXT NOT NULL,author TEXT NOT NULL,alias TEXT NOT NULL,created INTEGER NOT NULL,parent INTEGER NOT NULL,title TEXT NOT NULL,body_hash TEXT NOT NULL,done INTEGER NOT NULL,actor INTEGER NOT NULL,PRIMARY KEY(board,origin,article)',
 }

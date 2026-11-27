@@ -102,6 +102,7 @@ ArticleOutcome article_author_set(const ArticleActor *,uint32_t article,uint32_t
 ArticleOutcome article_guest_set(const ArticleActor *,uint32_t board,unsigned enabled);
 ArticleOutcome article_sigop_set(const ArticleActor *,uint32_t board,uint32_t target,ArticleRoleChange *out);
 
+ArticleOutcome article_wani_change(const ArticleActor *,uint32_t board,uint32_t id,int confirmed,const char *title);
 ArticleOutcome article_withdraw(const ArticleActor *,uint32_t board,
                                uint32_t article,int confirmed);
 ArticleOutcome article_retitle(const ArticleActor *,uint32_t board,
@@ -228,6 +229,8 @@ typedef struct {
     int unread_known;
     ArticleNoteRow rows[5];
 } ArticleNotesPage;
+ArticleOutcome article_notes_window(const ArticleActor *,uint32_t board,uint32_t start,
+                                    uint64_t since,uint64_t until,ArticleNotesPage *out);
 ArticleOutcome article_notes(const ArticleActor *,uint32_t board,uint32_t start,
                              int unread_only,ArticleNotesPage *out);
 /* Bounded forward/backward scan of roots or replies in posting order.

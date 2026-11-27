@@ -371,6 +371,29 @@ ArticleOutcome article_retitle(const ArticleActor *actor,uint32_t board,uint32_t
     return result;
 }
 
+static ArticleOutcome wani_change(const ArticleActor *actor,uint32_t board,uint32_t id,int confirmed,const char *title) {
+    ArticleOutcome result=authorize(actor,board,id);
+    if(result!=ARTICLE_OK)return result;
+    int unavailable=article_repository_unavailable(id);
+    if(unavailable<0)return ARTICLE_STORAGE;
+    if(unavailable)return ARTICLE_HIDDEN;
+    if(!catalog_manage(board,actor->user)) {
+        ArticleMetadata latest;
+        for(uint32_t next=article_repository_count();next>id;next--) {
+            if(!article_repository_find(next,&latest))return ARTICLE_STORAGE;
+            if(latest.board==board)return ARTICLE_OWNER_REQUIRED;
+        }
+    }
+    return title?retitle(actor,board,id,title):withdraw(actor,board,id,confirmed);
+}
+
+ArticleOutcome article_wani_change(const ArticleActor *actor,uint32_t board,uint32_t id,int confirmed,const char *title) {
+    policy_context(actor?actor->board_grants:NULL);
+    ArticleOutcome result=wani_change(actor,board,id,confirmed,title);
+    policy_context(NULL);
+    return result;
+}
+
 static ArticleOutcome moderate(const ArticleActor *actor,uint32_t board,uint32_t id,int hide) {
     ArticleOutcome result=health();
     if(result!=ARTICLE_OK)return result;
@@ -1043,7 +1066,7 @@ ArticleOutcome article_unread(const ArticleActor *actor,uint32_t board,uint32_t 
 }
 
 static ArticleOutcome note_summary(uint32_t user,uint32_t board,uint32_t root,uint32_t count,
-                                   uint32_t *visited,ArticleNoteRow *row) {
+                                   uint32_t *visited,uint64_t since,uint64_t until,ArticleNoteRow *row) {
     for(uint32_t id=root;id;id=article_repository_tree_next(id)) {
         ArticleMetadata article;
         if(++(*visited)>count || id>count || !article_repository_find(id,&article) ||
@@ -1059,7 +1082,7 @@ static ArticleOutcome note_summary(uint32_t user,uint32_t board,uint32_t root,ui
             memcpy(row->author,article.author,sizeof(row->author));
         } else row->replies++;
         if(id>row->latest) { row->latest=id;row->updated=article.created; }
-        if(user) {
+        if(user && article.created>=since && (!until || article.created<=until)) {
             int seen=members_seen(user,id);
             if(members_broken())return ARTICLE_READ_STATE_STORAGE;
             if(!seen)row->unread++;
@@ -1069,7 +1092,7 @@ static ArticleOutcome note_summary(uint32_t user,uint32_t board,uint32_t root,ui
 }
 
 static ArticleOutcome notes_articles(const ArticleActor *actor,uint32_t board,uint32_t start,
-                                     int unread_only,ArticleNotesPage *out) {
+                                     int unread_only,uint64_t since,uint64_t until,ArticleNotesPage *out) {
     ArticleOutcome result=health();
     if(result!=ARTICLE_OK)return result;
     result=identity(actor,!unread_only);
@@ -1087,7 +1110,7 @@ static ArticleOutcome notes_articles(const ArticleActor *actor,uint32_t board,ui
         if(hidden<0)return ARTICLE_STORAGE;
         if(hidden)continue;
         ArticleNoteRow row={0};
-        result=note_summary(user,board,id,count,&visited,&row);
+        result=note_summary(user,board,id,count,&visited,since,until,&row);
         if(result!=ARTICLE_OK)return result;
         if(unread_only && !row.unread)continue;
         out->total++;
@@ -1103,7 +1126,18 @@ ArticleOutcome article_notes(const ArticleActor *actor,uint32_t board,uint32_t s
     if(!out)return ARTICLE_INVALID_READ;
     memset(out,0,sizeof(*out));
     policy_context(actor?actor->board_grants:NULL);
-    ArticleOutcome result=notes_articles(actor,board,start,unread_only,out);
+    ArticleOutcome result=notes_articles(actor,board,start,unread_only,0,0,out);
+    policy_context(NULL);
+    if(result!=ARTICLE_OK)memset(out,0,sizeof(*out));
+    return result;
+}
+
+ArticleOutcome article_notes_window(const ArticleActor *actor,uint32_t board,uint32_t start,
+                                    uint64_t since,uint64_t until,ArticleNotesPage *out) {
+    if(!out)return ARTICLE_INVALID_READ;
+    memset(out,0,sizeof(*out));
+    policy_context(actor?actor->board_grants:NULL);
+    ArticleOutcome result=notes_articles(actor,board,start,1,since,until,out);
     policy_context(NULL);
     if(result!=ARTICLE_OK)memset(out,0,sizeof(*out));
     return result;
