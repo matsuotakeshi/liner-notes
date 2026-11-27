@@ -1,6 +1,6 @@
 # Liner Notes
 
-HyperNotes型のツリー掲示板、会員間メール、チャット、ファイル保管庫、WebUI、PTY Doorと公開鍵による共有ボードを備えたBBSです。このソースは **0.75** 向けです。公開済みの安定版は [GitHub Releases](https://github.com/matsuotakeshi/liner-notes/releases/latest) で確認できます。
+HyperNotes型のツリー掲示板、会員間メール、チャット、ファイル保管庫、WebUI、PTY Doorと公開鍵による共有ボードを備えたBBSです。このソースは **0.76** 向けです。公開済みの安定版は [GitHub Releases](https://github.com/matsuotakeshi/liner-notes/releases/latest) で確認できます。
 
 ## 統合マニュアル
 

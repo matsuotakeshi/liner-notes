@@ -1,6 +1,6 @@
 #ifndef SESSION_IO_H
 #define SESSION_IO_H
-#define LINER_VERSION_TEXT "Liner notes 0.75"
+#define LINER_VERSION_TEXT "Liner notes 0.76"
 #include "session.h"
 /* Authorized adapter output. Queue/write failure invalidates the Session.
  * No RTBBS state, interpretation of text, or permission grant occurs here. */

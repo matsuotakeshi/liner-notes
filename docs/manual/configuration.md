@@ -4,7 +4,7 @@
 
 設定を変える前に、実際の起動引数・実行ユーザー・保存先を確認します。FreeBSDは配布liner_notes.confの値より `/etc/rc.conf` の指定を優先します。LinuxのLINER_NOTES_OPTIONSはsystemdの環境値であり、シェルのコマンド置換は使えません。オプションは本体のポート番号より前へ置きます。
 
-以下は0.75の配布例です。**設定例の値と、省略時にコードが採用する既定値は別**の場合があります。パス・ホスト名・会員番号・共有IDを実環境へ置き換えます。秘密情報を公開ファイルへ入れないでください。
+以下は0.76の配布例です。**設定例の値と、省略時にコードが採用する既定値は別**の場合があります。パス・ホスト名・会員番号・共有IDを実環境へ置き換えます。秘密情報を公開ファイルへ入れないでください。
 
 ## 日時・外部文書・機能選択
 
@@ -394,7 +394,7 @@ LINER_NOTES_OPTIONS="--telnet --menu --lang ja --bind 127.0.0.1 --timezone Asia/
 
 `runtime [オプション] PORT [BOARD_FILE [MEMBERS_FILE [CATALOG_FILE]]]` の順です。`liner-notes` はインストール時の実行名です。全オプションはポートより前へ置きます。
 
-端末UIも起動引数で設定できます。選択範囲は `--ui-policy FIXED|MEMBERS|ALL`、接続時の既定は `--ui-default NAME`、許可一覧は `--ui-allow NAME,...` です。例は `--ui-policy MEMBERS --ui-default rtbbs --ui-allow rtbbs,mmm,mash,ktbbs,big-model,wani-bbs,net-cock,vs`。[KTBBS風UI](personal-settings.md#ktbbs-ui)、[WANI-BBS風UI](personal-settings.md#wani-bbs-ui)、[NET-COCK風UI](personal-settings.md#net-cock-ui)、[VS風UI](personal-settings.md#vs-ui)を参照してください。
+端末UIも起動引数で設定できます。端末UIの登録枠は16、識別子は最大31文字、許可一覧の上限はカンマを含め511バイトです。起動引数には導入済みの識別子を指定します。選択範囲は `--ui-policy FIXED|MEMBERS|ALL`、接続時の既定は `--ui-default NAME`、許可一覧は `--ui-allow NAME,...` です。例は `--ui-policy MEMBERS --ui-default rtbbs --ui-allow rtbbs,mmm,mash,ktbbs,big-model,wani-bbs,net-cock,vs`。[KTBBS風UI](personal-settings.md#ktbbs-ui)、[WANI-BBS風UI](personal-settings.md#wani-bbs-ui)、[NET-COCK風UI](personal-settings.md#net-cock-ui)、[VS風UI](personal-settings.md#vs-ui)を参照してください。
 
 WANI-BBS風UIの対応版では `layout 掲示板番号 flat|mnotes|inherit` で表示形式を設定します。ボード管理権限が必要です。管理者は `layout default flat|mnotes` で局の既定値を変更できます。初期値はマルチノーツです。
 

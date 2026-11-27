@@ -6,7 +6,7 @@
 %endif
 
 Name:           liner-notes
-Version:        0.75
+Version:        0.76
 Release:        1%{?dist}
 Summary:        Liner notes multi-user bulletin board system
 License:        GPL-3.0-only
@@ -122,6 +122,9 @@ if [ -d /run/systemd/system ]; then systemctl daemon-reload >/dev/null 2>&1 || :
 %endif
 
 %changelog
+* Sat Nov 28 2026 Liner Notes contributors - 0.76-1
+- Prepare the multi-UI maintenance release.
+
 * Tue Nov 24 2026 Liner Notes contributors - 0.75-1
 - Update the BBS, Web connector and signed link packages to 0.75.
 

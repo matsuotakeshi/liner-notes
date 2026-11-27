@@ -1,5 +1,5 @@
 PORTNAME=	liner-notes
-DISTVERSION=	0.75
+DISTVERSION=	0.76
 CATEGORIES=	comms
 MASTER_SITES=	https://github.com/matsuotakeshi/liner-notes/releases/download/v${DISTVERSION}/
 DISTNAME=	liner-notes-${DISTVERSION}

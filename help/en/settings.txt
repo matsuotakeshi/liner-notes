@@ -17,7 +17,7 @@ The game list requires login and shows only games allowed for your current membe
 D in Settings displays actual language, editor, menu verbosity, paging, screen dimensions, timezone and transfer protocol. S reads external sysinfo.txt; V shows version. O/Q ask Y/N; QUIT is immediate. goodbye.txt is displayed on exit.
 
 Line numbering (editor M / /M) and PROTOCOL are included in PREFS SAVE/LOAD, login restoration and normal disconnect saving. Abrupt process failure or revoked credentials can prevent a save.
-UI lists the active UI, station policy and permitted profiles. UI name selects a permitted UI; UI RESET returns to the station default and clears your saved preference. Members save selections immediately; guests use them for this connection only. Switch at the main menu after finishing editing, transfers, chat or games. Only RTBBS is currently installed; RAW is not a separate UI.
+UI lists the current terminal UI and permitted choices. Use UI number or UI name, UI CANCEL to keep the current UI, or UI RESET to restore the station default. Member choices are saved. Use the main menu after completing any edit, transfer or game. FIXED stations do not offer a switch.
 
 UI shows available profiles. UI mash selects MASH when the station permits it. The default is RTBBS unless configured otherwise. In MASH, log in, use 9 for the guide, cmdlst for commands and COMMAND -? for syntax.
 UI ktbbs selects the KTBBS profile when the station allows it. At MAIN, ? displays the bilingual KTBBS guide. R opens board selection, E opens the posting menu, and ! opens Liner Notes extensions.
