@@ -7,9 +7,9 @@ on:
         type: string
         required: true
       scope:
-        description: 'FreeBSD only, or the existing Rocky -> Debian -> FreeBSD sequence'
+        description: 'One production host, or the existing Rocky -> Debian -> FreeBSD sequence'
         type: choice
-        options: [freebsd, all]
+        options: [freebsd, debian, rocky, all]
         default: freebsd
       mode:
         description: 'Plan does not contact production. Apply requires a new explicit review.'
