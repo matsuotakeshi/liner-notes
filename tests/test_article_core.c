@@ -1048,6 +1048,13 @@ static void page_tests(void) {
     assert(page.count==1 && !page.next && page.rows[0].id==9 && page.rows[0].parent==1);
     assert(article_list(&actor,2,UINT32_MAX,&page)==ARTICLE_OK);
     assert(page.total==6 && !page.count && !page.next);
+    assert(article_browse_board(&actor,2,0,1,&page)==ARTICLE_OK);
+    assert(page.count==6 && page.rows[0].id==9 && page.rows[0].parent==1 &&
+           page.rows[1].id==8 && page.rows[5].id==1 && !page.next);
+    page_hidden[1]=page_hidden[9]=1; /* repository supplies effective thread visibility */
+    assert(article_browse_board(&actor,2,0,1,&page)==ARTICLE_OK);
+    assert(page.count==4 && page.rows[0].id==8 && page.rows[3].id==3);
+    page_hidden[1]=page_hidden[9]=0;
     for(unsigned i=1;i<=9;i++)assert(!body_probes[i]);
     actor=page_reset(0);
     assert(article_list(NULL,2,0,&page)==ARTICLE_OK);page_cleared(&page);

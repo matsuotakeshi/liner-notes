@@ -41,6 +41,7 @@ void mmm_prompt(Session *s) {
         session_impl_queue_text(s,text);
         return;
     }
+    if(ktbbs_active(s) && ktbbs_prompt(s))return;
     static const char *const inputs[]={
         NULL,"ID> ","Password> ","Board password> ","Title> ","Text> ",
         "Editor>> ","Base note #> ","Response number> ","Title search> ","File board password> "
@@ -61,10 +62,12 @@ void mmm_prompt(Session *s) {
 }
 
 void mmm_menu(Session *s,int requested) {
+    if(ktbbs_active(s)) { ktbbs_menu(s,requested);return; }
     (void)requested;
     if(!s->core.user) { mmm_say(s,"Login required. login ID / register ID / ?\r\n",
                               "ログインが必要です。login ID / register ID / ?\r\n");return; }
     switch(mmm_view(s)->screen) {
+    case KTBBS_ENTER_SCREEN: case KTBBS_EXT_SCREEN: break;
     case MAIN_SCREEN:
         if(is_mash(s)) {
             mmm_say(s,"MASH | 1 Mail   2 Bulletin boards   3 Setup   4 Profiles   5 Library\r\n"
@@ -147,7 +150,7 @@ int mmm_submit(Session *s,OperationRequest *q,MmmJob job) {
     return 0;
 }
 
-static void boards(Session *s,uint32_t cursor) {
+void mmm_ui_boards(Session *s,uint32_t cursor) {
     OperationRequest *q=mmm_request(s,BOARD_NOTE_VIEW);
     if(!q)return;
     q->action='B';q->number=mmm_view(s)->parent;q->cursor=cursor;
@@ -161,19 +164,19 @@ static void index_page(Session *s,uint32_t cursor) {
     if(mmm_submit(s,q,JOB_INDEX))mmm_state(s)->page_start=cursor;
 }
 
-static void board(Session *s,uint32_t id) {
+static void mmm_ui_board(Session *s,uint32_t id) {
     OperationRequest *q=mmm_request(s,'j');
     if(!q)return;
     q->number=id;
     if(mmm_submit(s,q,JOB_BOARD))mmm_state(s)->board_target=id;
 }
 
-static void enter_board(Session *s,const char *name,MmmBoardAction action) {
+void mmm_ui_enter_board(Session *s,const char *name,MmmBoardAction action) {
     MmmUi *m=mmm_state(s);
     m->action=action;
     uint32_t id;
-    if(!*name) { board(s,s->core.board);return; }
-    if(mmm_number(*name=='#'?name+1:name,&id)) { board(s,id);return; }
+    if(!*name) { mmm_ui_board(s,s->core.board);return; }
+    if(mmm_number(*name=='#'?name+1:name,&id)) { mmm_ui_board(s,id);return; }
     if(strlen(name)>80) { mmm_say(s,"Invalid board name.\r\n","ボード名が不正です。\r\n");return; }
     OperationRequest *q=mmm_request(s,BOARD_NOTE_VIEW);
     if(!q)return;
@@ -182,7 +185,7 @@ static void enter_board(Session *s,const char *name,MmmBoardAction action) {
     mmm_submit(s,q,JOB_NAMED);
 }
 
-static void read_article(Session *s,uint32_t id) {
+void mmm_ui_read_article(Session *s,uint32_t id) {
     OperationRequest *q=mmm_request(s,'R');
     if(!q)return;
     q->number=id;
@@ -194,11 +197,12 @@ static void continue_browse(Session *s,uint32_t cursor) {
     OperationRequest *q=mmm_request(s,BOARD_NOTE_VIEW);
     if(!q)return;
     q->number=m->browse_root;q->cursor=cursor;q->descending=m->descending;q->notes_unread=m->unread;
+    if(m->browse>=BROWSE_KTBBS_LIST)q->action='F';
     if(m->search_responses || m->search_next)strcpy(q->title,m->search);
     mmm_submit(s,q,JOB_BROWSE);
 }
 
-static void browse(Session *s,MmmBrowse purpose,uint32_t root,uint32_t start,int down,int unread) {
+void mmm_ui_browse(Session *s,MmmBrowse purpose,uint32_t root,uint32_t start,int down,int unread) {
     MmmUi *m=mmm_state(s);
     m->browse=purpose;m->browse_root=root;m->descending=down;m->unread=unread;
     m->number_seen=0;
@@ -209,10 +213,10 @@ static void read_search(Session *s,int response,uint32_t start) {
     MmmUi *m=mmm_state(s);
     m->search_responses=response;
     m->search_next=start?start:UINT32_MAX;
-    browse(s,BROWSE_READ,response?m->root:0,start,1,0);
+    mmm_ui_browse(s,BROWSE_READ,response?m->root:0,start,1,0);
 }
 
-static void prepare_post(Session *s,uint32_t parent) {
+void mmm_ui_prepare_post(Session *s,uint32_t parent) {
     OperationRequest *q=mmm_request(s,'e');
     if(!q)return;
     q->number=parent;
@@ -287,7 +291,7 @@ static void editorial(Session *s,char *text) {
         return;
     }
     if(m->input==INPUT_BODY) {
-        if(!strcmp(text,"."))m->input=INPUT_EDITOR;
+        if(!strcmp(text,ktbbs_active(s)?"//":"."))m->input=INPUT_EDITOR;
         else if(editor_apply(&d,EDITOR_INSERT,m->insert_at,0,text)==EDITOR_OK)m->insert_at++;
         else mmm_say(s,"Line or body limit.\r\n","入力行または本文の上限です。\r\n");
         if(m->input==INPUT_BODY && m->numbered) {
@@ -418,7 +422,7 @@ static void send_password(Session *s,const char *text) {
     mmm_submit(s,q,op=='('?JOB_UNLOCK:JOB_AUTH);
 }
 
-static void auth_start(Session *s,const char *name,char op) {
+void mmm_ui_auth_start(Session *s,const char *name,char op) {
     MmmUi *m=mmm_state(s);
     if(!s->core.member_mode) { mmm_say(s,"The member service is disabled.\r\n","会員機能が無効です。\r\n");return; }
     if(!*name || strlen(name)>32 || strpbrk(name," \t")) {
@@ -448,21 +452,21 @@ static void return_to_parent(Session *s) {
     MmmUi *m=mmm_state(s);
     m->row_count=0;m->next=0;
     if(m->screen==MASH_OTHERS_SCREEN)m->screen=MAIN_SCREEN;
-    else if(m->screen==BOARD_SCREEN)boards(s,0);
-    else if(m->depth) { m->parent=m->ancestors[--m->depth];boards(s,0); }
+    else if(m->screen==BOARD_SCREEN)mmm_ui_boards(s,0);
+    else if(m->depth) { m->parent=m->ancestors[--m->depth];mmm_ui_boards(s,0); }
     else m->screen=MAIN_SCREEN;
 }
 
-static void subboards(Session *s,uint32_t parent) {
+void mmm_ui_subboards(Session *s,uint32_t parent) {
     MmmUi *m=mmm_state(s);
     if(parent!=m->parent && m->depth<sizeof(m->ancestors)/sizeof(m->ancestors[0])) {
         m->ancestors[m->depth++]=m->parent;
         m->parent=parent;
     }
-    boards(s,0);
+    mmm_ui_boards(s,0);
 }
 
-static void choose_profile(Session *s,char *arg) {
+void mmm_ui_choose_profile(Session *s,char *arg) {
     const SessionUiConfig *c=&s->ui_binding.config;
     if(!*arg) {
         static const char *const policies[]={"FIXED","MEMBERS","ALL"};
@@ -499,7 +503,7 @@ static void open_command(Session *s,char *arg) {
     m->continuous=command.continuous;m->stream_paused=0;m->stream_all=command.all;
     m->stream_is_board=command.continuous;
     if(command.mode==MMM_OPEN_ARTICLE)m->target=command.article;
-    enter_board(s,command.board,command.continuous?OPEN_NEW:actions[command.mode]);
+    mmm_ui_enter_board(s,command.board,command.continuous?OPEN_NEW:actions[command.mode]);
     if(!s->core.pending && m->input!=INPUT_BOARD_PASSWORD)m->continuous=m->stream_is_board=0;
 }
 
@@ -507,7 +511,7 @@ static int open_new_only(const MmmUi *m) {
     return m->action==OPEN_NEW || m->action==OPEN_NEW_OR_INDEX;
 }
 
-static void note_draft_command(Session *s,const char *arg) {
+void mmm_ui_note_draft_command(Session *s,const char *arg) {
     if(!*arg)mmm_simple_operation(s,'d',0,0,JOB_NOTE_DRAFT_STATUS);
     else if(!strcmp(arg,"resume"))mmm_simple_operation(s,'o',0,0,JOB_NOTE_DRAFT);
     else if(!strcmp(arg,"drop confirm"))mmm_simple_operation(s,'d',0,0,JOB_NOTE_DRAFT_DROP);
@@ -569,7 +573,7 @@ static void open_mail(Session *s) {
     mmm_mail_list(s,MAIL_LIST_INBOX,0);
 }
 
-static void open_setup(Session *s) {
+void mmm_ui_open_setup(Session *s) {
     mmm_state(s)->screen=TERM_SCREEN;
     mmm_menu(s,1);mmm_simple_operation(s,'V',0,2,JOB_PREF);
 }
@@ -590,16 +594,16 @@ static void number_menu(Session *s,uint32_t n) {
         return;
     }
     if(m->screen==MAIN_SCREEN && n==1)open_mail(s);
-    else if(m->screen==MAIN_SCREEN && n==2) { m->parent=0;m->depth=0;boards(s,0); }
+    else if(m->screen==MAIN_SCREEN && n==2) { m->parent=0;m->depth=0;mmm_ui_boards(s,0); }
     else if(m->screen==MAIN_SCREEN && n==3) { m->screen=FILER_SCREEN;m->service_next=0;mmm_file_enter(s,m->file_path); }
     else if(m->screen==MAIN_SCREEN && n==4)mmm_chat_request(s,'J',0,"");
-    else if(m->screen==MAIN_SCREEN && n==5)open_setup(s);
+    else if(m->screen==MAIN_SCREEN && n==5)mmm_ui_open_setup(s);
     else if(m->screen==MAIN_SCREEN && n==6)mmm_games(s,0);
     else if(m->screen==MAIN_SCREEN && n==7)mmm_off(s,0);
-    else if(m->screen==NOTES_SCREEN && n<=m->row_count) { m->action=OPEN_BOARD_MENU;board(s,m->rows[n-1]); }
+    else if(m->screen==NOTES_SCREEN && n<=m->row_count) { m->action=OPEN_BOARD_MENU;mmm_ui_board(s,m->rows[n-1]); }
     else if(m->screen==BOARD_SCREEN && n==1)index_page(s,0);
-    else if(m->screen==BOARD_SCREEN && n==2)prepare_post(s,0);
-    else if(m->screen==BOARD_SCREEN && n==3)subboards(s,s->core.board);
+    else if(m->screen==BOARD_SCREEN && n==2)mmm_ui_prepare_post(s,0);
+    else if(m->screen==BOARD_SCREEN && n==3)mmm_ui_subboards(s,s->core.board);
     else mmm_say(s,"Choose a listed number.\r\n","一覧にある番号を入力してください。\r\n");
 }
 
@@ -658,8 +662,8 @@ static int mash_command(Session *s,const char *text) {
         if(*arg)break;
         switch(input.command) {
         case MASH_BBS: case MASH_MAP:
-            m->parent=0;m->depth=0;boards(s,0);break;
-        case MASH_SETUP: open_setup(s);break;
+            m->parent=0;m->depth=0;mmm_ui_boards(s,0);break;
+        case MASH_SETUP: mmm_ui_open_setup(s);break;
         case MASH_MY_PROFILE: mmm_profile(s,"");break;
         case MASH_WHO: case MASH_CHAT:
             if(board_feature_enabled("chat"))
@@ -705,12 +709,12 @@ static void command(Session *s,char *text) {
         session_impl_queue_text(s,usage);session_impl_queue_text(s,"\r\n");return;
     }
     if(s->core.user && (m->screen==NOTES_SCREEN) && (!strcmp(text,"L") || !strcmp(text,"l"))) {
-        if(m->next)boards(s,m->next);
+        if(m->next)mmm_ui_boards(s,m->next);
         else mmm_say(s,"End of boards.\r\n","ボード一覧の末尾です。\r\n");
         return;
     }
     switch(input.command) {
-    case MMM_MENU: if(m->screen==NOTES_SCREEN)boards(s,0);else mmm_menu(s,1);break;
+    case MMM_MENU: if(m->screen==NOTES_SCREEN)mmm_ui_boards(s,0);else mmm_menu(s,1);break;
     case MMM_HELP: help(s,"");break;
     case MMM_HOME:
         m->screen=MAIN_SCREEN;m->parent=0;m->depth=0;mmm_menu(s,1);break;
@@ -719,7 +723,7 @@ static void command(Session *s,char *text) {
     case MMM_LOGIN: case MMM_REGISTER:
         if(s->core.user) { mmm_say(s,"Log out first.\r\n","先にログアウトしてください。\r\n");break; }
         if(input.command==MMM_LOGIN && !*input.argument)m->input=INPUT_LOGIN;
-        else auth_start(s,input.argument,input.command==MMM_REGISTER?'g':'a');
+        else mmm_ui_auth_start(s,input.argument,input.command==MMM_REGISTER?'g':'a');
         break;
     case MMM_OFF:
         if(!*input.argument || !strcmp(input.argument,"-n"))mmm_off(s,*input.argument!=0);
@@ -735,16 +739,16 @@ static void command(Session *s,char *text) {
             mmm_menu(s,1);
         }
         break;
-    case MMM_NOTES: m->parent=0;m->depth=0;boards(s,0);break;
-    case MMM_GO: if(*input.argument)enter_board(s,input.argument,OPEN_BOARD_MENU);else help(s,"go");break;
+    case MMM_NOTES: m->parent=0;m->depth=0;mmm_ui_boards(s,0);break;
+    case MMM_GO: if(*input.argument)mmm_ui_enter_board(s,input.argument,OPEN_BOARD_MENU);else help(s,"go");break;
     case MMM_OPEN: m->topics=0;open_command(s,input.argument);break;
-    case MMM_POST: enter_board(s,input.argument,OPEN_POST);break;
-    case MMM_UI: choose_profile(s,input.argument);break;
+    case MMM_POST: mmm_ui_enter_board(s,input.argument,OPEN_POST);break;
+    case MMM_UI: mmm_ui_choose_profile(s,input.argument);break;
     case MMM_MAIL: open_mail(s);break;
     case MMM_FILER:
         m->screen=FILER_SCREEN;m->service_next=0;mmm_file_enter(s,*input.argument?input.argument:m->file_path);break;
     case MMM_CHAT: mmm_chat_request(s,'J',0,"");break;
-    case MMM_TERM: open_setup(s);break;
+    case MMM_TERM: mmm_ui_open_setup(s);break;
     case MMM_PROFILE: mmm_profile(s,input.argument);break;
     case MMM_GAMES: mmm_games(s,0);break;
     case MMM_NEW:
@@ -765,7 +769,7 @@ static void command(Session *s,char *text) {
     case MMM_TALK: mmm_conference_enter(s,input.argument);break;
     case MMM_PFILE: personal_file(s,input.argument);break;
     case MMM_SIGNATURE: signature_command(s,input.argument);break;
-    case MMM_DRAFT: note_draft_command(s,input.argument);break;
+    case MMM_DRAFT: mmm_ui_note_draft_command(s,input.argument);break;
     case MMM_RETITLE: case MMM_WITHDRAW:
         note_change(s,input.argument,input.command==MMM_WITHDRAW);break;
     case MMM_SCANLIST: scanlist_command(s,input.argument);break;
@@ -803,8 +807,14 @@ static void line(Session *s,char *text,size_t size) {
         }
         break;
     }
-    case INPUT_LOGIN: m->input=INPUT_NONE;auth_start(s,text,'a');break;
-    case INPUT_TITLE: case INPUT_BODY: case INPUT_EDITOR: editorial(s,text);break;
+    case INPUT_LOGIN: m->input=INPUT_NONE;mmm_ui_auth_start(s,text,'a');break;
+    case INPUT_TITLE: case INPUT_BODY: case INPUT_EDITOR: case INPUT_KTBBS_CONFIRM:
+        if(!ktbbs_active(s) || !ktbbs_editor_line(s,&text)) {
+            MmmPrompt previous=m->input;
+            editorial(s,text);
+            if(ktbbs_active(s) && previous==INPUT_TITLE && m->input==INPUT_BODY)m->input=INPUT_KTBBS_CONFIRM;
+        }
+        break;
     case INPUT_NOTE: case INPUT_RESPONSE: {
         MmmPrompt input=m->input;m->input=INPUT_NONE;
         char joined[16];
@@ -815,7 +825,7 @@ static void line(Session *s,char *text,size_t size) {
         }
         if(!mmm_number(text,&m->target)) { mmm_say(s,"Invalid number.\r\n","番号が不正です。\r\n");break; }
         m->search_next=0;m->search_responses=0;
-        browse(s,input==INPUT_NOTE?BROWSE_EXACT:BROWSE_RESPONSE,input==INPUT_NOTE?0:m->root,
+        mmm_ui_browse(s,input==INPUT_NOTE?BROWSE_EXACT:BROWSE_RESPONSE,input==INPUT_NOTE?0:m->root,
                input==INPUT_NOTE?m->target:0,0,0);
         break;
     }
@@ -830,6 +840,7 @@ static void line(Session *s,char *text,size_t size) {
         break;
     default:
         if(m->application.step)application_value(s,text);
+        else if(ktbbs_active(s))ktbbs_line(s,text);
         else command(s,text);
         break;
     }
@@ -868,12 +879,12 @@ static void key(Session *s,unsigned char ch) {
         }
         else if(ch=='?' || ch=='&')help(s,"");
         else if(ch=='p' && !index && is_mash(s)) {
-            if(m->note_parent)read_article(s,m->note_parent);
+            if(m->note_parent)mmm_ui_read_article(s,m->note_parent);
             else mmm_say(s,"This is a base note.\r\n","この記事には親記事がありません。\r\n");
         }
         else if(ch=='w') {
             uint32_t parent=is_mash(s)?m->article:m->root;
-            prepare_post(s,index?0:parent);
+            mmm_ui_prepare_post(s,index?0:parent);
         }
         else if(ch=='s' && !index && m->article) {
             OperationRequest *q=mmm_request(s,'Z');
@@ -882,25 +893,25 @@ static void key(Session *s,unsigned char ch) {
         else if(ch=='b')m->input=INPUT_NOTE;
         else if(ch=='i' && !index)index_page(s,m->page_start);
         else if(ch=='l' || ch=='L' || ch=='\t')
-            browse(s,BROWSE_READ,index || ch=='L'?0:m->root,index?0:m->article+1,0,1);
+            mmm_ui_browse(s,BROWSE_READ,index || ch=='L'?0:m->root,index?0:m->article+1,0,1);
         else if(ch=='=' || ch==12 || ch=='v' || ch=='X') {
             if(index)index_page(s,ch=='='?0:m->page_start);
-            else read_article(s,ch=='='?m->root:m->article);
+            else mmm_ui_read_article(s,ch=='='?m->root:m->article);
         } else if(index) {
             if(ch>='1' && ch<='8' && (unsigned)(ch-'0')<=m->row_count)
-                read_article(s,m->rows[ch-'1']);
+                mmm_ui_read_article(s,m->rows[ch-'1']);
             else if((ch==' ' || ch==24 || ch=='\r') && m->next)index_page(s,m->next);
             else if(ch==8 || ch==127 || ch==5 || ch=='*')
-                browse(s,BROWSE_INDEX,0,ch=='*'?0:(m->page_start>1?m->page_start-1:1),1,0);
+                mmm_ui_browse(s,BROWSE_INDEX,0,ch=='*'?0:(m->page_start>1?m->page_start-1:1),1,0);
         } else if(ch=='+' || ch=='j' || ch=='-') {
-            if(ch!='-' || m->root>1)browse(s,BROWSE_READ,0,ch=='-'?m->root-1:m->root+1,ch=='-',0);
+            if(ch!='-' || m->root>1)mmm_ui_browse(s,BROWSE_READ,0,ch=='-'?m->root-1:m->root+1,ch=='-',0);
         } else if(ch=='*' || ch=='t')
-            browse(s,ch=='t'?BROWSE_TITLES:BROWSE_READ,m->root,ch=='t'?m->article+1:0,ch=='*',0);
+            mmm_ui_browse(s,ch=='t'?BROWSE_TITLES:BROWSE_READ,m->root,ch=='t'?m->article+1:0,ch=='*',0);
         else if(ch==' ' || ch=='>' || ch==24 || ch=='\r')
-            browse(s,BROWSE_READ,m->root,m->article+1,0,0);
+            mmm_ui_browse(s,BROWSE_READ,m->root,m->article+1,0,0);
         else if(ch==8 || ch==127 || ch=='<' || ch==5) {
-            if(m->article!=m->root)browse(s,BROWSE_READ,m->root,m->article-1,1,0);
-            else if(m->root>1)browse(s,BROWSE_READ,0,m->root-1,1,0);
+            if(m->article!=m->root)mmm_ui_browse(s,BROWSE_READ,m->root,m->article-1,1,0);
+            else if(m->root>1)mmm_ui_browse(s,BROWSE_READ,0,m->root-1,1,0);
         } else if(ch>='1' && ch<='9') {
             m->first_digit=(unsigned)(ch-'0');m->input=INPUT_RESPONSE;
             session_impl_queue_text(s,"\r\n");
@@ -936,11 +947,17 @@ static void render_index(Session *s,const ArticleNotesPage *page) {
 
 static void browse_result(Session *s,const ArticlePage *page) {
     MmmUi *m=mmm_state(s);
+    if(m->browse==BROWSE_KTBBS_BODY && page->count) { mmm_ui_read_article(s,page->rows[0].id);return; }
+    if(m->browse>=BROWSE_KTBBS_LIST) {
+        if(!page->count && page->next)continue_browse(s,page->next);
+        else ktbbs_render_articles(s,page,m->browse==BROWSE_KTBBS_TITLE);
+        return;
+    }
     if(m->browse==BROWSE_RESPONSE) {
         uint32_t before=m->number_seen;
         m->number_seen+=page->count;
         if(m->target>before && m->target<=m->number_seen) {
-            read_article(s,page->rows[m->target-before-1].id);
+            mmm_ui_read_article(s,page->rows[m->target-before-1].id);
             return;
         }
         if(page->next) { continue_browse(s,page->next);return; }
@@ -961,14 +978,14 @@ static void browse_result(Session *s,const ArticlePage *page) {
         }
         if(m->browse!=BROWSE_EXACT || id==m->target) {
             if(m->search_next)m->search_next=id>1?id-1:0;
-            read_article(s,id);return;
+            mmm_ui_read_article(s,id);return;
         }
     }
     if(m->search_next)m->search_next=0;
     else if(m->browse==BROWSE_READ && m->browse_root) {
-        if(m->descending) { read_article(s,m->root);return; }
-        if(m->unread) { browse(s,BROWSE_READ,0,m->root+1,0,1);return; }
-        browse(s,BROWSE_READ,0,m->root+1,0,0);return;
+        if(m->descending) { mmm_ui_read_article(s,m->root);return; }
+        if(m->unread) { mmm_ui_browse(s,BROWSE_READ,0,m->root+1,0,1);return; }
+        mmm_ui_browse(s,BROWSE_READ,0,m->root+1,0,0);return;
     }
     mmm_say(s,"No matching note.\r\n","該当するノートがありません。\r\n");
 }
@@ -982,6 +999,7 @@ static void render_article(Session *s,const OperationContent *c,const char *body
         snprintf(title,sizeof(title),"Parent #%u (p)\r\n",c->parent);
         session_impl_queue_text(s,title);
     }
+    if(ktbbs_active(s) && ktbbs_page_article(s,c,body))return;
     session_impl_queue_text(s,body);
     OperationRequest *q=mmm_request(s,'s');
     if(q) { q->board=c->board;q->number=c->id;mmm_submit(s,q,JOB_SEEN); }
@@ -1007,7 +1025,7 @@ static void begin_new(Session *s,const OperationResult *r,const MmmScanList *lis
     MmmUi *m=mmm_state(s);
     m->new_since=m->sequence_override?m->session_since:r->since;m->new_until=r->until;
     m->stream_at=m->stream_next=m->stream_seen=0;
-    m->scan_custom=list->custom;m->scan_count=list->count;m->scan_at=0;
+    m->scan_custom=!ktbbs_active(s) && list->custom;m->scan_count=list->count;m->scan_at=0;
     m->scan_had_match=m->scan_index=0;
     for(unsigned i=0;i<list->count;i++) {
         m->scan_boards[i]=list->rows[i].board;m->scan_modes[i]=list->rows[i].mode;
@@ -1022,7 +1040,7 @@ static void open_news_result(Session *s,const ArticlePage *page) {
     else if(page->next)mmm_open_page(s,page->next);
     else if(m->action==OPEN_NEW_OR_INDEX) {
         m->action=OPEN_INDEX;
-        board(s,m->open_board);
+        mmm_ui_board(s,m->open_board);
     } else mmm_say(s,"No new notes.\r\n","新着ノートはありません。\r\n");
 }
 
@@ -1072,11 +1090,11 @@ static void result(Session *s,const OperationResult *r,SessionResultView project
     switch(job) {
     case JOB_AUTH: mmm_say(s,"Registration request received.\r\n","登録申請を受け付けました。\r\n");break;
     case JOB_BOARDS: if(page && page->kind==OPERATION_PAGE_BOARDS)render_boards(s,&page->data.boards);break;
-    case JOB_NAMED: if(r->service_number)board(s,r->service_number);break;
-    case JOB_UNLOCK: board(s,m->board_target);break;
+    case JOB_NAMED: if(r->service_number)mmm_ui_board(s,r->service_number);break;
+    case JOB_UNLOCK: mmm_ui_board(s,m->board_target);break;
     case JOB_BOARD:
         if(r->service_action=='1') { m->lock=r->board_grant;m->input=INPUT_BOARD_PASSWORD; }
-        else if(r->service_action=='7')subboards(s,r->board);
+        else if(r->service_action=='7')mmm_ui_subboards(s,r->board);
         else if(open_new_only(m)) {
             m->open_board=r->board;
             mmm_simple_operation(s,BOARD_NOTE_VIEW,'C',0,JOB_OPEN_WINDOW);
@@ -1084,9 +1102,10 @@ static void result(Session *s,const OperationResult *r,SessionResultView project
         else {
             snprintf(m->board_title,sizeof(m->board_title),"%.80s",r->service_text);
             m->screen=BOARD_SCREEN;m->article=m->root=m->note_parent=m->search_next=0;m->search_responses=0;m->search[0]=0;
-            if(m->action==OPEN_POST)prepare_post(s,0);
+            if(ktbbs_active(s) && ktbbs_board_ready(s))break;
+            if(m->action==OPEN_POST)mmm_ui_prepare_post(s,0);
             else if(m->action==OPEN_INDEX)index_page(s,0);
-            else if(m->action==OPEN_BASE)browse(s,BROWSE_EXACT,0,m->target,0,0);
+            else if(m->action==OPEN_BASE)mmm_ui_browse(s,BROWSE_EXACT,0,m->target,0,0);
             else {
                 session_impl_queue_text(s,m->board_title);session_impl_queue_text(s,"\r\n");
                 mmm_menu(s,1);
@@ -1095,6 +1114,16 @@ static void result(Session *s,const OperationResult *r,SessionResultView project
         break;
     case JOB_INDEX: if(page && page->kind==OPERATION_PAGE_NOTES)render_index(s,&page->data.notes);break;
     case JOB_BROWSE: if(page && page->kind==OPERATION_PAGE_ARTICLES)browse_result(s,&page->data.articles);break;
+    case JOB_KTBBS_FIND:
+        if(page && page->kind==OPERATION_PAGE_ARTICLES)ktbbs_render_articles(s,&page->data.articles,0);
+        break;
+    case JOB_KTBBS_STATUS:
+        if(page && page->kind==OPERATION_PAGE_ARTICLES) {
+            char text[84];
+            snprintf(text,sizeof(text),mmm_local(s,"Visible articles: %u\r\n","閲覧可能な記事数: %u\r\n"),page->data.articles.total);
+            session_impl_queue_text(s,text);
+        }
+        break;
     case JOB_READ: case JOB_OPEN_READ:
         if(projection.content && projection.content->state==ARTICLE_VISIBLE) {
             const OperationContent *c=projection.content;
@@ -1155,7 +1184,7 @@ static void result(Session *s,const OperationResult *r,SessionResultView project
     case JOB_POST: {
         char text[48];snprintf(text,sizeof(text),"Saved #%u\r\n",s->core.current);
         session_impl_queue_text(s,text);mmm_clear_composition(m);m->input=INPUT_NONE;
-        if(m->screen==INDEX_SCREEN)index_page(s,m->page_start);
+        if(m->screen==INDEX_SCREEN && !ktbbs_active(s))index_page(s,m->page_start);
         break;
     }
     case JOB_MAIL: mmm_mail_result(s,r,projection);break;
@@ -1246,7 +1275,7 @@ static SessionUiSnapshot snapshot(const Session *s) {
     const MmmUi *m=mmm_view(s);
     return (SessionUiSnapshot){.language=m->language,.menu=1,
         .secret=m->input==INPUT_PASSWORD || m->input==INPUT_BOARD_PASSWORD || m->input==INPUT_FILE_PASSWORD,
-        .editing=m->input>=INPUT_TITLE && m->input<=INPUT_EDITOR,
+        .editing=(m->input>=INPUT_TITLE && m->input<=INPUT_EDITOR) || m->input==INPUT_KTBBS_CONFIRM,
         .chatting=m->chatting,.chat_pending=m->job==JOB_CHAT};
 }
 
@@ -1267,13 +1296,15 @@ static void enter(Session *s,int initial,int interactive,Language language) {
 
 static int can_leave(const Session *s) {
     const MmmUi *m=mmm_view(s);
-    return m->screen==MAIN_SCREEN && m->input==INPUT_NONE && !m->application.step;
+    return m->screen==MAIN_SCREEN && m->input==INPUT_NONE && !m->application.step &&
+           (!ktbbs_active(s) || ((const KtbbsUi *)s->ui_binding.state)->question==KT_READY);
 }
 
 static void cleanup(Session *s,int reason,int notify_revocation) {
     Language language=mmm_view(s)->language;
     if(reason!=2)chat_disconnect(s->core.id);
-    OPENSSL_cleanse(mmm_state(s),sizeof(MmmUi));
+    if(ktbbs_active(s))ktbbs_clear_page(s);
+    OPENSSL_cleanse(mmm_state(s),s->ui_binding.active->state_size);
     mmm_state(s)->language=language;
     if(reason==1 && notify_revocation)mmm_say(s,"Session revoked.\r\n","セッションが取り消されました。\r\n");
 }
@@ -1281,6 +1312,7 @@ static void cleanup(Session *s,int reason,int notify_revocation) {
 static void noop(Session *s) { (void)s; }
 static void refresh_board_list(Session *s) {
     MmmUi *m=mmm_state(s);
+    if(ktbbs_active(s))ktbbs_clear_page(s);
     if(m->screen==NOTES_SCREEN || m->screen==INDEX_SCREEN)m->row_count=m->next=0;
     if(m->screen==NEW_SCREEN)m->row_count=0;
 }
@@ -1345,7 +1377,7 @@ void mmm_stream_pause(Session *s) {
     MmmUi *m=mmm_state(s);
     if(!m->continuous)return;
     m->continuous=0;m->stream_paused=1;
-    mmm_say(s,"Reading paused. C: continue  Q: exit\r\n","読み出しを中断しました。C: 続行 Q: 終了\r\n");
+    if(!ktbbs_active(s))mmm_say(s,"Reading paused. C: continue  Q: exit\r\n","読み出しを中断しました。C: 続行 Q: 終了\r\n");
 }
 
 void mmm_stream_step(Session *s) {
@@ -1423,24 +1455,45 @@ static int notice(const Session *s,SessionNotice kind,unsigned number,uint64_t b
 }
 
 /* A separate adapter identity gives each dialect its own session-owned state. */
-#define NOTES_ADAPTER(profile) { \
-        .name=profile,.state_size=sizeof(MmmUi),.login_required=1,.keys=keys,.key=key, \
+#define NOTES_ADAPTER(profile,bytes,key_mode,key_input,help_output) { \
+        .name=profile,.state_size=bytes,.login_required=1,.keys=key_mode,.key=key_input, \
         .snapshot=snapshot,.cleanup=cleanup,.connector_line=unsupported_line,.binary_byte=unsupported_binary, \
         .prepare_request=prepare,.preferences=preferences,.signature=signature,.scan_pause=noop, \
         .scan_stop=noop,.board_refresh=refresh_board_list,.access_refresh=refresh_board_list,.chat_kick=chat_kick,.chat_event=mmm_chat_event, \
         .announce=session_impl_queue_text,.notify=notify,.mail_arrived=mail_arrived,.mail_notify=mail_preference, \
         .personal_receive=personal_receive,.transfer_receipt=transfer_receipt,.transfer_finish=transfer_finish,.notice=notice, \
         .enter=enter,.leave=noop,.can_leave=can_leave,.line=line,.keep_position=keep_position,.result=result, \
-        .emit=session_impl_queue_text,.prompt=mmm_prompt,.menu=mmm_menu,.help=help,.uppercase=uppercase,.tick=tick,.door_finish=door_finish, \
+        .emit=session_impl_queue_text,.prompt=mmm_prompt,.menu=mmm_menu,.help=help_output,.uppercase=uppercase,.tick=tick,.door_finish=door_finish, \
 }
 
 const SessionUiAdapter *session_ui_mmm(void) {
-    static const SessionUiAdapter adapter=NOTES_ADAPTER("mmm");
+    static const SessionUiAdapter adapter=NOTES_ADAPTER("mmm",sizeof(MmmUi),keys,key,help);
     return &adapter;
 }
 
 const SessionUiAdapter *session_ui_mash(void) {
-    static const SessionUiAdapter adapter=NOTES_ADAPTER("mash");
+    static const SessionUiAdapter adapter=NOTES_ADAPTER("mash",sizeof(MmmUi),keys,key,help);
+    return &adapter;
+}
+static int kt_key_mode(const Session *s) {
+    const MmmUi *m=mmm_view(s);
+    if(m->screen==NEW_SCREEN && (m->continuous || m->stream_paused))return 1;
+    return ktbbs_keys(s);
+}
+static void kt_key_input(Session *s,unsigned char ch) {
+    const MmmUi *m=mmm_view(s);
+    if(m->screen==NEW_SCREEN && (m->continuous || m->stream_paused)) {
+        MmmUi *edit=mmm_state(s);
+        if(m->continuous && (ch=='c' || ch=='C' || ch==3))mmm_stream_pause(s);
+        else if(m->stream_paused && (ch=='y' || ch=='Y')) { edit->stream_paused=0;edit->continuous=1; }
+        else if(m->stream_paused && (ch=='n' || ch=='N' || ch=='0')) {
+            edit->stream_paused=0;edit->screen=MAIN_SCREEN;mmm_menu(s,0);
+        }
+        mmm_prompt(s);
+    } else ktbbs_key(s,ch);
+}
+const SessionUiAdapter *session_ui_ktbbs(void) {
+    static const SessionUiAdapter adapter=NOTES_ADAPTER("ktbbs",sizeof(KtbbsUi),kt_key_mode,kt_key_input,ktbbs_help);
     return &adapter;
 }
 #undef NOTES_ADAPTER

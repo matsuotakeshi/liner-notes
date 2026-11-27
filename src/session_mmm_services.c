@@ -48,7 +48,7 @@ void mmm_mail_list(Session *s,MailListMode mode,uint32_t cursor) {
     }
 }
 
-static int transfer_protocol(Session *s,const char *name) {
+int mmm_ui_transfer_protocol(Session *s,const char *name) {
     static const char *const names[]={"zmodem","xmodem","ymodem","ymodem-g","mlink","text","xmodem-sum","xmodem-1k"};
     if(*name) {
         unsigned index=0;
@@ -61,7 +61,7 @@ static int transfer_protocol(Session *s,const char *name) {
     session_impl_queue_text(s,text);return 1;
 }
 
-static void transfer(Session *s,int mode,uint32_t id,const char *text,int mail) {
+void mmm_ui_transfer(Session *s,int mode,uint32_t id,const char *text,int mail) {
     unsigned protocol=s->connection.transfer_protocol;
     if((mode==7 || mode==12) && protocol) {
         mmm_say(s,"Resume requires ZMODEM.\r\n","再開にはZMODEMを指定してください。\r\n");return;
@@ -100,7 +100,7 @@ void mmm_pfile_receive(Session *s,const char *bytes) {
         }
         char count[16];
         snprintf(count,sizeof(count),"%u",length);
-        transfer(s,ZHOST_RECEIVE_PERSONAL,0,count,0);
+        mmm_ui_transfer(s,ZHOST_RECEIVE_PERSONAL,0,count,0);
         return;
     }
     if(protocol!=0 && protocol!=2) {
@@ -109,10 +109,10 @@ void mmm_pfile_receive(Session *s,const char *bytes) {
         return;
     }
     if(*bytes) { mmm_bad_service_command(s);return; }
-    transfer(s,ZHOST_RECEIVE_PERSONAL,0,"",0);
+    mmm_ui_transfer(s,ZHOST_RECEIVE_PERSONAL,0,"",0);
 }
 
-static int mail_command(Session *s,const char *name,char *arg) {
+int mmm_ui_mail_command(Session *s,const char *name,char *arg) {
     MmmUi *m=mmm_state(s);
     uint32_t id;
     if(!*name || !strcmp(name,"inbox"))mmm_mail_list(s,MAIL_LIST_INBOX,0);
@@ -145,11 +145,11 @@ static int mail_command(Session *s,const char *name,char *arg) {
     else if((!strcmp(name,"read") && mmm_number(arg,&id)) || (!*arg && mmm_number(name,&id)))
         mmm_simple_operation(s,'m','R',id,JOB_MAIL);
     else if(!strcmp(name,"save") && mmm_number(arg,&id))mmm_simple_operation(s,'m','R',id,JOB_PFILE_MAIL);
-    else if(!strcmp(name,"get") && mmm_number(arg,&id))transfer(s,5,id,"",1);
+    else if(!strcmp(name,"get") && mmm_number(arg,&id))mmm_ui_transfer(s,5,id,"",1);
     else if(!strcmp(name,"getall") && mmm_number(arg,&id))mmm_simple_operation(s,'}','B',id,JOB_MAIL_BATCH);
-    else if(!strcmp(name,"upload") && mmm_ui_text_valid(arg,240))transfer(s,4,0,arg,1);
+    else if(!strcmp(name,"upload") && mmm_ui_text_valid(arg,240))mmm_ui_transfer(s,4,0,arg,1);
     else if((!strcmp(name,"uploadbatch") || !strcmp(name,"resumebatch")) && mmm_ui_text_valid(arg,80))
-        transfer(s,name[0]=='r'?12:11,0,arg,1);
+        mmm_ui_transfer(s,name[0]=='r'?12:11,0,arg,1);
     else if(!strcmp(name,"delete") || !strcmp(name,"killmail")) {
         char *confirm=verb(arg);
         if(!mmm_number(arg,&id) || strcmp(confirm,"confirm"))mmm_bad_service_command(s);
@@ -158,13 +158,13 @@ static int mail_command(Session *s,const char *name,char *arg) {
     return 1;
 }
 
-static void file_page(Session *s,uint32_t cursor) {
+void mmm_ui_file_page(Session *s,uint32_t cursor) {
     const MmmUi *m=mmm_view(s);
     OperationRequest *q=mmm_request(s,'Y');
     if(!q)return;
     const char *path=*m->file_path?m->file_path:"-";
     q->action=m->file_action;q->number=cursor;
-    if(q->action==VAULT_CMD_SEARCH)snprintf(q->body,sizeof(q->body),"%s|%s",path,m->file_filter);
+    if(q->action==VAULT_CMD_SEARCH || q->action==VAULT_CMD_NEWS)snprintf(q->body,sizeof(q->body),"%s|%s",path,m->file_filter);
     else if(q->action==VAULT_CMD_IN || q->action==VAULT_CMD_CHILDREN)strcpy(q->title,path);
     else if(q->action==VAULT_CMD_TEXT) {
         q->number=m->file_text_id;snprintf(q->title,sizeof(q->title),"%u",cursor);
@@ -186,22 +186,22 @@ void mmm_file_enter(Session *s,const char *path) {
     }
 }
 
-static int filer_command(Session *s,const char *name,char *arg) {
+int mmm_ui_filer_command(Session *s,const char *name,char *arg) {
     MmmUi *m=mmm_state(s);
     uint32_t id;
     if(!strcmp(name,"cd"))mmm_file_enter(s,arg);
     else if(!strcmp(name,"list") || !*name) {
-        m->file_action=VAULT_CMD_IN;file_page(s,0);
+        m->file_action=VAULT_CMD_IN;mmm_ui_file_page(s,0);
     } else if(!strcmp(name,"dirs"))mmm_file_enter(s,m->file_path);
-    else if(!strcmp(name,"more") && m->service_next)file_page(s,m->service_next);
+    else if(!strcmp(name,"more") && m->service_next)mmm_ui_file_page(s,m->service_next);
     else if(!strcmp(name,"find") && *arg && mmm_ui_text_valid(arg,80) && !strchr(arg,'|')) {
-        strcpy(m->file_filter,arg);m->file_action=VAULT_CMD_SEARCH;file_page(s,0);
+        strcpy(m->file_filter,arg);m->file_action=VAULT_CMD_SEARCH;mmm_ui_file_page(s,0);
     } else if(!strcmp(name,"text") && mmm_number(arg,&id)) {
-        m->file_action=VAULT_CMD_TEXT;m->file_text_id=id;file_page(s,0);
+        m->file_action=VAULT_CMD_TEXT;m->file_text_id=id;mmm_ui_file_page(s,0);
     } else if((!strcmp(name,"info") || !strcmp(name,"add")) && mmm_number(arg,&id))
         mmm_simple_operation(s,'Y',VAULT_CMD_INFO,id,
                          !strcmp(name,"add")?JOB_FILE_ADD:JOB_FILES);
-    else if(!strcmp(name,"get") && mmm_number(arg,&id))transfer(s,0,id,"",0);
+    else if(!strcmp(name,"get") && mmm_number(arg,&id))mmm_ui_transfer(s,0,id,"",0);
     else if(!strcmp(name,"unlock") && mmm_ui_text_valid(arg,48) && !strchr(arg,'|')) {
         strcpy(m->requested_path,*arg?arg:m->file_path);m->input=INPUT_FILE_PASSWORD;
     } else if((!strcmp(name,"put") || !strcmp(name,"resume") || !strcmp(name,"putbatch")) &&
@@ -211,11 +211,11 @@ static int filer_command(Session *s,const char *name,char *arg) {
         const char *path=*m->file_path?m->file_path:"-";
         int mode=!strcmp(name,"resume")?7:!strcmp(name,"putbatch")?6:3;
         snprintf(text,sizeof(text),"%s%s%s",path,*arg?"|":"",arg);
-        transfer(s,mode,0,text,0);
+        mmm_ui_transfer(s,mode,0,text,0);
     } else if(!strcmp(name,"batch")) {
         char text[180];
         BatchIds ids=batch_ids(&m->files,1);
-        if(ids.count && batch_format_ids(&ids,text,sizeof(text)))transfer(s,2,0,text,0);
+        if(ids.count && batch_format_ids(&ids,text,sizeof(text)))mmm_ui_transfer(s,2,0,text,0);
         else mmm_say(s,"No pending files.\r\n","未取得の選択ファイルはありません。\r\n");
     } else if(!strcmp(name,"clear"))batch_reset(&m->files);
     else return 0;
@@ -228,7 +228,7 @@ void mmm_profile(Session *s,const char *arg) {
     if(q) { q->action=7;strcpy(q->username,arg);mmm_submit(s,q,JOB_PROFILE); }
 }
 
-static void profile_search(Session *s,uint32_t cursor) {
+void mmm_ui_profile_search(Session *s,uint32_t cursor) {
     const MmmUi *m=mmm_view(s);
     OperationRequest *q=mmm_request(s,'Z');
     if(q) {
@@ -237,7 +237,7 @@ static void profile_search(Session *s,uint32_t cursor) {
     }
 }
 
-static int term_command(Session *s,char *name,char *arg) {
+int mmm_ui_term_command(Session *s,char *name,char *arg) {
     MmmUi *m=mmm_state(s);
     if(!strcmp(name,"lang")) {
         if(!strcmp(arg,"ja"))m->language=LANGUAGE_JA;
@@ -259,13 +259,13 @@ static int term_command(Session *s,char *name,char *arg) {
             mmm_submit(s,q,JOB_PREF);
         }
     } else if(!strcmp(name,"profile"))mmm_profile(s,arg);
-    else if(!strcmp(name,"more") && !*arg && m->profile_next)profile_search(s,m->profile_next);
+    else if(!strcmp(name,"more") && !*arg && m->profile_next)mmm_ui_profile_search(s,m->profile_next);
     else if(!strcmp(name,"find") && *arg && mmm_ui_text_valid(arg,80)) {
-        strcpy(m->profile_filter,arg);m->profile_scope=0;profile_search(s,0);
+        strcpy(m->profile_filter,arg);m->profile_scope=0;mmm_ui_profile_search(s,0);
     } else if(!strcmp(name,"ingroup")) {
         uint32_t group;
         if(!mmm_number(arg,&group))return 0;
-        m->profile_scope=100;m->profile_group=group;m->profile_filter[0]=0;profile_search(s,0);
+        m->profile_scope=100;m->profile_group=group;m->profile_filter[0]=0;mmm_ui_profile_search(s,0);
     } else if(!strcmp(name,"set") || !strcmp(name,"privacy") || !strcmp(name,"findfield")) {
         char *value=verb(arg);
         for(char *p=arg;*p;p++)if(*p>='a' && *p<='z')*p=(char)(*p-'a'+'A');
@@ -273,7 +273,7 @@ static int term_command(Session *s,char *name,char *arg) {
         if(field<0 || !mmm_ui_text_valid(value,320))return 0;
         if(!strcmp(name,"findfield")) {
             if(!*value || strlen(value)>80)return 0;
-            m->profile_scope=(unsigned)field+1;strcpy(m->profile_filter,value);profile_search(s,0);return 1;
+            m->profile_scope=(unsigned)field+1;strcpy(m->profile_filter,value);mmm_ui_profile_search(s,0);return 1;
         }
         int visibility=-1;
         if(!strcmp(name,"privacy")) {
@@ -372,7 +372,7 @@ void mmm_manage_menu(Session *s) {
         "members 会員一覧 / member 会員詳細 / applications 申請 / approve 承認 / suspend 停止 / reinstate 解除 / boardset ボード設定\r\n");
 }
 
-static int manage_command(Session *s,const char *name,char *arg) {
+int mmm_ui_manage_command(Session *s,const char *name,char *arg) {
     char op=0;
     int action=0;
     uint32_t id=0,cursor=0;
@@ -426,14 +426,14 @@ int mmm_service_line(Session *s,char *text) {
     uint32_t id;
     int handled=0;
     if((m->screen==MAIL_SCREEN || m->screen==FILER_SCREEN) && !strcmp(text,"protocol")) {
-        if(!transfer_protocol(s,arg))mmm_bad_service_command(s);
+        if(!mmm_ui_transfer_protocol(s,arg))mmm_bad_service_command(s);
         return 1;
     }
     switch(m->screen) {
-    case MAIL_SCREEN: handled=mail_command(s,text,arg);break;
-    case FILER_SCREEN: handled=filer_command(s,text,arg);break;
-    case TERM_SCREEN: handled=term_command(s,text,arg);break;
-    case MANAGE_SCREEN: handled=manage_command(s,text,arg);break;
+    case MAIL_SCREEN: handled=mmm_ui_mail_command(s,text,arg);break;
+    case FILER_SCREEN: handled=mmm_ui_filer_command(s,text,arg);break;
+    case TERM_SCREEN: handled=mmm_ui_term_command(s,text,arg);break;
+    case MANAGE_SCREEN: handled=mmm_ui_manage_command(s,text,arg);break;
     case GAMES_SCREEN:
         if(!*text || !strcmp(text,"list")) { mmm_games(s,0);handled=1; }
         else if((!*arg && mmm_number(text,&id)) || (!strcmp(text,"play") && mmm_number(arg,&id))) {
@@ -476,6 +476,7 @@ void mmm_mail_result(Session *s,const OperationResult *r,SessionResultView proje
     } else if(page && page->kind==OPERATION_PAGE_MAIL) {
         const MailPage *mail=&page->data.mail;
         m->service_next=mail->next;
+        if(ktbbs_active(s))ktbbs_mail_page(s,mail);
         if(!mail->count)mmm_say(s,"No messages.\r\n","メールはありません。\r\n");
         for(unsigned i=0;i<mail->count;i++) {
             const MailSummary *item=&mail->rows[i];
@@ -485,6 +486,7 @@ void mmm_mail_result(Session *s,const OperationResult *r,SessionResultView proje
         }
     } else if(projection.content && projection.content->kind==2) {
         const OperationContent *item=projection.content;
+        if(ktbbs_active(s))ktbbs_mail_read(s,item->id);
         char text[192];snprintf(text,sizeof(text),"Mail #%u  %s -> %s\r\n%s\r\n",
                                 item->id,item->author,item->recipient_name,item->title);
         session_impl_queue_text(s,text);session_impl_queue_text(s,projection.body);
@@ -523,7 +525,7 @@ void mmm_mail_batch_result(Session *s,const OperationFeedback *feedback) {
         BatchIds files={.count=feedback->count};
         char text[180];
         memcpy(files.ids,feedback->ids,files.count*sizeof(files.ids[0]));
-        if(batch_format_ids(&files,text,sizeof(text))) { transfer(s,10,0,text,1);return; }
+        if(batch_format_ids(&files,text,sizeof(text))) { mmm_ui_transfer(s,10,0,text,1);return; }
     }
     mmm_say(s,"No attachments available.\r\n","取得できる添付はありません。\r\n");
 }
@@ -549,7 +551,8 @@ void mmm_file_result(Session *s,const OperationResult *r,const OperationPage *pa
         m->service_next=children->next;
         char text[160];snprintf(text,sizeof(text),"[%s]\r\n",*m->file_path?m->file_path:"/");
         session_impl_queue_text(s,text);
-        for(size_t i=0;i<children->count;i++) {
+        if(ktbbs_active(s))ktbbs_file_children(s,children);
+        else for(size_t i=0;i<children->count;i++) {
             snprintf(text,sizeof(text),"%s  %s\r\n",children->rows[i].name,children->rows[i].display);
             session_impl_queue_text(s,text);
         }
@@ -674,6 +677,7 @@ void mmm_door_result(Session *s,const OperationResult *r,const OperationPage *pa
 void mmm_render_news(Session *s,const ArticlePage *page) {
     MmmUi *m=mmm_state(s);
     m->row_count=page->count;m->service_next=page->next;
+    if(ktbbs_active(s))((KtbbsUi *)s->ui_binding.state)->news_at=0;
     if(m->scan_custom && !page->next && m->scan_at<m->scan_count) {
         mmm_next_scan_board(s);
         if(m->scan_at<m->scan_count)m->service_next=1; /* First ID in the next board. */

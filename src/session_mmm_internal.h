@@ -8,11 +8,11 @@
 typedef enum {
     MAIN_SCREEN, NOTES_SCREEN, BOARD_SCREEN, INDEX_SCREEN, OPEN_SCREEN, MAIL_SCREEN,
     FILER_SCREEN, CHAT_SCREEN, TERM_SCREEN, GAMES_SCREEN, NEW_SCREEN, MANAGE_SCREEN, TALK_SCREEN,
-    MASH_OTHERS_SCREEN
+    MASH_OTHERS_SCREEN, KTBBS_ENTER_SCREEN, KTBBS_EXT_SCREEN
 } MmmScreen;
 typedef enum {
     INPUT_NONE, INPUT_LOGIN, INPUT_PASSWORD, INPUT_BOARD_PASSWORD, INPUT_TITLE,
-    INPUT_BODY, INPUT_EDITOR, INPUT_NOTE, INPUT_RESPONSE, INPUT_FIND, INPUT_FILE_PASSWORD
+    INPUT_BODY, INPUT_EDITOR, INPUT_NOTE, INPUT_RESPONSE, INPUT_FIND, INPUT_FILE_PASSWORD, INPUT_KTBBS_CONFIRM
 } MmmPrompt;
 typedef enum {
     JOB_NONE, JOB_AUTH, JOB_BOARDS, JOB_NAMED, JOB_BOARD, JOB_UNLOCK, JOB_INDEX,
@@ -22,10 +22,10 @@ typedef enum {
     JOB_SCANLIST, JOB_SCANLIST_SAVE, JOB_LABEL, JOB_OPEN_WINDOW, JOB_OPEN_PAGE, JOB_OPEN_READ,
     JOB_NOTE_DRAFT, JOB_NOTE_DRAFT_SAVE, JOB_NOTE_DRAFT_STATUS, JOB_NOTE_DRAFT_DROP, JOB_NOTE_CHANGE,
     JOB_NOTE_DRAFT_DROPPED, JOB_STREAM_READ, JOB_STREAM_SEEN, JOB_MANAGE, JOB_PFILE_APPEND, JOB_PFILE_MAIL, JOB_SIGNATURE, JOB_SIGNATURE_EDIT, JOB_SIGNATURE_SAVE,
-    JOB_CONFERENCE
+    JOB_CONFERENCE, JOB_KTBBS_FIND, JOB_KTBBS_STATUS
 } MmmJob;
 typedef enum { OPEN_BOARD_MENU, OPEN_INDEX, OPEN_BASE, OPEN_POST, OPEN_NEW, OPEN_NEW_OR_INDEX } MmmBoardAction;
-typedef enum { BROWSE_READ, BROWSE_INDEX, BROWSE_EXACT, BROWSE_RESPONSE, BROWSE_TITLES } MmmBrowse;
+typedef enum { BROWSE_READ, BROWSE_INDEX, BROWSE_EXACT, BROWSE_RESPONSE, BROWSE_TITLES, BROWSE_KTBBS_LIST, BROWSE_KTBBS_TITLE, BROWSE_KTBBS_BODY } MmmBrowse;
 
 enum { MMM_PFILE_MAX=10240 };
 typedef struct {
@@ -121,4 +121,64 @@ void mmm_settings_summary(Session *s);
 void mmm_render_profile(Session *s,const OperationPage *page);
 void mmm_door_result(Session *s,const OperationResult *r,const OperationPage *page);
 void mmm_render_news(Session *s,const ArticlePage *page);
+/* Shared typed terminal actions. Each profile owns its input grammar. */
+void mmm_ui_boards(Session *,uint32_t);
+void mmm_ui_enter_board(Session *,const char *,MmmBoardAction);
+void mmm_ui_read_article(Session *,uint32_t);
+void mmm_ui_browse(Session *,MmmBrowse,uint32_t,uint32_t,int,int);
+void mmm_ui_prepare_post(Session *,uint32_t);
+void mmm_ui_auth_start(Session *,const char *,char);
+void mmm_ui_choose_profile(Session *,char *);
+void mmm_ui_note_draft_command(Session *,const char *);
+void mmm_ui_open_setup(Session *);
+void mmm_ui_subboards(Session *,uint32_t);
+int mmm_ui_mail_command(Session *,const char *,char *);
+int mmm_ui_filer_command(Session *,const char *,char *);
+int mmm_ui_term_command(Session *,char *,char *);
+int mmm_ui_manage_command(Session *,const char *,char *);
+int mmm_ui_transfer_protocol(Session *,const char *);
+void mmm_ui_file_page(Session *,uint32_t);
+void mmm_ui_transfer(Session *,int,uint32_t,const char *,int);
+void mmm_ui_profile_search(Session *,uint32_t);
+
+typedef enum {
+    KT_READY, KT_ARTICLE_BOARD, KT_FILE_BOARD, KT_LIST_START, KT_READ_START, KT_READ_ID,
+    KT_REPLY_ID, KT_SEARCH_KIND, KT_SEARCH_TEXT, KT_NEWS_DATE, KT_MAIL_LIST,
+    KT_MAIL_TO, KT_FILE_TEXT, KT_FILE_ID, KT_FILE_UPLOAD, KT_TELEGRAM_TO, KT_TELEGRAM_TEXT,
+    KT_DELETE_ID, KT_DELETE_CONFIRM, KT_MAIL_DELETE_CONFIRM, KT_FILE_NEWS
+} KtbbsQuestion;
+typedef struct {
+    MmmUi shared;
+    KtbbsQuestion question;
+    MmmBoardAction board_action;
+    uint32_t selected_title, mail_id, telegram_target, delete_id;
+    uint32_t mail_rows[8];
+    unsigned news_at, mail_count, mail_at;
+    int reverse, title_mode, find_author, find_active, reply_after_board;
+    int mail_advance, upload_protocol, expert;
+    char find_text[81];
+    unsigned file_board_count;
+    char file_boards[15][49];
+    char *page_body;
+    size_t page_offset;
+    uint32_t page_article, page_board;
+} KtbbsUi;
+
+static inline int ktbbs_active(const Session *s) {
+    return s->ui_binding.active==session_ui_ktbbs();
+}
+void ktbbs_line(Session *,char *);
+int ktbbs_keys(const Session *);
+void ktbbs_key(Session *,unsigned char);
+int ktbbs_prompt(Session *);
+void ktbbs_menu(Session *,int);
+int ktbbs_editor_line(Session *,char **);
+int ktbbs_board_ready(Session *);
+void ktbbs_render_articles(Session *,const ArticlePage *,int);
+void ktbbs_mail_page(Session *,const MailPage *);
+void ktbbs_mail_read(Session *,uint32_t);
+void ktbbs_file_children(Session *,const VaultQueryChildren *);
+void ktbbs_help(Session *,const char *);
+int ktbbs_page_article(Session *,const OperationContent *,const char *);
+void ktbbs_clear_page(Session *);
 #endif

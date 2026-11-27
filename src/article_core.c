@@ -661,7 +661,7 @@ static void add_summary(ArticlePage *out,uint32_t id,const ArticleMetadata *arti
 
 static ArticleOutcome browse_notes(const ArticleActor *actor,uint32_t board,uint32_t root,
                                    uint32_t start,int descending,int unread,const char *query,
-                                   ArticlePage *out) {
+                                   int flat,ArticlePage *out) {
     ArticleOutcome result=health();
     if(result!=ARTICLE_OK)return result;
     result=identity(actor,0);
@@ -682,7 +682,7 @@ static ArticleOutcome browse_notes(const ArticleActor *actor,uint32_t board,uint
         if(visible<0)return ARTICLE_STORAGE;
         uint32_t current=id;
         id=descending?id-1:id+1;
-        if(!visible || (root?(entry.root!=root || !entry.parent):entry.parent!=0))continue;
+        if(!visible || (!flat && (root?(entry.root!=root || !entry.parent):entry.parent!=0)))continue;
         if(query && !strstr(entry.title,query))continue;
         if(unread && members_seen(actor->user,current))continue;
         if(members_broken())return ARTICLE_READ_STATE_STORAGE;
@@ -698,7 +698,18 @@ ArticleOutcome article_browse_notes(const ArticleActor *actor,uint32_t board,uin
     if(!out)return ARTICLE_INVALID_READ;
     memset(out,0,sizeof(*out));
     policy_context(actor?actor->board_grants:NULL);
-    ArticleOutcome result=browse_notes(actor,board,root,start,descending,unread,query,out);
+    ArticleOutcome result=browse_notes(actor,board,root,start,descending,unread,query,0,out);
+    policy_context(NULL);
+    if(result!=ARTICLE_OK)memset(out,0,sizeof(*out));
+    return result;
+}
+
+ArticleOutcome article_browse_board(const ArticleActor *actor,uint32_t board,uint32_t start,
+                                    int descending,ArticlePage *out) {
+    if(!out)return ARTICLE_INVALID_READ;
+    memset(out,0,sizeof(*out));
+    policy_context(actor?actor->board_grants:NULL);
+    ArticleOutcome result=browse_notes(actor,board,0,start,descending,0,NULL,1,out);
     policy_context(NULL);
     if(result!=ARTICLE_OK)memset(out,0,sizeof(*out));
     return result;
