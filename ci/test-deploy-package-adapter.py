@@ -6,6 +6,7 @@ import subprocess
 import sys
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'scripts'))
 from deploy_policy import package_commands, require
+from deploy_host import preflight_debian_upgrade
 
 require(os.geteuid() == 0 and Path('/.dockerenv').exists() and Path.cwd() == Path('/build/liner-notes'), 'Disposable CI container required')
 platform, *files = sys.argv[1:]
@@ -20,8 +21,13 @@ for filename in files:
         name = subprocess.check_output(['/usr/bin/rpm', '-qp', '--qf', '%{NAME}', str(path)], text=True)
     else:
         name = subprocess.check_output(['/usr/bin/dpkg-deb', '-f', str(path), 'Package'], text=True).strip()
+        version = subprocess.check_output(['/usr/bin/dpkg-deb', '-f', str(path), 'Version'], text=True).strip()
     require(name not in packages, 'Duplicate package')
     (staging / path.name).symlink_to(path)
     packages[name] = {'filename': path.name}
+    if platform == 'debian13':
+        packages[name]['version'] = version
+if platform == 'debian13':
+    preflight_debian_upgrade(staging, packages)
 for argv in package_commands(platform, packages, staging):
     subprocess.run(argv, check=True)

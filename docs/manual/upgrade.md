@@ -131,7 +131,9 @@ backup receiverはprivate directory `/var/lib/liner-notes-release-backups` を�
 ゲーム外部データ、秘密鍵、証明書を含むバックアップをActions Artifactに保管しないでください。
 
 Linux更新はローカルpackageだけのRPM/dpkgで行い、依存解決のための一括OS更新はしません。
-Debianの既存conffileは保持します。FreeBSDはOrigin `comms/liner-notes` を確認した
+Debianはサービス停止前にAPTの試行結果を読み、承認済みDEB以外の追加・更新・削除や、
+依存不足で完了しない計画を拒否します。必要な依存は管理者が別途導入します。
+インストール時は既存conffileを保持します。FreeBSDはOrigin `comms/liner-notes` を確認した
 単一packageのprivate repositoryから `pkg upgrade` を実行し、New/削除を含むplanを拒否します。
 `pkg delete` → `pkg add` はこのCD機構では使用しません。Apache・SofChat・OS操作を
 helperのサービス許可一覧に追加しないでください。更新前後で無関係packageが変わっていないことも確認します。
