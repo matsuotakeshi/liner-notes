@@ -293,7 +293,7 @@ void ktbbs_key(Session *s,unsigned char ch) {
         if(ch=='P')reverse=!reverse;
         if(ch=='+' || ch=='-') { reverse=ch=='-';step=10; }
         if(reverse && id<=step)mmm_say(s,"Beginning of board.\r\n","先頭の記事です。\r\n");
-        else browse(s,k->title_mode?BROWSE_KTBBS_TITLE:BROWSE_KTBBS_BODY,reverse?id-step:id+step,reverse);
+        else browse(s,k->title_mode?BROWSE_KTBBS_TITLE:BROWSE_FLAT_BODY,reverse?id-step:id+step,reverse);
     }
     mmm_prompt(s);
 }
@@ -389,7 +389,7 @@ static int question_line(Session *s,char *line) {
         if(*line && !ktbbs_id(line,&id))break;
         k->question=KT_READY;k->reverse=!id;k->find_active=0;
         k->title_mode=question==KT_READ_START;
-        browse(s,k->title_mode?BROWSE_KTBBS_TITLE:BROWSE_KTBBS_LIST,id,k->reverse);
+        browse(s,k->title_mode?BROWSE_KTBBS_TITLE:BROWSE_FLAT_LIST,id,k->reverse);
         break;
     case KT_READ_ID: case KT_REPLY_ID:
         if(!ktbbs_id(line,&id))break;
@@ -544,7 +544,7 @@ static void board_line(Session *s,KtbbsInput input) {
     } else if(input.key=='L' && m->screen==INDEX_SCREEN) {
         if(m->next) {
             if(k->find_active)find_page(s,m->next);
-            else browse(s,BROWSE_KTBBS_LIST,m->next,k->reverse);
+            else browse(s,BROWSE_FLAT_LIST,m->next,k->reverse);
         } else mmm_say(s,"End of article list.\r\n","記事一覧の末尾です。\r\n");
     } else if(input.key=='L' || input.key=='R') {
         k->question=input.key=='L'?KT_LIST_START:KT_READ_START;
