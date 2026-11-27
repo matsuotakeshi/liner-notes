@@ -55,7 +55,12 @@ void session_rtbbs_menu(Session *s,int explicit_request) {
         const char *text=menu_section_text(rtbbs(s)->presentation.ui.language,part);
         session_impl_queue_text(s,text?text:ui_text(&rtbbs(s)->presentation.ui,fallback[part]));return;
     }
-    if(explicit_request || !rtbbs(s)->presentation.menu_mode || (rtbbs(s)->presentation.menu_mode==1 && !rtbbs(s)->presentation.menu_shown))session_impl_queue_text(s,ui_menu(&rtbbs(s)->presentation.ui));
+    if(explicit_request || !rtbbs(s)->presentation.menu_mode || (rtbbs(s)->presentation.menu_mode==1 && !rtbbs(s)->presentation.menu_shown)) {
+        session_impl_queue_text(s,ui_menu(&rtbbs(s)->presentation.ui));
+        session_ui_menu_hint(s);
+        if(s->core.user)session_impl_queue_text(s,rtbbs(s)->presentation.ui.language==LANGUAGE_JA?
+            "TOPIC 短文伝言板（TOPIC -W 本文）\r\n":"TOPIC Short notices (TOPIC -W text)\r\n");
+    }
     rtbbs(s)->presentation.menu_shown=1;
 }
 

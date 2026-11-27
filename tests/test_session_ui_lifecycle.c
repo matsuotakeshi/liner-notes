@@ -99,6 +99,83 @@ void board_conference_session(int slot,unsigned long session,uint32_t user,uint3
 }
 int board_submit(const BoardRequest *q) { assert(q->user==12 && q->user_epoch==3 && q->session==77 && q->slot==2);requests++;return 1; }
 
+typedef struct { char text[2048];size_t length; } Captured;
+static int capture(void *context,const char *text,size_t size) {
+    Captured *output=context;
+    if(size>=sizeof(output->text)-output->length)return 0;
+    memcpy(output->text+output->length,text,size);
+    output->length+=size;output->text[output->length]=0;return 1;
+}
+
+static void registration_limits(SessionIO io) {
+    Session s;
+    SessionUiConfig config=session_ui_default();
+    SessionUiAdapter doubles[SESSION_UI_MAX];
+    char names[SESSION_UI_MAX][UI_PROFILE_NAME_MAX+1];
+    char allow[SESSION_UI_ALLOW_MAX+2];
+    for(unsigned i=0;i<SESSION_UI_MAX;i++) {
+        int length=snprintf(names[i],sizeof(names[i]),"test-profile-name-%013u",i);
+        assert(length==UI_PROFILE_NAME_MAX);
+        doubles[i]=adapter;
+        doubles[i].name=names[i];
+        config.adapters[i]=&doubles[i];
+        memcpy(allow+i*(UI_PROFILE_NAME_MAX+1),names[i],UI_PROFILE_NAME_MAX);
+        allow[i*(UI_PROFILE_NAME_MAX+1)+UI_PROFILE_NAME_MAX]=',';
+    }
+    allow[SESSION_UI_ALLOW_MAX]=0;
+    config.default_index=0;config.allowed=UINT32_C(0xffff);config.count=SESSION_UI_MAX;
+    assert(session_ui_configure(&config,"ALL",names[15],allow));
+    assert(config.default_index==15 && config.allowed==UINT32_C(0xffff));
+    Captured output={0};io.context=&output;io.write=capture;
+    assert(session_init_ui(&s,io,77,2,1,1,1,LANGUAGE_EN,&config));
+    assert(s.ui_binding.states[15] && !s.ui_binding.states[8]);
+    session_ui_list_choices(&s,1);
+    char last[64];snprintf(last,sizeof(last),"16. %s",names[15]);
+    assert(strstr(output.text,last));
+    assert(!strcmp(session_ui_choice_name(&s,"16"),names[15]));
+    assert(!strcmp(session_ui_choice_name(&s,"17"),"17"));
+    s.ui_binding.config.policy=SESSION_UI_FIXED;
+    output=(Captured){0};session_ui_list_choices(&s,1);
+    assert(!strstr(output.text,last) && !strstr(output.text,"UI RESET"));
+    s.ui_binding.config.policy=SESSION_UI_ALL;
+    for(unsigned i=0;i<SESSION_UI_MAX;i++)
+        assert(session_ui_select(&s,names[i])==SESSION_UI_SELECTED);
+    session_dispose(&s);
+    for(unsigned i=0;i<SESSION_UI_MAX;i++)assert(!s.ui_binding.states[i]);
+
+    config.default_index=0;
+    assert(session_init_ui(&s,io,77,2,1,1,1,LANGUAGE_EN,&config));
+    OperationResult *completion=calloc(1,sizeof(*completion));
+    assert(completion);
+    completion->session=77;completion->slot=2;completion->auth=12;completion->user_epoch=3;
+    strcpy(completion->ui_profile,names[15]);
+    session_result(&s,completion,100);
+    assert(!strcmp(session_ui_name(&s),names[15]));
+    assert(session_ui_save_choice(&s,names[15]));
+    completion->auth=0;completion->feedback.ui_profile_saved=1;
+    session_result(&s,completion,101);
+    assert(!strcmp(s.ui_binding.preferred,names[15]));
+    free(completion);session_dispose(&s);
+
+    assert(!session_ui_configure(&config,"ALL",names[15],names[0]));
+    allow[SESSION_UI_ALLOW_MAX]='x';allow[SESSION_UI_ALLOW_MAX+1]=0;
+    assert(!session_ui_configure(&config,"ALL",names[15],allow));
+    config.count=17;assert(!session_ui_config_valid(&config));
+    assert(!session_ui_configure(&config,"ALL",names[0],names[0]));
+    config.count=9;config.allowed=UINT32_C(0x101);config.default_index=8;
+    assert(session_ui_config_valid(&config));
+    config.allowed|=UINT32_C(0x200);assert(!session_ui_config_valid(&config));
+    config.count=SESSION_UI_MAX;config.default_index=0;config.allowed=1;
+    assert(session_init_ui(&s,io,77,2,1,1,1,LANGUAGE_EN,&config));
+    assert(session_ui_select(&s,names[15])==SESSION_UI_DENIED);
+    State *original=state(&s);
+    s.ui_binding.config.allowed|=UINT32_C(0x8000);
+    doubles[15].state_size=SIZE_MAX;
+    assert(session_ui_select(&s,names[15])==SESSION_UI_INVALID);
+    assert(state(&s)==original && !s.ui_binding.states[15] && !strcmp(session_ui_name(&s),names[0]));
+    session_dispose(&s);
+}
+
 int main(void) {
     Session s;SessionIO io={NULL,write_bytes,NULL,NULL};
     SessionUiAdapter other=adapter;other.name="second";
@@ -186,5 +263,6 @@ int main(void) {
         }
         session_dispose(&s);
     }
+    registration_limits(io);
     free(q);free(r);puts("PASS: opaque UI ownership, independent routing, identity invalidation, teardown and typed Core operations");return 0;
 }

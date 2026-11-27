@@ -60,17 +60,18 @@ typedef struct {
     void (*door_finish)(Session *);
 } SessionUiAdapter;
 
-enum { SESSION_UI_MAX=8 };
+#include "ui_profile.h"
+enum { SESSION_UI_MAX=16, SESSION_UI_ALLOW_MAX=SESSION_UI_MAX*(UI_PROFILE_NAME_MAX+1)-1 };
 typedef enum { SESSION_UI_FIXED,SESSION_UI_MEMBERS,SESSION_UI_ALL } SessionUiPolicy;
 typedef struct {
     const SessionUiAdapter *adapters[SESSION_UI_MAX];
     unsigned count,default_index;
-    unsigned allowed; /* bits refer to adapters[]; default must be allowed */
+    uint32_t allowed; /* bits refer to adapters[]; default must be allowed */
     SessionUiPolicy policy;
 } SessionUiConfig;
 typedef struct {
     SessionUiConfig config; /* per-connection policy snapshot */
-    char preferred[32];int explicit_choice,restore_pending;
+    char preferred[UI_PROFILE_NAME_MAX+1];int explicit_choice,restore_pending;
     const SessionUiAdapter *active;
     void *state;
     void *states[SESSION_UI_MAX];
@@ -87,6 +88,9 @@ const SessionUiAdapter *session_ui_wani_bbs(void);
 const SessionUiAdapter *session_ui_net_cock(void);
 const SessionUiAdapter *session_ui_vs(void);
 SessionUiConfig session_ui_default(void);
+void session_ui_menu_hint(Session *);
+void session_ui_list_choices(Session *,int interactive);
+const char *session_ui_choice_name(const Session *,const char *);
 int session_ui_configure(SessionUiConfig *,const char *,const char *,const char *);
 SessionUiSelection session_ui_preflight(const Session *,const char *);
 SessionUiSelection session_ui_choose(Session *,const char *);

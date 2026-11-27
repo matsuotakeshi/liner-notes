@@ -43,11 +43,12 @@ void session_impl_command(Session *s,char *line) {
         int en=rtbbs(s)->presentation.ui.language==LANGUAGE_EN;
         const SessionUiConfig *config=&s->ui_binding.config;
         if(!strcmp(line,"UI")) {
-            char text[512];size_t used=(size_t)snprintf(text,sizeof(text),"UI %s / %s / DEFAULT %s\r\n",session_ui_name(s),config->policy==SESSION_UI_FIXED?"FIXED":config->policy==SESSION_UI_MEMBERS?"MEMBERS":"ALL",config->adapters[config->default_index]->name);
-            for(unsigned i=0;i<config->count && used<sizeof(text);i++)if((config->allowed&(1u<<i)) && (config->policy!=SESSION_UI_FIXED || i==config->default_index))used+=(size_t)snprintf(text+used,sizeof(text)-used,"  UI %s\r\n",config->adapters[i]->name);
-            session_impl_queue_text(s,text);session_impl_prompt(s);return;
+            session_ui_list_choices(s,rtbbs(s)->presentation.ui.enabled);
+            session_impl_prompt(s);return;
         }
-        char name[32];const char *input=line+3;int reset=!strcmp(input,"RESET");
+        char name[UI_PROFILE_NAME_MAX+1];const char *input=line+3;int reset=!strcmp(input,"RESET");
+        if(rtbbs(s)->presentation.ui.enabled && !strcmp(input,"CANCEL")) { session_impl_prompt(s);return; }
+        if(rtbbs(s)->presentation.ui.enabled && !reset)input=session_ui_choice_name(s,input);
         if(reset)input=config->adapters[config->default_index]->name;
         size_t n=strlen(input);if(!n || n>=sizeof(name)) { session_impl_emit(s,"ERR UI\r\n");session_impl_prompt(s);return; }
         for(size_t i=0;i<=n;i++)name[i]=input[i]>='A' && input[i]<='Z'?(char)(input[i]+32):input[i];
@@ -187,9 +188,9 @@ void session_impl_command(Session *s,char *line) {
             if(rtbbs(s)->presentation.ui.view==UI_AUDIT) { session_impl_audit_command(&rtbbs(s)->presentation.ui,0,mapped,sizeof(mapped)); action=mapped; }
             else action="AUDIT";
             break;
-        case 'K': action="NOTES UNREAD"; break;
+        case 'K': action="UNREAD"; break;
         case 'J': action="NEXTBOARD"; break;
-        case 'B': action="BOARDS"; break; case 'N': action="NOTES"; break;
+        case 'B': action="BOARDS"; break; case 'N': action="LIST"; break;
         case 'U': action="UNREAD"; break; case 'F': action="NEW"; break;
         case 'P': action="PARENT"; break; case 'C': action="CHILD"; break;
         case '>': action="NEXT"; break; case '<': action="PREV"; break;

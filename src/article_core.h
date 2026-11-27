@@ -186,6 +186,7 @@ typedef struct {
 } ArticleFilter;
 typedef struct { ArticleSummary article; uint32_t next; } ArticleScan;
 ArticleOutcome article_find(const ArticleActor *,const ArticleFilter *,uint32_t start,ArticlePage *out);
+ArticleOutcome article_flat_neighbour(const ArticleActor *,uint32_t board,uint32_t current,int backwards,ArticleSummary *);
 ArticleOutcome article_scan(const ArticleActor *,const ArticleFilter *,uint32_t start,
                             int descending,ArticleScan *out);
 /* Whole thread containing article, in existing depth-first order. start=0

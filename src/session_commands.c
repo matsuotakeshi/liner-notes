@@ -60,7 +60,7 @@ void session_rtbbs_command(Session *s,char *line) {
         session_impl_password_reset_command,
         session_impl_editor_mode_command,
         session_impl_service_command,
-        session_impl_conference_command,
+        session_impl_conference_command,session_topic_command,
         session_impl_mail_command,
         session_impl_conversation_command,
         session_impl_extended_command,

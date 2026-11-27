@@ -63,8 +63,10 @@ void wani_menu(Session *s,int requested) {
     }
     switch(u->common.screen) {
     case MAIN_SCREEN:
-        mmm_say(s,"board (b)  pool (p)  system (s)  game (g)\r\nl / cd PATH / read / open / topic / mail / ui / off / ?\r\n",
-                  "board (b) 掲示板 / pool (p) 保管庫 / system (s) 設定 / game (g) ゲーム\r\nl / cd パス / read / open / topic / mail / ui / off / ?\r\n");break;
+        session_ui_menu_hint(s);
+        mmm_extensions_hint(s);
+        mmm_say(s,"board (b)  pool (p)  system (s)  game (g)\r\nl / cd PATH / read / open / topic / mail / off / ?\r\n",
+                  "board (b) 掲示板 / pool (p) 保管庫 / system (s) 設定 / game (g) ゲーム\r\nl / cd パス / read / open / topic / mail / off / ?\r\n");break;
     case NOTES_SCREEN:
         mmm_say(s,"Number or name: select  l: list  more: next  q: up\r\n","番号・名前 選択 / l 一覧 / more 続き / q 上位\r\n");break;
     case BOARD_SCREEN: case INDEX_SCREEN: case OPEN_SCREEN:
@@ -76,9 +78,9 @@ void wani_menu(Session *s,int requested) {
                       "マルチノーツ: l 索引 / 番号 表紙 / . ページ一覧 / w / S 購読 / U 解除\r\n");
         }
         break;
-    case FILER_SCREEN: mmm_say(s,"l list / r ID / w description / x ID / f pattern / cd PATH / q\r\n",
+    case FILER_SCREEN: mmm_extensions_hint(s);mmm_say(s,"l list / r ID / w description / x ID / f pattern / cd PATH / q\r\n",
                                   "l 一覧 / r 番号 / w 説明 / x 番号 / f 検索 / cd パス / q\r\n");break;
-    case MAIL_SCREEN: mmm_say(s,"l inbox / r [ID] read / m USER / R reply / D ID confirm / S personal / q\r\n",
+    case MAIL_SCREEN: mmm_extensions_hint(s);mmm_say(s,"l inbox / r [ID] read / m USER / R reply / D ID confirm / S personal / q\r\n",
                                  "l 受信箱 / r [番号] / m 会員ID / R 返信 / D 番号 confirm / S 一時保存 / q\r\n");break;
     case TERM_SCREEN: mmm_say(s,"mail / prof / regprof / passwd / layout / seqset / subscriptions / manage\r\n",
                                  "mail 郵便受け / prof / regprof / passwd / layout / seqset / subscriptions / manage\r\n");break;

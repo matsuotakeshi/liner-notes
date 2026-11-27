@@ -1597,7 +1597,9 @@ static void execute(const BoardRequest *q,BoardResult *r) {
         ArticleActor actor={q->user,q->user_epoch,q->board_grants};ArticleSummary target;
         ArticleDirection direction=q->op=='U'?ARTICLE_PARENT:q->op=='C'?ARTICLE_CHILD:
                                    q->op=='N'?ARTICLE_NEXT:ARTICLE_PREVIOUS;
-        ArticleOutcome result=article_navigate(&actor,q->board,q->number,direction,&target);
+        ArticleOutcome result=q->scope && (direction==ARTICLE_NEXT || direction==ARTICLE_PREVIOUS)?
+            article_flat_neighbour(&actor,q->board,q->number,direction==ARTICLE_PREVIOUS,&target):
+            article_navigate(&actor,q->board,q->number,direction,&target);
         if(result!=ARTICLE_OK) {
             switch(result) {
             case ARTICLE_REVOKED: r->revoked=1;(r->feedback.failed=1,strcpy(r->text,"ERR session revoked\r\n"));break;

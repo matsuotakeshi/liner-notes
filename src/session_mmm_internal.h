@@ -102,6 +102,7 @@ void mmm_simple_operation(Session *s,char op,int action,uint32_t number,MmmJob j
 void mmm_mail_list(Session *s,MailListMode mode,uint32_t cursor);
 void mmm_file_enter(Session *s,const char *path);
 void mmm_profile(Session *s,const char *arg);
+void mmm_extensions_hint(Session *);
 void mmm_chat_request(Session *s,int action,unsigned long target,const char *text);
 void mmm_games(Session *s,uint32_t id);
 void mmm_new_page(Session *s,uint32_t cursor);

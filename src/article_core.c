@@ -1043,6 +1043,24 @@ ArticleOutcome article_scan(const ArticleActor *actor,const ArticleFilter *filte
     return result;
 }
 
+ArticleOutcome article_flat_neighbour(const ArticleActor *actor,uint32_t board,uint32_t current,
+                                      int backwards,ArticleSummary *out) {
+    if(!out)return ARTICLE_INVALID_READ;
+    memset(out,0,sizeof(*out));
+    if(!current || current>CONTENT_ID_MAX)return ARTICLE_NOT_FOUND;
+    ArticleFilter filter={.board=board,.scope=ARTICLE_HERE,.author="*",.query="*"};
+    ArticleScan scan;
+    if(backwards && current==1) {
+        policy_context(actor?actor->board_grants:NULL);
+        ArticleOutcome result=validate_filter(actor,&filter);
+        policy_context(NULL);
+        return result;
+    }
+    ArticleOutcome result=article_scan(actor,&filter,backwards?current-1:current+1,backwards,&scan);
+    if(result==ARTICLE_OK)*out=scan.article;
+    return result;
+}
+
 static ArticleOutcome tree_articles(const ArticleActor *actor,uint32_t board,uint32_t target,
                                      uint32_t start,ArticleTreePage *out) {
     ArticleOutcome result=health();

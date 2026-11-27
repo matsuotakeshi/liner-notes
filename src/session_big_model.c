@@ -56,12 +56,14 @@ void big_model_menu(Session *s,int requested) {
     if(ui->quiet && !requested)return;
     switch(ui->shared.screen) {
     case MAIN_SCREEN:
+        session_ui_menu_hint(s);
+        mmm_extensions_hint(s);
         mmm_say(s,"BIG-Model | B SIGs  C Chat  E Exit  H Help  M Mail\r\n"
                   "N New articles (N resume)  O New headlines  P Files  T Telegram  U Settings  W Who  X All SIGs\r\n"
-                  "+ Liner Notes extensions\r\n",
+                  "+ Liner Notes extensions / TOPIC short notices\r\n",
                   "BIG-Model | B 掲示板・SIG  C チャット  E 終了  H 案内  M メール\r\n"
                   "N 新着記事 (N resume 再開)  O 新着見出し  P 保管庫  T 電報  U 端末設定  W 接続一覧  X 全SIG探索\r\n"
-                  "+ Liner Notes拡張\r\n");
+                  "+ Liner Notes拡張 / TOPIC 短文伝言板\r\n");
         break;
     case NOTES_SCREEN:
         mmm_say(s,"Number: select  L: more  0: up  /: main\r\n","番号 選択  L 続き  0 上位  / 主メニュー\r\n");
@@ -77,12 +79,14 @@ void big_model_menu(Session *s,int requested) {
                   "番号または R 番号 本文  Enter 次の記事  L 続き  Q 中断  0 戻る\r\n");
         break;
     case MAIL_SCREEN:
+        mmm_extensions_hint(s);
         mmm_say(s,"R [NUM]: inbox/read  W USER: send  N: unread  A NUM: reply  K NUM confirm: delete\r\n"
                   "L: more  FIND/FILES/UPLOAD/GET/GETALL/RESUME: Liner Notes extensions  0: back\r\n",
                   "R [番号] 受信一覧・本文  W 会員ID 送信  N 未読  A 番号 返信  K 番号 confirm 削除\r\n"
                   "L 続き  FIND/FILES/UPLOAD/GET/GETALL/RESUME は拡張  0 戻る\r\n");
         break;
     case FILER_SCREEN:
+        mmm_extensions_hint(s);
         mmm_say(s,"L: list  S PATTERN: find  I NUM: info  D NUM: get  U [DESC]: upload  R: resume\r\n"
                   "CD/DIRS/PROTOCOL/ADD/BATCH/PUTBATCH/UNLOCK: Liner Notes extensions  0: back\r\n",
                   "L 一覧  S パターン 検索  I 番号 詳細  D 番号 取得  U [説明] 登録  R 再開\r\n"

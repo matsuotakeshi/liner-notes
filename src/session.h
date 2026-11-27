@@ -59,6 +59,8 @@ void session_abort(Session *);
 int session_logout(Session *);
 SessionOperationStatus session_submit(Session *,OperationRequest *);
 void session_notify(Session *,MessageId,uint32_t,const char *);
+int session_topic_command(Session *,char *);
+int session_topic_result(Session *,const OperationResult *);
 int session_notice(const Session *,SessionNotice,unsigned,uint64_t,uint64_t,char *,size_t);
 void session_door_finish(Session *);
 void session_scan_stop(Session *);

@@ -81,6 +81,9 @@ void mmm_menu(Session *s,int requested) {
     switch(mmm_view(s)->screen) {
     case KTBBS_ENTER_SCREEN: case KTBBS_EXT_SCREEN: case BIG_MODEL_EXT_SCREEN: break;
     case MAIN_SCREEN:
+        session_ui_menu_hint(s);
+        mmm_extensions_hint(s);
+        mmm_say(s,"TOPIC short notices (TOPIC -W text)\r\n","TOPIC 短文伝言板（TOPIC -W 本文）\r\n");
         if(is_mash(s)) {
             mmm_say(s,"MASH | 1 Mail   2 Bulletin boards   3 Setup   4 Profiles   5 Library\r\n"
                       "6 Online commands   7 Exit   8 My profile   9 Manual   10 Board map\r\n"
@@ -109,9 +112,11 @@ void mmm_menu(Session *s,int requested) {
         mmm_say(s,"Space/BS: response  +/-: base note  =/*: first/last  l/L: unread  f/F: find  s: save to personal file  w: reply  i: index  q: close\r\n",
                             "空白/BS: レス  +/-: ベース  =/*: 先頭/末尾  l/L: 未読  f/F: 検索  s: 個人ファイルに保存  w: 返信  i: 索引  q: 閉じる\r\n");break;
     case MAIL_SCREEN:
+        mmm_extensions_hint(s);
         mmm_say(s,"inbox / sent / unread / more / read ID / send USER / reply ID / delete ID confirm\r\nfind TEXT / news YYYY-MM-DD / notify [on|off] / killmail ID confirm / protocol [name]\r\nfiles / resume / get ID / getall MAIL / upload / uploadbatch / resumebatch   .: back\r\n",
               "inbox 受信 / sent 送信済み / unread 未読 / more 続き / read 番号 / send 宛先 / reply 番号 / delete 番号 confirm\r\nfind 本文検索 / news YYYY-MM-DD 新着 / notify [on|off] 通知 / killmail 番号 confirm / protocol [方式]\r\nfiles 添付一覧 / resume 下書き再開 / get 番号 / getall メール番号 / upload / uploadbatch / resumebatch   .: 戻る\r\n");break;
     case FILER_SCREEN:
+        mmm_extensions_hint(s);
         mmm_say(s,"list / more / cd PATH / find PATTERN / info ID / text ID / unlock / get ID\r\nput [description] / resume / add ID / batch / clear / protocol [name]   .: back\r\n",
               "list 一覧 / more 続き / cd パス / find 検索語 / info 番号 / text 番号 / unlock / get 番号\r\nput [説明] / resume / add 番号 / batch / clear / protocol [方式]   .: 戻る\r\n");break;
     case CHAT_SCREEN:
@@ -198,8 +203,10 @@ void mmm_ui_enter_board(Session *s,const char *name,MmmBoardAction action) {
 }
 
 void mmm_ui_read_article(Session *s,uint32_t id) {
-    OperationRequest *q=mmm_request(s,'R');
+    int scoped=ktbbs_active(s);
+    OperationRequest *q=mmm_request(s,scoped?'Z':'R');
     if(!q)return;
+    if(scoped) { q->action=5;q->scope=1; }
     q->number=id;
     mmm_submit(s,q,JOB_READ);
 }
@@ -480,24 +487,11 @@ void mmm_ui_subboards(Session *s,uint32_t parent) {
 
 void mmm_ui_choose_profile(Session *s,char *arg) {
     const SessionUiConfig *c=&s->ui_binding.config;
-    if(!*arg) {
-        static const char *const policies[]={"FIXED","MEMBERS","ALL"};
-        char summary[96];
-        snprintf(summary,sizeof(summary),"UI %s / %s / DEFAULT %s\r\n",session_ui_name(s),
-                 policies[c->policy],c->adapters[c->default_index]->name);
-        session_impl_queue_text(s,summary);
-        for(unsigned i=0;i<c->count;i++) {
-            const char *name=c->adapters[i]->name;
-            SessionUiSelection status=session_ui_preflight(s,name);
-            if(status==SESSION_UI_SELECTED || status==SESSION_UI_UNCHANGED) {
-                session_impl_queue_text(s,name);session_impl_queue_text(s,"\r\n");
-            }
-        }
-        return;
-    }
+    if(!*arg) { session_ui_list_choices(s,1);return; }
     for(char *p=arg;*p;p++)if(*p>='A' && *p<='Z')*p=(char)(*p+'a'-'A');
+    if(!strcmp(arg,"cancel"))return;
     int reset=!strcmp(arg,"reset");
-    const char *name=reset?c->adapters[c->default_index]->name:arg;
+    const char *name=reset?c->adapters[c->default_index]->name:session_ui_choice_name(s,arg);
     SessionUiSelection result=session_ui_choose(s,name);
     if(result==SESSION_UI_SELECTED || result==SESSION_UI_UNCHANGED) {
         if(s->core.user && !session_ui_save_choice(s,reset?"":name)) {
@@ -805,6 +799,76 @@ static void command(Session *s,char *text) {
 void mmm_ui_shared_command(Session *s,char *text) { command(s,text); }
 void mmm_ui_editor(Session *s,char *text) { editorial(s,text); }
 
+static int extensions_available(const Session *s) {
+    const MmmUi *m=mmm_view(s);
+    return s->core.user && m->input==INPUT_NONE && !m->application.step &&
+        (m->screen==MAIN_SCREEN || m->screen==MAIL_SCREEN || m->screen==FILER_SCREEN) &&
+        (!ktbbs_active(s) || ((const KtbbsUi *)s->ui_binding.state)->question==KT_READY) &&
+        (!big_model_active(s) || big_model_ready(s)) &&
+        (!wani_active(s) || wani_ready(s)) &&
+        (!net_cock_active(s) || net_cock_ready(s)) && (!vs_active(s) || vs_ready(s));
+}
+
+void mmm_extensions_hint(Session *s) {
+    if(extensions_available(s))
+        mmm_say(s,"LN  Liner Notes extensions\r\n","LN  Liner Notes拡張\r\n");
+}
+
+static int common_extensions(Session *s,char *line) {
+    MmmUi *m=mmm_state(s);
+    if(!extensions_available(s) ||
+       (line[0]!='L' && line[0]!='l') || (line[1]!='N' && line[1]!='n') ||
+       (line[2] && line[2]!=' '))return 0;
+    char *command=line+2+strspn(line+2," ");
+    char *arg=command+strcspn(command," ");
+    if(*arg)*arg++=0;
+    arg+=strspn(arg," ");
+    for(char *p=command;*p;p++)if(*p>='A' && *p<='Z')*p=(char)(*p-'A'+'a');
+    if(!*command) {
+        if(m->screen==MAIL_SCREEN)
+            mmm_say(s,"LN FILES [ID] / UPLOAD / RESUME / GET ID / GETALL ID\r\n",
+                      "LN FILES [番号] 添付 / UPLOAD 受信 / RESUME 下書き / GET 番号 / GETALL 番号\r\n");
+        else if(m->screen==FILER_SCREEN)
+            mmm_say(s,"LN FIND pattern / ADD ID / BATCH / RESUME\r\n",
+                      "LN FIND 条件 / ADD 番号 / BATCH 一括 / RESUME 転送再開\r\n");
+        else {
+            mmm_say(s,"Liner Notes extensions: LN SIGNATURE [-e|-a|-n] / PROFILE [ID] / TALK / GAMES\r\n",
+                      "Liner Notes拡張: LN SIGNATURE [-e|-a|-n] 署名 / PROFILE [会員ID] / TALK 一行会議 / GAMES\r\n");
+            if(board_feature_enabled("chat"))
+                mmm_say(s,"LN ONLINE / CALL reason / TELEGRAM ON|OFF\r\n",
+                          "LN ONLINE 接続者 / CALL 理由 / TELEGRAM ON|OFF 受信設定\r\n");
+            if(s->core.admin || s->core.sigop)
+                mmm_say(s,"LN MANAGE\r\n","LN MANAGE 管理\r\n");
+        }
+    } else if(m->screen==MAIL_SCREEN) {
+        if(strcmp(command,"files") && strcmp(command,"upload") && strcmp(command,"resume") &&
+           strcmp(command,"get") && strcmp(command,"getall"))mmm_bad_service_command(s);
+        else if(!mmm_ui_mail_command(s,command,arg))mmm_bad_service_command(s);
+    } else if(m->screen==FILER_SCREEN) {
+        if(strcmp(command,"find") && strcmp(command,"add") && strcmp(command,"batch") && strcmp(command,"resume"))
+            mmm_bad_service_command(s);
+        else if(!mmm_ui_filer_command(s,command,arg))mmm_bad_service_command(s);
+    } else if(!strcmp(command,"signature"))signature_command(s,arg);
+    else if(!strcmp(command,"profile"))mmm_profile(s,arg);
+    else if(!strcmp(command,"talk") && !*arg)mmm_conference_enter(s,arg);
+    else if(!strcmp(command,"games") && !*arg)mmm_games(s,0);
+    else if(!strcmp(command,"manage") && !*arg && (s->core.admin || s->core.sigop)) {
+        m->screen=MANAGE_SCREEN;mmm_manage_menu(s);
+    } else if(board_feature_enabled("chat") && !strcmp(command,"online") && !*arg)
+        mmm_chat_request(s,'O',0,"");
+    else if(board_feature_enabled("chat") && !strcmp(command,"call") && chat_text_valid(arg))
+        mmm_chat_request(s,'C',0,arg);
+    else if(board_feature_enabled("chat") && !strcmp(command,"telegram") &&
+            (!strcmp(arg,"ON") || !strcmp(arg,"OFF") || !strcmp(arg,"on") || !strcmp(arg,"off"))) {
+        OperationRequest *q=mmm_request(s,'&');
+        if(q) {
+            q->action='p';q->number=strlen(arg)==2?CHAT_PREF_RECEIVE_ON:CHAT_PREF_RECEIVE_OFF;
+            mmm_submit(s,q,JOB_CHAT);
+        }
+    } else mmm_bad_service_command(s);
+    return 1;
+}
+
 static void line(Session *s,char *text,size_t size) {
     (void)size;
     MmmUi *m=mmm_state(s);
@@ -858,6 +922,10 @@ static void line(Session *s,char *text,size_t size) {
         break;
     default:
         if(m->application.step)application_value(s,text);
+        else if(common_extensions(s,text)) {}
+        else if(s->core.user && (m->screen==MAIN_SCREEN || m->screen==BOARD_SCREEN ||
+                m->screen==KTBBS_EXT_SCREEN || m->screen==BIG_MODEL_EXT_SCREEN) &&
+                !wani_active(s) && !net_cock_active(s) && !vs_active(s) && session_topic_command(s,text)) {}
         else if(ktbbs_active(s))ktbbs_line(s,text);
         else if(big_model_active(s))big_model_line(s,text);
         else if(wani_active(s))wani_line(s,text);
@@ -974,7 +1042,12 @@ static void browse_result(Session *s,const ArticlePage *page) {
         else big_model_articles(s,page,m->browse==BROWSE_FLAT_BODY);
         return;
     }
-    if(m->browse==BROWSE_FLAT_BODY && page->count) { mmm_ui_read_article(s,page->rows[0].id);return; }
+    if(m->browse==BROWSE_FLAT_BODY) {
+        if(page->count)mmm_ui_read_article(s,page->rows[0].id);
+        else if(page->next)continue_browse(s,page->next);
+        else mmm_say(s,"No further visible articles.\r\n","この先に表示できる記事はありません。\r\n");
+        return;
+    }
     if(m->browse>=BROWSE_FLAT_LIST) {
         if(!page->count && page->next)continue_browse(s,page->next);
         else ktbbs_render_articles(s,page,m->browse==BROWSE_KTBBS_TITLE);
@@ -1084,6 +1157,7 @@ static void result(Session *s,const OperationResult *r,SessionResultView project
     MmmUi *m=mmm_state(s);
     MmmJob job=m->job;m->job=JOB_NONE;
     if(vs_active(s) && vs_scan_cancelled(s)) { mmm_prompt(s);return; }
+    if(job==JOB_NONE && session_topic_result(s,r))return;
     if(job==JOB_CONFERENCE) {
         if(r->page.kind==OPERATION_PAGE_CONFERENCE)mmm_conference_result(s,&r->page.data.conference);
         else { m->conference_automatic=0;mmm_say(s,"Conference unavailable.\r\n","一行会議を利用できません。\r\n"); }

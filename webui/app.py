@@ -498,26 +498,38 @@ def create_app(config):
         session = current(request, mutate=True)
         payload = await object_body(request)
         action = payload.get('action')
+        topic = payload.get('topic', False)
+        if type(topic) is not bool:
+            raise ValueError('Invalid conference type')
         room, cursor = payload.get('room', 0), payload.get('cursor', 0)
         if (type(room) is not int or not 0 <= room <= 1500
                 or type(cursor) is not int or not 0 <= cursor <= 2147483646):
             raise ValueError('Invalid conference room or position')
+        if topic and room:
+            raise ValueError('Invalid topic room')
         async with session.bridge.lock:
             state = session.bridge.state
             if not state.get('user'):
                 raise web.HTTPForbidden(text='Sign in to use line conference')
+            if topic:
+                if state.get('core_topic') != 1:
+                    raise BridgeError('This BBS backend does not support Web TOPIC')
+                if action in ('history', 'unread'):
+                    return response(session, await session.bridge.view('topic_'+action, 0, cursor))
+                if action not in ('post', 'seen', 'delete'):
+                    raise ValueError('Invalid topic action')
             if state.get('core_conference') != 1:
                 raise BridgeError('This BBS backend does not support the Web line conference')
-            if action in ('rooms', 'history', 'unread', 'position'):
+            if not topic and action in ('rooms', 'history', 'unread', 'position'):
                 return response(session, await session.bridge.view('conf_'+action, room, cursor))
-            if action not in ('post', 'seen', 'create'):
+            if not topic and action not in ('post', 'seen', 'create'):
                 raise ValueError('Invalid conference action')
             body = payload.get('body', '')
             maximum = 80 if action == 'create' else 512
             if (not isinstance(body, str) or len(body.encode()) > maximum
                     or any(ord(c) < 32 or 127 <= ord(c) <= 159 for c in body)):
                 raise ValueError('Invalid conference text')
-            return response(session, await session.bridge.update('conference.'+action,
+            return response(session, await session.bridge.update(('topic.' if topic else 'conference.')+action,
                                  id=room, arg=cursor, body=body))
 
     async def chat_send(request):

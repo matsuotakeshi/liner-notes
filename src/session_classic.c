@@ -248,7 +248,7 @@ int session_impl_classic_commands(Session *s,const char *line) {
         if(!strcmp(line,"2")) { session_impl_queue_text(s,ui_text(&rtbbs(s)->presentation.ui,MSG_CLASSIC_NO_ESC));session_impl_prompt(s);return 1; }
     }
     if(!strcmp(line,"0")) {
-        if(rtbbs(s)->presentation.classic_area==CM_BOARD && rtbbs(s)->presentation.ui.view==UI_ARTICLE)classic_run(s,"NOTES");
+        if(rtbbs(s)->presentation.classic_area==CM_BOARD && rtbbs(s)->presentation.ui.view==UI_ARTICLE)classic_run(s,"LIST");
         else classic_run(s,"MENU");
         return 1;
     }
@@ -299,7 +299,7 @@ int session_impl_classic_commands(Session *s,const char *line) {
         }
     } else if(rtbbs(s)->presentation.classic_area==CM_BOARD) {
         switch(key) {
-        case 'B':action="BOARDS";break;case 'I':action="INFO";break;case 'L':action="NOTES";break;
+        case 'B':action="BOARDS";break;case 'I':action="INFO";break;case 'L':action="LIST";break;
         case 'T':action="SCAN DESC HERE * *";break;
         case 'N':classic_ask(s,CI_DATE,MSG_CLASSIC_DATE);return 1;
         case 'F':classic_ask(s,CI_AUTHOR,MSG_CLASSIC_AUTHOR);return 1;

@@ -97,13 +97,16 @@ void ktbbs_menu(Session *s,int requested) {
     }
     switch(mmm_view(s)->screen) {
     case MAIN_SCREEN:
-        if(!view(s)->expert || requested)
+        if(!view(s)->expert || requested) {
+            session_ui_menu_hint(s);
+            mmm_extensions_hint(s);
             mmm_say(s,"KTBBS | R Read  E Enter  N News  M Mail  F Files  C Chat\r\n"
                       "I Install  O Profile  U Users  W Who  K Withdraw  X Expert  G Goodbye\r\n"
                       "A Apply  H Help  L History  Y System  # Status  ! Liner Notes\r\n",
                       "KTBBS | R 読書  E 書込  N 新着  M メール  F 保管庫  C チャット\r\n"
                       "I 端末設定  O プロフィール  U 会員  W 接続一覧  K 取消  X 案内切替  G 終了\r\n"
                       "A 入会  H ヘルプ  L 履歴  Y 局情報  # 状態  ! Liner Notes拡張\r\n");
+        }
         break;
     case NOTES_SCREEN: mmm_say(s,"Board number or name; ? list, L more, 0 back.\r\n","ボード番号・名前。? 一覧 L 続き 0 戻る。\r\n");break;
     case BOARD_SCREEN: mmm_say(s,"R Read / I Article # / S Search / L List / # Status / B Sub-boards / 0 Back\r\n",
@@ -112,9 +115,9 @@ void ktbbs_menu(Session *s,int requested) {
                                  "表示行の番号で選択。#ID は記事番号。L 続き 0 戻る。\r\n");break;
     case OPEN_SCREEN: mmm_say(s,"Enter Next / P Previous / R Reply / + - Jump / D Parent / 0 Back\r\n",
                                 "Enter 次 / P 前 / R 返信 / + - 移動 / D 親記事 / 0 戻る\r\n");break;
-    case MAIL_SCREEN: mmm_say(s,"Enter Read / L List / I # Open / R # Reply / K # Delete / S Search / 0 Back\r\n",
+    case MAIL_SCREEN: mmm_extensions_hint(s);mmm_say(s,"Enter Read / L List / I # Open / R # Reply / K # Delete / S Search / 0 Back\r\n",
                                 "Enter 順次読む / L 一覧 / I # 番号指定 / R # 返信 / K # 削除 / S 検索 / 0 戻る\r\n");break;
-    case FILER_SCREEN: mmm_say(s,"L List / S Search / X Y Z M Protocol / U Upload / D Download / H Guide / 0 Back\r\n",
+    case FILER_SCREEN: mmm_extensions_hint(s);mmm_say(s,"L List / S Search / X Y Z M Protocol / U Upload / D Download / H Guide / 0 Back\r\n",
                                  "L 一覧 / S 検索 / X Y Z M 転送方式 / U 登録 / D 取得 / H 案内 / 0 戻る\r\n");break;
     case CHAT_SCREEN: mmm_say(s,"Type a message. W Who / T Telegram / S Call operator / // Leave\r\n",
                                 "発言を入力。W 接続一覧 / T 電報 / S SYSOP呼出 / // 退出\r\n");break;
@@ -128,8 +131,8 @@ void ktbbs_menu(Session *s,int requested) {
     case TALK_SCREEN: mmm_conference_menu(s);break;
     case KTBBS_ENTER_SCREEN: mmm_say(s,"M Mail / W Write article / R Reply / 0 Back\r\n",
                                       "M メール / W 投稿 / R 返信 / 0 戻る\r\n");break;
-    case KTBBS_EXT_SCREEN: mmm_say(s,"Liner Notes extensions: games / talk / manage / draft [resume] / UI [name] / 0 Back\r\n",
-                                    "Liner Notes拡張: games / talk / manage / draft [resume] / UI [名前] / 0 戻る\r\n");break;
+    case KTBBS_EXT_SCREEN: mmm_say(s,"Liner Notes extensions: games / talk / TOPIC / manage / draft [resume] / 0 Back\r\n",
+                                    "Liner Notes拡張: games / talk / TOPIC / manage / draft [resume] / 0 戻る\r\n");break;
     default: break;
     }
 }

@@ -101,7 +101,11 @@ int session_impl_article_command(Session *s,char *line) {
                 if(!session_impl_number_arg(line+5,&q.number,&tail)) { session_impl_emit(s,"ERR tree syntax\r\n"); return 1; }
                 if(*tail && (*tail!=' ' || !session_impl_number_arg(tail+1,&q.cursor,&tail) || *tail)) { session_impl_emit(s,"ERR tree syntax\r\n"); return 1; }
             }
-        } else q.op=!strcmp(line,"PARENT")?'U':!strcmp(line,"CHILD")?'C':!strcmp(line,"NEXT")?'N':'B';
+        } else {
+            q.op=!strcmp(line,"PARENT")?'U':!strcmp(line,"CHILD")?'C':!strcmp(line,"NEXT")?'N':'B';
+            if(rtbbs(s)->presentation.ui.enabled && !s->connection.legacy_connector && !*s->connection.connector_token)
+                q.scope=q.op=='N' || q.op=='B';
+        }
         session_impl_submit(s,&q);
     }
     else if(!strncmp(line,"POST ",5) || !strncmp(line,"REPLY ",6) || !strncmp(line,"RESPOND ",8)) {
@@ -205,7 +209,7 @@ int session_impl_article_result(Session *s,const BoardResult *completion,uint64_
         }
         int next=rtbbs(s)->presentation.ui.next_after_seen; rtbbs(s)->presentation.ui.next_after_seen=0;
         if(next && completion->feedback.seen) { char cmd[]="NEW"; session_rtbbs_command(s,cmd); }
-        else if(completion->board && !completion->draft_loaded && !completion->direct) { if(completion->service_action=='7') { BoardRequest q={0};q.op='b';q.action='C';q.number=completion->board;session_impl_submit(s,&q); }else { char cmd[]="NOTES"; session_rtbbs_command(s,cmd); } }
+        else if(completion->board && !completion->draft_loaded && !completion->direct) { if(completion->service_action=='7') { BoardRequest q={0};q.op='b';q.action='C';q.number=completion->board;session_impl_submit(s,&q); }else { char cmd[]="LIST"; session_rtbbs_command(s,cmd); } }
         session_impl_prompt(s);
     }
 

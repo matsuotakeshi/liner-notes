@@ -1,6 +1,6 @@
 RTBBS-style boards and reading
 Main B / BOARDS lists boards. Select a number or BOARD id.
-Board L / NOTES lists base notes. Select an article number or READ id.
+Board L / LIST lists articles and replies. Select an article number or READ id. NOTES lists base notes on request.
 I / INFO: information. E: new post. R: reply to the selected article.
 N asks for a date. Empty input starts CHECK ARTICLES HERE for the current board.
 F asks for an author login. T starts newest-first sequential reading.
