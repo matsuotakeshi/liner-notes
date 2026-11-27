@@ -60,17 +60,18 @@ typedef struct {
     void (*door_finish)(Session *);
 } SessionUiAdapter;
 
-enum { SESSION_UI_MAX=8 };
+#include "ui_profile.h"
+enum { SESSION_UI_MAX=16, SESSION_UI_ALLOW_MAX=SESSION_UI_MAX*(UI_PROFILE_NAME_MAX+1)-1 };
 typedef enum { SESSION_UI_FIXED,SESSION_UI_MEMBERS,SESSION_UI_ALL } SessionUiPolicy;
 typedef struct {
     const SessionUiAdapter *adapters[SESSION_UI_MAX];
     unsigned count,default_index;
-    unsigned allowed; /* bits refer to adapters[]; default must be allowed */
+    uint32_t allowed; /* bits refer to adapters[]; default must be allowed */
     SessionUiPolicy policy;
 } SessionUiConfig;
 typedef struct {
     SessionUiConfig config; /* per-connection policy snapshot */
-    char preferred[32];int explicit_choice,restore_pending;
+    char preferred[UI_PROFILE_NAME_MAX+1];int explicit_choice,restore_pending;
     const SessionUiAdapter *active;
     void *state;
     void *states[SESSION_UI_MAX];

@@ -3,7 +3,10 @@
 #include "zmodem_host.h"
 #include <string.h>
 #include <stdlib.h>
-#include "ui_profile.h"
+#include <limits.h>
+
+_Static_assert(SESSION_UI_MAX < sizeof(uint32_t)*CHAR_BIT,
+               "UI mask validation shifts by the registered adapter count");
 #include <openssl/crypto.h>
 
 SessionUiConfig session_ui_default(void) {
@@ -20,7 +23,10 @@ SessionUiConfig session_ui_default(void) {
 }
 
 int session_ui_configure(SessionUiConfig *config,const char *policy,const char *name,const char *allow) {
-    if(!config || !policy || !name || !allow || !*allow || strlen(allow)>255)return 0;
+    if(!config || !config->count || config->count>SESSION_UI_MAX || !policy ||
+       !ui_profile_valid(name) || !allow || !*allow || strlen(allow)>SESSION_UI_ALLOW_MAX)return 0;
+    for(unsigned i=0;i<config->count;i++)
+        if(!config->adapters[i] || !ui_profile_valid(config->adapters[i]->name))return 0;
     SessionUiConfig next=*config;
     if(!strcmp(policy,"FIXED"))next.policy=SESSION_UI_FIXED;
     else if(!strcmp(policy,"MEMBERS"))next.policy=SESSION_UI_MEMBERS;
@@ -32,11 +38,11 @@ int session_ui_configure(SessionUiConfig *config,const char *policy,const char *
     const char *p=allow;
     while(*p) {
         const char *end=strchr(p,',');size_t length=end?(size_t)(end-p):strlen(p);
-        if(!length || length>31)return 0;
-        char part[32];memcpy(part,p,length);part[length]=0;
+        if(!length || length>UI_PROFILE_NAME_MAX)return 0;
+        char part[UI_PROFILE_NAME_MAX+1];memcpy(part,p,length);part[length]=0;
         for(i=0;i<next.count;i++)if(!strcmp(part,next.adapters[i]->name))break;
-        if(i==next.count || (next.allowed&(1u<<i)))return 0;
-        next.allowed|=1u<<i;
+        if(i==next.count || (next.allowed&(UINT32_C(1)<<i)))return 0;
+        next.allowed|=UINT32_C(1)<<i;
         if(!end)break;
         p=end+1;if(!*p)return 0;
     }
@@ -48,16 +54,15 @@ int session_ui_config_valid(const SessionUiConfig *config) {
     if(!config || !config->count || config->count>SESSION_UI_MAX ||
        config->default_index>=config->count || config->policy<SESSION_UI_FIXED ||
        config->policy>SESSION_UI_ALL || (config->allowed>>config->count) ||
-       !(config->allowed&(1u<<config->default_index)))return 0;
+       !(config->allowed&(UINT32_C(1)<<config->default_index)))return 0;
     for(unsigned i=0;i<config->count;i++) {
         const SessionUiAdapter *a=config->adapters[i];
         if(!a || !a->state_size || !a->snapshot || !a->cleanup || !a->connector_line || !a->binary_byte ||
            !a->prepare_request || !a->preferences || !a->signature || !a->scan_pause || !a->scan_stop ||
            !a->board_refresh || !a->access_refresh || !a->chat_kick || !a->chat_event || !a->announce || !a->notify ||
-           !a->mail_arrived || !a->mail_notify || !a->transfer_receipt || !a->transfer_finish || !a->notice || !a->name || !*a->name || strlen(a->name)>31 || !a->enter || !a->leave ||
+           !a->mail_arrived || !a->mail_notify || !a->transfer_receipt || !a->transfer_finish || !a->notice || !ui_profile_valid(a->name) || !a->enter || !a->leave ||
            !a->can_leave || !a->line || !a->keep_position || !a->result || !a->emit ||
            !a->prompt || !a->menu || !a->help || !a->uppercase || !a->tick || !a->door_finish)return 0;
-        for(const char *p=a->name;*p;p++)if(!((*p>='a' && *p<='z') || (*p>='0' && *p<='9') || *p=='-'))return 0;
         for(unsigned j=0;j<i;j++)if(!strcmp(a->name,config->adapters[j]->name))return 0;
     }
     return 1;
@@ -73,7 +78,7 @@ SessionUiSelection session_ui_preflight(const Session *s,const char *name) {
     unsigned i;
     for(i=0;i<c->count;i++)if(!strcmp(name,c->adapters[i]->name))break;
     if(i==c->count)return SESSION_UI_UNKNOWN;
-    if(!(c->allowed&(1u<<i)) || (c->policy==SESSION_UI_FIXED && c->adapters[i]!=s->ui_binding.active) ||
+    if(!(c->allowed&(UINT32_C(1)<<i)) || (c->policy==SESSION_UI_FIXED && c->adapters[i]!=s->ui_binding.active) ||
        (c->policy==SESSION_UI_MEMBERS && !s->core.user))return SESSION_UI_DENIED;
     /* Common security/transport barriers apply even to a permissive UI adapter. */
     if(!session_ready(s) || session_secret(s) || s->connection.door || s->connection.zmodem_start ||
@@ -137,7 +142,7 @@ void session_result(Session *s,const BoardResult *completion,uint64_t now) {
     if(view.status!=SESSION_RESULT_IGNORED)s->ui_binding.active->result(s,completion,view,now,cancelled);
     if(view.status==SESSION_RESULT_OK && (completion->auth>0 || completion->feedback.ui_profile_saved)) {
         memcpy(s->ui_binding.preferred,completion->ui_profile,sizeof(s->ui_binding.preferred));
-        s->ui_binding.preferred[31]=0;
+        s->ui_binding.preferred[UI_PROFILE_NAME_MAX]=0;
         if(completion->auth>0 && !s->ui_binding.explicit_choice) { s->ui_binding.restore_pending=1;restore_choice(s); }
     }
 }
