@@ -657,6 +657,8 @@ static void add_summary(ArticlePage *out,uint32_t id,const ArticleMetadata *arti
     ArticleSummary *row=&out->rows[out->count++];
     row->id=id;row->board=article->board;row->parent=article->parent;
     memcpy(row->title,article->title,sizeof(row->title));
+    memcpy(row->author,article->author,sizeof(row->author));
+    row->created=article->created;
 }
 
 static ArticleOutcome browse_notes(const ArticleActor *actor,uint32_t board,uint32_t root,

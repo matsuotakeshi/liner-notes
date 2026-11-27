@@ -77,9 +77,9 @@ int mmm_notes_label_save(uint32_t board,const char *label) {
     return rc==SQLITE_DONE && finalized==SQLITE_OK?1:duplicate?-1:0;
 }
 
-int mmm_notes_scanlist_load(uint32_t user,uint32_t out[MMM_SCAN_MAX],unsigned *count) {
+static int scanlist_load(uint32_t user,uint32_t out[MMM_SCAN_MAX],unsigned *count,const char *sql) {
     *count=0;
-    sqlite3_stmt *s=member_settings_statement("SELECT position,board FROM mmm_scanlist WHERE user=? ORDER BY position");
+    sqlite3_stmt *s=member_settings_statement(sql);
     if(!s)return 0;
     unsigned used=0;
     int ok=sqlite3_bind_int64(s,1,user)==SQLITE_OK,rc=SQLITE_ERROR;
@@ -92,6 +92,33 @@ int mmm_notes_scanlist_load(uint32_t user,uint32_t out[MMM_SCAN_MAX],unsigned *c
     if(sqlite3_finalize(s)!=SQLITE_OK)ok=0;
     if(ok && rc==SQLITE_DONE) { *count=used;return 1; }
     memset(out,0,MMM_SCAN_MAX*sizeof(*out));
+    return 0;
+}
+
+int mmm_notes_scanlist_load(uint32_t user,uint32_t out[MMM_SCAN_MAX],unsigned *count) {
+    return scanlist_load(user,out,count,"SELECT position,board FROM mmm_scanlist WHERE user=? ORDER BY position");
+}
+int big_model_scanlist_load(uint32_t user,uint32_t out[MMM_SCAN_MAX],unsigned *count) {
+    return scanlist_load(user,out,count,"SELECT position,board FROM big_model_scanlist WHERE user=? ORDER BY position");
+}
+int big_model_scanlist_replace(uint32_t user,const uint32_t *boards,unsigned count) {
+    if(!user || count>MMM_SCAN_MAX || (!boards && count) || !member_settings_repository_ready() ||
+       sqlite3_exec(features_db,"SAVEPOINT big_model_scanlist_replace",NULL,NULL,NULL)!=SQLITE_OK)return 0;
+    sqlite3_stmt *s=member_settings_statement("DELETE FROM big_model_scanlist WHERE user=?");
+    int ok=s && sqlite3_bind_int64(s,1,user)==SQLITE_OK && sqlite3_step(s)==SQLITE_DONE;
+    if(sqlite3_finalize(s)!=SQLITE_OK)ok=0;
+    if(ok && count) {
+        s=member_settings_statement("INSERT INTO big_model_scanlist(user,position,board) VALUES(?,?,?)");
+        ok=s!=NULL;
+        for(unsigned i=0;ok && i<count;i++) {
+            ok=sqlite3_bind_int64(s,1,user)==SQLITE_OK && sqlite3_bind_int(s,2,(int)i+1)==SQLITE_OK &&
+                sqlite3_bind_int64(s,3,boards[i])==SQLITE_OK && sqlite3_step(s)==SQLITE_DONE &&
+                sqlite3_reset(s)==SQLITE_OK;
+        }
+        if(sqlite3_finalize(s)!=SQLITE_OK)ok=0;
+    }
+    if(ok && sqlite3_exec(features_db,"RELEASE big_model_scanlist_replace",NULL,NULL,NULL)==SQLITE_OK)return 1;
+    sqlite3_exec(features_db,"ROLLBACK TO big_model_scanlist_replace;RELEASE big_model_scanlist_replace",NULL,NULL,NULL);
     return 0;
 }
 

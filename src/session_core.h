@@ -11,6 +11,7 @@ typedef struct {
     int board_enabled;
     int member_mode;
     uint64_t connected_at;
+    uint64_t previous_login;
     char guest_handle[33];
     uint64_t now;
     uint64_t wake;

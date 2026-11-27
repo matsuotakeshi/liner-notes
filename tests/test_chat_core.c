@@ -128,8 +128,30 @@ static void presence_snapshots(void) {
     assert(!strcmp(presence.rows[1].memo,"memo"));
 }
 
+static void bound_telegram(void) {
+    reset();ChatPreferences prefs={0};
+    assert(chat_core_register(&first,1,1,"alice","Alice",notify,&alice,&prefs));
+    assert(chat_core_register(&first,2,2,"bob","Bob",notify,&bob,&prefs));
+    ChatPresence peers;
+    assert(chat_core_presence(&first,1,1,0,&peers) && peers.count==2);
+    uint64_t old=peers.rows[1].generation;
+    assert(old && peers.rows[1].accepts_telegram);
+    chat_core_disconnect(&first,2);
+    assert(chat_core_register(&first,2,3,"carol","Carol",notify,&carol,&prefs));
+    assert(chat_core_private_scoped(&first,1,2,old,"never deliver",1000)==-2);
+    assert(!carol.count);
+    assert(chat_core_presence(&first,1,1,0,&peers) && peers.rows[1].generation!=old);
+    uint64_t current=peers.rows[1].generation;
+    assert(chat_core_receive(&first,2,0));
+    assert(chat_core_presence(&first,1,1,0,&peers) && !peers.rows[1].accepts_telegram);
+    assert(chat_core_private_scoped(&first,1,2,current,"refused",1000)==-3);
+    assert(chat_core_receive(&first,2,1));
+    assert(chat_core_private_scoped(&first,1,2,current,"deliver",1000)==1);
+    assert(carol.count==1 && !strcmp(carol.events[0].text,"deliver"));
+}
+
 int main(void) {
-    presence_snapshots();
+    bound_telegram();presence_snapshots();
     isolation();persistence();privacy_and_preferences();presence_and_call();
     puts("PASS chat core: context isolation, durable-before-delivery, replay, private routing, preferences, presence, SYSOP cooldown");
     return 0;

@@ -29,6 +29,10 @@ static void mmm_names_and_order(void) {
     assert(mmm_notes_scanlist_load(1,boards,&count) && count==3 &&
            !memcmp(boards,preferred,sizeof(preferred)));
     assert(mmm_notes_scanlist_load(2,boards,&count) && !count);
+    assert(big_model_scanlist_replace(1,preferred,3));
+    assert(!big_model_scanlist_replace(1,duplicate,2));
+    assert(big_model_scanlist_load(1,boards,&count) && count==3 && !memcmp(boards,preferred,sizeof(preferred)));
+    assert(big_model_scanlist_load(2,boards,&count) && !count);
     sql("PRAGMA query_only=ON");
     assert(!mmm_notes_scanlist_replace(1,NULL,0,NULL));
     assert(mmm_notes_scanlist_load(1,boards,&count) && count==3);
@@ -47,7 +51,10 @@ static void mmm_names_and_order(void) {
     assert(mmm_signature_store(1,&loaded));
     assert(mmm_signature_load(1,&loaded) && !*loaded.body);
     assert(mmm_notes_scanlist_load(1,boards,&count) && !count);
-    puts("PASS: unique MMM aliases, private scan order, atomic rollback and reset");
+    assert(big_model_scanlist_load(1,boards,&count) && count==3);
+    assert(big_model_scanlist_replace(1,NULL,0));
+    assert(big_model_scanlist_load(1,boards,&count) && !count);
+    puts("PASS: unique MMM aliases, isolated MMM/BIG-Model scan order, atomic rollback and reset");
 }
 
 int main(void) {

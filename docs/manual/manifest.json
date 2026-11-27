@@ -475,7 +475,13 @@
         "tests/test_session_core.c",
         "tests/test_session_operations.c",
         "src/session_ktbbs.c",
-        "src/ktbbs_input.c"
+        "src/ktbbs_input.c",
+        "src/session_big_model.c",
+        "src/session_big_model.h",
+        "src/big_model_input.c",
+        "src/big_model_input.h",
+        "tests/test_big_model_input.c",
+        "tests/test_big_model_ui.py"
       ]
     },
     {

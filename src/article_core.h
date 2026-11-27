@@ -135,7 +135,7 @@ ArticleOutcome article_read(const ArticleActor *,uint32_t article,int inspect,
  * after at most 256 index candidates, with total=0 (no global count). next=0
  * means end; start=0 means first page. Reauthorize every call, not just page 1.
  * Errors clear the entire page. No SEEN/cursor/session state is mutated. */
-typedef struct { uint32_t id,board,parent; char title[81]; } ArticleSummary;
+typedef struct { uint32_t id,board,parent; char title[81],author[33]; uint64_t created; } ArticleSummary;
 /* Select a related visible article; no body/read mark/audit/selection mutation.
  * Hidden parent chains move upward; hidden children/next siblings move forward,
  * previous siblings backward. A hidden current article may still navigate out.

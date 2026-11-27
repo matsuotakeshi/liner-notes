@@ -42,7 +42,7 @@ static int features_import(const char *base) {
         sqlite3_stmt *attach=feature_stmt("ATTACH DATABASE ? AS legacy");if(!attach)return 0;sqlite3_bind_text(attach,1,path,-1,SQLITE_STATIC);int ok=sqlite3_step(attach)==SQLITE_DONE;sqlite3_finalize(attach);if(!ok)return 0;
     }
     if(!feature_exec("BEGIN IMMEDIATE"))return 0;
-    const char *tables[]={"board_deletions","ui_preferences","menu_preferences","guest_boards","news_scoped","news","delegated","group_moves","applications","link_articles","mmm_board_labels","mmm_scanlist","mmm_scan_rules","mmm_signatures","conference_rooms","conference_lines","conference_read"};int ok=1;
+    const char *tables[]={"board_deletions","ui_preferences","menu_preferences","guest_boards","news_scoped","news","delegated","group_moves","applications","link_articles","mmm_board_labels","mmm_scanlist","mmm_scan_rules","big_model_scanlist","mmm_signatures","conference_rooms","conference_lines","conference_read"};int ok=1;
     for(unsigned i=0;legacy && ok && i<sizeof(tables)/sizeof(*tables);i++) {
         sqlite3_stmt *q=feature_stmt("SELECT 1 FROM legacy.sqlite_master WHERE type='table' AND name=?");if(!q) { ok=0;break; }sqlite3_bind_text(q,1,tables[i],-1,SQLITE_STATIC);int present=sqlite3_step(q)==SQLITE_ROW;sqlite3_finalize(q);
         if(present) { char command[256];snprintf(command,sizeof(command),"INSERT OR IGNORE INTO %s SELECT * FROM legacy.%s",tables[i],tables[i]);ok=feature_exec(command); }
@@ -155,6 +155,7 @@ static void advanced_execute(const BoardRequest *q,BoardResult *r) {
         MemberOutcome result=member_core_menu_save(&actor,(MemberMenuMode)q->number);
         if(result==MEMBER_CORE_INVALID)goto invalid;
         if(result!=MEMBER_CORE_OK) { member_result(result,r);return; }
+        r->service_number=q->number;
         strcpy(r->text,"MENU MODE SAVED\r\n");return;
     }
     if(q->action=='p' || q->action=='o') {

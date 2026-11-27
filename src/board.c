@@ -527,7 +527,36 @@ static void note_view(const BoardRequest *q,BoardResult *r) {
         else { r->feedback.checkpoint_saved=1;r->since=q->until; }
         return;
     }
-    if(q->action=='S') {
+    if(q->action=='c') {
+        MemberActor member={q->user,q->user_epoch};
+        MemberCheckWindow window;
+        MemberOutcome status=member_core_check_begin(&member,MEMBER_CHECK_ARTICLES,"",&window);
+        if(status!=MEMBER_CORE_OK)member_result(status,r);
+        else {
+            r->since=window.since;r->until=window.until;
+            if(q->scope) {
+                MmmScanList list;
+                result=flat_scanlist(&actor,&list);
+                if(result!=ARTICLE_OK)post_result(result,r);
+                else OPERATION_PAGE(r,MMM_SCANLIST,mmm_scanlist,list);
+            }
+        }
+        return;
+    }
+    if(q->action=='d' || q->action=='w') {
+        MmmScanList list;
+        result=q->action=='d'?flat_scanlist(&actor,&list):flat_scanlist_save(&actor,&q->mmm_scanlist);
+        if(result!=ARTICLE_OK)post_result(result,r);
+        else if(q->action=='d')OPERATION_PAGE(r,MMM_SCANLIST,mmm_scanlist,list);
+        return;
+    }
+    if(q->action=='n') {
+        ArticlePage page;
+        result=article_news_filtered(&actor,q->board,(ArticleScope)q->scope,q->cursor,
+                                     q->since,q->until,q->notes_unread,&page);
+        if(result==ARTICLE_BOARD_DENIED && q->number)result=ARTICLE_OK;
+        if(result==ARTICLE_OK)OPERATION_PAGE(r,ARTICLES,articles,page);
+    } else if(q->action=='S') {
         ArticlePage page;
         result=article_news_filtered(&actor,q->number,q->number?ARTICLE_HERE:ARTICLE_ALL,
                                      q->cursor,q->since,q->until,q->notes_unread,&page);
@@ -675,7 +704,11 @@ static void extra_execute(const BoardRequest *q,BoardResult *r) {
         (r->feedback.page_found=1,r->feedback.page_next=page.next,snprintf(r->text+pos,sizeof(r->text)-pos,"END NEXT %u\r\n",page.next));return;
     }
     if(q->action==5) {
-        if(!q->number || q->number>article_count || !catalog_read((*article_at(q->number-1)).board,q->user)) { (r->feedback.failed=1,strcpy(r->text,"ERR no article\r\n")); return; }
+        if(!q->number || q->number>article_count ||
+           (q->scope && (*article_at(q->number-1)).board!=q->board) ||
+           !catalog_read((*article_at(q->number-1)).board,q->user)) {
+            (r->feedback.failed=1,strcpy(r->text,"ERR no article\r\n"));return;
+        }
         display_article(q,q->number,r,0); r->board=(*article_at(q->number-1)).board; r->direct=1; return;
     }
     if(q->action==6) {
@@ -1281,7 +1314,7 @@ static void execute(const BoardRequest *q,BoardResult *r) {
             return;
         }
         r->chat_user=q->user;
-        r->chat_action=q->action;r->chat_target=q->chat_target;
+        r->chat_action=q->action;r->chat_target=q->chat_target;r->chat_generation=q->chat_generation;
         snprintf(r->chat_login,sizeof(r->chat_login),"%s",members_name(q->user));
         const char *name=profile_value(q->user,0);
         snprintf(r->chat_name,sizeof(r->chat_name),"%s",*name?name:r->chat_login);

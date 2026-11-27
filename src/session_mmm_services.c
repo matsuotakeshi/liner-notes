@@ -1,5 +1,6 @@
 #define _POSIX_C_SOURCE 200809L
 #include "session_mmm_internal.h"
+#include "session_big_model.h"
 #include "mmm_input.h"
 #include "vault_bridge.h"
 #include "profile_store.h"
@@ -572,10 +573,10 @@ void mmm_file_result(Session *s,const OperationResult *r,const OperationPage *pa
 
 int mmm_chat_event(Session *s,const ChatEvent *e) {
     const MmmUi *m=mmm_view(s);
-    if((e->kind=='I' || e->kind=='C') && (m->input || m->application.step || s->core.pending))return 0;
+    if((e->kind=='I' || e->kind=='C') && (session_secret(s) || m->input || m->application.step || s->core.pending))return 0;
     if(strchr("LJS",e->kind) && !m->chatting)return 1;
     /* MASH telegrams also have a sender acknowledgement outside the room. */
-    if(e->kind=='O' && !m->chatting && s->ui_binding.active!=session_ui_mash())return 1;
+    if(e->kind=='O' && !m->chatting && s->ui_binding.active!=session_ui_mash() && !big_model_active(s))return 1;
     char text[CHAT_TEXT+160];
     switch(e->kind) {
     case 'I': snprintf(text,sizeof(text),"[wire %lu %s] %s\r\n",e->connection,e->name,e->text);break;
@@ -602,7 +603,17 @@ void mmm_chat_result(Session *s,const OperationResult *r,uint64_t now) {
         break;
     case 'O': chat_online(s->core.id);ok=1;break;
     case 'S': ok=chat_say(s->core.id,r->text,now);break;
-    case 'D': ok=chat_private(s->core.id,r->chat_target,r->text,now);break;
+    case 'D':
+        ok=r->chat_generation?chat_private_scoped(s->core.id,r->chat_target,r->chat_generation,r->text,now):
+                              chat_private(s->core.id,r->chat_target,r->text,now);
+        break;
+    case 'P':
+        if(big_model_active(s)) {
+            if(r->chat_preferences.deny)mmm_say(s,"Receiving telegrams: OFF.\r\n","電報受信: OFF\r\n");
+            else mmm_say(s,"Receiving telegrams: ON.\r\n","電報受信: ON\r\n");
+            return;
+        }
+        break;
     case 'C':
         ok=chat_call(s->core.id,r->text,now);
         if(ok>0)mmm_say(s,"SYSOP notified.\r\n","SYSOPへ通知しました。\r\n");
@@ -618,6 +629,7 @@ void mmm_chat_result(Session *s,const OperationResult *r,uint64_t now) {
 void mmm_load_preferences(Session *s,const OperationResult *r) {
     MmmUi *m=mmm_state(s);
     if(!r->preferences)return;
+    if(big_model_active(s))((BigModelUi *)m)->quiet=r->menu_mode==MEMBER_MENU_EXPERT;
     m->language=(Language)r->language;m->pager=r->pager;m->editor=r->editor_preference;m->ui_aux=r->ui_aux;
     if(r->columns && r->rows)session_dimensions(s,r->columns,r->rows);
 }

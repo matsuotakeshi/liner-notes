@@ -21,4 +21,6 @@ ArticleOutcome mmm_note_label(const ArticleActor *,uint32_t,const char *replacem
 ArticleOutcome mmm_note_scanlist(const ArticleActor *,MmmScanList *);
 /* Empty list resets to default. Validation and persistence are all-or-nothing. */
 ArticleOutcome mmm_note_scanlist_save(const ArticleActor *,const MmmScanTargets *);
+ArticleOutcome flat_scanlist(const ArticleActor *,MmmScanList *);
+ArticleOutcome flat_scanlist_save(const ArticleActor *,const MmmScanTargets *);
 #endif

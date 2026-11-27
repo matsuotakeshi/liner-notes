@@ -45,6 +45,19 @@ configured default without deleting the stored value. An explicit choice made
 during the current connection wins over login restoration. Logout clears that
 choice's ownership. Existing Core ACLs, binary/connector and Door barriers apply.
 
+## Article presentation
+
+The Article Core retains article ID, parent ID and root ID for every profile.
+HyperNotes profiles such as MMM and MASH use the relationships to present base
+notes and replies. BIG-Model uses a single list in article ID order, including
+replies. It uses the typed flat page and content APIs, so no renderer writes or
+changes those relationships. Search, direct read, parent navigation, unread
+state, and moderation use the same Core authorization in both views.
+
+Build a new profile's presentation from its documented conventions. The
+planned RTBBS and KTBBS flat-view updates belong in follow-up changes. The
+BIG-Model work leaves both profiles' current views intact.
+
 ## Checks
 
 - Core tests: authenticated owner, suspended/stale actor, settings failures,
