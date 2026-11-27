@@ -74,10 +74,14 @@ def apply_host(release, authorization, target, adapter):
             state['result'] = 'stopped'
             adapter.save_state(identity, state)
             backup = adapter.backup(identity)
-            require(backup.get('restored') is True and backup.get('off_host_verified') is True,
-                    'A verified off-host backup and isolated restore are required')
+            storage = backup.get('storage', 'off-host')
+            verification = {'local': 'local_verified', 'off-host': 'off_host_verified'}
+            require(backup.get('restored') is True and storage in verification
+                    and backup.get(verification[storage]) is True,
+                    'A verified backup and isolated restore are required')
             state['backup_id'] = backup['id']
             state['backup_sha256'] = backup['sha256']
+            state['backup_storage'] = storage
             state['result'] = 'backed-up'
             adapter.save_state(identity, state)
             adapter.install(release)

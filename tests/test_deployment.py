@@ -26,7 +26,8 @@ from deploy_transaction import apply_host, atomic_json, rollout
 from deploy_backup_store import receive
 from deploy_restore import health_probes
 from deploy_release import successful_execution, latest_full_run, trusted_release_ancestor, fresh_connectivity, main as controller_main, record_target
-from deploy_host import Host, command as host_command, validate_backup_inventory, validate_link_processes
+from deploy_host import (Host, backup_storage, command as host_command, validate_backup_inventory,
+                         validate_link_processes, verify_local_archive)
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 from cryptography.hazmat.primitives.serialization import Encoding, PrivateFormat, PublicFormat, NoEncryption
 
@@ -200,6 +201,63 @@ class Deployment(unittest.TestCase):
         with self.assertRaises(ValueError):
             apply_host(self.doc, self.auth, policy.TARGETS[0], host)
         self.assertNotIn('install', host.calls)
+
+    def test_local_backup_is_explicit_and_unverified_archive_blocks_install(self):
+        self.assertEqual(backup_storage({'backup_sink': {}}), 'off-host')
+        self.assertEqual(backup_storage({'backup_storage': 'local'}), 'local')
+        for profile in ({}, {'backup_storage': 'local', 'backup_sink': {}},
+                        {'backup_storage': 'nfs', 'backup_sink': {}}):
+            with self.assertRaises(ValueError):
+                backup_storage(profile)
+
+        target = policy.TARGETS[0]
+        for index, (restored, verified) in enumerate(((True, True), (False, True), (True, False))):
+            host = Fixture(self.base / str(index), target)
+            receipt = {'id': 'backup-test', 'sha256': '1' * 64, 'storage': 'local',
+                       'restored': restored, 'local_verified': verified}
+            with patch.object(host, 'backup', return_value=receipt):
+                if restored and verified:
+                    state = apply_host(self.doc, self.auth, target, host)
+                    self.assertEqual(state['backup_storage'], 'local')
+                    self.assertEqual(state['result'], 'healthy')
+                else:
+                    with self.assertRaises(ValueError):
+                        apply_host(self.doc, self.auth, target, host)
+                    self.assertNotIn('install', host.calls)
+
+    @unittest.skipUnless(os.name == 'posix', 'Local archive permissions require POSIX')
+    def test_local_backup_retains_private_archive_and_rejects_corruption(self):
+        host = object.__new__(Host)
+        host.root = self.base / 'state'
+        host.root.mkdir(mode=0o700)
+        host.target = policy.TARGETS[2]
+        host.backup_storage = 'local'
+        data = self.base / 'data.sqlite'
+        with contextlib.closing(sqlite3.connect(data)) as db:
+            db.execute('CREATE TABLE articles (body TEXT)')
+            db.execute("INSERT INTO articles VALUES ('retained article')")
+            db.commit()
+        host.profile = {'backup_roots': {'data': [str(data)]},
+                        'database_checks': [{'path': str(data), 'query': 'SELECT body FROM articles'}],
+                        'restore_application': {}}
+        identity = policy.transaction_id(self.doc)
+        previous_umask = os.umask(0o077)
+        self.addCleanup(os.umask, previous_umask)
+        with patch('deploy_host.trusted', side_effect=Path), \
+             patch('deploy_restore.verify_application') as restore, \
+             patch('deploy_host.machine_identity', side_effect=AssertionError('network backup selected')):
+            result = host.backup(identity)
+            restore.assert_called_once()
+            archive = host.root / (identity + '.tar')
+            original = archive.read_bytes()
+            self.assertTrue(result['local_verified'])
+            self.assertEqual(archive.stat().st_mode & 0o777, 0o600)
+            with self.assertRaises(ValueError):
+                host.backup(identity)
+            self.assertEqual(archive.read_bytes(), original)
+            archive.write_bytes(b'corrupted')
+            with self.assertRaises(ValueError):
+                verify_local_archive(archive, result['sha256'])
 
     def test_partly_stopped_service_is_never_reported_as_preflight_failure(self):
         host = Fixture(self.base / 'host', policy.TARGETS[0], 'stop')

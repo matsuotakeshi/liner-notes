@@ -27,7 +27,7 @@ mainへのpushやタグ作成だけでは配備しません。必要な条件は
 
 ### 1局だけを配備する操作
 
-この選択肢は本番未導入です。初回のhelper・公開鍵・最小sudo権限・バックアップ受信先・
+この選択肢は本番未導入です。初回のhelper・公開鍵・最小sudo権限・バックアップ保管先・
 site profile設置には別途承認が必要です。旧版のhelperは対応していない単独配備を拒否するため、
 新しいcontrollerだけを反映して本番準備完了とは扱いません。
 
@@ -110,10 +110,19 @@ Web/linkサービスを有効にして対応する保存先を空にする設定
 SQLiteの照合はDB/WALのさらに別コピーで行います。原本DBへSQLite接続せず、原本側にSHMを
 作成することも避けます。コピー中の変化・未回復のrollback journalは更新を拒否する理由です。
 さらに使い捨てコピー上のBBSを非root・loopbackで起動してlogin/article/mailを確認します。外部のゲームdaemon等が
-まだデータを書いている場合は停止し、ゲーム側の整合バックアップ手順を先に設計します。別ホストの専用backup
-receiverへ転送し、保管後hashが一致するまでpackage更新を開始しません。
-backup識別子は局名・release ID・SHAで区別します。転送先SSH host keyに加え、OS machine IDの
-SHA-256も固定して照合し、同じ局への「ホスト外バックアップ」を拒否します。
+まだデータを書いている場合は停止し、ゲーム側の整合バックアップ手順を先に設計します。
+更新は、隔離した復元と、選択した保管先でのSHA-256照合が成功してから開始します。
+
+- **同一ホスト保管**を使う場合は、root専用の `host.json` に `"backup_storage": "local"` を設定し、
+  `backup_sink` を削除します。archiveは `state_directory`（例 `/var/lib/liner-notes-deploy`）の
+  `<release ID>-<SHA>.tar` にモード0600で保持し、同じ名前の既存ファイルは上書きしません。
+  更新前にarchiveをディスクへ同期し、読み直してSHA-256を照合します。監査には `backup_storage=local`
+  と識別子・SHA-256を残します。同一ホストのディスク故障には備えられないため、別ホスト保管を導入する際は
+  保存先と復元手順を見直してください。
+- **別ホスト保管**では `"backup_storage": "off-host"`（従来の省略時既定）と `backup_sink` を設定します。
+  別ホストの専用receiverへ転送し、保管後のSHA-256を確認します。SSH host keyとOS machine IDの
+  SHA-256を固定し、同じ局を別ホストとして指定した場合は拒否します。
+
 backup receiverはprivate directory `/var/lib/liner-notes-release-backups` を使い、
 専用SSHアカウントには `deploy_backup_store.py` のみを実行可能にします。
 ゲーム外部データ、秘密鍵、証明書を含むバックアップをActions Artifactに保管しないでください。
@@ -129,7 +138,7 @@ helperのサービス許可一覧に追加しないでください。更新前�
 再利用しません。サービス停止前の拒否は `preflight-failed`、停止開始後の中断・失敗は
 `planned-restore-required` として保持し、いずれも後続局への更新を止めます。
 DB互換性の推測による自動バイナリ切り戻しは行いません。private host state、
-off-host backupと旧packageを確認して[計画的な復元](backup-recovery.md)を実施し、
+監査に記録された保管方式のbackupと旧packageを確認して[計画的な復元](backup-recovery.md)を実施し、
 整合性を確認した後に新しいrun/承認で再開します。状態fileを消すだけの再実行は禁止です。
 失敗状態が一つでも残る局は別releaseへの更新も拒否します。計画復元の完了を管理者が確認してから、
 失敗stateを復元証跡と一緒にroot専用の履歴directoryへ移して保持し、新しい承認で再検査します。

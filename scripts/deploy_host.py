@@ -44,6 +44,29 @@ def validate_backup_inventory(profile, platform):
         require(service not in profile['services'] or features[feature], 'Enabled service has no corresponding backup roots')
 
 
+def backup_storage(profile):
+    mode = profile.get('backup_storage', 'off-host')
+    require(mode in ('local', 'off-host'), 'Unknown backup storage mode')
+    require(('backup_sink' in profile) == (mode == 'off-host'),
+            'Backup sink must be specified only for off-host storage')
+    return mode
+
+
+def verify_local_archive(archive, checksum):
+    with trusted(archive).open('r+b') as stream:
+        info = os.fstat(stream.fileno())
+        require(stat.S_ISREG(info.st_mode) and stat.S_IMODE(info.st_mode) == 0o600
+                and info.st_nlink == 1 and info.st_size > 0, 'Invalid private local backup archive')
+        os.fsync(stream.fileno())
+        require(hashlib.file_digest(stream, 'sha256').hexdigest() == checksum,
+                'Stored local backup checksum mismatch')
+    fd = os.open(archive.parent, os.O_RDONLY | os.O_DIRECTORY)
+    try:
+        os.fsync(fd)
+    finally:
+        os.close(fd)
+
+
 def validate_link_processes(lines, managed, allowed_uids):
     for line in lines.splitlines():
         fields = line.strip().split(None, 1)
@@ -106,6 +129,7 @@ class Host:
         require(set(profile['services']) <= set(SERVICES[self.platform]) and SERVICES[self.platform][0] in profile['services'], 'Unexpected service')
         require(profile['services'] == [s for s in SERVICES[self.platform] if s in profile['services']], 'Services must follow core/web/link order without duplicates')
         validate_backup_inventory(profile, self.platform)
+        self.backup_storage = backup_storage(profile)
         # Root-maintained probes are declarative local TCP/SQLite checks, not shell hooks.
         require({'login', 'article', 'mail'} <= set(profile['probes']), 'Login/article/mail health probes are mandatory')
         for feature, service in zip(('web', 'link'), SERVICES[self.platform][1:]):
@@ -191,6 +215,8 @@ class Host:
 
     def preflight(self, release):
         identity = transaction_id(release)
+        archive = self.root / (identity + '.tar')
+        require(not archive.exists() and not archive.is_symlink(), 'Backup archive already exists')
         incoming = Path(self.profile['incoming_directory']) / identity
         self.stage = self.root / (identity + '-packages')
         self.stage.mkdir(mode=0o700)
@@ -288,6 +314,7 @@ class Host:
 
     def backup(self, identity):
         archive = self.root / (identity + '.tar')
+        require(not archive.exists() and not archive.is_symlink(), 'Backup archive already exists')
         roots = sorted({str(Path(p)) for group in self.profile['backup_roots'].values() for p in group})
         require(roots and all(Path(p).is_absolute() and p != '/' and Path(p).exists() for p in roots), 'Invalid backup root')
         require(not any(self.root.is_relative_to(Path(p)) for p in roots), 'Backup inventory includes the deployment archive itself')
@@ -318,6 +345,11 @@ class Host:
         from deploy_restore import verify_restored, verify_application
         verify_restored(restored, roots, self.profile['database_checks'])
         verify_application(restored, self.profile['restore_application'], trusted)
+        backup_id = self.target + '-' + identity
+        if self.backup_storage == 'local':
+            verify_local_archive(archive, checksum)
+            return {'id': backup_id, 'sha256': checksum, 'restored': True,
+                    'storage': 'local', 'local_verified': True}
         sink = self.profile['backup_sink']
         require(re.fullmatch(r'[a-zA-Z0-9.-]+', sink['host']) and sink['host'] not in PLATFORMS,
                 'Backup destination must be a separate non-production host')
@@ -325,7 +357,6 @@ class Host:
                 'Backup destination must have a different pinned OS machine identity')
         require(re.fullmatch(r'[a-z_][a-z0-9_-]*', sink['user']), 'Invalid backup user')
         key, hosts = trusted(sink['key']), trusted(sink['known_hosts'])
-        backup_id = self.target + '-' + identity
         request = json.dumps({'id': backup_id, 'sha256': checksum, 'size': archive.stat().st_size}, separators=(',', ':'))
         argv = ['/usr/bin/ssh', '-T', '-i', str(key), '-o', 'BatchMode=yes', '-o', 'IdentitiesOnly=yes',
                 '-o', 'StrictHostKeyChecking=yes', '-o', 'UserKnownHostsFile=' + str(hosts),
