@@ -27,4 +27,5 @@ UI で利用可能なUIを表示し、局が許可していれば UI mash でMAS
 
 局が許可していれば UI wani-bbs で切り替えます。b 掲示板、p 保管庫、s 設定、g ゲーム、topic 簡易伝言板、? 現画面の案内です。
 
+局が許可していれば UI vs で切り替えます。B は掲示板、N はニュース、NA は一気読みです。U → B → N NUMBER または N RELATED で巡回順を変更します。J／DJ は未対応です。
 対応版で局が許可していれば UI net-cock で切り替えます。MODE MENU は番号、MODE COMMAND はコマンド方式です。BREAD は掲示板、R は本文、EXCOM は拡張案内です。
