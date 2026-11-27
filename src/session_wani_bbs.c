@@ -68,11 +68,14 @@ void wani_menu(Session *s,int requested) {
     case NOTES_SCREEN:
         mmm_say(s,"Number or name: select  l: list  more: next  q: up\r\n","番号・名前 選択 / l 一覧 / more 続き / q 上位\r\n");break;
     case BOARD_SCREEN: case INDEX_SCREEN: case OPEN_SCREEN:
-        if(u->mode==WANI_VIEW_FLAT)
+        if(u->mode==WANI_VIEW_FLAT) {
             mmm_say(s,"Flat board: l / r [ID] / w / f TEXT / S personal / Q advance / Z interrupt\r\n",
                       "通常掲示板: l 一覧 / r [番号] / w 投稿・返信 / f 検索 / S 一時保存 / Q 更新 / Z 中断\r\n");
-        else mmm_say(s,"Multi-notes: l index / number cover / . pages / w / S subscribe / U unsubscribe\r\n",
-                        "マルチノーツ: l 索引 / 番号 表紙 / . ページ一覧 / w / S 購読 / U 解除\r\n");break;
+        } else {
+            mmm_say(s,"Multi-notes: l index / number cover / . pages / w / S subscribe / U unsubscribe\r\n",
+                      "マルチノーツ: l 索引 / 番号 表紙 / . ページ一覧 / w / S 購読 / U 解除\r\n");
+        }
+        break;
     case FILER_SCREEN: mmm_say(s,"l list / r ID / w description / x ID / f pattern / cd PATH / q\r\n",
                                   "l 一覧 / r 番号 / w 説明 / x 番号 / f 検索 / cd パス / q\r\n");break;
     case MAIL_SCREEN: mmm_say(s,"l inbox / r [ID] read / m USER / R reply / D ID confirm / S personal / q\r\n",
