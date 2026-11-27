@@ -14,14 +14,53 @@ FreeBSDの候補pkg生成とnative試験は、既存検証機内の共通ロッ�
 他OSの検証は並列のままです。CIの接続断・取消・時間切れでは検証プロセスを回収し、
 ロック待ちや中断を成功済み試験として扱いません。
 
-更新順序はRocky Linux → Debian → FreeBSDです。各局のヘルスチェックが成功してから
-次局へ進みます。必要な条件は次のとおりです。
+対象は `scope=freebsd`（画面の既定）または `scope=all` から選びます。
+FreeBSDのみの場合は `srv.ysni.org` だけを更新します。`all` の更新順序は
+Rocky Linux → Debian → FreeBSDで、各局のヘルスチェック成功後に次局へ進みます。
+mainへのpushやタグ作成だけでは配備しません。必要な条件は次のとおりです。
 
 1. 公開済み安定リリースのtagと署名付き `DEPLOYMENT-MANIFEST.json` が同じ完全SHAであること。配備controllerは実行時の最新mainに固定し、release SHAがその祖先であることを確認します。リリース後の文書更新だけで既存リリースを作り直す必要はありません。ただし承認待ち中にmainが進んだ場合は新しいrunと承認が必要です。
-2. native/Linux/pkg/RPM/DEB/Release Set/manual/deployment安全性、doctorの原本非変更試験、Solaris native、Rocky SELinux Enforcing、FreeBSD jail更新CIがreleaseと同一SHAで成功していること。本番SSH事前検査は現在のcontroller SHAで実行し、実際の検査step完了から1時間以内であること。文書変更によるskipは実行済み試験として認めません。controllerだけが新しいSHAであることを理由に過去のrelease検証を他のreleaseへ流用しません。
+2. native/Linux/pkg/RPM/DEB/Release Set/manual/deployment安全性、doctorの原本非変更試験、Solaris native、Rocky SELinux Enforcing、FreeBSD jail更新CIがreleaseと同一SHAで成功していること。controller自身のSHAでもdeployment安全性試験の実行成功が必要です。apply時の本番SSH事前検査は現在のcontroller SHA・同じscopeで実行し、実際の検査step完了から1時間以内であること。planでは本番接続を要求せず未確認と記録します。文書変更によるskipは実行済み試験として認めません。controllerだけが新しいSHAであることを理由に過去のrelease検証を他のreleaseへ流用しません。
 3. CI由来manifest・Release Set receiptと、ダウンロードしたpackageの名前・版・サイズ・SHA-256が一致すること。
 4. `production-release` Environmentにmain専用のブランチ制限とオーナーのrequired reviewerが実在すること。
-5. 今回のrun summaryに示す `DEPLOY v版 SHA rocky.ysni.org,debian.ysni.org,srv.ysni.org RUN run番号/attempt` を、承認コメントへそのまま記載すること。古いrun/attemptの承認は再利用できません。
+5. 今回のrun summaryに示す承認文をそのまま承認コメントへ記載すること。FreeBSDのみなら `DEPLOY v版 SHA srv.ysni.org RUN run番号/attempt`、allなら対象は `rocky.ysni.org,debian.ysni.org,srv.ysni.org` です。異なる対象・古いrun/attemptの承認は再利用できません。
+
+### FreeBSDのみの配備操作
+
+この選択肢は本番未導入です。初回のhelper・公開鍵・最小sudo権限・バックアップ受信先・
+site profile設置には別途承認が必要です。古いhelperはFreeBSDのみの許可を拒否するため、
+新しいcontrollerだけを反映して本番準備完了とは扱いません。
+
+1. 必要なCIが完了した正式な `v版` リリースを選び、数値release IDを確認します。
+   監査用タグ、draft、prerelease、署名manifestのないリリースは対象外です。
+   既存CI成果物から署名manifestを準備し、承認した公開作業でリリースへ添付します。
+2. Actionsの `Approved staged production update` でmain、release ID、
+   `scope=freebsd`、`mode=plan` を指定し、SHA・pkg・既存CIの結果を確認します。
+   この操作はSSH接続、ビルド、サービス操作を行いません。
+3. 本番読み取り確認の承認後、`Production SSH Connectivity Test` をmain・
+   `scope=freebsd` で実行します。`production` EnvironmentのFreeBSDホスト変数は
+   `srv.ysni.org`、SSHユーザーは `ln-deploy`、固定ホスト鍵を使います。
+   これはOS/CPUとSSHの検査であり、バックアップやhelper導入の証明ではありません。
+4. 準備と復元検証を確認したうえで同じrelease ID・`scope=freebsd`・`mode=apply` を
+   新規実行します。その実行のplan summaryを確認し、`production-release` の承認欄へ
+   **その実行**の承認文を記入します。事前のplan-only実行の文は使えません。
+   初回だけでなく毎回、明示承認が必要です。
+5. applyはCI・tag・承認・hashを再確認し、FreeBSDのpkgだけを転送します。
+   承認待ちにmainが進む、接続検査が1時間を超える、CIが失敗へ変わる等の場合は拒否します。
+   新しい接続検査と必要に応じて新しいapply実行・承認を行ってください。
+
+既存の3 OS署名release setと全リリース検査はFreeBSDのみでも維持します。
+配備時にCIの再ビルドを起動したり、別SHAの成功で不足を補ったりしません。
+CI親機から本番へ中継せず、既存GitHub-hosted runnerから直接SSH接続します。
+本番専用runnerの新設は不要です。接続できない場合もホスト鍵照合を無効化せず、
+接続制限と経路を確認してから別途設計します。
+
+計画確認もapplyも既存の配備用排他グループを使い、稼働中の更新を自動取消しません。
+host側ではさらに機械単位のロックと永続状態で二重更新・失敗後の再更新を拒否します。
+DB schema変換コマンドはこのCDから自動実行しません。DB移行が必要な版は、停止中の
+別コピーでの変換・復元検証と切替手順を先に承認し、既存DBのまま更新できると推測しません。
+
+### 配備用の資格情報と保全
 
 配布計画の署名鍵と実行承認の署名鍵は分離します。`scripts/deploy_manifest.py` は既存の
 `verify_release_set.py` で確認済みのCI成果物だけから署名計画を作成します。
