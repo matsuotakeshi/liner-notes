@@ -87,6 +87,8 @@ async def exercise(bbs, directory):
                 assert message in history["text"], history
                 sent = await bridge.command("LINECONF POST 2 From the terminal")
                 assert "CONFERENCE SAVED" in sent["text"], sent
+                # TOPIC's terminal acknowledgement is localized.
+                await bridge.command("LANG EN")
                 sent = await bridge.command("TOPIC -W Bob's notice")
                 assert "Topic posted." in sent["text"], sent
             finally:
