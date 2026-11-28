@@ -470,6 +470,17 @@ class Deployment(unittest.TestCase):
         validate_link_processes('80 /usr/local/sbin/httpd -D FOREGROUND', False, set())
 
     @unittest.skipUnless(os.name == 'posix', 'POSIX service accounts are exercised on hosted Linux')
+    def test_freebsd_process_inventory_parses_separate_uid_and_command_fields(self):
+        host = object.__new__(Host)
+        host.platform = 'freebsd15'
+        host.profile = {'services': ['liner_notes'], 'quiescence_users': ['liner_notes']}
+        process = '1007 /usr/local/bin/python3.12 /usr/local/share/liner-notes/scripts/link_service.py serve'
+        users = SimpleNamespace(getpwnam=lambda name: SimpleNamespace(pw_uid=995))
+        with patch.dict(sys.modules, {'pwd': users}), patch('deploy_host.command', return_value=process) as ps:
+            with self.assertRaisesRegex(ValueError, 'no managed stop/backup owner'):
+                host.check_service_inventory()
+        ps.assert_called_once_with(['/bin/ps', '-ax', '-o', 'uid=', '-o', 'command='])
+
     def test_omitted_running_service_is_rejected_without_stop(self):
         host = object.__new__(Host)
         host.platform = 'rocky10'

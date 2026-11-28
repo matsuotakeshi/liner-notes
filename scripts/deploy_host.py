@@ -174,7 +174,7 @@ class Host:
         """Only the three known BBS services; never operate unrelated services."""
         import pwd
         ps = '/bin/ps' if self.platform == 'freebsd15' else '/usr/bin/ps'
-        validate_link_processes(command([ps, '-ax', '-o', 'uid=,command=']),
+        validate_link_processes(command([ps, '-ax', '-o', 'uid=', '-o', 'command=']),
                                 SERVICES[self.platform][2] in self.profile['services'],
                                 {pwd.getpwnam(name).pw_uid for name in self.profile['quiescence_users']})
         for service, user_name in zip(SERVICES[self.platform], ('liner_notes', 'liner_notes_web', 'liner_notes_link')):
