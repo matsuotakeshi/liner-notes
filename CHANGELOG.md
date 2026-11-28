@@ -1,5 +1,7 @@
 # 変更履歴
 
+- BBS間リンク用のFreeBSD rc.dを配布し、Linuxと共通のCLIで運用できるようにした。手動導入からの移行、設定・鍵・リンクDBの保全手順を日英マニュアルに追加。
+
 - 配備前後に局間連携のUnixソケットで読み取り専用の状態確認を行い、設定した連携ノードの応答を確認できるようにした。
 
 - Development candidate: opt-in libssh listener with BBS password/public-key authentication, shared Core/session/ACL/Door lifecycle, bounded authentication and default-deny SSH requests. Encrypted interoperability is covered by Hosted CI; native SSH/SELinux validation is not yet complete.
