@@ -1,0 +1,4 @@
+# The BBS validates approved catalog entries before contacting the launcher.
+# Copy into /etc/apparmor.d/local/liner-notes after review.
+  /usr/libexec/liner-notes/doors/example r,
+  /var/lib/liner-notes-door-slots/example/ r,

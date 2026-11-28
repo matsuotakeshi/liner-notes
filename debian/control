@@ -26,3 +26,11 @@ Depends: ${misc:Depends}, liner-notes (= ${binary:Version}), python3-cryptograph
 Description: Optional signed shared-board connector for Liner Notes
  Mutually authenticated BBS-to-BBS synchronization. Identity and trusted
  peers must be configured explicitly before use.
+
+Package: liner-notes-apparmor
+Architecture: all
+Depends: ${misc:Depends}, liner-notes (= ${binary:Version}), apparmor
+Suggests: apparmor-utils
+Description: Optional named AppArmor profiles for Liner Notes
+ Separate path policies and systemd opt-in examples for Liner Notes.
+ Installation does not enable confinement or start any services.
