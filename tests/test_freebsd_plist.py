@@ -44,9 +44,15 @@ def main():
     })
     for role in ('broker','isolation'):
         name='liner_notes_door_'+role
-        assert (ROOT/'ports/comms/liner-notes/files'/(name+'.in')).is_file()
-        expected.add('%%DATADIR%%/door-services/freebsd/'+name)
-        assert 'etc/rc.d/'+name not in content,'Candidate must not activate automatically'
+        template = ROOT/'ports/comms/liner-notes/files'/(name+'.in')
+        assert template.is_file()
+        sample = '%%DATADIR%%/door-services/freebsd/'+name
+        active = 'etc/rc.d/'+name
+        expected.add(f'@sample(root,wheel,0755) {sample} {active}')
+        assert active not in content, 'The package must preserve a manually installed rc.d'
+        assert ': ${'+name+'_enable:=NO}' in template.read_text(encoding='utf-8')
+        assert not any(line.startswith(('@preexec ', '@postexec ')) and name in line
+                       for line in content), 'The package must not start the service'
     actual = set(content)
     missing = sorted(expected - actual)
     extra=sorted(x for x in actual-expected if x.startswith('%%PORTDOCS%%'))
