@@ -60,7 +60,7 @@ transfer_timeout = 120
 
 | 項目 | 合わせる値 |
 | --- | --- |
-| `origin` | ブラウザーの公開元。`https://bbs.linernotes.site`など。`/notes/`を含めない |
+| `origin` | ブラウザーの公開元。`https://bbs.example.org`など。`/notes/`を含めない |
 | `base_path` | `/notes/`。Apacheの転送元・転送先とも一致させる |
 | `[bbs] port` | 実際のruntime待受。23運用なら23。8088ではない |
 | `secure_cookies` | HTTPS公開ではtrue。ブラウザーから平文HTTPでログインする設定ではない |
