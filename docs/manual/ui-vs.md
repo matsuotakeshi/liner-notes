@@ -24,3 +24,11 @@ Liner Notes v0.76を隔離されたLinuxの検証環境で起動し、試用会�
 ![日本語のメニュー](../assets/ui-vs-ja.png)
 
 ![英語のメニュー](../assets/ui-vs-en.png)
+
+## 記事一覧の画面例
+
+隔離したLinux検証環境のv0.76で試用会員と検証用の記事を使った実際の端末出力を、80×24文字の画像に描画しています。
+
+![日本語の記事一覧](../assets/ui-vs-articles-ja.png)
+
+![英語の記事一覧](../assets/ui-vs-articles-en.png)

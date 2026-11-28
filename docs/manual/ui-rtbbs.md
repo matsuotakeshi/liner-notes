@@ -80,3 +80,19 @@ Liner Notes v0.76を隔離されたLinuxの検証環境で起動し、試用会�
 ![日本語のメニュー](../assets/ui-rtbbs-ja.png)
 
 ![英語のメニュー](../assets/ui-rtbbs-en.png)
+
+## 記事一覧の画面例
+
+隔離したLinux検証環境のv0.76で試用会員と検証用の記事を使った実際の端末出力を、80×24文字の画像に描画しています。
+
+![日本語の記事一覧](../assets/ui-rtbbs-articles-ja.png)
+
+![英語の記事一覧](../assets/ui-rtbbs-articles-en.png)
+
+## 返信ツリーの画面例
+
+`TREE 1` で親記事と返信の関係を表示した例です。
+
+![日本語の返信ツリー](../assets/ui-rtbbs-tree-ja.png)
+
+![英語の返信ツリー](../assets/ui-rtbbs-tree-en.png)
