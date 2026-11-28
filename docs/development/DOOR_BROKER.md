@@ -149,7 +149,8 @@ acceptance is pending for this candidate. This is **not a production runbook**.
 ### FreeBSD service candidate and preflight
 
 The port installs `liner_notes_door_broker` and `liner_notes_door_isolation`
-under `share/liner-notes/door-services/freebsd/`, not `etc/rc.d/`. No automatic
+under `share/liner-notes/door-services/freebsd/` and registers the executable
+samples under `etc/rc.d/` when no local service definition exists. No automatic
 activation, policy creation, account provisioning or directory repair is done.
 For an independently provisioned development instance only, root can invoke
 these samples through `/bin/sh SAMPLE onestart|onestatus|onestop`.
@@ -189,7 +190,7 @@ reset/cleanup) remain rejected. The preflight tests separately verify that the
 check does not start a server, bind a socket or fork a worker.
 
 Start refuses a duplicate process and reports readiness only after both child
-PID and socket identity checks succeed. Stop uses rc.subr TERM-and-wait behavior.
+PID and socket identity checks succeed. Stop checks the child PID, UID and service arguments before TERM and waits for the daemon to release the PID file.
 The samples do not use automatic restart, SIGKILL, socket unlink, or reservation
 reset. A failed start/stop requires inspection; never clear BUSY as a workaround.
 An orphan socket is not ready and is not automatically replaced.

@@ -1,5 +1,6 @@
 """Bounded Door admission; fault injection never exhausts the host itself."""
 import errno
+import json
 import os
 from pathlib import Path
 import sys
@@ -90,6 +91,103 @@ class Admission(unittest.TestCase):
                 finally:
                     os.close(fd)
         self.assertEqual(phases, ['slot-uid-scan', 'slot-marker-write', 'slot-marker-sync'])
+
+    def test_policy_accepts_fixed_and_pooled_games_but_rejects_duplicate_ids(self):
+        with TemporaryDirectory() as directory:
+            path = Path(directory) / 'policy.json'
+            game = dict(door=7, level=0, exe='/fixture', cwd='/assets', seconds=30,
+                        drop=False, auth=True)
+            account = dict(uid=7001, gid=7001)
+            policy = dict(bbs_uid=10, socket='/run/control', socket_gid=10,
+                          state_dir=directory, broker_config='/broker.json',
+                          slots=[dict(game, door=8, node=1, uid=8001, gid=8001)],
+                          pools=[dict(game, nodes=32, accounts=[account])])
+            broker = dict(bbs_uid=10, broker_uid=20, socket='/broker',
+                          door_uids=[7001, 8001], consumers={30: [7]})
+            with patch.object(isolation, 'secure_path', side_effect=lambda p, *args: Path(p)), \
+                 patch.object(isolation, 'broker_configuration', return_value=broker), \
+                 patch.object(isolation.os, 'access', return_value=True):
+                path.write_text(json.dumps(policy), encoding='utf8')
+                parsed = isolation.config_read(path)
+                self.assertEqual([slot['door'] for slot in parsed['slots']], [8, 7])
+                self.assertEqual(parsed['slots'][1]['_nodes'], 32)
+                self.assertNotIn('max_active', parsed)
+                policy['max_active'] = 3
+                path.write_text(json.dumps(policy), encoding='utf8')
+                with self.assertRaises(ValueError):
+                    isolation.config_read(path)
+                del policy['max_active']
+                policy['pools'][0]['accounts'] = [dict(uid=8001, gid=8001)]
+                path.write_text(json.dumps(policy), encoding='utf8')
+                with self.assertRaisesRegex(isolation.Rejected, 'slot isolation'):
+                    isolation.config_read(path)
+                policy['pools'][0]['door'] = 8
+                path.write_text(json.dumps(policy), encoding='utf8')
+                with self.assertRaisesRegex(isolation.Rejected, 'mixed or duplicate'):
+                    isolation.config_read(path)
+
+    def test_pools_keep_logical_nodes_independent_and_obey_global_limit(self):
+        with TemporaryDirectory() as directory:
+            p = Path(directory)
+            pool = [dict(door=7, level=0, uid=uid, _nodes=32, node=0) for uid in (7001, 7002)]
+            pool += [dict(door=8, level=0, uid=8001, _nodes=32, node=0)]
+            config = dict(slots=pool, state_dir=directory, _pool_admission=True, max_active=2)
+            fstat = os.fstat
+            def root_owned(fd):
+                info = fstat(fd)
+                return SimpleNamespace(st_mode=info.st_mode, st_uid=0,
+                                       st_nlink=info.st_nlink, st_size=info.st_size)
+            with patch.object(isolation, 'processes', return_value=False), \
+                 patch.object(isolation.os, 'fstat', side_effect=root_owned):
+                first, fd = isolation.slot_acquire(config, 7, 0)
+                try:
+                    second, other_fd = isolation.slot_acquire(config, 7, 0)
+                    try:
+                        self.assertEqual((first['node'], second['node']), (1, 2))
+                        self.assertNotEqual(first['uid'], second['uid'])
+                        with self.assertRaisesRegex(isolation.Rejected, 'global Door capacity'):
+                            isolation.slot_acquire(config, 8, 0)
+                        # A restarted worker must count the durable reservation.
+                        self.assertEqual(isolation.occupied_slots(config), (2, {7: {1, 2}}))
+                    finally:
+                        os.ftruncate(other_fd, 0)
+                        os.close(other_fd)
+                    unrelated, other_fd = isolation.slot_acquire(config, 8, 0)
+                    try:
+                        self.assertEqual(unrelated['node'], 1)
+                        self.assertEqual(unrelated['uid'], 8001)
+                    finally:
+                        os.ftruncate(other_fd, 0)
+                        os.close(other_fd)
+                finally:
+                    os.ftruncate(fd, 0)
+                    os.close(fd)
+                self.assertEqual((p/'pool-uid-7001').read_text(), '7\n')
+                with self.assertRaisesRegex(isolation.Rejected, 'already bound'):
+                    isolation.verify_uid_binding(config, dict(first, door=8))
+                with self.assertRaisesRegex(isolation.Rejected, 'already bound'):
+                    isolation.verify_uid_binding(config, dict(door=7, uid=7001))
+
+    def test_pooled_worker_crash_retains_logical_node(self):
+        with TemporaryDirectory() as directory:
+            pool = [dict(door=7, level=0, uid=uid, _nodes=32, node=0) for uid in (7001, 7002)]
+            config = dict(slots=pool, state_dir=directory, _pool_admission=True)
+            fstat = os.fstat
+            def root_owned(fd):
+                info = fstat(fd)
+                return SimpleNamespace(st_mode=info.st_mode, st_uid=0,
+                                       st_nlink=info.st_nlink, st_size=info.st_size)
+            with patch.object(isolation, 'processes', return_value=False), \
+                 patch.object(isolation.os, 'fstat', side_effect=root_owned):
+                first, fd = isolation.slot_acquire(config, 7, 0)
+                os.close(fd)  # job exits before clearing the durable reservation
+                second, fd = isolation.slot_acquire(config, 7, 0)
+                try:
+                    self.assertEqual((first['node'], second['node']), (1, 2))
+                    with self.assertRaises(isolation.Rejected):
+                        isolation.slot_acquire(config, 7, 0)
+                finally:
+                    os.close(fd)
 
     def test_fork_failure_preserves_existing_workers_then_recovers(self):
         config={'bbs_uid':10,'slots':[{}]};children={101};connection=Mock();listener=Mock()

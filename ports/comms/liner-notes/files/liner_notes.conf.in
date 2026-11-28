@@ -23,6 +23,8 @@ liner_notes_registration_form="simple"
 
 # Optional native games; leave unset to disable.
 # liner_notes_doors="%%ETCDIR%%/doors.conf"
+# Applies isolation to every configured Door. Leave unset until all have slots.
+# liner_notes_door_isolation_socket="/var/run/liner-notes-door-isolation/control.sock"
 # Optional shared-board connector account allowlist (board ID and member ID):
 # liner_notes_link_accounts="%%ETCDIR%%/link-accounts.conf"
 

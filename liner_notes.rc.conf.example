@@ -70,6 +70,8 @@ liner_notes_registration_form="simple"
 
 # Optional native games; leave unset to disable.
 # liner_notes_doors="/usr/local/etc/liner-notes/doors.conf"
+# Applies isolation to every configured Door. Leave unset until all have slots.
+# liner_notes_door_isolation_socket="/var/run/liner-notes-door-isolation/control.sock"
 
 # Optional RTBBS member policy; saved private profile settings are retained.
 liner_notes_rtbbs_member_policy="NO"

@@ -1,5 +1,5 @@
 #!/bin/sh
-# Opt-in development candidate; installed outside rc.d.
+# Opt-in service. No policy or accounts are created by the package.
 # PROVIDE: liner_notes_door_isolation
 # REQUIRE: LOGIN liner_notes_door_broker
 # BEFORE: liner_notes
@@ -22,12 +22,47 @@ procname="$command"
 script="%%DATADIR%%/scripts/door_isolation.py"
 start_cmd="door_start"
 status_cmd="door_status"
-# Default rc.subr stop sends TERM and waits; never KILL cleanup workers.
-# daemon -p tracks the Python child, without restart or socket/marker removal.
+stop_cmd="door_stop"
+# daemon -p tracks the Python child; no automatic restart or recovery writes.
+
+door_pid()
+{
+    pid=$(check_pidfile "$pidfile" "$procname") || return 1
+    [ -n "$pid" ] || return 1
+    uid=$(/usr/bin/id -u "$run_user") || return 1
+    actual_uid=$(/bin/ps -p "$pid" -o uid=) || return 1
+    [ "$actual_uid" -eq "$uid" ] || return 1
+    args=$(/bin/ps -ww -p "$pid" -o args=) || return 1
+    [ "$args" = "$command -E -s -B $script --config $config" ] || return 1
+    printf '%s\n' "$pid"
+}
+
+door_stop()
+{
+    if ! target=$(door_pid); then
+        if [ -e "$pidfile" ]; then
+            echo "$name PID file does not identify this service; inspect before recovery." >&2
+            return 1
+        fi
+        return 0
+    fi
+    kill -TERM "$target" || return 1
+    attempts=0
+    while [ "$attempts" -lt 60 ]; do
+        [ "$(door_pid)" = "$target" ] || {
+            [ -e "$pidfile" ] || return 0
+            # daemon(8) may still be releasing its PID file after reaping.
+        }
+        attempts=$((attempts + 1))
+        sleep 1
+    done
+    echo "$name did not finish stopping; inspect $logfile. No forced cleanup performed." >&2
+    return 1
+}
 
 door_status()
 {
-    if [ -n "$(check_pidfile "$pidfile" "$procname")" ] &&
+    if door_pid >/dev/null &&
         "$command" -E -s -B "$script" --config "$config" --check-ready; then
         echo "$name is ready."
         return 0
@@ -42,6 +77,9 @@ door_start()
         echo "$name is already running; refusing a duplicate start."
         return 1
     fi
+    expected_uid=$(/usr/bin/id -u "$run_user") || { echo "$name account is missing." >&2; return 1; }
+    [ "$expected_uid" -eq 0 ] ||
+        { echo "$name requires the root supervisor." >&2; return 1; }
     "$command" -E -s -B "$script" --config "$config" --check-config || return 1
     umask 077
     /usr/sbin/daemon -f -p "$pidfile" -o "$logfile" -u "$run_user" \

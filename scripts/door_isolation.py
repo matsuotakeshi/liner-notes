@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Opt-in Linux/FreeBSD Door isolation supervisor; privileged local socket only.
 
-Fixed root-owned policy selects binaries and dedicated slot UIDs. The BBS never
+Root-owned policy selects binaries and fixed-slot or per-game UIDs. The BBS never
 supplies an executable or working directory. No privilege-changing executable
 is installed setuid. Solaris remains disabled pending contract-based process isolation.
 """
@@ -51,27 +51,63 @@ def send(sock,value):sock.sendall(json.dumps(value,separators=(',',':')).encode(
 
 def config_read(path):
     config=json.loads(secure_path(path,0).read_text(encoding='utf8'))
-    if set(config)!={'bbs_uid','socket','socket_gid','broker_config','state_dir','slots'}:raise Rejected('policy fields')
+    if set(config)-{'pools','max_active'}!={'bbs_uid','socket','socket_gid','broker_config','state_dir','slots'}:raise Rejected('policy fields')
     policy=broker_configuration(config['broker_config'])
     bbs=positive(config['bbs_uid']);broker=policy['broker_uid'];positive(config['socket_gid'])
     if bbs!=policy['bbs_uid']:raise Rejected('BBS identity mismatch')
     config['broker_uid']=broker;config['broker_socket']=policy['socket']
     if bbs==broker:raise Rejected('UID collision')
     secure_path(Path(config['socket']).parent,0,True);secure_path(config['state_dir'],0,True)
+    pools = config.get('pools', [])
+    if not isinstance(config['slots'], list) or not isinstance(pools, list):
+        raise Rejected('slot lists')
+    fixed_doors = {positive(slot['door'], 86400) for slot in config['slots']}
+    pooled_doors = set()
+    fixed_slots = len(config['slots'])
+    if fixed_slots > 128 or len(pools) > 128:
+        raise Rejected('slot count')
+    for pool in pools:
+        if set(pool) != {'door','nodes','exe','cwd','level','seconds','drop','auth','accounts'}:
+            raise Rejected('pool fields')
+        door = positive(pool['door'], 86400)
+        nodes = positive(pool['nodes'], 128)
+        accounts = pool['accounts']
+        if door in fixed_doors or door in pooled_doors:
+            raise Rejected('mixed or duplicate game policy')
+        if not isinstance(accounts, list) or not 1 <= len(accounts) <= nodes:
+            raise Rejected('pool accounts exceed logical nodes or are missing')
+        if len(config['slots']) + len(accounts) > 128:
+            raise Rejected('slot count')
+        pooled_doors.add(door)
+        launch = {key: pool[key] for key in ('door','exe','cwd','level','seconds','drop','auth')}
+        secure_path(launch['cwd'], 0, True)
+        for account in accounts:
+            if set(account) != {'uid','gid'}:
+                raise Rejected('pool account fields')
+            config['slots'].append(dict(launch, **account, node=0, _nodes=nodes))
+    if 'max_active' in config:
+        positive(config['max_active'], len(config['slots']))
+    config['_pool_admission'] = bool(pools) or 'max_active' in config
+
     used=set();pairs=set()
-    if not config['slots'] or len(config['slots'])>128:raise Rejected('slot count')
-    for slot in config['slots']:
-        if set(slot)!={'door','node','uid','gid','exe','cwd','level','seconds','drop','auth'}:raise Rejected('slot fields')
-        positive(slot['door'],86400);positive(slot['node'],128);uid=positive(slot['uid']);positive(slot['gid']);positive(slot['seconds'],86400)
+    if not 1 <= len(config['slots']) <= 128:raise Rejected('slot count')
+    for index, slot in enumerate(config['slots']):
+        pooled = index >= fixed_slots
+        if set(slot)-({'_nodes'} if pooled else set())!={'door','node','uid','gid','exe','cwd','level','seconds','drop','auth'}:raise Rejected('slot fields')
+        positive(slot['door'],86400)
+        if not pooled:positive(slot['node'],128)
+        uid=positive(slot['uid']);positive(slot['gid']);positive(slot['seconds'],86400)
         if type(slot['level']) is not int or not 0<=slot['level']<=5 or type(slot['drop']) is not bool or type(slot['auth']) is not bool:raise Rejected('slot values')
         if slot['gid']!=uid:raise Rejected('dedicated slot GID must match UID')
-        if uid in used or uid in (bbs,broker) or (slot['door'],slot['node']) in pairs:raise Rejected('slot isolation')
+        if uid in used or uid in (bbs,broker) or (not pooled and (slot['door'],slot['node']) in pairs):raise Rejected('slot isolation')
         used.add(uid);pairs.add((slot['door'],slot['node']))
         secure_path(slot['exe'],0)
         # A writable game directory is intentional; writable ancestors or a
         # symlink controlled by another identity are not an isolation boundary.
         secure_path(slot['cwd'],uid,True)
         if not os.access(slot['exe'],os.X_OK):raise Rejected('slot path')
+        verify_uid_binding(config, slot)
+
     if used!=set(policy['door_uids']):raise Rejected('Broker slot identities differ')
     if used&set(policy['consumers']):raise Rejected('consumer/slot identity collision')
     return config
@@ -101,28 +137,150 @@ def request_check(request):
     if not name or len(name.encode())>32 or any(ord(c)<32 or ord(c)==127 for c in name):raise Rejected('name')
     return name
 
-def slot_acquire(config,door,level,*,timing=None):
-    timing=timing if timing is not None else LaunchTiming()
-    for slot in config['slots']:
-        if slot['door']!=door or level<slot['level']:continue
-        fd=os.open(str(Path(config['state_dir'])/('slot-'+str(slot['uid']))),os.O_CREAT|os.O_RDWR|os.O_NOFOLLOW,0o600)
-        st=os.fstat(fd)
-        if not stat.S_ISREG(st.st_mode) or st.st_uid!=0 or st.st_nlink!=1 or st.st_mode&0o077:os.close(fd);raise Rejected('slot lock')
-        try:fcntl.flock(fd,fcntl.LOCK_EX|fcntl.LOCK_NB)
-        except BlockingIOError:os.close(fd);continue
+def state_file(path, flags):
+    fd = os.open(path, flags | os.O_NOFOLLOW, 0o600)
+    try:
+        st = os.fstat(fd)
+        if not stat.S_ISREG(st.st_mode) or st.st_uid != 0 or st.st_nlink != 1 or st.st_mode & 0o077:
+            raise Rejected('unsafe isolation state file')
+        return fd
+    except BaseException:
+        os.close(fd)
+        raise
+
+
+def verify_uid_binding(config, slot, *, create=False):
+    directory = Path(config['state_dir'])
+    path = directory / ('pool-uid-' + str(slot['uid']))
+    expected = ('%d\n' % slot['door']).encode()
+    try:
+        fd = state_file(path, os.O_RDONLY)
+    except FileNotFoundError:
+        if not create:
+            return
+        with os.fdopen(state_file(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL), 'wb') as out:
+            out.write(expected)
+            out.flush()
+            os.fsync(out.fileno())
+        parent = os.open(directory, os.O_RDONLY | os.O_DIRECTORY)
         try:
-            # Read reservation only after taking the lock; an earlier fstat can
-            # predate another worker's crash and otherwise reuse a dirty slot.
-            if os.fstat(fd).st_size:os.close(fd);continue
+            os.fsync(parent)
+        finally:
+            os.close(parent)
+        return
+    try:
+        if '_nodes' not in slot or os.read(fd, 32) != expected:
+            raise Rejected('pool UID already bound to a different game or execution policy')
+    finally:
+        os.close(fd)
+
+
+def occupied_slots(config):
+    directory = Path(config['state_dir'])
+    configured = {str(slot['uid']): slot for slot in config['slots']}
+    active = 0
+    nodes = {}
+    for marker in directory.glob('slot-*'):
+        name = marker.name.removeprefix('slot-')
+        if not name.isascii() or not name.isdecimal():
+            continue
+        try:
+            fd = state_file(marker, os.O_RDONLY)
+        except FileNotFoundError:
+            continue
+        try:
+            state = os.read(fd, 64)
+        finally:
+            os.close(fd)
+        if not state:
+            continue
+        active += 1
+        slot = configured.get(name)
+        if slot is None:
+            raise Rejected('reservation for an unconfigured UID requires inspection')
+        if '_nodes' not in slot:
+            if state != b'BUSY\n':
+                raise Rejected('unexpected fixed slot reservation')
+            continue
+        fields = state.split()
+        if len(fields) != 2 or fields[0] != b'NODE' or not fields[1].isdigit():
+            raise Rejected('unknown pooled launch reservation')
+        node = positive(int(fields[1]), slot['_nodes'])
+        held = nodes.setdefault(slot['door'], set())
+        if node in held:
+            raise Rejected('duplicate logical node reservation')
+        held.add(node)
+    return active, nodes
+
+
+def acquire_slot(config, door, level, timing, occupied):
+    for slot in config['slots']:
+        if slot['door'] != door or level < slot['level']:
+            continue
+        fd = state_file(Path(config['state_dir']) / ('slot-' + str(slot['uid'])), os.O_CREAT | os.O_RDWR)
+        try:
+            try:
+                fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            except BlockingIOError:
+                continue
+            # Check the durable reservation after taking its lock.
+            if os.fstat(fd).st_size:
+                continue
             timing.mark('slot-uid-scan')
-            if processes(slot['uid']):os.close(fd);continue
+            if processes(slot['uid']):
+                continue
+            pooled = '_nodes' in slot
+            verify_uid_binding(config, slot, create=pooled)
+            marker = b'BUSY\n'
+            if pooled:
+                node = next((n for n in range(1, slot['_nodes']+1) if n not in occupied), None)
+                if node is None:
+                    continue
+                slot = dict(slot, node=node)
+                marker = f'NODE {node}\n'.encode()
             timing.mark('slot-marker-write')
-            os.write(fd,b'BUSY\n')
+            if os.write(fd, marker) != len(marker):
+                raise Rejected('incomplete slot reservation')
             timing.mark('slot-marker-sync')
             os.fsync(fd)
-            return slot,fd
-        except BaseException:os.close(fd);raise
+            if config.get('_pool_admission'):
+                parent = os.open(config['state_dir'], os.O_RDONLY | os.O_DIRECTORY)
+                try:
+                    os.fsync(parent)
+                finally:
+                    os.close(parent)
+            reservation, fd = fd, None
+            return slot, reservation
+        finally:
+            if fd is not None:
+                os.close(fd)
     raise Rejected('no isolated slot')
+
+
+def slot_acquire(config,door,level,*,timing=None):
+    timing = timing if timing is not None else LaunchTiming()
+    if not config.get('_pool_admission'):
+        return acquire_slot(config, door, level, timing, ())
+    # The global lock is held only during admission. Durable per-UID records
+    # are counted across workers and survive a worker or supervisor crash.
+    fd = state_file(Path(config['state_dir']) / 'admission.lock', os.O_CREAT | os.O_RDWR)
+    try:
+        deadline = time.monotonic() + 1
+        while True:
+            try:
+                fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                break
+            except BlockingIOError:
+                if time.monotonic() >= deadline:
+                    raise Rejected('Door admission lock timeout')
+                time.sleep(0.01)
+        active, nodes = occupied_slots(config)
+        if active >= config.get('max_active', len(config['slots'])):
+            raise Rejected('global Door capacity')
+        return acquire_slot(config, door, level, timing, nodes.get(door, ()))
+    finally:
+        os.close(fd)
+
 
 class LaunchTiming:
     """Opt-in numeric phase timing; no policy, request or credential values."""
@@ -153,18 +311,21 @@ def supervise(config,connection,parent_watch=None):
         phase=timing.mark('ticket-pipe')
         if token:
             ticket_read,ticket_write=os.pipe();os.write(ticket_write,(token+'\n').encode());os.close(ticket_write)
-        if slot['drop']:
+        if slot['drop'] or '_nodes' in slot:
             phase=timing.mark('dropfile')
             run=Path(config['state_dir'])/('run-'+secrets.token_hex(16));run.mkdir(mode=0o700)
-            drop=run/'DORINFO1.DEF'
-            drop.write_text('Liner notes\r\nSYSOP\r\n\r\nCOM0\r\n0 BAUD,N,8,1\r\n0\r\nLN%09d\r\n\r\n\r\n1\r\n%d\r\n%d\r\n'%(request['user'],request['level'],(slot['seconds']+59)//60),newline='')
-            os.chmod(drop,0o600);os.chown(drop,slot['uid'],slot['gid']);os.chown(run,slot['uid'],slot['gid'])
+            if slot['drop']:
+                drop=run/'DORINFO1.DEF'
+                drop.write_text('Liner notes\r\nSYSOP\r\n\r\nCOM0\r\n0 BAUD,N,8,1\r\n0\r\nLN%09d\r\n\r\n\r\n1\r\n%d\r\n%d\r\n'%(request['user'],request['level'],(slot['seconds']+59)//60),newline='')
+                os.chmod(drop,0o600);os.chown(drop,slot['uid'],slot['gid'])
+            os.chown(run,slot['uid'],slot['gid'])
         phase=timing.mark('pty')
         master,slave=pty.openpty();fcntl.ioctl(slave,termios_TIOCSWINSZ(),struct.pack('HHHH',request['rows'],request['columns'],0,0))
-        env={'PATH':'/usr/local/bin:/usr/bin:/bin','TERM':'xterm','LANG':'C.UTF-8','HOME':slot['cwd'],
+        env={'PATH':'/usr/local/bin:/usr/bin:/bin','TERM':'xterm','LANG':'C.UTF-8','HOME':str(run) if '_nodes' in slot else slot['cwd'],
              'LINER_USER_ID':str(request['user']),'LINER_USER':name,'LINER_DOOR_ID':str(slot['door']),
-             'LINER_DOOR_NODE':str(slot['node']),'LINER_DOOR_DROP_DIR':str(run or ''),
+             'LINER_DOOR_NODE':str(slot['node']),'LINER_DOOR_DROP_DIR':str(run) if slot['drop'] else '',
              'COLUMNS':str(request['columns']),'LINES':str(request['rows'])}
+        if '_nodes' in slot:env['TMPDIR']=str(run)
         if token:env['LINER_AUTH_FD']='3' # descriptor number only, never the credential
         phase=timing.mark('launch')
         pid=os.fork()
@@ -213,7 +374,12 @@ def supervise(config,connection,parent_watch=None):
             if scope:scope.stop()
             elif slot:raise Rejected('Cleanup scope unavailable; slot stays reserved')
             cleanup_phase='dropfile-remove'
-            if run:
+            if run and '_nodes' in slot:
+                (run/'DORINFO1.DEF').unlink(missing_ok=True)
+                run.rmdir()  # unexpected files quarantine the UID and logical node
+                if processes(slot['uid']):
+                    raise Rejected('pooled slot still has UID processes')
+            elif run:
                 with contextlib.suppress(OSError):(run/'DORINFO1.DEF').unlink();run.rmdir()
             cleanup_phase='slot-release'
             if lock is not None:os.ftruncate(lock,0);os.fsync(lock);os.close(lock)
@@ -300,6 +466,11 @@ def main():
         if args.check_config:return
     except (ValueError,OSError,KeyError,TypeError):parser.exit(1,'Isolation policy or service rejected.\n')
     if endpoint.exists() or endpoint.is_symlink():parser.exit(1,'Socket exists; verify the old supervisor is stopped.\n')
+    try:
+        state_guard = state_file(Path(config['state_dir']) / 'supervisor.lock', os.O_CREAT | os.O_RDWR)
+        fcntl.flock(state_guard, fcntl.LOCK_EX | fcntl.LOCK_NB)
+    except (OSError, Rejected):
+        parser.exit(1, 'Isolation state directory is unavailable or already in use.\n')
     listener=socket.socket(socket.AF_UNIX,socket.SOCK_STREAM);old=os.umask(0o077)
     try:listener.bind(str(endpoint))
     finally:os.umask(old)
@@ -324,5 +495,6 @@ def main():
         # Parent death also closes alive, revoking every worker. Do not forcibly
         # kill a worker and silently make its slot reusable after partial cleanup.
         while children:reap_workers(children);time.sleep(.05)
+        os.close(state_guard)
 
 if __name__=='__main__':main()

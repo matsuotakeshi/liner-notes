@@ -6,9 +6,10 @@ class RcProcess:
     """Installed rc sample, restricted to the already-admitted disposable jail."""
     def __init__(self,role,config,base):
         self.name='liner_notes_door_'+role
-        self.rc=Path('/usr/local/share/liner-notes/door-services/freebsd')/self.name
-        assert self.rc.is_file(),'installed rc sample missing'
-        assert not (Path('/usr/local/etc/rc.d')/self.name).exists(),'candidate activated automatically'
+        self.rc=Path('/usr/local/etc/rc.d')/self.name
+        sample=Path('/usr/local/share/liner-notes/door-services/freebsd')/self.name
+        assert self.rc.is_file() and os.access(self.rc,os.X_OK),'installed rc service missing'
+        assert self.rc.read_bytes()==sample.read_bytes(),'installed rc differs from packaged service'
         self.pidfile=base/(role+'.pid');self.logfile=base/(role+'.log')
         self.env=dict(os.environ,**{self.name+'_enable':'NO',self.name+'_config':str(config),
             self.name+'_pidfile':str(self.pidfile),self.name+'_logfile':str(self.logfile),
@@ -30,6 +31,16 @@ class RcProcess:
         subprocess.run(self.command('onestatus'),env=self.env,check=True,timeout=10)
         duplicate=subprocess.run(self.command('onestart'),env=self.env,capture_output=True,timeout=10)
         assert duplicate.returncode!=0 and int(self.pidfile.read_text())==self.pid,'duplicate rc launch'
+
+    def restart(self):
+        old_pid = self.pid
+        result = subprocess.run(self.command('onerestart'), env=self.env,
+                                capture_output=True, timeout=90)
+        if self.pidfile.exists():
+            self.pid = int(self.pidfile.read_text().strip())
+        assert result.returncode == 0, ('rc restart failed', result.stdout, result.stderr)
+        assert self.pid is not None and self.pid != old_pid
+        subprocess.run(self.command('onestatus'), env=self.env, check=True, timeout=10)
 
     def poll(self):
         if self.returncode is not None:return self.returncode
