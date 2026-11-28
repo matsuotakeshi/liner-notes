@@ -10,10 +10,12 @@ jobs:
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - name: Verify exact runtime source
         run: |
-          test "$(git rev-parse HEAD^)" = 66b157e7b76a9e0be23fd870de63adc5afbddc58
-          test "$(git diff --name-only HEAD^ HEAD | grep -vc '^.github/' || true)" = 0
+          test "$(git rev-parse v0.76^{commit})" = 66b157e7b76a9e0be23fd870de63adc5afbddc58
+          test -z "$(git diff --name-only v0.76 HEAD -- . ':(exclude).github/')"
       - name: Install isolated capture dependencies
         run: |
           sudo apt-get update -qq
