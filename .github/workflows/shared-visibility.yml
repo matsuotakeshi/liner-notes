@@ -42,6 +42,11 @@ jobs:
             python tests/test_stage74_link_bbs.py ./runtime
             python tests/test_shared_visibility.py ./runtime
           } 2>&1 | tee build/shared-visibility.log
+      - name: Packaged Link systemd lifecycle
+        run: |
+          set -euo pipefail
+          sudo --preserve-env=GITHUB_ACTIONS,RUNNER_ENVIRONMENT "$(command -v python)" \
+            tests/test_link_systemd.py 2>&1 | tee build/link-systemd.log
       - uses: actions/setup-node@v4
         with:
           node-version: '22'

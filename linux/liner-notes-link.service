@@ -1,14 +1,14 @@
 [Unit]
 Description=Liner notes signed shared-board link
-After=network.target liner-notes.service
+Wants=network-online.target
+# The connector queues signed events while the local BBS is unavailable.
+After=network-online.target liner-notes.service
 
 [Service]
 Type=simple
 User=liner_notes_link
 Group=liner_notes_linkctl
 ExecStart=/usr/bin/liner-notes-link serve --config /etc/liner-notes/link.toml
-StateDirectory=liner-notes-link
-StateDirectoryMode=0700
 RuntimeDirectory=liner-notes-link
 RuntimeDirectoryMode=0750
 UMask=0077

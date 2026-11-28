@@ -48,6 +48,99 @@ def free_port():
         return sock.getsockname()[1]
 
 
+def link_service_check():
+    """Run the packaged rc.d in the disposable jail with synthetic keys."""
+    import grp
+    import link_transport
+
+    account = pwd.getpwnam('liner_notes_link')
+    group = grp.getgrnam('liner_notes_linkctl')
+    assert account.pw_uid > 0 and account.pw_gid == group.gr_gid
+    state = Path('/var/db/liner-notes-link')
+    assert state.stat().st_uid == account.pw_uid and state.stat().st_mode & 0o777 == 0o700
+    rc = Path('/usr/local/etc/rc.d/liner_notes_link')
+    vendor = Path('/usr/local/share/liner-notes/liner_notes_link.sample')
+    assert rc.read_bytes() == vendor.read_bytes() and os.access(rc, os.X_OK)
+    assert 'liner_notes_link_enable="NO"' in command([rc, 'rcvar']).splitlines()
+    with tempfile.TemporaryDirectory(prefix='link-rc-', dir=state) as temp:
+        directory = Path(temp)
+        identity = directory/'identity'
+        node = link_transport.generate(identity, 'FreeBSD CI node')
+        peer = directory/'peer'
+        link_transport.generate(peer, 'FreeBSD CI offline peer')
+        secret = directory/'password'
+        secret.write_text('disposable-unregistered-link-member\n')
+        secret.chmod(0o600)
+        cfg = directory/'link.toml'
+        use_port = free_port()
+        bbs_port = free_port()
+        peer_port = free_port()
+        cfg.write_text(f"""[node]
+identity = "{identity}"
+database = "{directory/'events.sqlite'}"
+port = {use_port}
+control_socket = "/var/run/liner-notes-link/control.sock"
+[bbs]
+port = {bbs_port}
+login = "fixturelink"
+password_file = "{secret}"
+[[boards]]
+id = "{'1'*64}"
+local = 1
+[[origins]]
+certificate = "{peer/'identity.crt'}"
+boards = ["{'1'*64}"]
+[[peers]]
+certificate = "{peer/'identity.crt'}"
+boards = ["{'1'*64}"]
+host = "127.0.0.1"
+port = {peer_port}
+""")
+        for item in [directory, *directory.rglob('*')]:
+            os.chown(item, account.pw_uid, group.gr_gid)
+        command(['/sbin/sysrc', f'liner_notes_link_config={cfg}'])
+        wrapper = '/usr/local/bin/liner-notes-link'
+        pidfile = Path('/var/run/liner_notes_link.pid')
+        control_path = Path('/var/run/liner-notes-link/control.sock')
+
+        def ready(previous=None):
+            for _ in range(100):
+                if pidfile.is_file() and control_path.is_socket():
+                    pid = pidfile.read_text().strip()
+                    if not pid or pid == previous:
+                        time.sleep(.1)
+                        continue
+                    result = json.loads(command([wrapper, 'status', '--config', cfg], user=account))
+                    assert result['node'] == node
+                    children = command(['/bin/ps', '-o', 'pid=,ppid=,uid=', '-ax']).splitlines()
+                    child, = [p for p, ppid, uid in map(str.split, children)
+                              if ppid == pid and int(uid) == account.pw_uid]
+                    return pid, child
+                time.sleep(.1)
+            raise AssertionError('Packaged link rc.d did not become ready')
+
+        command([wrapper, 'check', '--config', cfg], user=account)
+        try:
+            command([rc, 'onestart'], timeout=15)
+            pid, child = ready()
+            assert pid in command([rc, 'onestatus'])
+            duplicate = subprocess.run([rc, 'onestart'], env=ENV,
+                                       capture_output=True, text=True, timeout=15)
+            assert duplicate.returncode == 1 and pid in duplicate.stderr
+            assert ready() == (pid, child)
+            command([rc, 'onerestart'], timeout=90)
+            restarted, new_child = ready(pid)
+            assert (restarted, new_child) != (pid, child)
+        finally:
+            command([rc, 'onestop'], timeout=70)
+        assert not pidfile.exists() and not control_path.exists()
+        for dead_pid in (restarted, new_child):
+            assert subprocess.run(['/bin/ps', '-p', dead_pid], env=ENV, capture_output=True).returncode != 0
+        assert json.loads(command([wrapper, 'status', '--config', cfg], user=account))['node'] == node
+
+
+
+
 def main():
     global PHASE
     assert os.geteuid() == 0 and sys.platform.startswith('freebsd')
@@ -185,6 +278,7 @@ def main():
         PHASE = 'new-services'
         service_check()
         PHASE = 'link'
+        link_service_check()
         # Real installed link service against two independent fixture BBSes.
         link_check = Path('/ci/link-check.py')
         link_check.write_text("import sys,asyncio,tempfile\nfrom pathlib import Path\nsys.path[:0]=['/ci/source/tests','/ci/source']\nimport test_link_service as t\nt.ROOT=Path('/usr/local/share/liner-notes')\nwith tempfile.TemporaryDirectory(prefix='jail-link-') as d: asyncio.run(t.exercise('/usr/local/sbin/liner-notes',Path(d)))\n")
@@ -211,7 +305,7 @@ def main():
             'config_data_retained': True, 'unrelated_services_untouched': True,
             'old_package_restoration_verified': True, 'maintainer_scripts_executed': True,
             'account_ownership_verified': True, 'web_installed_service_verified': True,
-            'link_installed_daemon_verified': True, 'door_pty_verified': True,
+            'link_installed_daemon_verified': True, 'link_rc_verified': True, 'door_pty_verified': True,
             'fixture_public_directory_repairs': public_directory_repairs,
             'revision_only_fixture': revision_only, 'previous_version': profile['old_version'],
             'candidate_version': metadata['version'], 'previous_source_sha': profile['old_release_source_sha']}, indent=2)+'\n')

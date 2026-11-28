@@ -7,8 +7,12 @@ case "$1" in
     getent passwd liner_notes_link >/dev/null ||
       adduser --quiet --system --disabled-login --no-create-home \
         --home /var/lib/liner-notes-link --ingroup liner_notes_linkctl liner_notes_link
-    install -d -m 0700 -o liner_notes_link -g liner_notes_linkctl /var/lib/liner-notes-link
-    if [ -f /etc/liner-notes/link.toml ]; then
+    if [ ! -e /var/lib/liner-notes-link ] && [ ! -L /var/lib/liner-notes-link ]; then
+      install -d -m 0700 -o liner_notes_link -g liner_notes_linkctl /var/lib/liner-notes-link
+    fi
+    if [ -z "${2:-}" ] && [ -f /etc/liner-notes/link.toml ] &&
+       [ ! -L /etc/liner-notes/link.toml ] &&
+       cmp -s /etc/liner-notes/link.toml /etc/liner-notes/link.toml.sample; then
       chgrp liner_notes_linkctl /etc/liner-notes/link.toml
       chmod 0640 /etc/liner-notes/link.toml
     fi
