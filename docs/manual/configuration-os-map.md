@@ -1,6 +1,6 @@
 # FreeBSD・Linux設定対応表
 
-この表はv0.76のFreeBSD `liner_notes.in` とLinux `liner-notes.service`・`liner-notes.env` の対応です。rc.dの省略時既定値であり、配布設定ファイルや管理者のrc.confの値は異なる場合があります。`%%PREFIX%%` と `%%DATADIR%%` はインストール時に展開されます。空値は未指定を表します。Linuxのオプションは既存の `LINER_NOTES_OPTIONS` に追加し、PORTとデータパスより前に置きます。
+この表はv0.76.1のFreeBSD `liner_notes.in` とLinux `liner-notes.service`・`liner-notes.env` の対応です。rc.dの省略時既定値であり、配布設定ファイルや管理者のrc.confの値は異なる場合があります。`%%PREFIX%%` と `%%DATADIR%%` はインストール時に展開されます。空値は未指定を表します。Linuxのオプションは既存の `LINER_NOTES_OPTIONS` に追加し、PORTとデータパスより前に置きます。
 
 | FreeBSD変数 | 用途 | rc.d省略時 | Linuxの対応 |
 |---|---|---|---|
@@ -35,7 +35,7 @@
 | `liner_notes_child_pidfile` | 本体プロセスPID | `/var/run/liner-notes.child.pid` | systemdが管理 |
 | `liner_notes_logfile` | 監督ログ | `${liner_notes_log_dir}/daemon.log` | unitのStandardOutput / StandardError |
 | `liner_notes_doors` | Door定義 | `未指定` | --doors |
-| `liner_notes_door_isolation_socket`（v0.76公開後のrc.d） | 全Doorの隔離ソケット | `未指定` | --door-isolation-socket |
+| `liner_notes_door_isolation_socket`（v0.76.1） | 全Doorの隔離ソケット | `未指定` | --door-isolation-socket |
 | `liner_notes_link_accounts` | リンク専用会員定義 | `未指定` | --link-accounts |
 | `liner_notes_admins` | 管理者一覧 | `未指定` | --admins |
 | `liner_notes_catalog` | ボード定義 | `未指定` | MEMBERSの次の位置引数 |
@@ -124,9 +124,9 @@ LinuxでMMMを既定とするには `--ui-default mmm`、固定は `--ui-policy 
 | BBS間リンク | `liner_notes_link_accounts` | `--link-accounts` | 専用会員、接続先・署名鍵・TLS・個別サービス設定。[リンク](links.md) / [管理](link-operations.md) |
 | WebUI | 別サービス・Web設定 | 別service・Web設定 | BBSへの接続とApache・TLSの準備。[Web](web-server.md) |
 
-この表と例はv0.76のソース・配布設定と照合した文書です。環境ごとの設定変更・接続・サービス再起動が成功することを保証するものではありません。実行前にバックアップし、各OSの導入ページに従って検証してください。
+この表と例はv0.76.1のソース・配布設定と照合した文書です。環境ごとの設定変更・接続・サービス再起動が成功することを保証するものではありません。実行前にバックアップし、各OSの導入ページに従って検証してください。
 
-## v0.76のBBS間リンク配布
+## v0.76.1のBBS間リンク配布
 
 Rocky Linux 10とDebian 13では、本体と同じ版の `liner-notes-link` パッケージに
 `liner-notes-link.service` と `liner-notes-link` コマンドが入っています。設定は
@@ -144,7 +144,7 @@ sudo -u liner_notes_link liner-notes-link status --config /etc/liner-notes/link.
 sudo systemctl enable liner-notes-link
 ```
 
-FreeBSDのv0.76はLINKオプションのCLIを配布します。リンク専用rc.dの同梱はこのタグ以降の変更です。
+FreeBSDのv0.76はLINKオプションのCLIを配布します。リンク専用rc.dはv0.76.1のパッケージに同梱します。
 v0.76では `sysrc liner_notes_link_accounts=/usr/local/etc/liner-notes/link-accounts.conf`
 で本体へ割り当てを設定し、[共有ボードの構築手順](links.md)に従って専用OSユーザーで
 `check` と `serve` を実行します。停止・監視は設置者が構成します。署名鍵を交換先へ渡さず、
