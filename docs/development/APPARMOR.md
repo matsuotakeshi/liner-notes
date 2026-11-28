@@ -54,7 +54,7 @@ the existing Debian CI SSH identity. Its `enforce` input invokes a separately
 installed fixed helper and verifies that the helper hash matches reviewed main.
 The helper is an independent file-boundary probe: it uses private test
 profiles and tests with synthetic files accessible to the same unprivileged UID
-without a profile. It checks Enforce labels and kernel denial events. It does
+without a profile. It checks Enforce labels and kernel denial events. Denied probes are spaced out to avoid exhausting the kernel journal rate limiter. It does
 not run the full BBS, Web, link, SSH, Door or transfer workloads.
 
 After approval, the administrator installs the reviewed `ci/apparmor_root.py`
@@ -67,7 +67,7 @@ ci-test ALL=(root) NOPASSWD: /usr/local/libexec/liner-notes-apparmor-ci ^[0-9a-f
 ```
 
 The host needs AppArmor already enabled, the parser, systemd, a kernel journal
-with AppArmor events, and Clang. The helper loads only random test profile
+with AppArmor events, Clang, and curl. The helper loads only random test profile
 names, checks for residual uses before removal, and leaves failed fixture
 inputs available for administrator diagnosis. It does not use site service
 units, site data, or custom AppArmor includes. A normal CI run cannot provision
