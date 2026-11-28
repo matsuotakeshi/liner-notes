@@ -103,7 +103,7 @@ port = {peer_port}
 """)
         for item in [directory, *directory.rglob('*')]:
             os.chown(item, account.pw_uid, group.gr_gid)
-        command(['/sbin/sysrc', f'liner_notes_link_config={cfg}'])
+        command(['/usr/sbin/sysrc', f'liner_notes_link_config={cfg}'])
         wrapper = '/usr/local/bin/liner-notes-link'
         pidfile = Path('/var/run/liner_notes_link.pid')
         control_path = Path('/var/run/liner-notes-link/control.sock')
