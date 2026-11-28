@@ -16,8 +16,8 @@ steps={
 'ktbbs':[('R',b'Board (? list / 0 back) > '),('1',b'READ> '),('L',b'Start article # (Enter: newest) > '),('',b'LIST> ')],
 'big-model':[('B',b'SIG> '),('1',b'BOARD> '),('R',b'LIST> ')],
 'wani-bbs':[('b',b'/board> '),('1',b'/board/1> '),('l',b'/board/1 index> ')],
-'net-cock':[('1',b'Board> '),('1',b'Read> '),('A',b'Read> ')],
-'vs':[('B',b'Message> '),('L 1',b'Message> ')]}
+'net-cock':[('2',b'Menu> '),('1',b'Board> '),('1',b'Read> '),('A',b'Read> ')],
+'vs':[('B #1',b'Message> '),('L 1',b'Message> ')]}
 mono=ImageFont.truetype('/usr/share/fonts/truetype/dejavu/DejaVuSansMono.ttf',18); cjk=ImageFont.truetype('/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc',18)
 results=[]
 for lang in ('en','ja'):
@@ -35,6 +35,8 @@ for lang in ('en','ja'):
      if i:c.cmd('UI '+profile,prompts[i])
      chunks=[]
      for cmd,marker in steps[profile]:
+      if profile=='ktbbs' and lang=='ja':
+       marker={b'Board (? list / 0 back) > ':'掲示板 (? 一覧 / 0 戻る) > '.encode(),b'Start article # (Enter: newest) > ':'開始記事 # (Enter: 最新) > '.encode()}.get(marker,marker)
       print('STEP',profile,lang,repr(cmd),flush=True)
       chunks.append(c.cmd(cmd,marker))
      data=chunks[-1];assert b'Welcome' in data,(profile,data[-500:])
