@@ -20,7 +20,7 @@ if(input){
   });
 }
 
-if (navigator.clipboard?.writeText) {
+if (globalThis.navigator?.clipboard?.writeText) {
   const japanese = document.documentElement.lang === 'ja';
   for (const code of document.querySelectorAll('.manual-article pre > code')) {
     const button = document.createElement('button');
