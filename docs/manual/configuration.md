@@ -405,3 +405,17 @@ WANI-BBS風UIの対応版では `layout 掲示板番号 flat|mnotes|inherit` で
 `--disable chat` / `--disable mail` / `--disable vault` は繰り返し指定できます。`--max-articles` / `--max-mail` / `--max-user-posts` は0でquotaなし。`--idle-seconds` は0〜86400で0は無入力切断なし。`--level-seconds LEVEL:SECONDS` は0〜5のレベルごと、0秒は時間制限なし。警告と猶予は `--time-warning` / `--time-grace`。`--gather-count` は0〜1000で0は無効です。`--userlog-keep` の0は保持件数無制限。`--user-log -` / `--chat-log -` は該当ログを無効にします。
 
 サービススクリプトと本体の両方の値検査に従います。FreeBSD rc.d経由の時間警告・猶予は86400秒以内、USERLOG保持は本体が1000000件以内、Gatherは1000件以内です。接続制限は管理者免除でも、転送コネクタの無通信制限は免除しません。
+
+## AppArmorのローカル設定
+
+管理者が独自配置を許可するには、`/etc/apparmor.d/local/liner-notes` など、
+対象プロファイル名のローカル追加ファイルを使います。パッケージ更新はこのファイルを上書きしません。
+独自のBBSデータ、保管庫、ログ、ホスト鍵、リンクの鍵・ソケットは、
+関係するプロファイルだけに実パスと必要な権限を追加します。
+ファイル転送のspoolを移す場合は本体と転送プロファイルの両方を確認します。
+ソース版の `/usr/local` は別配置としてラッパー、Python、設定、データの実パスを確認してください。
+
+Doorの追加例は `/usr/share/liner-notes-apparmor/examples/` にあります。
+特権ランチャーでは承認した実行ファイルから、ゲーム専用の名前付きプロファイルへの
+`Px` 遷移を指定します。各ゲームの保存先は個別に限定し、別UIDと既存のDoor設定を維持します。
+同じOSユーザーで直接起動する従来型Door、任意のゲーム、外部consumerの一律適用は未検証です。

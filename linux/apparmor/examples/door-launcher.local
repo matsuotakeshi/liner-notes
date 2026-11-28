@@ -1,0 +1,5 @@
+# Reviewed game executable and a directory traversable by its dedicated UID.
+# Copy into /etc/apparmor.d/local/liner-notes-door-launcher after review.
+  /usr/libexec/liner-notes/doors/ r,
+  /usr/libexec/liner-notes/doors/example rPx -> liner-notes-door,
+  /var/lib/liner-notes-door-slots/example/ r,

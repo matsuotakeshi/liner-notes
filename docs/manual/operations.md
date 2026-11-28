@@ -35,3 +35,18 @@ rc.confの `liner_notes_program` が標準以外を指している場合、パ�
 全機能の入口があることと、全端末・ブラウザー・最大容量の組合せを確認済みであることは別です。物理モデム、設置先のHTTPS経路、最大規模の長期運転、外部ゲームは個別の受入確認が必要です。テスト結果の詳細は開発リポジトリに保管し、運用手順とは分けています。
 
 SolarisでDoorを設定した場合、`liner-notes-doctor --check-doors`は小さい排他helperの配置・所有者・mode・実行権と親ディレクトリを検査します。helper自体は起動せず、Door未使用時には必須扱いしません。詳しくは[Solarisの導入](install-solaris.md)を参照してください。
+
+## AppArmorポリシーの更新と解除
+
+有効化したサービスの `/proc/<PID>/attr/current` と `aa-status` を更新前後で確認します。
+ポリシーの `apparmor_parser -r -K /etc/apparmor.d/<名前>` は稼働中の同名プロファイルにも
+影響するため、構文検査とバックアップを先に行い、変更後に正規操作と拒否ログを確認します。
+AppArmorパッケージを利用中なら、同じ版の本体とAppArmor用DEBを一緒に更新します。
+
+解除時は、対象サービスとDoor・転送の子プロセスを先に停止します。
+適用中のプロセスがないことを `aa-status` で確認し、設置時に追加した
+`90-apparmor.conf` だけを退避して `systemctl daemon-reload` を行います。
+管理者がロードしたLiner Notes専用プロファイルを、対応するファイルが残っている間に
+`apparmor_parser -R /etc/apparmor.d/<名前>` で解除します。
+必要ならその後に `apt remove liner-notes-apparmor` を行います。
+別のアプリケーションのプロファイルや既存のsystemd制約はこの操作の対象外です。

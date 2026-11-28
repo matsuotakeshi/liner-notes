@@ -1,0 +1,17 @@
+abi <abi/3.0>,
+include <tunables/global>
+
+profile liner-notes-door-broker {
+  include <abstractions/base>
+  include <abstractions/liner-notes-python>
+  /usr/libexec/liner-notes/door-broker r,
+  /usr/share/liner-notes/scripts/door_broker{,_core}.py r,
+  /etc/liner-notes/door-broker.json r,
+  /run/liner-notes-door-broker/{,broker.sock} rw,
+  network unix stream,
+  deny network inet,
+  deny network inet6,
+  signal (receive) peer=unconfined,
+  audit deny /var/lib/liner-notes/{,**} rwklm,
+  include if exists <local/liner-notes-door-broker>
+}

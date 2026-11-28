@@ -1,0 +1,21 @@
+abi <abi/3.0>,
+include <tunables/global>
+
+profile liner-notes-admin {
+  include <abstractions/base>
+  include <abstractions/liner-notes-python>
+  /usr/bin/liner-notes-{admin,doctor,check-resume,memberctl,vaultctl,dbconvert} rix,
+  /usr/bin/{tar,zstd,gzip} rix,
+  /usr/share/liner-notes/{scripts,door-services}/** r,
+  /usr/sbin/liner-notes r,
+  /etc/liner-notes/{liner-notes.env,limits.conf,doors.conf,vault-limits.conf,link-accounts.conf,ssh-member-keys.conf} r,
+  /var/lib/liner-notes/{,**} rwk,
+  /var/log/liner-notes/{,**} r,
+  /var/backups/liner-notes/{,**} rwk,
+  /tmp/liner-doctor-*/{,**} rwk,
+  deny network inet,
+  deny network inet6,
+  signal (receive) peer=unconfined,
+  audit deny /var/lib/liner-notes-link/identity/{,**} r,
+  include if exists <local/liner-notes-admin>
+}

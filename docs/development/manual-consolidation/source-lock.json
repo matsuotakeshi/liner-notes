@@ -139,7 +139,7 @@
   "tests/test_transfer_terminal.py": "04f0f7d5e62e0a899a171929cb42d88f4237b29d4df4579b882c4f7331a44e37",
   "ci/freebsd_fixture_permissions.py": "80431c66875b4483f7c6d5401eda9dadc4537f1ca527b9b387aab801227d4b2c",
   "tests/test_freebsd_fixture_permissions.py": "e2a70d9b451da8bb97cd572bb1f381ce04100c993af5c53fc2b51f7ed15ba3a7",
-  ".github/workflows/debian-package.yml": "5a380158787a3187d39753ffe3be44eeb91255be05f04312359ff4b5f62544dc",
+  ".github/workflows/debian-package.yml": "508d3ebfcd7103e58a996c285708dc08704d6e90b73a82cebee8358a9024965b",
   "ci/solaris_smf_control.py": "7c790b566e197c12c4e49d3b35f5990cfa86a027e19e8c07649ab5b5ee317cfb",
   "ci/solaris_smf_method.py": "0ef0d00f08680356e7b419706c8312467cf1c92af0fc63b4539f651a34954d42",
   "ci/solaris_smf_lifecycle.py": "2b5bf36ba6ad205af9fe040aadb340f4fd62c106e2a5d872a0086b9d8d88325e",

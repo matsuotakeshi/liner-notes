@@ -1,0 +1,27 @@
+abi <abi/3.0>,
+include <tunables/global>
+
+profile liner-notes-link {
+  include <abstractions/base>
+  include <abstractions/liner-notes-python>
+  /usr/bin/liner-notes-link r,
+  /usr/share/liner-notes/scripts/{link_*.py,bbs_transport.py,posix_locks.py} r,
+  /etc/liner-notes/link.toml r,
+  /etc/liner-notes/link-peers/{,**} r,
+  /etc/liner-notes/link-secrets/{,**} r,
+  /var/lib/liner-notes-link/ r,
+  /var/lib/liner-notes-link/{identity,peers}/{,**} r,
+  /var/lib/liner-notes-link/bbs-password r,
+  /var/lib/liner-notes-link/identity/{tls-*/**,tls-*/,tls-current.json,.tls-current-*} rwk,
+  # Name resolution is needed for configured peers.
+  include <abstractions/nameservice>
+  /var/lib/liner-notes-link/{link,events}.sqlite{,-wal,-shm,-journal,.lock} rwk,
+  /run/liner-notes-link/{,control.sock} rw,
+  /etc/ssl/certs/{,**} r,
+  network inet stream,
+  network inet6 stream,
+  network unix stream,
+  signal (receive) peer=unconfined,
+  audit deny /var/lib/liner-notes/{,**} rwklm,
+  include if exists <local/liner-notes-link>
+}

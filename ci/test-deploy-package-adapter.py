@@ -29,5 +29,10 @@ for filename in files:
         packages[name]['version'] = version
 if platform == 'debian13':
     preflight_debian_upgrade(staging, packages)
+# Production CD still admits the three standard packages. This disposable
+# transaction also verifies co-updating the exact-version optional policy DEB.
+optional = packages.pop('liner-notes-apparmor', None) if platform == 'debian13' else None
 for argv in package_commands(platform, packages, staging):
+    if optional:
+        argv.append(str(staging / optional['filename']))
     subprocess.run(argv, check=True)

@@ -20,6 +20,10 @@ override_dh_auto_install:
 	python3 scripts/install-linux.py --destdir=$(CURDIR)/debian/tmp --prefix=/usr --python=/usr/bin/python3 --unitdir=/usr/lib/systemd/system
 	python3 linux/rpm/optional.py $(CURDIR)/debian/tmp /usr/bin/python3
 	python3 linux/deb/manifest.py $(CURDIR)/debian/tmp
+	install -Dm0644 -t debian/tmp/etc/apparmor.d linux/apparmor/profiles/*
+	install -Dm0644 -t debian/tmp/etc/apparmor.d/abstractions linux/apparmor/abstractions/*
+	install -Dm0644 -t debian/tmp/usr/share/liner-notes-apparmor/systemd linux/apparmor/systemd/*
+	install -Dm0644 -t debian/tmp/usr/share/liner-notes-apparmor/examples linux/apparmor/examples/*
 
 # No package-triggered service activation or restart.
 override_dh_installsystemd:

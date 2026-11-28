@@ -24,6 +24,13 @@ for package in "${packages[@]}"; do
 done
 
 # Local changes must survive a dpkg revision upgrade without conffile prompts.
+apparmor_digests=/tmp/liner-notes-apparmor-local-digests
+install -d /etc/apparmor.d/local /etc/systemd/system/liner-notes.service.d
+printf '# Local AppArmor rules retained by upgrade and purge\n' > /etc/apparmor.d/local/liner-notes
+cp /usr/share/liner-notes-apparmor/systemd/liner-notes.service.conf \
+  /etc/systemd/system/liner-notes.service.d/90-apparmor.conf
+sha256sum /etc/apparmor.d/local/liner-notes /etc/systemd/system/liner-notes.service.d/90-apparmor.conf > "$apparmor_digests"
+
 config_digests=/tmp/liner-notes-ci-config-digests
 : > "$config_digests"
 for file in /etc/liner-notes/liner-notes.env /etc/liner-notes/web/web.toml /etc/liner-notes/link.toml; do
@@ -69,7 +76,10 @@ dpkg-buildpackage -b -us -uc
 python3 ci/test-deploy-package-adapter.py debian13 \
   "/build/liner-notes_${next_version}_amd64.deb" \
   "/build/liner-notes-web_${next_version}_all.deb" \
-  "/build/liner-notes-link_${next_version}_all.deb"
+  "/build/liner-notes-link_${next_version}_all.deb" \
+  "/build/liner-notes-apparmor_${next_version}_all.deb"
+test "$(dpkg-query -W -f='${Version}' liner-notes-apparmor)" = "$next_version"
+sha256sum -c "$apparmor_digests"
 
 for package in "${packages[@]}"; do
   test "$(dpkg-query -W -f='${Version}' "$package")" = "$next_version"
