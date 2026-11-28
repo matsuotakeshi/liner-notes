@@ -35,6 +35,7 @@
 | `liner_notes_child_pidfile` | 本体プロセスPID | `/var/run/liner-notes.child.pid` | systemdが管理 |
 | `liner_notes_logfile` | 監督ログ | `${liner_notes_log_dir}/daemon.log` | unitのStandardOutput / StandardError |
 | `liner_notes_doors` | Door定義 | `未指定` | --doors |
+| `liner_notes_door_isolation_socket`（v0.76公開後のrc.d） | 全Doorの隔離ソケット | `未指定` | --door-isolation-socket |
 | `liner_notes_link_accounts` | リンク専用会員定義 | `未指定` | --link-accounts |
 | `liner_notes_admins` | 管理者一覧 | `未指定` | --admins |
 | `liner_notes_catalog` | ボード定義 | `未指定` | MEMBERSの次の位置引数 |

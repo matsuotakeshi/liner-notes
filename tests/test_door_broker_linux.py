@@ -194,6 +194,9 @@ while True:
         try:
             for index in range(2):start_service(index)
             ready(endpoint,services[0]);ready(isolation,services[1])
+            if isinstance(services[1], RcProcess):
+                services[1].restart()
+                ready(isolation,services[1])
             game=backend.start_game(game_socket,endpoint,scripts) if backend else multiprocessing.Process(target=game_server,args=(game_socket,endpoint,scripts))
             if not backend:game.start()
             for _ in range(100):

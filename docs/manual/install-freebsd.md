@@ -74,6 +74,9 @@ ls comms/liner-notes/Makefile distfiles/liner-notes-0.76.tar.gz
 配布物には `comms/liner-notes`、ソースを収めた `distfiles`、マニュアル、検証記録があります。
 独自のlrzsz portsは同梱しません。ZMODEMには本家FreeBSDの `comms/lrzsz` を使います。
 
+Doorの隔離は別途設定が必要です。v0.76のサンプル配置と、それ以降のrc.d対応版の違いは
+[FreeBSDのDoor隔離設定](external-games.md#freebsdのdoor隔離設定)を参照してください。
+
 ```sh
 pkg install lrzsz
 ```

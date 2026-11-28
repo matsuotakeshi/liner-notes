@@ -645,6 +645,7 @@ check: test-session-ui-lifecycle
 # added to existing Hosted Linux CI with libssh and OpenSSH, not LAN PR runners.
 test-ssh-sources:
 	$(PYTHON) tests/test_ssh_sources.py
+	$(PYTHON) tests/test_freebsd_door_rc.py
 
 check: test-ssh-sources
 

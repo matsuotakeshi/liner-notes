@@ -59,6 +59,7 @@ fi
 : ${liner_notes_child_pidfile:=/var/run/liner-notes.child.pid}
 : ${liner_notes_logfile:=${liner_notes_log_dir}/daemon.log}
 : ${liner_notes_doors:=}
+: ${liner_notes_door_isolation_socket:=}
 : ${liner_notes_link_accounts:=}
 : ${liner_notes_admins:=}
 : ${liner_notes_catalog:=}
@@ -101,8 +102,27 @@ liner_notes_ready()
         /usr/bin/awk -v pid="$_ln_child" '$3 == pid { found=1 } END { exit !found }'
 }
 
+liner_notes_validate_isolation()
+{
+    [ -n "$liner_notes_door_isolation_socket" ] || return 0
+    case "$liner_notes_door_isolation_socket" in
+        /*) ;;
+        *) echo "liner_notes_door_isolation_socket must be an absolute path." >&2; return 1 ;;
+    esac
+    _ln_socket_bytes=$(printf '%s' "$liner_notes_door_isolation_socket" | /usr/bin/wc -c) || return 1
+    if [ "$_ln_socket_bytes" -gt 99 ]; then
+        echo "liner_notes_door_isolation_socket must be at most 99 bytes." >&2
+        return 1
+    fi
+    if [ ! -S "$liner_notes_door_isolation_socket" ]; then
+        echo "Door isolation socket is missing or invalid; check liner_notes_door_isolation status." >&2
+        return 1
+    fi
+}
+
 liner_notes_validate()
 {
+    liner_notes_validate_isolation || return 1
     if [ "$liner_notes_home" = "%%PREFIX%%/libexec/liner-notes" ]; then
         echo "Old package layout: update liner_notes_home, asset/helper and log paths; see PORTS.md." >&2
         return 1
@@ -190,6 +210,8 @@ liner_notes_start()
     [ -z "$liner_notes_vault_dir" ] || set -- "$@" --vault-dir "$liner_notes_vault_dir"
     [ -z "$liner_notes_zmodem_helper" ] || set -- "$@" --zmodem-helper "$liner_notes_zmodem_helper"
     [ -z "$liner_notes_doors" ] || set -- "$@" --doors "$liner_notes_doors"
+    [ -z "$liner_notes_door_isolation_socket" ] ||
+        set -- "$@" --door-isolation-socket "$liner_notes_door_isolation_socket"
     [ -z "$liner_notes_link_accounts" ] || set -- "$@" --link-accounts "$liner_notes_link_accounts"
     [ -z "$liner_notes_help_dir" ] || set -- "$@" --help-dir "$liner_notes_help_dir"
     set -- "$@" --userlog-keep "$liner_notes_userlog_keep" --time-warning "$liner_notes_time_warning" --time-grace "$liner_notes_time_grace" \

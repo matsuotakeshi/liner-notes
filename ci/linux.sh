@@ -35,6 +35,7 @@ runuser -u bbstest -- bash -c '
   python3.11 -m venv .web-venv
   .web-venv/bin/pip install -r webui/requirements.txt -r link-requirements.txt -r tests/ssh-requirements.txt
   .web-venv/bin/python tests/test_ssh_sources.py
+  .web-venv/bin/python tests/test_freebsd_door_rc.py
   .web-venv/bin/python tests/test_ssh_transport.py ./runtime
   make PYTHON="$PWD/.web-venv/bin/python" test-doctor
   make CC=clang PYTHON="$PWD/.web-venv/bin/python" SQLITE_CFLAGS= SQLITE_LIBS=-lsqlite3 test-stage73 test-stage74

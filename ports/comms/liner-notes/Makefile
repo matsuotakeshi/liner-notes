@@ -76,7 +76,7 @@ do-install:
 	${INSTALL_DATA} ${WRKSRC}/scripts/*.py ${STAGEDIR}${DATADIR}/scripts/
 	${MKDIR} ${STAGEDIR}${DATADIR}/door-services/freebsd
 .for service in liner_notes_door_broker liner_notes_door_isolation
-	${INSTALL_DATA} ${WRKDIR}/${service} ${STAGEDIR}${DATADIR}/door-services/freebsd/${service}
+	${INSTALL_SCRIPT} ${WRKDIR}/${service} ${STAGEDIR}${DATADIR}/door-services/freebsd/${service}
 .endfor
 	${INSTALL_DATA} ${WRKSRC}/webui/bbs_transport.py ${STAGEDIR}${DATADIR}/scripts/bbs_transport.py
 	${INSTALL_DATA} ${WRKSRC}/ports/test-resume.py ${STAGEDIR}${DATADIR}/scripts/check-resume.py
