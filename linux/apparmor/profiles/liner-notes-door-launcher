@@ -1,0 +1,27 @@
+abi <abi/3.0>,
+include <tunables/global>
+
+profile liner-notes-door-launcher {
+  include <abstractions/base>
+  include <abstractions/liner-notes-python>
+  /usr/libexec/liner-notes/door-isolation r,
+  /usr/share/liner-notes/scripts/{door_isolation.py,door_broker.py,door_broker_core.py,door_processes.py} r,
+  /etc/liner-notes/door-{broker,isolation}.json r,
+  /run/liner-notes-door-broker/broker.sock rw,
+  /run/liner-notes-door-isolation/{,control.sock} rw,
+  /var/lib/liner-notes-door-isolation/{,**} rwk,
+  /var/lib/liner-notes-door-slots/ r,
+  /proc/ r,
+  /proc/[0-9]*/status r,
+  /dev/ptmx rw,
+  /dev/pts/ptmx rw,
+  /dev/pts/[0-9]* rw,
+  network unix stream,
+  deny network inet,
+  deny network inet6,
+  capability {chown,dac_override,fowner,kill,setgid,setuid},
+  signal (send,receive) peer=liner-notes-door-launcher,
+  signal (send) peer=liner-notes-door,
+  signal (receive) peer=unconfined,
+  include if exists <local/liner-notes-door-launcher>
+}

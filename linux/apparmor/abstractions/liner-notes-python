@@ -1,0 +1,9 @@
+# Python is inherited only inside a selected Liner Notes profile.
+  /usr/bin/{dash,sh} rix,
+  /usr/bin/python3{,.[0-9]*} rix,
+  /usr/lib/python3/ r,
+  /usr/lib/python3/** mr,
+  /usr/lib/python3.[0-9]*/ r,
+  /usr/lib/python3.[0-9]*/** mr,
+  /usr/pyvenv.cfg r,
+  /usr/bin/pyvenv.cfg r,

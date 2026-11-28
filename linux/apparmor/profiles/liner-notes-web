@@ -1,0 +1,17 @@
+abi <abi/3.0>,
+include <tunables/global>
+
+profile liner-notes-web {
+  include <abstractions/base>
+  include <abstractions/liner-notes-python>
+  /usr/sbin/liner-notes-web r,
+  /usr/share/liner-notes/web/{,**} r,
+  /etc/liner-notes/web/{web.toml,messages/**,templates/**} r,
+  /var/lib/liner-notes-web/{,**} rwk,
+  /run/liner-notes-link/control.sock rw,
+  network inet stream,
+  network inet6 stream,
+  network unix stream,
+  signal (receive) peer=unconfined,
+  include if exists <local/liner-notes-web>
+}

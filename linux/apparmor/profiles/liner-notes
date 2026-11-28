@@ -1,0 +1,27 @@
+abi <abi/3.0>,
+include <tunables/global>
+
+profile liner-notes {
+  include <abstractions/base>
+  /usr/sbin/liner-notes mr,
+  /usr/share/liner-notes/{menus,help}/** r,
+  /usr/share/liner-notes/*.txt r,
+  /etc/liner-notes/{limits,doors,vault-limits,link-accounts,ssh-member-keys}.conf r,
+  /etc/liner-notes/ssh_host_ed25519_key r,
+  /etc/liner-notes/ssh-host-keys/{,**} r,
+  /var/lib/liner-notes/{,**} rwk,
+  /var/log/liner-notes/{,**} rwk,
+  /run/liner-notes/{,**} rwk,
+  /run/liner-notes-door-isolation/control.sock rw,
+
+  /dev/ptmx rw,
+  /dev/pts/ptmx rw,
+  /dev/pts/[0-9]* rw,
+  network inet stream,
+  network inet6 stream,
+  network unix stream,
+  /usr/bin/liner-notes-zmodem Px -> liner-notes-transfer,
+  signal (send,receive) peer=liner-notes-transfer,
+  signal (receive) peer=unconfined,
+  include if exists <local/liner-notes>
+}

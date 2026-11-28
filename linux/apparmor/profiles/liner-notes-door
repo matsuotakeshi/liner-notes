@@ -1,0 +1,16 @@
+abi <abi/3.0>,
+include <tunables/global>
+
+profile liner-notes-door {
+  include <abstractions/base>
+  # Template for one isolated game. Clone with a unique name for each game.
+  /usr/libexec/liner-notes/doors/example mr,
+  /var/lib/liner-notes-door-slots/example/{,**} rwk,
+  /var/lib/liner-notes-door-isolation/run-*/ r,
+  /var/lib/liner-notes-door-isolation/run-*/DORINFO1.DEF r,
+  /dev/pts/[0-9]* rw,
+  deny network inet,
+  deny network inet6,
+  signal (receive) peer=liner-notes-door-launcher,
+  include if exists <local/liner-notes-door>
+}
