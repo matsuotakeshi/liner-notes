@@ -2,3 +2,4 @@
 # Copy into /etc/apparmor.d/local/liner-notes after review.
   /usr/libexec/liner-notes/doors/example r,
   /var/lib/liner-notes-door-slots/example/ r,
+  /run/liner-notes-door-isolation/control.sock rw,

@@ -1,0 +1,56 @@
+name: Debian AppArmor Enforce acceptance
+on:
+  workflow_dispatch:
+    inputs:
+      enforce:
+        description: Run the approved fixed helper (otherwise inventory only)
+        type: boolean
+        default: false
+permissions:
+  contents: read
+concurrency:
+  group: liner-notes-debian-apparmor-native
+  cancel-in-progress: false
+jobs:
+  accept:
+    if: github.repository == 'matsuotakeshi/liner-notes' && github.ref == 'refs/heads/main'
+    runs-on: [self-hosted, Linux, X64]
+    timeout-minutes: 16
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Inspect the approved Debian VM
+        shell: bash
+        env:
+          RUN_ENFORCE: ${{ inputs.enforce }}
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          [[ "$GITHUB_SHA" =~ ^[0-9a-f]{40}$ ]]
+          ssh_args=(-i /home/ci/.ssh/id_ed25519_debian_ci -o IdentitiesOnly=yes -o BatchMode=yes
+            -o PasswordAuthentication=no -o StrictHostKeyChecking=yes -o ConnectTimeout=10
+            -o ServerAliveInterval=10 -o ServerAliveCountMax=3 ci-test@10.0.0.59)
+          mkdir -p apparmor-evidence
+          ssh "${ssh_args[@]}" 'cat /etc/os-release; uname -r
+            for item in /sys/kernel/security/lsm /sys/module/apparmor/parameters/enabled; do
+              if test -r "$item"; then cat "$item"; else printf "Unreadable: %s\n" "$item"; fi
+            done
+            if test -x /usr/sbin/apparmor_parser; then /usr/sbin/apparmor_parser --version; fi' |
+            tee apparmor-evidence/inventory.txt
+          if [[ "$RUN_ENFORCE" = true ]]; then
+            read -r expect _ < <(sha256sum ci/apparmor_root.py)
+            actual=$(ssh "${ssh_args[@]}" 'sha256sum /usr/local/libexec/liner-notes-apparmor-ci')
+            test "${actual%% *}" = "$expect"
+            ssh "${ssh_args[@]}" "sudo -n /usr/local/libexec/liner-notes-apparmor-ci '$GITHUB_SHA'" |
+              tee apparmor-evidence/enforce.json
+            python3 -c 'import json,os; r=json.load(open("apparmor-evidence/enforce.json")); assert r["source_sha"]==os.environ["GITHUB_SHA"] and r["apparmor_file_boundaries_verified"] is True'
+          else
+            echo 'Inventory only. Enforce acceptance was not run.' >> "$GITHUB_STEP_SUMMARY"
+          fi
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: debian-apparmor-evidence
+          path: apparmor-evidence/
+          if-no-files-found: warn

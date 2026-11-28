@@ -5,12 +5,13 @@ profile liner-notes-transfer {
   include <abstractions/base>
   include <abstractions/liner-notes-python>
   /usr/bin/liner-notes-zmodem r,
-  /usr/share/liner-notes/scripts/{zmodem*,vault_zmodem.py,transfer*.py,bbs_transport.py} r,
+  /usr/share/liner-notes/scripts/{zmodem*,vault_zmodem.py,transfer*.py,bbs_transport.py,posix_locks.py,legacy_transfer.py} r,
   /usr/{,local/}bin/{lrz,lsz,rz,sz,rx,sx,rb,sb} rix,
   /var/lib/liner-notes/spool/{,**} rwk,
   /var/lib/liner-notes/lrz-resume.json r,
   network unix stream,
   signal (send,receive) peer=liner-notes,
   signal (receive) peer=unconfined,
+  audit deny /var/lib/liner-notes/{*.sqlite,members.dat,notes.dat} rwklm,
   include if exists <local/liner-notes-transfer>
 }

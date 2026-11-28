@@ -23,5 +23,6 @@ profile liner-notes-door-launcher {
   signal (send,receive) peer=liner-notes-door-launcher,
   signal (send) peer=liner-notes-door,
   signal (receive) peer=unconfined,
+  audit deny /var/lib/liner-notes/{,**} rwklm,
   include if exists <local/liner-notes-door-launcher>
 }

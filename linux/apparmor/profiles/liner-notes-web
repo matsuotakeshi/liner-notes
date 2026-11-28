@@ -13,5 +13,9 @@ profile liner-notes-web {
   network inet6 stream,
   network unix stream,
   signal (receive) peer=unconfined,
+  audit deny /var/lib/liner-notes/{,**} rwklm,
+  audit deny /var/lib/liner-notes-link/{,**} rwklm,
+  audit deny /etc/liner-notes/ssh_host_ed25519_key r,
+  audit deny /etc/liner-notes/ssh-host-keys/{,**} r,
   include if exists <local/liner-notes-web>
 }

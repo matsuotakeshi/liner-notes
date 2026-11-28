@@ -12,5 +12,7 @@ profile liner-notes-door {
   deny network inet,
   deny network inet6,
   signal (receive) peer=liner-notes-door-launcher,
+  audit deny /var/lib/liner-notes/{,**} rwklm,
+  audit deny /etc/liner-notes/ssh_host_ed25519_key rw,
   include if exists <local/liner-notes-door>
 }

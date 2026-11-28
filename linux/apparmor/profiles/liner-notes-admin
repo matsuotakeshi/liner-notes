@@ -12,8 +12,10 @@ profile liner-notes-admin {
   /var/lib/liner-notes/{,**} rwk,
   /var/log/liner-notes/{,**} r,
   /var/backups/liner-notes/{,**} rwk,
+  /tmp/liner-doctor-*/{,**} rwk,
   deny network inet,
   deny network inet6,
   signal (receive) peer=unconfined,
+  audit deny /var/lib/liner-notes-link/identity/{,**} r,
   include if exists <local/liner-notes-admin>
 }

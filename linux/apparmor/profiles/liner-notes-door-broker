@@ -12,5 +12,6 @@ profile liner-notes-door-broker {
   deny network inet,
   deny network inet6,
   signal (receive) peer=unconfined,
+  audit deny /var/lib/liner-notes/{,**} rwklm,
   include if exists <local/liner-notes-door-broker>
 }

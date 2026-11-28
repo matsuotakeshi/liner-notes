@@ -12,7 +12,6 @@ profile liner-notes {
   /var/lib/liner-notes/{,**} rwk,
   /var/log/liner-notes/{,**} rwk,
   /run/liner-notes/{,**} rwk,
-  /run/liner-notes-door-isolation/control.sock rw,
 
   /dev/ptmx rw,
   /dev/pts/ptmx rw,
@@ -23,5 +22,7 @@ profile liner-notes {
   /usr/bin/liner-notes-zmodem Px -> liner-notes-transfer,
   signal (send,receive) peer=liner-notes-transfer,
   signal (receive) peer=unconfined,
+  audit deny /var/lib/liner-notes-link/identity/{,**} r,
+  audit deny /etc/liner-notes/link-secrets/{,**} r,
   include if exists <local/liner-notes>
 }
