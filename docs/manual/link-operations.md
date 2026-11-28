@@ -59,6 +59,7 @@ Rockyで専用SELinuxポリシーを使う場合は関連ディレクトリの�
 管理グループだけが通過できる0750、ソケットは0660です。Webアカウントにはそのグループだけを
 追加し、DBや秘密鍵の読み取り権限は与えません。Linuxの付属unitは`liner_notes_linkctl`を使います。
 FreeBSDの配布rc.dも同じグループを既定とし、ソケット用に `/var/run/liner-notes-link` を準備します。Web側の設定パスはOSに合わせます。
+FreeBSDパッケージが `/var/db/liner-notes-link` を新規作成する際は、所有者 `liner_notes_link`、グループ `liner_notes_linkctl`、権限 `0700` を設定します。すでにある状態ディレクトリの所有者や権限は更新後も維持します。初回起動前に `stat -f '%Su:%Sg %OLp' /var/db/liner-notes-link` で確認してください。
 
 Webの`[web]`に次を指定し、Webサービスを再起動します。
 

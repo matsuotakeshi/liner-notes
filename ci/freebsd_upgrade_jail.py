@@ -9,6 +9,7 @@ import pwd
 import shlex
 import shutil
 import socket
+import stat
 import subprocess
 import sys
 import tempfile
@@ -57,7 +58,11 @@ def link_service_check():
     group = grp.getgrnam('liner_notes_linkctl')
     assert account.pw_uid > 0 and account.pw_gid == group.gr_gid
     state = Path('/var/db/liner-notes-link')
-    assert state.stat().st_uid == account.pw_uid and state.stat().st_mode & 0o777 == 0o700
+    metadata = state.lstat()
+    mode = stat.S_IMODE(metadata.st_mode)
+    assert stat.S_ISDIR(metadata.st_mode) and (metadata.st_uid, metadata.st_gid, mode) == (
+        account.pw_uid, group.gr_gid, 0o700
+    ), f'Link state directory: uid={metadata.st_uid} gid={metadata.st_gid} mode={mode:04o}'
     rc = Path('/usr/local/etc/rc.d/liner_notes_link')
     vendor = Path('/usr/local/share/liner-notes/liner_notes_link.sample')
     assert rc.read_bytes() == vendor.read_bytes() and os.access(rc, os.X_OK)
