@@ -101,6 +101,31 @@ port = {ports[1-i]}
   await asyncio.sleep(2);start(1)
   async def renamed():return response_data((await users[1].command('READ 4'))['text']).get('article',{}).get('title')=='new title'
   await wait_for(renamed)
+  # Stopping only the sink BBS must not drop a signed event already pulled
+  # from its peer. Restart the BBS on the same local endpoint with its data.
+  old_port=servers[1].port
+  connector_pid=processes[1].pid
+  node_before=(await control(1,'status'))['node']
+  await users.pop().close()
+  servers.pop().close()
+  await post(users[0],'post while BBS is stopped','must survive in the pending queue')
+  async def queued():
+   return (await control(1,'status'))['pending']>0
+  await wait_for(queued)
+  d=dirs[1]
+  servers.append(Server(binary,d/'notes',members=d/'members',telnet=True,port=old_port,
+                        options=['--link-accounts',str(d/'accounts')]))
+  user=await Bridge('127.0.0.1',old_port).open()
+  users.append(user)
+  await user.command('LOGIN alice')
+  await user.command('user-test-password')
+  assert user.state['user']>0
+  async def recovered():
+   article=response_data((await user.command('READ 5'))['text']).get('article',{})
+   return article.get('title')=='post while BBS is stopped' and (await control(1,'status'))['pending']==0
+  await wait_for(recovered)
+  assert processes[1].pid==connector_pid
+  assert (await control(1,'status'))['node']==node_before
   before=(dirs[1]/'notes').stat().st_size
   stop(1)
   peer=tls.certificate_node(dirs[0]/'identity/identity.crt')[0]

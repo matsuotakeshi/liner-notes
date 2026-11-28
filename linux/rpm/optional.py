@@ -12,6 +12,6 @@ for name in ('liner-notes-web','liner-notes-link'):
  (stage/'usr/lib/systemd/system'/f'{name}.service').write_bytes((ROOT/'linux'/f'{name}.service').read_bytes())
 for name in ('link.toml','link.toml.sample'):
  p=stage/'etc/liner-notes'/name
- text=p.read_text().replace('/var/db/liner-notes-link','/var/lib/liner-notes-link').replace('/usr/local/etc/liner-notes','/etc/liner-notes').replace('port = 23','port = 2222')
+ text=p.read_text().replace('/var/db/liner-notes-link','/var/lib/liner-notes-link').replace('/usr/local/etc/liner-notes','/etc/liner-notes')
  text=text.replace('[node]','[node]\ncontrol_socket = "/run/liner-notes-link/control.sock"')
  p.write_text(text)

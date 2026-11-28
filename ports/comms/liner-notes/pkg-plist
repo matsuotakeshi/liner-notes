@@ -154,6 +154,9 @@ bin/liner-notes-check-resume
 %%WEBUI%%@dir(liner_notes_web,liner_notes_web,0700) /var/db/liner-notes-web
 bin/liner-notes-serial
 %%LINK%%bin/liner-notes-link
+%%LINK%%@preunexec if [ "${PKG_UPGRADE:-}" != true ] && [ "${PKG_ROOTDIR:-/}" = / ] && cmp -s "%D/etc/rc.d/liner_notes_link" "%D/%%DATADIR%%/liner_notes_link.sample"; then "%D/etc/rc.d/liner_notes_link" onestop; fi
+%%LINK%%@sample(root,wheel,0755) %%DATADIR%%/liner_notes_link.sample etc/rc.d/liner_notes_link
+%%LINK%%@postexec if [ ! -e /var/db/liner-notes-link ] && [ ! -L /var/db/liner-notes-link ]; then install -d -m 0700 -o liner_notes_link -g liner_notes_linkctl /var/db/liner-notes-link; fi
 %%LINK%%@sample %%ETCDIR%%/link.toml.sample
 %%LINK%%@sample %%ETCDIR%%/link-accounts.conf.sample
 %%WEBUI%%%%DATADIR%%/web/webui/bbs_transport.py

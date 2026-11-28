@@ -81,6 +81,8 @@ jobs:
               cp /tmp/liner-notes-doctor.json /out/doctor-evidence/doctor-installed-doors.json
               apt-get remove -y liner-notes-link liner-notes-web liner-notes
               test "$(cat /var/lib/liner-notes/package-removal-test)" = keep
+              test -f /var/lib/liner-notes-link/ci-link-key
+              test -f /etc/systemd/system/liner-notes-link.service
               cd /out
               sha256sum ./*.deb > SHA256SUMS
               sha256sum -c SHA256SUMS
