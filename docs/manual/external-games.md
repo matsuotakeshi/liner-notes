@@ -35,13 +35,13 @@ TelnetのNAWS通知によるサイズ変更は、Door実行中もPTYへ反映し
 
 ## FreeBSDのDoor隔離設定
 
-v0.76公開後のrc.d対応版では、rc.confの
+v0.76.1では、rc.confの
 `liner_notes_door_isolation_socket="/var/run/liner-notes-door-isolation/control.sock"`
 で本体の `--door-isolation-socket` を指定できます。既定は空欄で、従来の起動方式を使用します。
 有効にすると登録済みの全Doorが隔離の対象になります。チケットを使わないDoorにも
 専用の実行UIDと実行枠が必要です。実行枠未設定のゲームに対して、従来の起動方式へ自動で戻ることはありません。
 
-対象版のpkgは `liner_notes_door_broker` と `liner_notes_door_isolation` を既定で無効の
+v0.76.1のpkgは `liner_notes_door_broker` と `liner_notes_door_isolation` を既定で無効の
 rc.dサービスとして配置します。専用アカウント、ポリシー、ディレクトリ、各ゲームの保存先は
 設置者が事前に確認します。運用前に隔離環境で、すべての登録ゲームが必要な権限だけで動作することを検証してください。
 v0.76では付属サンプルを管理者が別途設置する方式です。
