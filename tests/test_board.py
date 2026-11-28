@@ -13,8 +13,8 @@ from test_runtime import Client, test_wait_timeout
 
 
 class Server:
-    def __init__(self, binary, store, preexec_fn=None, members=None, catalog=None, menu=False, language=None, telnet=False, admins=None, menu_dir=None, bind=None, vault=None, zhelper=None, options=None):
-        args=[binary]+(options or [])+(['--zmodem-helper',str(zhelper)] if zhelper else [])+(['--vault-dir',str(vault)] if vault is not None else [])+(['--bind',bind] if bind is not None else [])+(['--menu-dir',str(menu_dir)] if menu_dir is not None else [])+(['--admins',str(admins)] if admins else [])+(['--telnet'] if telnet else [])+(['--menu'] if menu else [])+(['--lang',language] if language else [])+['0', str(store)]+([str(members)] if members else [])+([str(catalog)] if catalog else [])
+    def __init__(self, binary, store, preexec_fn=None, members=None, catalog=None, menu=False, language=None, telnet=False, admins=None, menu_dir=None, bind=None, vault=None, zhelper=None, options=None, port=0):
+        args=[binary]+(options or [])+(['--zmodem-helper',str(zhelper)] if zhelper else [])+(['--vault-dir',str(vault)] if vault is not None else [])+(['--bind',bind] if bind is not None else [])+(['--menu-dir',str(menu_dir)] if menu_dir is not None else [])+(['--admins',str(admins)] if admins else [])+(['--telnet'] if telnet else [])+(['--menu'] if menu else [])+(['--lang',language] if language else [])+[str(port), str(store)]+([str(members)] if members else [])+([str(catalog)] if catalog else [])
         self.proc = subprocess.Popen(args, stdout=subprocess.PIPE,
                                      stderr=subprocess.PIPE, text=True, preexec_fn=preexec_fn)
         result = []

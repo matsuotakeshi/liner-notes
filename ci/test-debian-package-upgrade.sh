@@ -31,6 +31,14 @@ for file in /etc/liner-notes/liner-notes.env /etc/liner-notes/web/web.toml /etc/
   printf '\n# CI-only local customization marker\n' >> "$file"
   sha256sum "$file" >> "$config_digests"
 done
+test "$(stat -c '%U:%G %a' /var/lib/liner-notes-link)" = 'liner_notes_link:liner_notes_linkctl 700'
+manual_unit=/etc/systemd/system/liner-notes-link.service
+mkdir -p /etc/systemd/system
+printf '# Local service override retained by package upgrades\n' > "$manual_unit"
+sha256sum "$manual_unit" >> "$config_digests"
+chmod 0644 /etc/liner-notes/link.toml
+config_metadata=$(stat -c '%u:%g %a' /etc/liner-notes/link.toml)
+state_metadata=$(stat -c '%u:%g %a' /var/lib/liner-notes-link)
 mkdir -p /var/lib/liner-notes /var/lib/liner-notes-link
 printf 'keep\n' > /var/lib/liner-notes/package-removal-test
 printf 'CI-ONLY-SYNTHETIC-LINK-KEY\n' > /var/lib/liner-notes-link/ci-link-key
@@ -67,6 +75,8 @@ for package in "${packages[@]}"; do
   test "$(dpkg-query -W -f='${Version}' "$package")" = "$next_version"
 done
 sha256sum -c "$config_digests"
+test "$(stat -c '%u:%g %a' /etc/liner-notes/link.toml)" = "$config_metadata"
+test "$(stat -c '%u:%g %a' /var/lib/liner-notes-link)" = "$state_metadata"
 test "$(cat /var/lib/liner-notes/package-removal-test)" = keep
 python3 - <<'PY'
 import sqlite3
