@@ -21,5 +21,15 @@
     "ui-vs-ja.png": "9ced9cdd9f6302a271db7c91917d1296e6833d2794f14de095661b8a4b518519",
     "ui-wani-bbs-en.png": "40ce5f2ce39510826092eced1c7df397aae45eb1984facc3648814aa6f98a86c",
     "ui-wani-bbs-ja.png": "6eaeed3934ee7af8d0beb73c22222e98f25f354186990a31e26c7a1404e6c12c"
+  },
+  "webui_capture": {
+    "environment": "isolated FreeBSD fixture; disposable account and article",
+    "source_commit": "66b157e7b76a9e0be23fd870de63adc5afbddc58",
+    "method": "Chrome full-page screenshots",
+    "language": "ja",
+    "images": {
+      "ui-web-home-ja.png": "9f1ca18bb40a3baef7a982a8d993fc492c639f715fc151a2efc47951474b3303",
+      "ui-web-article-ja.png": "e888e39a8333e12e85e200b817447c971e2a925125e9780139f7fa679ab79b85"
+    }
   }
 }
