@@ -145,7 +145,7 @@ sudo systemctl enable liner-notes-link
 
 FreeBSDのv0.76はLINKオプションのCLIを配布します。リンク専用rc.dの同梱はこのタグ以降の変更です。
 v0.76では `sysrc liner_notes_link_accounts=/usr/local/etc/liner-notes/link-accounts.conf`
-で本体へ割り当てを設定し、[FreeBSDの準備](links.md#freebsdでの準備)に従って専用OSユーザーで
+で本体へ割り当てを設定し、[共有ボードの構築手順](links.md)に従って専用OSユーザーで
 `check` と `serve` を実行します。停止・監視は設置者が構成します。署名鍵を交換先へ渡さず、
 公開証明書を別経路で照合してから接続します。[状態確認・バックアップと再同期](link-operations.md)。
 
