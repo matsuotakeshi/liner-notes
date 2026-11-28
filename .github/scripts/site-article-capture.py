@@ -48,7 +48,19 @@ for lang in ('en','ja'):
        width=2 if unicodedata.east_asian_width(ch) in ('W','F') else 1
        if ch!=' ':d.text((20+x*12,51+y*24.5),ch,font=cjk if ord(ch)>127 else mono,fill='#c2e7c1')
        x+=width
-     name='ui-'+profile+'-articles-'+lang;im.save(out/(name+'.png'));(out/(name+'.txt')).write_text('\n'.join(lines)+'\n',encoding='utf8');results.append({'ui':profile,'lang':lang,'ok':True,'raw_sha256':hashlib.sha256(data).hexdigest()});c.close()
+     name='ui-'+profile+'-articles-'+lang;im.save(out/(name+'.png'));(out/(name+'.txt')).write_text('\n'.join(lines)+'\n',encoding='utf8');results.append({'ui':profile,'lang':lang,'ok':True,'raw_sha256':hashlib.sha256(data).hexdigest()})
+     if profile=='rtbbs':
+      data=c.cmd('TREE 1',b'] > ');assert b'Welcome' in data and b'Reply to welcome' in data
+      screen=pyte.Screen(80,24);pyte.Stream(screen).feed(data.decode('utf8','strict'));lines=screen.display
+      im=Image.new('RGB',(1000,660),'#101d23');d=ImageDraw.Draw(im);d.text((20,12),f'Liner Notes v0.76 / {profile} / {lang} / tree',font=mono,fill='#93b7a3')
+      for y,line in enumerate(lines):
+       x=0
+       for ch in line:
+        width=2 if unicodedata.east_asian_width(ch) in ('W','F') else 1
+        if ch!=' ':d.text((20+x*12,51+y*24.5),ch,font=cjk if ord(ch)>127 else mono,fill='#c2e7c1')
+        x+=width
+      name='ui-rtbbs-tree-'+lang;im.save(out/(name+'.png'));(out/(name+'.txt')).write_text('\n'.join(lines)+'\n',encoding='utf8');results.append({'ui':'rtbbs-tree','lang':lang,'ok':True,'raw_sha256':hashlib.sha256(data).hexdigest()})
+     c.close()
     finally:s.close()
   except Exception as e:results.append({'ui':profile,'lang':lang,'ok':False,'error':str(e)[:300]});print('FAILED',profile,lang,type(e).__name__,str(e)[:150],flush=True)
 (out/'article-capture-manifest.json').write_text(json.dumps({'source_commit':'66b157e7b76a9e0be23fd870de63adc5afbddc58','results':results},indent=2),encoding='utf8')
