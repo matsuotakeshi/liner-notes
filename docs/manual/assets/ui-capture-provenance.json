@@ -1,0 +1,71 @@
+{
+  "product": "Liner Notes v0.76",
+  "source_commit": "66b157e7b76a9e0be23fd870de63adc5afbddc58",
+  "environment": "isolated Linux CI, disposable test account",
+  "method": "actual terminal output rendered as 80 x 24 cells",
+  "ci_run": "https://github.com/matsuotakeshi/liner-notes/actions/runs/46114618288",
+  "images": {
+    "ui-big-model-en.png": "1677d0e3404170565625c70cf6e2743bdeb31c4197c14429431ba39fc31df89e",
+    "ui-big-model-ja.png": "55e27212a6bd944117547d66505c5f997a14a10bf7964e9db9ce9a92e91955f3",
+    "ui-ktbbs-en.png": "56c57cddecd4ccb6c57b89c8bd1d9d380a7ff1200f3e1a1071e87b6cc19c3dd4",
+    "ui-ktbbs-ja.png": "89c8a6fcff2ff5d8ee9325802b388202496ff4593e5a8642affc7df552ecf580",
+    "ui-mash-en.png": "568bdf13ddc91cbeac062f13590dd136f00a93c928c831a1763b5b196dd657ca",
+    "ui-mash-ja.png": "406569a53a9f757cd1f6b896e6b328b51f4e9556ab654b245acfefca041724bb",
+    "ui-mmm-en.png": "07147d101dbdba9c83b5f888e045d20b49ef0a64cd2e10277308924cdf8b4e43",
+    "ui-mmm-ja.png": "d7806943203171b57701ea816b47564af27926a43c126274daa9afa2d55c5b52",
+    "ui-net-cock-en.png": "db2d6269e047e459c218149f673972d94528661f57b013ddda5468bb83c544b8",
+    "ui-net-cock-ja.png": "46247144e664de2c7e21592ce4b197400f9ccca5e360c642771b3a40dd4b4266",
+    "ui-rtbbs-en.png": "4a0d858e19d63fcb8b59ac1b3cfc8e62432639d83f327204743304af22f7bfb4",
+    "ui-rtbbs-ja.png": "d42d8ab8dea9ddf0c47d8a388c06eccf30b7118d44df1c9ac79e57abf9e91ef3",
+    "ui-vs-en.png": "770cde6f27e8c0571e263c1ab104f36e6f8175ba511aa6b0a63dff5eac452125",
+    "ui-vs-ja.png": "9ced9cdd9f6302a271db7c91917d1296e6833d2794f14de095661b8a4b518519",
+    "ui-wani-bbs-en.png": "40ce5f2ce39510826092eced1c7df397aae45eb1984facc3648814aa6f98a86c",
+    "ui-wani-bbs-ja.png": "6eaeed3934ee7af8d0beb73c22222e98f25f354186990a31e26c7a1404e6c12c"
+  },
+  "webui_capture": {
+    "environment": "isolated FreeBSD fixture; disposable account and article",
+    "source_commit": "66b157e7b76a9e0be23fd870de63adc5afbddc58",
+    "method": "Chrome full-page screenshots",
+    "language": "ja and en",
+    "images": {
+      "ui-web-home-ja.png": "9f1ca18bb40a3baef7a982a8d993fc492c639f715fc151a2efc47951474b3303",
+      "ui-web-article-ja.png": "e888e39a8333e12e85e200b817447c971e2a925125e9780139f7fa679ab79b85",
+      "ui-web-home-en.png": "c69a455d657c3abf8d08637e72fd2be2b1270f462fd7dfbd1efb5c2320d61b3c",
+      "ui-web-article-en.png": "1ed2b476a18a98fd7d8bd7df9c9df98aba90a5ef4f7152d6a2db0b84d96eb2f0"
+    }
+  },
+  "article_capture": {
+    "source_commit": "66b157e7b76a9e0be23fd870de63adc5afbddc58",
+    "environment": "isolated GitHub-hosted Linux, disposable account and articles",
+    "method": "actual 80x24 terminal output rendered to image",
+    "run": "https://github.com/matsuotakeshi/liner-notes/actions/runs/46118937170",
+    "images": {
+      "ui-rtbbs-articles-ja.png": "fd8efb0ae654d0a2d6c551c9ffdd292542b4d9a8b604cf5d2f6eac18fa2a47d4",
+      "ui-rtbbs-articles-en.png": "1b3c96642e310c4ce5645440d5a1e33bb727454e651390d9367cc06cdd4ba02c",
+      "ui-mmm-articles-ja.png": "aa1a28f750a624a269ccf4b5d43c04d2fb08ab8e3f2b44e2b8b0d481a722107c",
+      "ui-mmm-articles-en.png": "6b96a215e2edb0eb32f834b456937cbf430f767241bc497181280711d63d1b0f",
+      "ui-mash-articles-ja.png": "dbc999327d90883ec98db7c5eced35a9b8b88466d8264c3da316db83d7a6327e",
+      "ui-mash-articles-en.png": "6e6a2959a25ab8b636e194d94337acd22cc6318b8569522f5c0fd83acc6cc790",
+      "ui-ktbbs-articles-ja.png": "6e9578ef7f55763256189b5e3e693679614269bf1351863aa3714e202192ccf3",
+      "ui-ktbbs-articles-en.png": "0e2145b222e66f59b68d72b0d4c83ba1bebad0b4d1a2f4f77cba5a41f0b15f96",
+      "ui-big-model-articles-ja.png": "90408623113f64839bb2e8a12204846c91da759375eaa22f51326488daa5df3f",
+      "ui-big-model-articles-en.png": "cda145ab1416e5a9bbd03250a42d735ca6b5afbf2b6f43b230ff73349d66b37d",
+      "ui-wani-bbs-articles-ja.png": "fb45a5ff344714cbf581d3d4ea2184d4a534165e68e704fb289fff5eb76381ed",
+      "ui-wani-bbs-articles-en.png": "55fa6d06b52a15321a2292d6509753530322786a44d40be91b1af72f16f5c6d6",
+      "ui-net-cock-articles-ja.png": "5175fac1d3ccdf97ff927506dcefe9fbd9270f748ca20c5c6e21b4036df369a3",
+      "ui-net-cock-articles-en.png": "3c05a522371578f93de78e3a18bb747cb33d1217718fc910dcf802128723ff63",
+      "ui-vs-articles-ja.png": "7ad6cbb87f739bda1f30120446ba2ea756a00ea54cc4b869c7694f9167ffd024",
+      "ui-vs-articles-en.png": "543609c5a2b378269d3526e71399bdc52128fc89802b9714a080b479efb49bcd"
+    }
+  },
+  "tree_capture": {
+    "source_commit": "66b157e7b76a9e0be23fd870de63adc5afbddc58",
+    "environment": "isolated GitHub-hosted Linux, disposable account and articles",
+    "method": "actual 80x24 terminal output rendered to image",
+    "run": "https://github.com/matsuotakeshi/liner-notes/actions/runs/46119162296",
+    "images": {
+      "ui-rtbbs-tree-ja.png": "4cdee86662a01e6e85217b8254aa8f8ff9e4cc4c6c09798f43f6dc69be448ef0",
+      "ui-rtbbs-tree-en.png": "c6d49798c541af0792aca82ef1fa960042f9fb26a03800c126024e66b4b89797"
+    }
+  }
+}

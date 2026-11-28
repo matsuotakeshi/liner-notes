@@ -19,3 +19,24 @@ if(input){
     }
   });
 }
+
+if (globalThis.navigator?.clipboard?.writeText) {
+  const japanese = document.documentElement.lang === 'ja';
+  for (const code of document.querySelectorAll('.manual-article pre > code')) {
+    const button = document.createElement('button');
+    const label = japanese ? 'コードをコピー' : 'Copy code';
+    button.type = 'button';
+    button.className = 'manual-copy';
+    button.textContent = label;
+    button.addEventListener('click', async () => {
+      try {
+        await navigator.clipboard.writeText(code.textContent);
+        button.textContent = japanese ? 'コピーしました' : 'Copied';
+      } catch {
+        button.textContent = japanese ? 'コピーできませんでした' : 'Copy failed';
+      }
+      setTimeout(() => { button.textContent = label; }, 1600);
+    });
+    code.parentElement.before(button);
+  }
+}

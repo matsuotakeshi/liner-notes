@@ -117,3 +117,17 @@ HTTP受信とBBS登録は別段階です。最終の登録完了まで確認し�
 ## TOPIC伝言板
 
 対応するBBSへ会員としてログインすると、ナビゲーションの「TOPIC伝言板」から短い伝言を読み書きできます。履歴と未読は端末UIの `TOPIC` と共通です。未読画面では表示した範囲を既読にできます。削除は投稿本人または運用管理者に限られます。一行会議の履歴・既読位置は別に管理されます。
+
+## WebUIの画面例（v0.76）
+
+FreeBSDの隔離された検証環境でv0.76を起動し、試用会員でログインした画面です。記事は検証用に投稿したものです。ブラウザーの実表示を撮影しています。表示は設定や権限により変わります。
+
+![WebUIホーム画面](../assets/ui-web-home-ja.png)
+
+![WebUIの記事本文と操作](../assets/ui-web-article-ja.png)
+
+英語表示でも同じ検証環境のホーム画面と記事を確認できます。
+
+![WebUI home in English](../assets/ui-web-home-en.png)
+
+![WebUI article in English](../assets/ui-web-article-en.png)

@@ -15,7 +15,7 @@ FreeBSDの候補pkg生成とnative試験は、既存検証機内の共通ロッ�
 ロック待ちや中断を成功済み試験として扱いません。
 
 単独配備は `scope=freebsd`（画面の既定）、`scope=debian`、`scope=rocky` から選びます。
-それぞれ `srv.ysni.org`、`debian.ysni.org`、`rocky.ysni.org` だけを更新します。`all` の更新順序は
+それぞれ設定済みの対象局だけを更新します。`all` の更新順序は
 Rocky Linux → Debian → FreeBSDで、各局のヘルスチェック成功後に次局へ進みます。
 mainへのpushやタグ作成だけでは配備しません。必要な条件は次のとおりです。
 
@@ -23,7 +23,7 @@ mainへのpushやタグ作成だけでは配備しません。必要な条件は
 2. native/Linux/pkg/RPM/DEB/Release Set/manual/deployment安全性、doctorの原本非変更試験、Solaris native、Rocky SELinux Enforcing、FreeBSD jail更新CIがreleaseと同一SHAで成功していること。controller自身のSHAでもdeployment安全性試験の実行成功が必要です。apply時の本番SSH事前検査は現在のcontroller SHA・同じscopeで実行し、実際の検査step完了から1時間以内であること。planでは本番接続を要求せず未確認と記録します。文書変更によるskipは実行済み試験として認めません。controllerだけが新しいSHAであることを理由に過去のrelease検証を他のreleaseへ流用しません。
 3. CI由来manifest・Release Set receiptと、ダウンロードしたpackageの名前・版・サイズ・SHA-256が一致すること。
 4. `production-release` Environmentにmain専用のブランチ制限とオーナーのrequired reviewerが実在すること。
-5. 今回のrun summaryに示す承認文をそのまま承認コメントへ記載すること。単独配備では対象局1件が入り、例えばDebianなら `DEPLOY v版 SHA debian.ysni.org RUN run番号/attempt` です。allの対象は `rocky.ysni.org,debian.ysni.org,srv.ysni.org` です。異なる対象・古いrun/attemptの承認は再利用できません。
+5. 今回のrun summaryに示す承認文をそのまま承認コメントへ記載すること。単独配備では対象局1件が入ります。承認文は例を流用せず、そのrunが示す対象を確認します。異なる対象・古いrun/attemptの承認は再利用できません。
 
 ### 1局だけを配備する操作
 
@@ -39,8 +39,8 @@ site profile設置には別途承認が必要です。旧版のhelperは対応�
    この操作はSSH接続、ビルド、サービス操作を行いません。
 3. 本番読み取り確認の承認後、`Production SSH Connectivity Test` をmain・
    配備と同じscopeで実行します。ホスト変数は `production` Environmentで設定します。
-   `LN_VPS_FREEBSD_HOST` は `srv.ysni.org`、`LN_VPS_DEBIAN_HOST` は `debian.ysni.org`、
-   `LN_VPS_ROCKY_HOST` は `rocky.ysni.org` に一致する必要があります。
+   `LN_VPS_FREEBSD_HOST`、`LN_VPS_DEBIAN_HOST`、`LN_VPS_ROCKY_HOST` は、
+   各環境の承認済み接続先と一致する必要があります。
    選んだ局へ `ln-deploy` と固定ホスト鍵で接続します。
    scopeごとに最新の実行を確認し、他局の成功や全局疎通で代用しません。
    これはOS/CPUとSSHの検査であり、バックアップやhelper導入の証明ではありません。
@@ -164,7 +164,7 @@ login/article/mail・論理backup/restore・旧package回復の試験も用意�
 こちらも非rootのrootdir内でmaintainer scriptsを無効化して実行するため、アカウント作成・
 所有権設定を含む完全なOS更新試験の代わりにはなりません。
 適用controllerは `FREEBSD-SERVICE-UPGRADE.json` に同一SHAの完全なpackage/service更新・復元証跡がない限りapplyを拒否します。
-専用の `FreeBSD isolated upgrade acceptance` は、10.0.0.50上のroot所有テンプレートを
+専用の `FreeBSD isolated upgrade acceptance` は、隔離検証機上のroot所有テンプレートを
 VNET jailへ複製し、maintainer script・会員/データ所有権、実rc起動、記事/メール、Web、link、
 Door、バックアップからの復元と旧package回復を検査する候補実装です。宿主のサービスや
 packageを更新しません。テンプレート・固定sudo entryの初期準備とネイティブ実行は別途必要です。
