@@ -34,7 +34,9 @@ for lang in ('en','ja'):
      c=Client(s.port);c.sock.settimeout(5);c.until(prompts[0]);c.cmd('LOGIN visitor',b'> ');c.cmd('test-only-secret-8721',prompts[0]);
      if i:c.cmd('UI '+profile,prompts[i])
      chunks=[]
-     for cmd,marker in steps[profile]:chunks.append(c.cmd(cmd,marker))
+     for cmd,marker in steps[profile]:
+      print('STEP',profile,lang,repr(cmd),flush=True)
+      chunks.append(c.cmd(cmd,marker))
      data=chunks[-1];assert b'Welcome' in data,(profile,data[-500:])
      screen=pyte.Screen(80,24);pyte.Stream(screen).feed(data.decode('utf8','strict'));lines=screen.display
      im=Image.new('RGB',(1000,660),'#101d23');d=ImageDraw.Draw(im);d.text((20,12),f'Liner Notes v0.76 / {profile} / {lang} / articles',font=mono,fill='#93b7a3')
