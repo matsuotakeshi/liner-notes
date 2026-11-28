@@ -13,7 +13,6 @@ import stat
 import subprocess
 import tempfile
 import time
-import urllib.request
 
 REPO = 'matsuotakeshi/liner-notes'
 BASE = Path('/var/lib/liner-notes-apparmor-ci')
@@ -68,12 +67,12 @@ def run(*args, timeout=30):
 
 
 def get(url, limit):
-    request = urllib.request.Request(url, headers={'User-Agent': 'liner-notes-apparmor-ci'})
-    with urllib.request.urlopen(request, timeout=30) as response:
-        data = response.read(limit + 1)
-    if len(data) > limit:
-        raise ValueError('Source response too large')
-    return data.decode('utf8')
+    # Bound the connect and transfer budgets across address candidates. curl's
+    # dual-stack fallback keeps an unreachable IPv6 route from delaying every file.
+    return run('/usr/bin/curl', '-q', '--silent', '--show-error', '--fail',
+               '--proto', '=https', '--connect-timeout', '5', '--max-time', '15',
+               '--max-filesize', str(limit), '--user-agent', 'liner-notes-apparmor-ci',
+               '--', url, timeout=20)
 
 
 def head():
@@ -180,6 +179,25 @@ def main():
         shutil.rmtree(root)
 
 
+def audited_denial(profile, unit, probe, mode, target):
+    # Systemd emits its own audit records for each transient unit. Leave room
+    # in the kernel journal rate limiter without changing host audit settings.
+    for attempt in range(3):
+        time.sleep(6)
+        since = int(time.time())
+        probe_run(profile, f'{unit}-{attempt}', probe, mode, target, 'DENIED')
+        for _ in range(4):
+            journal = run('/usr/bin/journalctl', '-k', '--since=@' + str(since),
+                          '--no-pager', '-o', 'cat')
+            if any('apparmor="DENIED"' in line and f'profile="{profile}"' in line
+                   and f'name="{target}"' in line
+                   and re.search(r'denied_mask="[^"]*' + mode, line)
+                   for line in journal.splitlines()):
+                return
+            time.sleep(.25)
+    raise ValueError('Missing kernel AppArmor denial evidence for ' + profile)
+
+
 def accept(root, sha):
     prefix = 'ln-aa-ci-' + secrets.token_hex(6)
     names = {role: prefix + '-' + role for role in CASES}
@@ -202,7 +220,6 @@ def accept(root, sha):
     run(*loader, '-Q', policy)
     if sha != head():
         raise ValueError('main advanced before policy load')
-    since = int(time.time())
     try:
         run(*loader, '-a', policy)
         loaded = set((SECURITY/'profiles').read_text().splitlines())
@@ -212,15 +229,7 @@ def accept(root, sha):
                 raise ValueError('Missing Enforce label for ' + name)
             probe_run(name, name + '-read', probe, 'r', root/allowed, 'ALLOWED')
             for i, (operation, path) in enumerate(denied):
-                probe_run(name, name + '-deny-' + str(i), probe, operation, root/path, 'DENIED')
-        journal = run('/usr/bin/journalctl', '-k', '--since=@' + str(since), '--no-pager', '-o', 'cat')
-        for role, (_, *denied) in CASES.items():
-            for mode, path in denied:
-                if not any('apparmor="DENIED"' in line and f'profile="{names[role]}"' in line
-                           and f'name="{root/path}"' in line
-                           and re.search(r'denied_mask="[^"]*' + mode, line)
-                           for line in journal.splitlines()):
-                    raise ValueError('Missing kernel AppArmor denial evidence for ' + role)
+                audited_denial(name, name + '-deny-' + str(i), probe, operation, root/path)
         features = SECURITY/'features'
         print(json.dumps({'source_sha': sha, 'apparmor_file_boundaries_verified': True,
                           'roles': sorted(CASES), 'kernel': os.uname().release,

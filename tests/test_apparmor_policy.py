@@ -4,6 +4,7 @@ from pathlib import Path
 import importlib.util
 import re
 import unittest
+from unittest.mock import patch
 
 ROOT = Path(__file__).resolve().parents[1]
 POLICY = ROOT / 'linux/apparmor'
@@ -16,6 +17,12 @@ UNITS = {
     'liner-notes', 'liner-notes-web', 'liner-notes-link',
     'liner-notes-door-broker', 'liner-notes-door-isolation',
 }
+
+def native_fixture():
+    spec = importlib.util.spec_from_file_location('apparmor_root', ROOT/'ci/apparmor_root.py')
+    helper = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(helper)
+    return helper
 
 
 class Policy(unittest.TestCase):
@@ -49,9 +56,7 @@ class Policy(unittest.TestCase):
         self.assertNotIn('/var/backups/', (POLICY/'profiles/liner-notes').read_text())
 
     def test_native_fixture_keeps_project_paths_and_names_private(self):
-        spec = importlib.util.spec_from_file_location('apparmor_root', ROOT/'ci/apparmor_root.py')
-        helper = importlib.util.module_from_spec(spec)
-        spec.loader.exec_module(helper)
+        helper = native_fixture()
         names = {name: 'ln-aa-ci-dummy-' + name for name in PROFILES}
         sources = [(POLICY/'profiles'/name).read_text() for name in sorted(PROFILES)]
         result = helper.assemble(sources, names, Path('/tmp/ln-aa-ci-dummy'), '/tmp/probe')
@@ -61,6 +66,28 @@ class Policy(unittest.TestCase):
         self.assertIn('-> ln-aa-ci-dummy-liner-notes-transfer,', result)
         self.assertNotIn('include if exists <local/', result)
         self.assertNotRegex(result, r'(?m)^  (?:audit deny )?/(?:etc|var/lib|var/log|run)/liner-notes')
+
+    def test_native_fetch_has_https_and_time_bounds(self):
+        helper = native_fixture()
+        url = 'https://raw.githubusercontent.com/matsuotakeshi/liner-notes/example'
+        with patch.object(helper, 'run', return_value='bounded') as invoke:
+            self.assertEqual(helper.get(url, 16384), 'bounded')
+        args = invoke.call_args.args
+        self.assertEqual(args[:2], ('/usr/bin/curl', '-q'))
+        for flag, value in (('--proto', '=https'), ('--connect-timeout', '5'),
+                            ('--max-time', '15'), ('--max-filesize', '16384')):
+            self.assertEqual(args[args.index(flag)+1], value)
+        self.assertEqual(args[-2:], ('--', url))
+
+    def test_native_denial_retries_until_matching_audit_event(self):
+        helper = native_fixture()
+        event = 'apparmor="DENIED" profile="profile" name="/fixture/data" denied_mask="r"'
+        with patch.object(helper, 'probe_run') as probe, patch.object(helper.time, 'sleep') as sleep, \
+             patch.object(helper, 'run', side_effect=[''] * 4 + [event]) as journal:
+            helper.audited_denial('profile', 'unit', '/fixture/probe', 'r', '/fixture/data')
+        self.assertEqual(probe.call_count, 2)
+        self.assertEqual(journal.call_count, 5)
+        self.assertEqual([call.args for call in sleep.call_args_list].count((6,)), 2)
 
     def test_opt_in_inactive_package_layout(self):
         self.assertFalse(list((ROOT / 'debian').glob('liner-notes-apparmor.*inst')))
