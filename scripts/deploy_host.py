@@ -144,6 +144,11 @@ def command(argv, *, accepted=(0,), input=None, with_status=False, package_insta
     return (result.returncode, output) if with_status else output
 
 
+def service_user_candidates(platform):
+    link_users = ('liner_notes_link', 'liner_link') if platform == 'freebsd15' else ('liner_notes_link',)
+    return (('liner_notes',), ('liner_notes_web',), link_users)
+
+
 class Host:
     def __init__(self, profile):
         global COMMAND_LOG
@@ -164,11 +169,10 @@ class Host:
             require(service not in profile['services'] or feature in profile['probes'], 'Enabled service has no health probe')
         require(not profile['backup_roots']['doors'] or 'door' in profile['probes'], 'Registered Doors require a health probe')
         require(profile.get('quiescence_users'), 'Dedicated service accounts must be checked for remaining workers')
-        required_users = {'liner_notes'}
-        for user, service in zip(('liner_notes_web', 'liner_notes_link'), SERVICES[self.platform][1:]):
+        quiescence_users = set(profile['quiescence_users'])
+        for service, users in zip(SERVICES[self.platform], service_user_candidates(self.platform)):
             if service in profile['services']:
-                required_users.add(user)
-        require(required_users <= set(profile['quiescence_users']), 'Known service owner missing from quiescence inventory')
+                require(quiescence_users.intersection(users), 'Known service owner missing from quiescence inventory')
 
     def check_service_inventory(self):
         """Only the three known BBS services; never operate unrelated services."""
@@ -177,7 +181,7 @@ class Host:
         validate_link_processes(command([ps, '-ax', '-o', 'uid=', '-o', 'command=']),
                                 SERVICES[self.platform][2] in self.profile['services'],
                                 {pwd.getpwnam(name).pw_uid for name in self.profile['quiescence_users']})
-        for service, user_name in zip(SERVICES[self.platform], ('liner_notes', 'liner_notes_web', 'liner_notes_link')):
+        for service, users in zip(SERVICES[self.platform], service_user_candidates(self.platform)):
             included = service in self.profile['services']
             if self.platform == 'freebsd15':
                 rc = Path('/usr/local/etc/rc.d') / service
@@ -198,13 +202,14 @@ class Host:
                 require(status != 0 and output in ('inactive', 'failed', 'unknown'),
                         'Omitted BBS service is active or its state is unknown')
             if not included:
-                try:
-                    user = pwd.getpwnam(user_name)
-                except KeyError:
-                    continue
-                pgrep = '/bin/pgrep' if self.platform == 'freebsd15' else '/usr/bin/pgrep'
-                require(not command([pgrep, '-u', str(user.pw_uid)], accepted=(0, 1)),
-                        'Omitted BBS service account still has running workers')
+                for user_name in users:
+                    try:
+                        user = pwd.getpwnam(user_name)
+                    except KeyError:
+                        continue
+                    pgrep = '/bin/pgrep' if self.platform == 'freebsd15' else '/usr/bin/pgrep'
+                    require(not command([pgrep, '-u', str(user.pw_uid)], accepted=(0, 1)),
+                            'Omitted BBS service account still has running workers')
 
     @contextlib.contextmanager
     def lock(self):
