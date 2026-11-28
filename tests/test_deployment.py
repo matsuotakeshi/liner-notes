@@ -608,6 +608,45 @@ class Deployment(unittest.TestCase):
         finally:
             os.umask(previous)
 
+    @unittest.skipUnless(os.name == 'posix' and hasattr(socket, 'AF_UNIX'), 'POSIX link control socket')
+    def test_link_health_probe_uses_fixed_status_request_and_checks_identity(self):
+        node = 'a' * 64
+        path = self.base / 'link.sock'
+        probe = {'transport': 'link-status', 'socket': str(path), 'node': node}
+        with self.assertRaisesRegex(ValueError, 'reserved'):
+            health_probes({'mail': probe}, readiness_seconds=0)
+        with self.assertRaisesRegex(ValueError, 'Invalid link status probe'):
+            health_probes({'link': dict(probe, send='pause')}, readiness_seconds=0)
+
+        for reported_node in (node, 'b' * 64):
+            requests = []
+            with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as server:
+                server.bind(str(path))
+                server.listen()
+                server.settimeout(3)
+
+                def serve():
+                    client, _ = server.accept()
+                    with client, client.makefile('rwb') as stream:
+                        requests.append(json.loads(stream.readline()))
+                        stream.write(json.dumps({'node': reported_node, 'protocol': 2}).encode() + b'\n')
+                        stream.flush()
+
+                thread = threading.Thread(target=serve)
+                thread.start()
+                # The socket in CI can be root-owned. Production requires the unprivileged owner.
+                info = path.lstat()
+                with patch('deploy_restore.Path.lstat',
+                           return_value=SimpleNamespace(st_mode=info.st_mode, st_uid=1000)):
+                    if reported_node == node:
+                        health_probes({'link': probe}, readiness_seconds=0)
+                    else:
+                        with self.assertRaisesRegex(ValueError, 'configured node'):
+                            health_probes({'link': probe}, readiness_seconds=0)
+                thread.join()
+            path.unlink()
+            self.assertEqual(requests, [{'action': 'status'}])
+
     def test_local_tcp_health_probe_executes(self):
         with socket.socket() as server:
             server.bind(('127.0.0.1', 0))

@@ -92,6 +92,8 @@ probeはlocalhostへの送受信で、任意のroot shellコマンドではあ�
 稼働中のサービスがTelnetの場合は該当probeに `"transport": "telnet"` を設定し、最初に接続時の
 プロンプトを待つ交換を置きます。サーバーによるエコーの交渉が成立してからコマンドやパスワードを送ります。
 RAW接続で起動する隔離復元側のprobeは `transport` を省略します。
+局間連携の管理ソケットで確認する場合は、`link` probeに `"transport": "link-status"`、絶対パスの `socket`、
+連携ノードの公開鍵指紋 `node` を設定します。読み取り専用の状態確認を送り、同じノードが応答することを検査します。
 profileから省略した既知のBBS/Web/linkサービスは、read-only statusと専用アカウントの
 worker確認で非稼働を確かめます。稼働サービスの漏れや、停止確認対象から外れた所有者を
 検出した場合は、BBSを止める前に拒否します。FreeBSDの標準配布には現時点でlink専用rcが
