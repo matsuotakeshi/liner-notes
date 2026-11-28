@@ -1,6 +1,6 @@
-# LN-38-C / D production design for review
+# LN-38-C / D production design
 
-The current supervisor requires one distinct UID/GID and one working directory
+Fixed-slot configuration requires one distinct UID/GID and one working directory
 for each configured (game, node) tuple. The isolation configuration supports
 up to 128 entries. The catalog's configured game capacities are not a measurement
 of site-wide simultaneous demand. The site inventory has 22 games configured
@@ -86,3 +86,58 @@ previous and next launch generations, capacity exhaustion, dropped privileges,
 consumer and non-consumer identity separation, storage access, and rollback.
 The 2026-11-20 independent review accepted the scoped replay-watermark fix in
 its review scope; its native and real-game qualifications still apply.
+
+## Approved per-game policy
+
+The operator selected dedicated per-game pools and deferred concurrency tuning.
+Keep existing fixed entries in `slots`. A game appears in either `slots` or
+`pools`, with one policy per pooled game. The following is a lab example of
+the additional fields, using synthetic identities and an illustrative node
+count.
+
+```json
+{
+  "slots": [],
+  "pools": [
+    {
+      "door": 7, "nodes": 32, "level": 0, "seconds": 30,
+      "auth": true, "drop": false,
+      "exe": "/usr/local/libexec/example-lobby",
+      "cwd": "/var/db/example-lobby/assets",
+      "accounts": [{"uid": 7001, "gid": 7001}, {"uid": 7002, "gid": 7002}]
+    }
+  ]
+}
+```
+
+Set `nodes` to that game's configured logical node count. The game receives a
+free node through `LINER_DOOR_NODE`. Two accounts in this example can run two
+simultaneous instances. The 128-account validation bound includes all fixed
+slots and all pool members. Broker `door_uids` must match that full set.
+The optional top-level `max_active` caps simultaneous reservations across
+fixed and pooled games, including quarantined reservations. With the field
+omitted, no separate site-wide cap applies. Exhaustion rejects admission
+without falling back to the BBS UID or changing `doors.conf`.
+
+Choose dedicated identities with no previous game ownership when provisioning
+a pool. The supervisor persists the game assignment in `pool-uid-<uid>` and
+takes one lifetime lock for each configured state directory. Keep the
+root-owned state directory on persistent local storage. Preserve its assignment
+and reservation records during upgrades and rollback. Keep retired pooled
+accounts reserved to the same game. A missing ledger after state loss must be
+reconciled against provisioning records before starting the service.
+
+The working directory and its ancestors must be root-owned. Pooled execution
+gets a private per-launch `HOME` and `TMPDIR`. The supervisor removes the
+standard drop file after process cleanup. Unexpected files or surviving
+processes keep the UID and logical node reserved for inspection. A root-owned
+working directory and a private temporary directory cannot restrict an
+application that writes to other writable paths. Enable a pool only for a
+reviewed launcher whose persistent state is held by a separately identified
+server, or whose writable paths, ownership and cleanup were validated
+independently. Keep a fixed-slot policy for games tied to persistent node state
+until the game-specific migration has been tested.
+
+Before production rollout, confirm FreeBSD process cleanup, concurrent
+admission, IPC permissions across daemon restart and login with private
+AREA-PC88 fixtures. Record the legacy games that still require acceptance.
