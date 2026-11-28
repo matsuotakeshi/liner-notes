@@ -124,3 +124,38 @@ LinuxでMMMを既定とするには `--ui-default mmm`、固定は `--ui-policy 
 | WebUI | 別サービス・Web設定 | 別service・Web設定 | BBSへの接続とApache・TLSの準備。[Web](web-server.md) |
 
 この表と例はv0.76のソース・配布設定と照合した文書です。環境ごとの設定変更・接続・サービス再起動が成功することを保証するものではありません。実行前にバックアップし、各OSの導入ページに従って検証してください。
+
+## v0.76のBBS間リンク配布
+
+Rocky Linux 10とDebian 13では、本体と同じ版の `liner-notes-link` パッケージに
+`liner-notes-link.service` と `liner-notes-link` コマンドが入っています。設定は
+`/etc/liner-notes/link.toml`、標準の状態領域は `/var/lib/liner-notes-link` です。
+各局で[共有ボードと専用会員を準備](links.md#共有単位と権限)し、環境ファイルのPORTより前に
+`--link-accounts /etc/liner-notes/link-accounts.conf` を追加します。鍵とパスワードファイルは
+専用OSユーザーの読み取りに限定します。設定・告知・バックアップ後に本体を再起動します。
+
+```sh
+sudo -u liner_notes_link liner-notes-link check --config /etc/liner-notes/link.toml
+sudo systemctl start liner-notes-link
+sudo systemctl status liner-notes-link
+sudo -u liner_notes_link liner-notes-link status --config /etc/liner-notes/link.toml
+# 双方向の投稿・返信を確認したあと、起動時に有効化する場合だけ実行
+sudo systemctl enable liner-notes-link
+```
+
+FreeBSDのv0.76はLINKオプションのCLIを配布します。リンク専用rc.dの同梱はこのタグ以降の変更です。
+v0.76では `sysrc liner_notes_link_accounts=/usr/local/etc/liner-notes/link-accounts.conf`
+で本体へ割り当てを設定し、[FreeBSDの準備](links.md#freebsdでの準備)に従って専用OSユーザーで
+`check` と `serve` を実行します。停止・監視は設置者が構成します。署名鍵を交換先へ渡さず、
+公開証明書を別経路で照合してから接続します。[状態確認・バックアップと再同期](link-operations.md)。
+
+## 新規局の設定例
+
+| 構成 | FreeBSDのrc.conf | Linuxのオプション | 確認 |
+|---|---|---|---|
+| 最小構成 | `liner_notes_bind="127.0.0.1"`、`liner_notes_port="2222"` | `--bind 127.0.0.1`、位置引数のPORTに `2222` | [初期設定](initial-setup.md)で最初の管理者を用意し、ローカルからログイン |
+| RTBBS専用 | `liner_notes_ui_policy="FIXED"`、既定・許可を `rtbbs` に設定 | `--ui-policy FIXED --ui-default rtbbs --ui-allow rtbbs` | ログイン後にRTBBSが選ばれること |
+| MMM専用 | `liner_notes_ui_policy="FIXED"`、既定・許可を `mmm` に設定 | `--ui-policy FIXED --ui-default mmm --ui-allow mmm` | ログイン後にMMMが選ばれること |
+| ゲストを許可 | `liner_notes_ui_policy="ALL"` で許可UIを列挙する場合でも、閲覧権限はボード設定で指定 | `--ui-policy ALL`。接続方式と権限の設定も確認 | 未ログインで許可ボードだけ閲覧できること。会員登録ポリシーは別に設定 |
+
+既存局ではポート・保存先・ACLを上記の値へ一括置換しません。
