@@ -469,7 +469,6 @@ class Deployment(unittest.TestCase):
                 validate_link_processes(text, managed, owners)
         validate_link_processes('80 /usr/local/sbin/httpd -D FOREGROUND', False, set())
 
-    @unittest.skipUnless(os.name == 'posix', 'POSIX service accounts are exercised on hosted Linux')
     def test_freebsd_process_inventory_parses_separate_uid_and_command_fields(self):
         host = object.__new__(Host)
         host.platform = 'freebsd15'
@@ -481,6 +480,7 @@ class Deployment(unittest.TestCase):
                 host.check_service_inventory()
         ps.assert_called_once_with(['/bin/ps', '-ax', '-o', 'uid=', '-o', 'command='])
 
+    @unittest.skipUnless(os.name == 'posix', 'POSIX service accounts are exercised on hosted Linux')
     def test_omitted_running_service_is_rejected_without_stop(self):
         host = object.__new__(Host)
         host.platform = 'rocky10'
