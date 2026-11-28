@@ -1,5 +1,7 @@
 # 変更履歴
 
+- 配備前後に局間連携のUnixソケットで読み取り専用の状態確認を行い、設定した連携ノードの応答を確認できるようにした。
+
 - Development candidate: opt-in libssh listener with BBS password/public-key authentication, shared Core/session/ACL/Door lifecycle, bounded authentication and default-deny SSH requests. Encrypted interoperability is covered by Hosted CI; native SSH/SELinux validation is not yet complete.
 
 - FreeBSD更新試験のメール閲覧では専用プロンプトを待ち、主メニューへの復帰も確認します。rootless/jail試験の構造化DB復元で導入済み変換ツールを明示し、同じ読戻しをhosted CIで先行検証します。

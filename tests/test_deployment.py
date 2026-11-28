@@ -469,6 +469,39 @@ class Deployment(unittest.TestCase):
                 validate_link_processes(text, managed, owners)
         validate_link_processes('80 /usr/local/sbin/httpd -D FOREGROUND', False, set())
 
+    def test_link_can_use_dedicated_liner_link_account(self):
+        directory = MagicMock(spec=Path)
+        directory.is_dir.return_value = True
+        directory.stat.return_value = SimpleNamespace(st_mode=0o700)
+        for target in policy.TARGETS:
+            platform = policy.PLATFORMS[target]
+            services = policy.SERVICES[platform]
+            profile = {
+                'target': target, 'state_directory': '/private-state',
+                'services': [services[0], services[2]],
+                'quiescence_users': ['liner_notes', 'liner_link'],
+                'backup_roots': {'doors': []},
+                'probes': {k: {} for k in ('login', 'article', 'mail', 'link')},
+                'backup_storage': 'local',
+            }
+            with self.subTest(target=target), patch('deploy_host.trusted', return_value=directory), \
+                    patch('deploy_host.validate_backup_inventory'), patch('deploy_host.COMMAND_LOG', None):
+                Host(profile)
+                profile['quiescence_users'] = ['liner_notes']
+                with self.assertRaisesRegex(ValueError, 'Known service owner missing'):
+                    Host(profile)
+
+    def test_freebsd_process_inventory_parses_separate_uid_and_command_fields(self):
+        host = object.__new__(Host)
+        host.platform = 'freebsd15'
+        host.profile = {'services': ['liner_notes'], 'quiescence_users': ['liner_notes']}
+        process = '1007 /usr/local/bin/python3.12 /usr/local/share/liner-notes/scripts/link_service.py serve'
+        users = SimpleNamespace(getpwnam=lambda name: SimpleNamespace(pw_uid=995))
+        with patch.dict(sys.modules, {'pwd': users}), patch('deploy_host.command', return_value=process) as ps:
+            with self.assertRaisesRegex(ValueError, 'no managed stop/backup owner'):
+                host.check_service_inventory()
+        ps.assert_called_once_with(['/bin/ps', '-ax', '-o', 'uid=', '-o', 'command='])
+
     @unittest.skipUnless(os.name == 'posix', 'POSIX service accounts are exercised on hosted Linux')
     def test_omitted_running_service_is_rejected_without_stop(self):
         host = object.__new__(Host)
@@ -607,6 +640,45 @@ class Deployment(unittest.TestCase):
             self.assertEqual(os.umask(0o077), 0o077)
         finally:
             os.umask(previous)
+
+    @unittest.skipUnless(os.name == 'posix' and hasattr(socket, 'AF_UNIX'), 'POSIX link control socket')
+    def test_link_health_probe_uses_fixed_status_request_and_checks_identity(self):
+        node = 'a' * 64
+        path = self.base / 'link.sock'
+        probe = {'transport': 'link-status', 'socket': str(path), 'node': node}
+        with self.assertRaisesRegex(ValueError, 'reserved'):
+            health_probes({'mail': probe}, readiness_seconds=0)
+        with self.assertRaisesRegex(ValueError, 'Invalid link status probe'):
+            health_probes({'link': dict(probe, send='pause')}, readiness_seconds=0)
+
+        for reported_node in (node, 'b' * 64):
+            requests = []
+            with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as server:
+                server.bind(str(path))
+                server.listen()
+                server.settimeout(3)
+
+                def serve():
+                    client, _ = server.accept()
+                    with client, client.makefile('rwb') as stream:
+                        requests.append(json.loads(stream.readline()))
+                        stream.write(json.dumps({'node': reported_node, 'protocol': 2}).encode() + b'\n')
+                        stream.flush()
+
+                thread = threading.Thread(target=serve)
+                thread.start()
+                # The socket in CI can be root-owned. Production requires the unprivileged owner.
+                info = path.lstat()
+                with patch('deploy_restore.Path.lstat',
+                           return_value=SimpleNamespace(st_mode=info.st_mode, st_uid=1000)):
+                    if reported_node == node:
+                        health_probes({'link': probe}, readiness_seconds=0)
+                    else:
+                        with self.assertRaisesRegex(ValueError, 'configured node'):
+                            health_probes({'link': probe}, readiness_seconds=0)
+                thread.join()
+            path.unlink()
+            self.assertEqual(requests, [{'action': 'status'}])
 
     def test_local_tcp_health_probe_executes(self):
         with socket.socket() as server:

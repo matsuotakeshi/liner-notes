@@ -1,6 +1,8 @@
 """Read-only verification of backup copies and configured local health probes."""
 import hashlib
 import contextlib
+import json
+import re
 import os
 from pathlib import Path
 import socket
@@ -123,6 +125,35 @@ def verify_restored(restored, roots, checks):
                 'Restored application records differ')
 
 
+def link_status_probe(probe, readiness_seconds):
+    require(set(probe) == {'transport', 'socket', 'node'}, 'Invalid link status probe')
+    path = Path(probe['socket'])
+    require(path.is_absolute() and re.fullmatch(r'[0-9a-f]{64}', probe['node']),
+            'Link status requires an absolute socket and pinned node identity')
+    deadline = time.monotonic() + readiness_seconds
+    with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as stream:
+        stream.settimeout(2)
+        while True:
+            try:
+                info = path.lstat()
+                require(stat.S_ISSOCK(info.st_mode) and info.st_uid != 0,
+                        'Link control path must be a service-owned socket')
+                stream.connect(str(path))
+                break
+            except (FileNotFoundError, ConnectionRefusedError):
+                require(time.monotonic() < deadline, 'Link control service did not become ready')
+                time.sleep(0.2)
+        # Keep privileged probes read-only. Never take a control request or payload from the profile.
+        stream.sendall(b'{"action":"status"}\n')
+        with stream.makefile('rb') as response:
+            line = response.readline(65537)
+        require(len(line) <= 65536 and line.endswith(b'\n'), 'Invalid link status response')
+        status = json.loads(line)
+        require(isinstance(status, dict) and 'error' not in status and status.get('node') == probe['node']
+                and type(status.get('protocol')) is int and status['protocol'] > 0,
+                'Link status does not match the configured node')
+
+
 def health_probes(probes, readiness_seconds=30):
     """Local raw TCP or Telnet exchanges, without shell or external hosts.
 
@@ -131,6 +162,10 @@ def health_probes(probes, readiness_seconds=30):
     Do not put private profiles into Actions artifacts.
     """
     for name, probe in probes.items():
+        if probe.get('transport') == 'link-status':
+            require(name == 'link', 'Link status transport is reserved for the link health probe')
+            link_status_probe(probe, readiness_seconds)
+            continue
         require(probe['host'] in ('127.0.0.1', '::1'), 'Health probes must stay on this host')
         require(type(probe['port']) is int and 0 < probe['port'] < 65536 and probe['exchanges'], 'Invalid health probe')
         transport = probe.get('transport', 'raw')
