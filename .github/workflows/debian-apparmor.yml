@@ -36,6 +36,9 @@ jobs:
             for item in /sys/kernel/security/lsm /sys/module/apparmor/parameters/enabled; do
               if test -r "$item"; then cat "$item"; else printf "Unreadable: %s\n" "$item"; fi
             done
+            if test -r /etc/ssh/ssh_host_ed25519_key.pub; then
+              ssh-keygen -E sha256 -lf /etc/ssh/ssh_host_ed25519_key.pub
+            fi
             if test -x /usr/sbin/apparmor_parser; then /usr/sbin/apparmor_parser --version; fi' |
             tee apparmor-evidence/inventory.txt
           if [[ "$RUN_ENFORCE" = true ]]; then
