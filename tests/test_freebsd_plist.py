@@ -32,6 +32,14 @@ def check_help_samples(content):
 def main():
     content = PLIST.read_text(encoding="utf-8").splitlines()
     help_count = check_help_samples(content)
+    uid_file = PLIST.parent / 'files/UIDs'
+    link, = [line.split(':') for line in uid_file.read_text(encoding='utf8').splitlines()
+             if line.startswith('liner_notes_link:')]
+    # Ports creates ordinary home directories before the guarded post-install.
+    assert link[8] == '/nonexistent', 'Link state must be created by the package with mode 0700'
+    assert any(line.startswith('%%LINK%%@postexec ') and
+               'install -d -m 0700 -o liner_notes_link -g liner_notes_linkctl /var/db/liner-notes-link' in line
+               for line in content), 'Missing private link-state directory setup'
     sys.path.insert(0,str(ROOT/'scripts/manual'))
     from build import build
     with tempfile.TemporaryDirectory(prefix='manual-plist-') as tmp:
