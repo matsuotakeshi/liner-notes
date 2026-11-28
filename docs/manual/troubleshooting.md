@@ -105,3 +105,16 @@ Clansの小さなclansスクリプトは異常ではありません。同じ場�
 `check` は設定検査、`status` は状態です。TLSの相手ID・証明書期限、peersとoriginsの共有範囲、BBS専用会員の認証・ボード許可・容量、pending/deferredを確認します。protocol 2に全ノードをそろえます。
 
 対向が古いDBへ復元されカーソルが進み過ぎた場合は、状態を確認して停止中にreset-peerします。本体だけを古いデータへ戻しリンク側の適用済み記録を残さないでください。履歴整理後の参加・復旧は署名付きスナップショットを新しいDBへ検証して取り込みます。[リンク保守](link-operations.md)を参照してください。
+
+## AppArmorによる拒否を調べる
+
+```sh
+sudo journalctl -k -b | grep 'apparmor="DENIED"'
+```
+
+`profile`、`operation`、`name`、`denied_mask` を確認し、
+対象PIDの `/proc/<PID>/attr/current` と照合します。
+Unix所有者・モード、systemdの `ReadWritePaths` などでもアクセスは拒否されます。
+証跡と設定を照合し、正規操作に必要な実パスだけをローカル追加設定へ反映して
+構文検査、再読込、再試験を行います。制約の全体無効化やログに出た全操作の許可は避けます。
+起動に失敗したときは、対応するプロファイルがカーネルにロードされていることも確認します。

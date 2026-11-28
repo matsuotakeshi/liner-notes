@@ -37,3 +37,48 @@ Test dependencies: Debian 13 amd64 with AppArmor enabled; parser compile-only
 in a Hosted container; live Enforce and denial evidence on trusted main in
 the designated Debian VM only. Debian 12 and Ubuntu compatibility remain
 unverified.
+
+
+## Packaging and acceptance
+
+The existing Debian package workflow compiles the policy with
+`apparmor_parser -Q -K`, installs the separate DEB, upgrades the standard
+packages and the policy together to a second revision, and purges the policy.
+The test checks that administrator-managed local rules and activation drop-ins
+still have the same bytes. The optional DEB is a separate Actions artifact
+with its base version, source SHA and SHA-256. It is outside the standard three
+DEBs consumed by the production deployment adapter.
+
+The main-only Debian AppArmor workflow defaults to a read-only inventory over
+the existing Debian CI SSH identity. Its `enforce` input invokes a separately
+installed fixed helper and verifies that the helper hash matches reviewed main.
+The helper is an independent file-boundary probe: it uses private test
+profiles and tests with synthetic files accessible to the same unprivileged UID
+without a profile. It checks Enforce labels and kernel denial events. It does
+not run the full BBS, Web, link, SSH, Door or transfer workloads.
+
+After approval, the administrator installs the reviewed `ci/apparmor_root.py`
+as root-owned mode 0755 at `/usr/local/libexec/liner-notes-apparmor-ci`.
+Verify its SHA-256 against reviewed main. The proposed sudoers entry must be
+validated with `visudo`. It has a fixed executable and one exact SHA argument:
+
+```sudoers
+ci-test ALL=(root) NOPASSWD: /usr/local/libexec/liner-notes-apparmor-ci ^[0-9a-f]{40}$
+```
+
+The host needs AppArmor already enabled, the parser, systemd, a kernel journal
+with AppArmor events, and Clang. The helper loads only random test profile
+names, checks for residual uses before removal, and leaves failed fixture
+inputs available for administrator diagnosis. It does not use site service
+units, site data, or custom AppArmor includes. A normal CI run cannot provision
+the sudo rule or helper.
+
+Full service acceptance is a separate gate on reviewed main. The lab needs
+isolated package instances and synthetic database, key, and user fixtures.
+Verify login, persistence and WAL, Web writes, link TLS and signed replication,
+embedded SSH, real transfer and resume, Door PTY plus Broker, and offline
+backup/restore with the actual service profiles. Record kernel feature support,
+package lifecycle results, and the Enforce labels. SSH, transfers and Door
+remain development candidates until these workloads and refusal cases pass.
+Ubuntu and Debian 12 are unverified. The site team receives only the canonical
+manual after a formally approved release.

@@ -234,3 +234,40 @@ dpkg-buildpackage -b -us -uc
 CIの同一ソースによるパッケージリビジョン更新試験は、設定・合成SQLiteデータ・ダミー鍵の保持確認です。旧版からの実データ移行、動作中サービスの無停止更新、バックアップからの復旧を保証するものではありません。DEBは検証候補として扱い、本番更新は別途判断してください。
 
 Debian 13のパッケージCIでは、導入済みdoctorモジュールに対して正常・破損設定、権限、WAL、秘密情報の非表示を含む全診断回帰を実行します。導入済みBBSが作ったblocks/structured形式の合成DBを導入済みCLIで検査し、内容・mode・更新時刻・ファイル一覧が変わらないことも確認します。既定設定の`--check-doors`検査と合わせ、ログとソースSHAを`doctor-debian13-evidence` Artifactへ保存します。これは使い捨てコンテナでの検証であり、Debian実機のsystemd常駐・再起動試験とは区別します。
+
+## 任意のAppArmor DEB
+
+開発中の `liner-notes-apparmor` は、同じ版の本体DEBと別途導入します。
+Debian 13 amd64の標準DEB配置を対象とします。Debian 12・Ubuntuに同じDEBを導入する手順は未検証です。
+
+```sh
+sudo apt install apparmor apparmor-utils
+sudo aa-status
+pkg_version=$(dpkg-query -W -f='${Version}' liner-notes)
+sudo apt install "./liner-notes-apparmor_${pkg_version}_all.deb"
+sudo apparmor_parser -Q -K /etc/apparmor.d/liner-notes
+sudo apparmor_parser -r -K /etc/apparmor.d/liner-notes
+```
+
+パッケージは名前付きプロファイルとテンプレートを置きます。
+既存サービスの有効化、制約の適用、再起動は管理者が行います。
+本体用の例を選ぶ場合は、既存のサービス定義とdrop-inを先に確認します。
+
+```sh
+sudo systemctl cat liner-notes.service
+sudo install -d -m 0755 /etc/systemd/system/liner-notes.service.d
+conf=/etc/systemd/system/liner-notes.service.d/90-apparmor.conf
+sudo test ! -e "$conf" &&
+  sudo install -m 0644 /usr/share/liner-notes-apparmor/systemd/liner-notes.service.conf "$conf"
+sudo systemctl daemon-reload
+sudo systemctl restart liner-notes.service
+pid=$(systemctl show -p MainPID --value liner-notes.service)
+test "$pid" -gt 0 && sudo cat "/proc/$pid/attr/current"
+```
+
+`liner-notes (enforce)` を確認してからログイン・保存・転送を確認します。
+転送を使う場合は先に `liner-notes-transfer` を構文検査してロードします。
+Web・リンク・Doorでは対応するプロファイルとテンプレートを個別に選びます。
+特権Door起動サービスとBrokerのベースunitは、既存の隔離導入手順に従って管理者が設置します。
+[RockyのSELinuxとDebianのAppArmor](security.md)、
+[停止・解除](operations.md)も参照してください。

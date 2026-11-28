@@ -100,3 +100,34 @@ BBS・ゲームクライアントからBrokerへの直接接続、ゲームか�
 追加のラベル復旧は明示操作とし、既存のローカルラベル設定を保持します。
 ポリシーRPMの生成・許可表検査と、実際のEnforcing下でのサービス動作は別検証です。
 この追加分の実機成功が確認されるまでは、本番への有効化手順として扱わないでください。
+
+## 任意のDebian AppArmorポリシー
+
+開発中の `liner-notes-apparmor` はDebian 13 amd64の標準DEB配置が対象です。
+Debian 12・Ubuntu・ソースインストール版の動作は未検証です。
+
+SELinuxは主にラベル、AppArmorは主にファイルのパスとプロセスのプロファイルで制約します。
+どちらもサービス専用ユーザー、Unix権限、systemdの既存制約、BBSの認証・ACLと併用します。
+AppArmorがカーネルで有効でも、対象プロセスにプロファイルが付いているかは別に確認します。
+Enforceではポリシーが違反操作を拒否します。Complainでは通常の許可ルールの不足はログ記録にとどまり、明示的な拒否は適用されます。
+
+| プロファイル | 主な範囲 |
+| --- | --- |
+| `liner-notes` | 本体データ・ログ・専用SSH鍵、Telnet／内蔵SSH、転送・隔離コネクタ |
+| `liner-notes-web` | Web専用設定・spool、BBSプロトコル、リンク管理ソケット |
+| `liner-notes-link` | 専用DB・ノード鍵・TLS・リンク会員の認証ファイル |
+| `liner-notes-transfer` | 継承した転送RPC、spool、明示した転送プログラム |
+| `liner-notes-admin` | 明示起動するオフライン管理と専用バックアップ先 |
+| `liner-notes-door-broker` | Broker専用設定とUnixソケット |
+| `liner-notes-door-launcher` | 別UID起動、PTY、実行枠とBroker接続 |
+| `liner-notes-door` | 管理者が承認した1ゲーム分のプロファイル例 |
+
+Web・リンク・DoorにBBS原本への直接アクセスを許可していません。転送は本体から
+別プロファイルへ必ず遷移します。Doorは別UIDの隔離経路を前提とし、登録済みの
+実行ファイルごとに管理者が遷移を明示します。認証consumerは外部アプリケーション側の
+専用ポリシーと受入試験が必要です。
+
+カーネルによるネットワーク・Unixソケットの制約は機能セットに依存します。
+Door起動用の有効化例ではsystemdでもソケットファミリーをAF_UNIXに限定します。
+接続先・ソケット利用者は、運用上のファイアウォール、Unix権限とアプリケーション側の確認を併用します。
+導入は[Linuxの導入](install-linux.md)、独自配置は[設定](configuration.md)を参照してください。
