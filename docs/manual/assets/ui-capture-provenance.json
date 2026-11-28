@@ -26,10 +26,12 @@
     "environment": "isolated FreeBSD fixture; disposable account and article",
     "source_commit": "66b157e7b76a9e0be23fd870de63adc5afbddc58",
     "method": "Chrome full-page screenshots",
-    "language": "ja",
+    "language": "ja and en",
     "images": {
       "ui-web-home-ja.png": "9f1ca18bb40a3baef7a982a8d993fc492c639f715fc151a2efc47951474b3303",
-      "ui-web-article-ja.png": "e888e39a8333e12e85e200b817447c971e2a925125e9780139f7fa679ab79b85"
+      "ui-web-article-ja.png": "e888e39a8333e12e85e200b817447c971e2a925125e9780139f7fa679ab79b85",
+      "ui-web-home-en.png": "c69a455d657c3abf8d08637e72fd2be2b1270f462fd7dfbd1efb5c2320d61b3c",
+      "ui-web-article-en.png": "1ed2b476a18a98fd7d8bd7df9c9df98aba90a5ef4f7152d6a2db0b84d96eb2f0"
     }
   }
 }

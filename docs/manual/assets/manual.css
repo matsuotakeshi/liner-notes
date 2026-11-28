@@ -13,3 +13,5 @@
   cursor: pointer;
 }
 .manual-copy + pre { margin-top: .35rem; }
+
+@media(max-width:700px){.manual-article table{width:max-content;max-width:100%;overflow-x:auto}.manual-article th,.manual-article td{min-width:11rem;overflow-wrap:normal}.manual-article td code{overflow-wrap:normal}}

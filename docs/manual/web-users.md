@@ -125,3 +125,9 @@ FreeBSDの隔離された検証環境でv0.76を起動し、試用会員でロ�
 ![WebUIホーム画面](../assets/ui-web-home-ja.png)
 
 ![WebUIの記事本文と操作](../assets/ui-web-article-ja.png)
+
+英語表示でも同じ検証環境のホーム画面と記事を確認できます。
+
+![WebUI home in English](../assets/ui-web-home-en.png)
+
+![WebUI article in English](../assets/ui-web-article-en.png)
