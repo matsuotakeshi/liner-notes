@@ -105,6 +105,10 @@ if [ -d /run/systemd/system ]; then systemctl daemon-reload >/dev/null 2>&1 || :
 getent group liner_notes_linkctl >/dev/null || groupadd -r liner_notes_linkctl
 getent passwd liner_notes_link >/dev/null || useradd -r -g liner_notes_linkctl -d /var/lib/liner-notes-link -s /sbin/nologin liner_notes_link
 %post link
+if [ ! -e /var/lib/liner-notes-link ] && [ ! -L /var/lib/liner-notes-link ]; then
+    install -d -m 0700 -o liner_notes_link -g liner_notes_linkctl /var/lib/liner-notes-link || exit 1
+    if command -v restorecon >/dev/null 2>&1; then restorecon /var/lib/liner-notes-link || exit 1; fi
+fi
 if [ -d /run/systemd/system ]; then systemctl daemon-reload >/dev/null 2>&1 || :; fi
 %preun link
 %systemd_preun liner-notes-link.service

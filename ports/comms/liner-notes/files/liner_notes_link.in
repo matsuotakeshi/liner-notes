@@ -1,0 +1,92 @@
+#!/bin/sh
+# PROVIDE: liner_notes_link
+# REQUIRE: NETWORKING liner_notes
+# KEYWORD: shutdown
+
+. /etc/rc.subr
+
+name=liner_notes_link
+rcvar=liner_notes_link_enable
+command=/usr/sbin/daemon
+procname=/usr/sbin/daemon
+start_cmd=liner_notes_link_start
+status_cmd=liner_notes_link_status
+stop_cmd=liner_notes_link_stop
+
+load_rc_config "$name"
+: ${liner_notes_link_enable:=NO}
+: ${liner_notes_link_run_user:=liner_notes_link}
+: ${liner_notes_link_control_group:=liner_notes_linkctl}
+: ${liner_notes_link_config:=%%ETCDIR%%/link.toml}
+: ${liner_notes_link_stop_timeout:=60}
+
+pidfile=/var/run/liner_notes_link.pid
+runtime_dir=/var/run/liner-notes-link
+
+liner_notes_link_pid()
+{
+    pid=$(check_pidfile "$pidfile" "$procname") || return 1
+    [ -n "$pid" ] || return 1
+    # Distinguish our supervisor from other daemon(8) instances after PID reuse.
+    supervisor_uid=$(ps -p "$pid" -o uid=) || return 1
+    [ "$supervisor_uid" -eq 0 ] 2>/dev/null || return 1
+    title=$(ps -ww -p "$pid" -o args=) || return 1
+    case "${title% (daemon)}" in
+        "daemon: liner_notes_link["*"]") printf '%s\n' "$pid" ;;
+        *) return 1 ;;
+    esac
+}
+
+liner_notes_link_start()
+{
+    if liner_notes_link_pid >/dev/null; then
+        echo "${name} is already running."
+        return 0
+    fi
+    if [ ! -f "$liner_notes_link_config" ]; then
+        warn "Missing configuration: $liner_notes_link_config"
+        return 1
+    fi
+    if [ "$(id -u "$liner_notes_link_run_user")" -gt 0 ] 2>/dev/null; then
+        install -d -m 0750 -o "$liner_notes_link_run_user" \
+            -g "$liner_notes_link_control_group" "$runtime_dir" || return 1
+    else
+        warn "Choose an existing non-root link service account."
+        return 1
+    fi
+    umask 077
+    "$command" -f -r -R 5 -P "$pidfile" -t "$name" -S -T "$name" \
+        -u "$liner_notes_link_run_user" "%%PREFIX%%/bin/liner-notes-link" \
+        serve --config "$liner_notes_link_config"
+}
+
+liner_notes_link_status()
+{
+    if pid=$(liner_notes_link_pid); then
+        echo "${name} is running as pid ${pid}."
+    else
+        echo "${name} is not running."
+        return 1
+    fi
+}
+
+liner_notes_link_stop()
+{
+    pid=$(liner_notes_link_pid) || return 0
+    kill -TERM "$pid" || return 1
+    case "$liner_notes_link_stop_timeout" in
+        ''|*[!0-9]*) remaining=60 ;;
+        *) remaining=$liner_notes_link_stop_timeout ;;
+    esac
+    # daemon(8) forwards TERM and disables restarts before reaping its child.
+    while [ "$(liner_notes_link_pid)" = "$pid" ]; do
+        if [ "$remaining" -le 0 ]; then
+            warn "Link supervisor did not exit. Inspect its log before restarting."
+            return 1
+        fi
+        sleep 1
+        remaining=$((remaining - 1))
+    done
+}
+
+run_rc_command "$1"

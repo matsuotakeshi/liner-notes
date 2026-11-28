@@ -32,7 +32,8 @@ GID_FILES=	${FILESDIR}/GIDs
 
 SUB_FILES=	liner-notes-admin liner-notes-doctor liner-notes-maintenance \
 		liner-notes-zmodem liner-notes-check-resume liner-notes-link liner-notes-serial \
-		liner_notes.conf doors.conf pkg-message liner_notes_door_broker liner_notes_door_isolation
+		liner_notes.conf doors.conf pkg-message liner_notes_door_broker liner_notes_door_isolation \
+		liner_notes_link
 SUB_LIST=	PYTHON_CMD=${PYTHON_CMD}
 
 OPTIONS_DEFINE=	DOCS WEBUI ZMODEM LINK SSH
@@ -54,6 +55,10 @@ ZMODEM_RUN_DEPENDS=	lrzsz>=0.13.1:comms/lrzsz
 .if ${PORT_OPTIONS:MWEBUI}
 USERS+=		liner_notes_web
 GROUPS+=	liner_notes_web
+.endif
+.if ${PORT_OPTIONS:MLINK}
+USERS+=		liner_notes_link
+GROUPS+=	liner_notes_linkctl
 .endif
 
 # Public executables in sbin/bin; support files in DATADIR.
@@ -108,6 +113,7 @@ do-install-WEBUI-on:
 	${MKDIR} ${STAGEDIR}/var/db/liner-notes-web/spool
 
 do-install-LINK-on:
+	${INSTALL_SCRIPT} ${WRKDIR}/liner_notes_link ${STAGEDIR}${DATADIR}/liner_notes_link.sample
 	${INSTALL_SCRIPT} ${WRKDIR}/liner-notes-link ${STAGEDIR}${PREFIX}/bin/
 	${INSTALL_DATA} ${WRKSRC}/link.example.toml ${STAGEDIR}${ETCDIR}/link.toml.sample
 	${INSTALL_DATA} ${WRKSRC}/link-accounts.example.conf ${STAGEDIR}${ETCDIR}/link-accounts.conf.sample
