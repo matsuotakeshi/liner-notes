@@ -117,7 +117,9 @@ port = {peer_port}
                         continue
                     result = json.loads(command([wrapper, 'status', '--config', cfg], user=account))
                     assert result['node'] == node
-                    children = command(['/bin/ps', '-o', 'pid=,ppid=,uid=', '-ax']).splitlines()
+                    # On FreeBSD an equals sign consumes the rest of an -o argument as a header.
+                    children = command(['/bin/ps', '-ax', '-o', 'pid=', '-o', 'ppid=',
+                                        '-o', 'uid=']).splitlines()
                     child, = [p for p, ppid, uid in map(str.split, children)
                               if ppid == pid and int(uid) == account.pw_uid]
                     return pid, child
