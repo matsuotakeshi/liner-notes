@@ -1,0 +1,25 @@
+{
+  "product": "Liner Notes v0.76",
+  "source_commit": "66b157e7b76a9e0be23fd870de63adc5afbddc58",
+  "environment": "isolated Linux CI, disposable test account",
+  "method": "actual terminal output rendered as 80 x 24 cells",
+  "ci_run": "https://github.com/matsuotakeshi/liner-notes/actions/runs/46114618288",
+  "images": {
+    "ui-big-model-en.png": "1677d0e3404170565625c70cf6e2743bdeb31c4197c14429431ba39fc31df89e",
+    "ui-big-model-ja.png": "55e27212a6bd944117547d66505c5f997a14a10bf7964e9db9ce9a92e91955f3",
+    "ui-ktbbs-en.png": "56c57cddecd4ccb6c57b89c8bd1d9d380a7ff1200f3e1a1071e87b6cc19c3dd4",
+    "ui-ktbbs-ja.png": "89c8a6fcff2ff5d8ee9325802b388202496ff4593e5a8642affc7df552ecf580",
+    "ui-mash-en.png": "568bdf13ddc91cbeac062f13590dd136f00a93c928c831a1763b5b196dd657ca",
+    "ui-mash-ja.png": "406569a53a9f757cd1f6b896e6b328b51f4e9556ab654b245acfefca041724bb",
+    "ui-mmm-en.png": "07147d101dbdba9c83b5f888e045d20b49ef0a64cd2e10277308924cdf8b4e43",
+    "ui-mmm-ja.png": "d7806943203171b57701ea816b47564af27926a43c126274daa9afa2d55c5b52",
+    "ui-net-cock-en.png": "db2d6269e047e459c218149f673972d94528661f57b013ddda5468bb83c544b8",
+    "ui-net-cock-ja.png": "46247144e664de2c7e21592ce4b197400f9ccca5e360c642771b3a40dd4b4266",
+    "ui-rtbbs-en.png": "4a0d858e19d63fcb8b59ac1b3cfc8e62432639d83f327204743304af22f7bfb4",
+    "ui-rtbbs-ja.png": "d42d8ab8dea9ddf0c47d8a388c06eccf30b7118d44df1c9ac79e57abf9e91ef3",
+    "ui-vs-en.png": "770cde6f27e8c0571e263c1ab104f36e6f8175ba511aa6b0a63dff5eac452125",
+    "ui-vs-ja.png": "9ced9cdd9f6302a271db7c91917d1296e6833d2794f14de095661b8a4b518519",
+    "ui-wani-bbs-en.png": "40ce5f2ce39510826092eced1c7df397aae45eb1984facc3648814aa6f98a86c",
+    "ui-wani-bbs-ja.png": "6eaeed3934ee7af8d0beb73c22222e98f25f354186990a31e26c7a1404e6c12c"
+  }
+}

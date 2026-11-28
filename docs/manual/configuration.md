@@ -1,5 +1,7 @@
 # 設定ファイルと配布設定値
 
+全rc.conf変数とLinuxの対応は[FreeBSD・Linux設定対応表](configuration-os-map.md)を参照してください。
+
 <a id="config-reference"></a>
 
 設定を変える前に、実際の起動引数・実行ユーザー・保存先を確認します。FreeBSDは配布liner_notes.confの値より `/etc/rc.conf` の指定を優先します。LinuxのLINER_NOTES_OPTIONSはsystemdの環境値であり、シェルのコマンド置換は使えません。オプションは本体のポート番号より前へ置きます。

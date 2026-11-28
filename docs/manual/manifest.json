@@ -485,6 +485,87 @@
       ]
     },
     {
+      "id": "ui-comparison",
+      "title": "端末UI別の主な入口",
+      "chapter": 3,
+      "sources": [
+        "docs/development/core/UI_FEATURE_MATRIX.md",
+        "tests/test_ui_selection.py"
+      ]
+    },
+    {
+      "id": "ui-rtbbs",
+      "title": "RTBBS風UIの使い方",
+      "chapter": 3,
+      "sources": [
+        "src/session_rtbbs.c",
+        "tests/test_ui_selection.py"
+      ]
+    },
+    {
+      "id": "ui-mmm",
+      "title": "MMM風UIの使い方",
+      "chapter": 3,
+      "sources": [
+        "src/session_mmm.c",
+        "tests/test_ui_selection.py"
+      ]
+    },
+    {
+      "id": "ui-mash",
+      "title": "MASH風UIの使い方",
+      "chapter": 3,
+      "sources": [
+        "src/session_mmm.c",
+        "tests/test_ui_selection.py"
+      ]
+    },
+    {
+      "id": "ui-ktbbs",
+      "title": "KTBBS風UIの使い方",
+      "chapter": 3,
+      "sources": [
+        "src/session_ktbbs.c",
+        "tests/test_ui_selection.py"
+      ]
+    },
+    {
+      "id": "ui-big-model",
+      "title": "BIG-Model風UIの使い方",
+      "chapter": 3,
+      "sources": [
+        "src/session_big_model.c",
+        "tests/test_ui_selection.py"
+      ]
+    },
+    {
+      "id": "ui-wani-bbs",
+      "title": "WANI-BBS風UIの使い方",
+      "chapter": 3,
+      "sources": [
+        "src/session_wani_bbs.c",
+        "tests/test_ui_selection.py"
+      ]
+    },
+    {
+      "id": "ui-net-cock",
+      "title": "NET-COCK風UIの使い方",
+      "chapter": 3,
+      "sources": [
+        "src/session_net_cock.c",
+        "tests/test_ui_selection.py"
+      ]
+    },
+    {
+      "id": "ui-vs",
+      "title": "VS風UIの使い方",
+      "chapter": 3,
+      "sources": [
+        "src/session_vs.c",
+        "tests/test_ui_selection.py"
+      ]
+    },
+    {
       "id": "web-users",
       "title": "WebUIを使う",
       "chapter": 3,
@@ -861,6 +942,18 @@
         "linux/liner-notes.env",
         "src/runtime.c",
         "ports/comms/liner-notes/files/liner_notes.in"
+      ]
+    },
+    {
+      "id": "configuration-os-map",
+      "title": "FreeBSD・Linux設定対応表",
+      "chapter": 6,
+      "sources": [
+        "ports/comms/liner-notes/files/liner_notes.in",
+        "ports/comms/liner-notes/files/liner_notes.conf.in",
+        "linux/liner-notes.service",
+        "linux/liner-notes.env",
+        "src/runtime.c"
       ]
     },
     {
