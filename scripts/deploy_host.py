@@ -144,9 +144,7 @@ def command(argv, *, accepted=(0,), input=None, with_status=False, package_insta
     return (result.returncode, output) if with_status else output
 
 
-def service_user_candidates(platform):
-    link_users = ('liner_notes_link', 'liner_link') if platform == 'freebsd15' else ('liner_notes_link',)
-    return (('liner_notes',), ('liner_notes_web',), link_users)
+SERVICE_USERS = (('liner_notes',), ('liner_notes_web',), ('liner_notes_link', 'liner_link'))
 
 
 class Host:
@@ -170,7 +168,7 @@ class Host:
         require(not profile['backup_roots']['doors'] or 'door' in profile['probes'], 'Registered Doors require a health probe')
         require(profile.get('quiescence_users'), 'Dedicated service accounts must be checked for remaining workers')
         quiescence_users = set(profile['quiescence_users'])
-        for service, users in zip(SERVICES[self.platform], service_user_candidates(self.platform)):
+        for service, users in zip(SERVICES[self.platform], SERVICE_USERS):
             if service in profile['services']:
                 require(quiescence_users.intersection(users), 'Known service owner missing from quiescence inventory')
 
@@ -181,7 +179,7 @@ class Host:
         validate_link_processes(command([ps, '-ax', '-o', 'uid=', '-o', 'command=']),
                                 SERVICES[self.platform][2] in self.profile['services'],
                                 {pwd.getpwnam(name).pw_uid for name in self.profile['quiescence_users']})
-        for service, users in zip(SERVICES[self.platform], service_user_candidates(self.platform)):
+        for service, users in zip(SERVICES[self.platform], SERVICE_USERS):
             included = service in self.profile['services']
             if self.platform == 'freebsd15':
                 rc = Path('/usr/local/etc/rc.d') / service

@@ -469,24 +469,27 @@ class Deployment(unittest.TestCase):
                 validate_link_processes(text, managed, owners)
         validate_link_processes('80 /usr/local/sbin/httpd -D FOREGROUND', False, set())
 
-    def test_freebsd_link_rc_can_use_dedicated_liner_link_account(self):
-        profile = {
-            'target': 'srv.ysni.org', 'state_directory': '/private-state',
-            'services': ['liner_notes', 'liner_notes_link'],
-            'quiescence_users': ['liner_notes', 'liner_link'],
-            'backup_roots': {'doors': []},
-            'probes': {k: {} for k in ('login', 'article', 'mail', 'link')},
-            'backup_storage': 'local',
-        }
+    def test_link_can_use_dedicated_liner_link_account(self):
         directory = MagicMock(spec=Path)
         directory.is_dir.return_value = True
         directory.stat.return_value = SimpleNamespace(st_mode=0o700)
-        with patch('deploy_host.trusted', return_value=directory), \
-                patch('deploy_host.validate_backup_inventory'), patch('deploy_host.COMMAND_LOG', None):
-            Host(profile)
-            profile['quiescence_users'] = ['liner_notes']
-            with self.assertRaisesRegex(ValueError, 'Known service owner missing'):
+        for target in policy.TARGETS:
+            platform = policy.PLATFORMS[target]
+            services = policy.SERVICES[platform]
+            profile = {
+                'target': target, 'state_directory': '/private-state',
+                'services': [services[0], services[2]],
+                'quiescence_users': ['liner_notes', 'liner_link'],
+                'backup_roots': {'doors': []},
+                'probes': {k: {} for k in ('login', 'article', 'mail', 'link')},
+                'backup_storage': 'local',
+            }
+            with self.subTest(target=target), patch('deploy_host.trusted', return_value=directory), \
+                    patch('deploy_host.validate_backup_inventory'), patch('deploy_host.COMMAND_LOG', None):
                 Host(profile)
+                profile['quiescence_users'] = ['liner_notes']
+                with self.assertRaisesRegex(ValueError, 'Known service owner missing'):
+                    Host(profile)
 
     def test_freebsd_process_inventory_parses_separate_uid_and_command_fields(self):
         host = object.__new__(Host)
