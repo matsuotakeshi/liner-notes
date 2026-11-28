@@ -43,6 +43,16 @@ for file in \
   sha256sum "$file" >> "$config_hashes"
 done
 
+test "$(stat -c '%U:%G %a' /var/lib/liner-notes-link)" = 'liner_notes_link:liner_notes_linkctl 700'
+manual_unit=/etc/systemd/system/liner-notes-link.service
+mkdir -p /etc/systemd/system
+printf '# Local service override retained by package upgrades\n' > "$manual_unit"
+sha256sum "$manual_unit" >> "$config_hashes"
+# Simulate an existing manual account without rewriting its state ownership.
+useradd --system --no-create-home --shell /sbin/nologin liner_link
+chown liner_link /var/lib/liner-notes-link
+state_metadata=$(stat -c '%u:%g %a' /var/lib/liner-notes-link)
+
 # Synthetic test data and key only. No production keys are used.
 mkdir -p /var/lib/liner-notes /var/lib/liner-notes-link
 printf 'keep\n' > /var/lib/liner-notes/package-removal-test
@@ -86,6 +96,7 @@ for package in "${packages[@]}"; do
   case "$actual" in "$version-2"|"$version-2".*) ;; *) exit 1 ;; esac
 done
 sha256sum -c "$config_hashes"
+test "$(stat -c '%u:%g %a' /var/lib/liner-notes-link)" = "$state_metadata"
 test "$(cat /var/lib/liner-notes/package-removal-test)" = keep
 python3 - <<'PY'
 import sqlite3
@@ -97,5 +108,6 @@ PY
 dnf remove -y --setopt=install_weak_deps=False "${packages[@]}"
 test "$(cat /var/lib/liner-notes/package-removal-test)" = keep
 test -s /var/lib/liner-notes-link/ci-link-key
+test -f "$manual_unit"
 test -s /var/lib/liner-notes/ci-package-upgrade.sqlite
 echo "PASS: disposable Rocky 10 RPM $version-1 -> $version-2, modified configs, SQLite and synthetic link-key preserved"

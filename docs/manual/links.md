@@ -23,70 +23,89 @@
 返信関係を保つための取り消し済み親を作ります。すでに相手へ渡した記事を
 取り消しても、相手のバックアップから物理消去される保証はありません。
 
-## FreeBSDでの準備
+## パッケージとOSアカウント
 
-FreeBSD portsの `LINK` オプションを有効にして構築します。Python 3.11以上と
-`cryptography` が必要です。通常のBBS用portsには独自lrzsz portを同梱しません。
-この文書は新機能の導入手順で、既存環境への自動切替は行いません。
+BBS上のリンク専用会員は、ローカルBBSへログインして指定ボードを操作するための会員です。OSアカウント `liner_notes_link` はリンクプロセスを動かし、鍵とリンクDBを所有します。OSアカウントへBBS本体の保存領域を公開する必要はありません。パッケージ導入だけではサービスを有効にしません。
 
-1. BBS上で専用会員（例: `bbslink`）と共有用ボードを作成し、会員番号を控えます。
-   この会員には全体管理者権限を付けません。
-2. `/usr/local/etc/liner-notes/link-accounts.conf` に `ボード番号 会員番号` を
-   1行ずつ記載します（例: `2 10`）。rc.confへ次を追加します。
+| 対象 | パッケージ | 設定ディレクトリ | 状態ディレクトリ |
+|---|---|---|---|
+| FreeBSD | `pkg install ./liner-notes-版.pkg`（Portsでは `LINK` を選択） | `/usr/local/etc/liner-notes` | `/var/db/liner-notes-link` |
+| Rocky Linux 10 | `dnf install ./liner-notes-版.x86_64.rpm ./liner-notes-link-版.x86_64.rpm` | `/etc/liner-notes` | `/var/lib/liner-notes-link` |
+| Debian 13 | `apt install ./liner-notes_版_amd64.deb ./liner-notes-link_版_all.deb` | `/etc/liner-notes` | `/var/lib/liner-notes-link` |
+
+上記コマンドのファイル名は同じリリースの実ファイル名に置き換えます。FreeBSDで `liner_notes_link` のrc.dが同梱されていない旧パッケージでは、共通CLIを専用アカウントで使用します。Linuxのソース導入・EL9は[Linuxへの導入](install-linux.md)を参照してください。従来のPythonスクリプト直接実行も使用できます。
+
+```text
+会員 → BBS本体 ← ローカルTelnet／BBS専用会員 ← Linkサービス
+                                            ├─ 専用OSユーザー／鍵・リンクDB
+                                            └─ 相互TLS → 対向Linkサービス → 対向BBS
+```
+
+## 初回構築
+
+1. 各局で空の共有専用ボードを作ります。番号、親階層、読み書き権限、表示名、説明を決めます。公開範囲は参加局すべてで確認します。リンク専用の一般会員（例 `bbslink`）を作り、該当ボードの閲覧・投稿を許可します。各局の番号は独立です。
+2. 設定ディレクトリの `link-accounts.conf` に、許可する `ローカルボード番号 会員番号` を各行に記載します。下記のどちらかで本体へ設定します。既存のボード設定や起動引数は残します。
 
    ```sh
+   # FreeBSD
    sysrc liner_notes_link_accounts=/usr/local/etc/liner-notes/link-accounts.conf
+
+   # Linux: /etc/liner-notes/liner-notes.env の LINER_NOTES_OPTIONS で
+   # ポート引数の直前より前に次の2引数を挿入
+   # --link-accounts /etc/liner-notes/link-accounts.conf
    ```
 
-   設定を反映するBBS再起動は、利用者への告知・バックアップ後に設置者が行います。
-   本体を直接起動する場合は `--link-accounts FILE` をポート番号の前に指定します。
-3. コネクタの専用OSユーザーを用意します（例: `liner_link`）。このユーザーには
-   BBS保存領域へのアクセスを与えず、専用の `/var/db/liner-notes-link` だけを
-   所有させます。以下のコマンドはこのユーザーで実行します。
+3. `id liner_notes_link` で専用OSユーザーを確認します。状態ディレクトリは専用サービスが所有する0700とします。以下はLinuxの例です。FreeBSDでは `state=/var/db/liner-notes-link` とし、`runuser` の行をその直後の `su` の例に置き換えます。
 
    ```sh
-   umask 077
-   liner-notes-link init /var/db/liner-notes-link/identity --name 'My BBS'
-   liner-notes-link inspect /var/db/liner-notes-link/identity/identity.crt
+   state=/var/lib/liner-notes-link
+   runuser -u liner_notes_link -- liner-notes-link init "$state/identity" --name "Example BBS A"
+   # FreeBSD:
+   # su -m liner_notes_link -c '/usr/local/bin/liner-notes-link init /var/db/liner-notes-link/identity --name "Example BBS A"'
+   liner-notes-link inspect "$state/identity/identity.crt"
    liner-notes-link new-board
    ```
 
-   `init` は既存ディレクトリへの上書きを拒否します。秘密鍵 `identity.key` は
-   相手へ渡しません。交換するのは `identity.crt` とその公開鍵指紋です。
-   `new-board` は共有単位の作成者だけが実行し、全参加BBSで同じ値を使います。
-4. 専用BBS会員のパスワードを改行付きテキストへ保存します。
-   例: `/var/db/liner-notes-link/bbs-password`、所有者 `liner_link`、モード0600。
-   コマンドラインにパスワードを直接書きません。
-5. `link.toml.sample` を `link.toml` へコピーし、identity/database/password_file、
-   BBSポート、共有IDとボード番号、各証明書・ホスト・ポートを設定します。
-   相手証明書は管理者が置き、コネクタには読み取り権限だけを与えます。
-   サンプルのIPと共有IDはそのまま利用しません。
+   `init` は既存領域を上書きしません。共有IDは参加局のうち1局で発行し、対象局で同じ値を使用します。各局で交換するのは `identity.crt` だけです。署名鍵の指紋は別の信頼できる経路で照合します。相手の公開証明書を設定ディレクトリの `link-peers/` に管理者が置き、サービスへ読み取りだけを許可します。
+4. BBS専用会員のパスワードを状態ディレクトリの `bbs-password` に1行で保存します。専用OSユーザー所有・0600とし、端末の履歴やコマンドラインに値を残さない方法で入力します。秘密鍵も0600とします。
+5. `link.toml.sample` を参照して `link.toml` を編集します。パス、ローカルBBSのポート、共有ID、各局の証明書・接続先を実設定へ置き換えます。設定は管理者所有で専用グループに必要な読み取りだけを許可します。LinuxパッケージのローカルBBSポート例は2222です。FreeBSDでも実際の `liner_notes_port` と合わせます。
+6. 待受を対向局が到達できるIPアドレスに設定し、対向局からのTCP通信だけをファイアウォールで許可します。`0.0.0.0` は全IPv4インターフェースで待ち受けます。NATを使用する局では必要なポートだけを転送します。相互TLSを構成した後も不必要な公開は避けてください。
+7. 専用OSユーザーで `liner-notes-link check --config 設定ディレクトリ/link.toml` を実行します。`check` は設定と鍵を検査します。BBSログイン、TLS疎通、書き込み可能な状態領域は起動後に確認します。
+8. バックアップと告知を済ませて本体の設定を反映し、[リンクサービスを起動](link-operations.md)します。全局で別々のテスト記事を投稿し、別局で返信します。全局で本文・返信先・件数を確認し、重複と保留が解消したら自動起動を有効にします。
 
-   ```sh
-   liner-notes-link check --config /usr/local/etc/liner-notes/link.toml
-   liner-notes-link serve --config /usr/local/etc/liner-notes/link.toml
-   ```
+## link.toml リファレンス
 
-`check`は設定と鍵の検査です。BBSログインや対向との疎通成功を意味しません。
-最初は検証用ボードとループバック待受で確認してください。外部接続には
-`node.listen` を適切なアドレスに変更し、指定TCPポートを対向へ開放します。
-プロセス監視はFreeBSDのdaemonまたはLinuxのsystemdから実行できます。
-専用PID・ログ、実行ユーザー、再起動間隔を設定し、BBSのPIDと共有しません。
-`SIGTERM`で終了します。BBS停止中は記事を保持して再試行します。
+パスは文字列で指定し、サービスから見える絶対パスを使います。下表の既定値はCLI実装の値です。サンプルの巡回予算や鍵更新設定は構築例です。
 
-## スター型／リング型
-
-| 構成 | 直接接続の設定 | 発信元の設定 |
+| 欄 | 型・既定値 | 条件と影響 |
 |---|---|---|
-| Aが中心、B・Cが末端 | AにはB,C。B,CにはA | 全参加者でA,B,Cの公開鍵と同じ共有IDを登録 |
-| A→B→C→Aのリング | AはBから、BはCから、CはAから取得 | 全参加者でA,B,Cの公開鍵と同じ共有IDを登録 |
+| `node.identity` | パス、必須 | `identity.key` と `identity.crt` を格納。鍵と証明書は同じノードを示すこと |
+| `node.database` | パス、必須 | SQLite、WAL・SHM・排他ロックを作成できる専用ディレクトリ |
+| `node.listen` | 文字列、`127.0.0.1` | 待受IP。遠隔局からの通信には到達可能なIPを指定 |
+| `node.port` | 整数、9044 | 1～65535。OSが許可する非特権ポートを選択 |
+| `node.interval` | 整数、5 | 1～3600秒。各巡回の後の待機時間 |
+| `node.rotate_tls` | 真偽値、false | trueで通信用TLS鍵を更新。発信元署名鍵は維持 |
+| `node.control_socket` | 絶対パス、指定なし | ローカル管理用Unixソケット。Linuxは `/run/liner-notes-link/control.sock`、FreeBSDは `/var/run/liner-notes-link/control.sock` を利用可能 |
+| `node.scan_budget` | 整数、128 | 1～8192件、1ボード・1巡回当たり |
+| `node.pull_batches` | 整数、16 | 1～1024回、対向局・1巡回当たり |
+| `node.max_events` | 整数、1000000 | 1以上。満杯ならデータを保持して再試行 |
+| `node.max_bytes` | 整数、1073741824 | 最小1048576バイト。履歴の自動削除は行わない |
+| `bbs.host`、`bbs.port` | 文字列 `127.0.0.1`、整数23 | ローカルTelnetの接続先。実際の本体待受に合わせる |
+| `bbs.login`、`bbs.password_file` | 空白なし文字列とパス、必須 | リンク専用会員と、その0600の認証ファイル |
+| `boards[].id`、`boards[].local` | 64桁の16進文字列と1～1024の整数、必須 | 共通IDとローカルボード。少なくとも1組、双方の重複不可 |
+| `origins[].certificate`、`origins[].boards` | パスと共有IDの配列 | 許可する発信元ごとに指定。各配列は空にできず、ローカルで設定したIDだけを許可 |
+| `peers[].certificate`、`peers[].boards`、`peers[].host` | パス、共有IDの配列、文字列、必須 | 直接接続する各相手に指定。最低1局。証明書が示す自局IDや重複IDは不可 |
+| `peers[].port` | 整数、9044 | 1～65535。対向局の実際の待受ポート |
 
-通信は取得側から開始します。`peers` はTLS接続の受入許可も兼ねるため、
-リングの各ノードには両隣を登録します（双方向リングになります）。一方通行の
-ネットワークを構成する場合、到達不能な方向の再試行ログが生じます。
-各イベントは発信元・記事ID・版で一意です。再送・循環は二重投稿にせず、
-同じ版で異なる署名済み内容が来た場合は競合として拒否します。
-返信の親や前の版が未着の場合、到着後に適用します。
+`inspect` は公開証明書のノードIDを出力します。`serve` はフォアグラウンドで実行するため、通常はサービス管理から起動します。`status` はリンクDBの状態を読み取ります。保守コマンドは[管理・保守手順](link-operations.md)を参照してください。
+
+## 2局・3局の構成例
+
+- **2局**　A ↔ B。各局の `peers` と `origins` に相手を1件登録します。
+- **3局**　A ↔ B ↔ C ↔ A。各局の `peers` と `origins` に自局以外の2局を登録します。各組で同じ共有IDを許可し、相手の設定にも自局を登録します。
+- **3局スター**　Aを中継局とし、BとCはAだけを `peers` に登録します。`origins` には、記事の送信元として許可する両局をそれぞれ登録します。
+
+例えば、Aでは `peer-b.example.test` と `peer-c.example.test`、Bでは `peer-a.example.test` と `peer-c.example.test` を接続先にします。実際に各局が到達できる名前に置き換えてください。返答が別局に同じ番号で現れる必要はありません。発信元IDと記事IDから各局の親記事へ対応付けます。4局以上の多段中継はこの運用例の検証範囲外です。
 
 ## 状態・復旧・バックアップ
 
@@ -131,9 +150,7 @@ liner-notes-link reset-peer --config /usr/local/etc/liner-notes/link.toml 相手
 変更検出もこの巡回で行うため、大規模ボードでは即時反映になりません。
 変更のない記事本文は読み直しません。初回共有では小さな専用ボードから始めます。
 
-Linuxでは `scripts/install-linux.py` のラッパーを使用し、コネクタ用Pythonに
-`link-requirements.txt` を導入します。設定例の `/var/db` を運用方針に合わせて
-`/var/lib` 等へ変更します。Solaris 11.4 x86-64では専用venvを用いて、3局スター・
+Solaris 11.4 x86-64では専用venvを用いて、3局スター・
 リング、mTLS、再送、再起動、チェックポイントを実機CIで確認しました。
 設定例の保存先は `/var/opt/liner-notes/link` です。
 パッケージによる導入範囲は[Solarisへの導入](install-solaris.md)を参照してください。
@@ -151,3 +168,28 @@ Linuxでは `scripts/install-linux.py` のラッパーを使用し、コネク�
 protocol 2、Ed25519署名、チェックポイントとスナップショットの形式は変更しません。ただし**旧0.74.1以前のノードは親取り消し後も返信を表示するため、共有する全局のBBS本体をこの修正を含む版へ更新してから、全局での子孫不可視を運用上保証してください**。通信形式が同じでも表示規則は同じとは限りません。旧ノードとの自動的な版識別・拒否は行いません。
 
 ローカル非表示は相手のBBSや既に保存されたリンクイベント、バックアップの内容を消しません。HIDEした親配下は新規送信走査から除外されますが、既に署名・送信キューへ保存したイベントは従来どおり中継されます。新規未送信の記事も共有したい場合は、その局での非表示を解除してから走査します。
+
+## English setup guide
+
+Install the `liner-notes-link` package alongside the main RPM on Rocky 10 or the main DEB on Debian 13. On FreeBSD, use the package built with `LINK` or enable that option in Ports. Linux uses `/etc/liner-notes` and `/var/lib/liner-notes-link`. FreeBSD uses `/usr/local/etc/liner-notes` and `/var/db/liner-notes-link`. Older FreeBSD packages without the rc.d file support the same foreground CLI.
+
+1. Create an empty shared board at each site. Use the board's existing read/write ACL and create a non-admin BBS member with access to that board. In `link-accounts.conf`, add one pair of local board number and BBS member number per line. The local numbers may differ between sites.
+2. Set `liner_notes_link_accounts=/usr/local/etc/liner-notes/link-accounts.conf` with `sysrc` on FreeBSD. On Linux, insert `--link-accounts /etc/liner-notes/link-accounts.conf` before the positional port in `LINER_NOTES_OPTIONS` in `/etc/liner-notes/liner-notes.env`.
+3. As the dedicated OS account `liner_notes_link`, run `liner-notes-link init STATE/identity --name "Example BBS A"`. The OS account owns the private state, while the separate BBS member authenticates over local Telnet. Exchange each site's `identity.crt` and verify the public key fingerprint out of band with `liner-notes-link inspect FILE`. Keep `identity.key` private. Generate a single shared board ID with `liner-notes-link new-board`.
+4. Save the BBS member password as one line in `STATE/bbs-password` with mode 0600 and ownership by the dedicated OS user. Copy the supplied sample into `link.toml` if needed. Set the identity and DB paths, the BBS endpoint and member, and map the shared ID to the local board. Put the verified public certificates in the config directory under `link-peers/`.
+5. Register the other node under both `origins` (signing trust) and `peers` (mutual TLS and TCP endpoint). With two sites, each registers the other. In a three-site bidirectional ring, each registers both other sites and allows the same board ID. For a three-site star, leaf nodes use the hub as their direct peer and explicitly trust all permitted signing origins. In all cases, signed replies resolve to the destination's local parent article.
+6. Set the listening IP and allow the configured TCP port from the peers. Binding `0.0.0.0` listens on every IPv4 interface. Use narrow firewall and NAT rules. Confirm the material with `liner-notes-link check --config CONF/link.toml` as the link OS user, then apply the BBS settings and start the link with the commands in [English operations guide](link-operations.md#english-operations-guide). Verify posts in both directions and a cross-site reply before enabling automatic startup.
+
+| Settings | Defaults and constraints |
+|---|---|
+| `node.identity`, `node.database` | Required paths. The identity directory holds both matching identity files. Use an owner-only state directory that supports SQLite WAL/SHM and the process lock. |
+| `node.listen`, `node.port` | `127.0.0.1`, 9044. Ports are integers 1–65535. |
+| `node.interval`, `node.rotate_tls`, `node.control_socket` | 5 seconds (1–3600), false, and absent. Rotation changes the TLS leaf while retaining the signing key. If set, the control socket path must be absolute. |
+| `node.scan_budget`, `node.pull_batches` | 128 articles per board (1–8192), 16 pulls per peer (1–1024). |
+| `node.max_events`, `node.max_bytes` | 1000000 events (minimum 1), 1073741824 bytes (minimum 1048576). Capacity exhaustion stalls exchange and retains existing data. |
+| `bbs.host`, `bbs.port`, `bbs.login`, `bbs.password_file` | `127.0.0.1`, 23 in the CLI (packaged BBS example 2222). Login and secret path are required. The login may not contain whitespace. |
+| `boards[].id`, `boards[].local` | Required 64-digit hex ID and local number 1–1024. At least one row. Use each ID and local board only once. |
+| `origins[].certificate`, `origins[].boards` | Public certificate and nonempty list of permitted configured board IDs for each signing origin. |
+| `peers[].certificate`, `peers[].boards`, `peers[].host`, `peers[].port` | At least one peer. Public certificate, board list and endpoint are required. Port defaults to 9044. Do not register the local identity as a peer. |
+
+`check` validates local configuration and key material. Confirm actual BBS login, mutual TLS and article exchange after startup. `serve` runs in the foreground for operator-managed installations. Only shared articles and their allowed changes are exchanged. Review existing board contents before sharing and agree on publication scope at all participating sites.

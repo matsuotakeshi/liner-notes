@@ -1,0 +1,11 @@
+#!/bin/sh
+set -e
+
+# The package deliberately uses dh_installsystemd --no-start, which also
+# suppresses the generated removal stop. Preserve running services on upgrade.
+if [ "$1" = remove ] && [ -d /run/systemd/system ]; then
+    deb-systemd-invoke stop liner-notes-link.service
+fi
+
+#DEBHELPER#
+exit 0
