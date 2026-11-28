@@ -74,59 +74,10 @@ Doorの外向き通信は既定で無効です。必要な場合だけ `liner_no
 ラベルをBBS用に設定したうえで記事とメールを再度読み出します。
 SQLを正本とする保管庫の管理試験では、停止済みデータを管理ドメイン内で私有の作業コピーへ複製し、`db-export`で別コピーへ索引を展開してから`vaultctl list`を実行します。SQLiteの読み取り専用接続でもWAL/SHMが作成され得るため、SQL操作は作業コピー内に限定します。元の`index.dat`をSQLの最新状態と誤認しないようにし、同じ複製・書き出し・一覧・バックアップ・復元手順をhosted CIでも検査します。hosted試験は原本ファイルの不変性を確認しますが、SELinuxの専用ドメインでの成功を意味しません。
 
-実機ジョブには、検証機の管理者による次の準備が必要です。これは本番導入手順ではありません。
-通常のCIアカウントへ任意のsudo権限を与えず、レビュー・統合済みmainにある
-`ci/selinux_root.py` だけをroot所有の `/usr/local/libexec/liner-notes-ci-selinux` として
-配置します。CIは配置したファイルのSHA-256が対象コミットと一致することを検査します。
-
-```sh
-# 10.0.0.51 の管理者が、レビュー済みmainのソースディレクトリで実行
-dnf install selinux-policy-devel policycoreutils-python-utils gcc make \
-    openssl-devel sqlite-devel python3-aiohttp python3-cryptography
-# 実転送用のlrz/lszは、下記のLinux導入手順に従って別途用意する。
-# 未作成の場合だけ追加。CI SSHアカウントとUID・グループを分離する。
-useradd --system --user-group --no-create-home --home-dir /nonexistent --shell /sbin/nologin liner_notes_ci
-install -d -o root -g root -m 755 /usr/local/libexec
-install -o root -g root -m 755 ci/selinux_root.py /usr/local/libexec/liner-notes-ci-selinux
-visudo -f /etc/sudoers.d/liner-notes-selinux-ci
-```
-
-sudoersには固定ヘルパーのみを許可します。受け付ける引数は40文字のコミットSHAだけで、
-ヘルパー自身もGitHub上の最新mainと二度照合します。ファイルパス、URL、任意コマンドは
-受け付けません。環境変数も固定し、SSHユーザーが書けるチェックアウトは実行しません。
-既存の基本サービス試験は専用の `liner_notes_ci` で動かします。認証付きDoorの追加試験では、
-補助グループをsystemdで解決できるよう、試験単位のログイン不可Brokerユーザーと専用グループを
-作成します。既存の名前・IDは再利用せず、ホームディレクトリも作成しません。SSHの `ci-test` には
-試験データの書き込み権を与えません。rootが準備中のパスを呼出元ユーザーに置き換えられることを防ぎます。
-
-```text
-ci-test ALL=(root) NOPASSWD: /usr/local/libexec/liner-notes-ci-selinux
-```
-
-ヘルパーは検証機のアドレスとOS、Enforcingを確認し、root専用領域に取得したmainから
-固定のビルドと試験を行います。既存の `liner_notes` ポリシーがあれば上書きせず停止します。
-試験中だけ優先度200でポリシーを導入し、新規のループバック待受・一時systemdユニット・
-専用データ領域を使用します。既存サービス、会員データ、ローカルラベル定義は変更しません。
-終了後は当該ユニットと追加したポート定義を除去してポリシーを外します。プロセスが残った
-場合はポリシーを残して失敗とし、root専用の記録と作業領域を保全します。準備不足や試験失敗を
-スキップ成功にはしません。
-
-タイムアウトやrunner切断時にも一時サービスは最長300秒で停止しますが、ポリシーが
-残った状態で次の試験を始めることはできません。検証機の管理者はroot専用作業領域の
-`fixture-state.json` と `acceptance.log` を確認し、記録された一時ユニットの停止・
-当該ポート定義の除去・専用ドメインの残留がないことを確認してから、試験用の優先度200の
-ポリシーを除去します。認証付きDoor試験の一時ユーザー・グループは、同じ記録の
-`door_account_plan`（作成予定）と `door_accounts`（作成済み）で確認します。試験が正常に
-後処理できた場合は自動削除しますが、プロセス残留・登録内容の変更・他ユーザーからのグループ参照を
-検出した場合は削除せず失敗とします。中断後も、所有する登録内容とUID/GIDの不使用を確認したものだけを
-片付け、強制削除やホームの削除は行いません。既存ポリシーを無条件に削除する回復コマンドは用意しません。
-
-認証付きDoorサービスの起動失敗時には、対象の一時ユニットのjournalを後処理前に最大40行・16KiBまで
-CIログへ保存します。起動前検査の失敗も対象とし、journal自体を取得できなくても元の起動エラーを保持します。
-
-試験終了時は、監査ログとkernel journalから専用ドメインに対する直近のAVC拒否だけをCIログへ記録します。
-無関係なサービスの拒否や、PATH・EXECVE等の監査レコード全体は公開しません。
-拒否ログを無条件に許可ルールへ変換せず、操作・保存先・必要な権限を確認してください。
+運用時はSELinuxをEnforcingのまま、管理者がjournalと監査ログを確認します。
+拒否された操作・サービスの実行ドメイン・対象ファイルやポートの型を照合します。
+個別のAVC拒否から機械的に許可ルールを追加せず、インストール時のラベルと設定を先に確認します。
+セットアップは[Linux導入](install-linux.md)を参照してください。
 
 配布元のlrzszがない場合や必要な転送試験に失敗する場合は、[Linux導入](install-linux.md)の
 隔離ビルド手順で用意した実エンジンを使います。版名だけで転送成功を判断しません。
